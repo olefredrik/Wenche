@@ -109,7 +109,7 @@ def send_aksjonaerregister(config_fil: str, dry_run: bool):
         oppgave = aksjonaerregister.les_config(config_fil)
     except FileNotFoundError:
         click.echo(
-            f"Feil: finner ikke {config_fil}.\n"
+            f"Wææ - noe gikk galt. Men det er din feil. Du har ikke noe config fil {config_fil}.\n"
             "Kopier config.example.yaml til config.yaml og fyll inn dine verdier.",
             err=True,
         )
