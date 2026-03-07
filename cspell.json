@@ -7,5 +7,9 @@
       "name": "nb-no",
       "path": "./node_modules/@cspell/dict-nb-no/cspell-ext.json"
     }
+  ],
+  "ignorePaths": [
+    "**/*.md",
+    "**/*.toml"
   ]
 }

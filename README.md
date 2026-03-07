@@ -34,17 +34,29 @@ Har du aldri hørt om disse skjemaene? Her er en kort forklaring:
 ## Installasjon
 
 ```bash
-git clone https://github.com/ditt-brukernavn/wenche.git
+pip install wenche
+```
+
+Det er alt. Wenche er nå tilgjengelig som kommandoen `wenche` i terminalen din.
+
+> **Merk:** Det anbefales å installere i et virtuelt miljø for å unngå konflikter med andre Python-pakker:
+> ```bash
+> python3 -m venv .venv
+> source .venv/bin/activate
+> pip install wenche
+> ```
+> Husk å aktivere miljøet (`source .venv/bin/activate`) i nye terminalvinduer.
+
+### For utviklere
+
+Vil du bidra til koden eller kjøre siste versjon fra GitHub?
+
+```bash
+git clone https://github.com/olefredrik/wenche.git
 cd wenche
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
-```
-
-Husk å aktivere det virtuelle miljøet hver gang du åpner en ny terminal:
-
-```bash
-source .venv/bin/activate
 ```
 
 ## Oppsett

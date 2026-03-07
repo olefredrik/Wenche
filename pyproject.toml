@@ -9,6 +9,19 @@ description = "Enkel innsending av årsregnskap, skattemelding og aksjonærregis
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"
+keywords = ["altinn", "skatt", "regnskap", "aksjonaerregister", "skattemelding", "holdingselskap", "norge"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: Norwegian",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial :: Accounting",
+]
 dependencies = [
     "click>=8.1",
     "httpx>=0.27",
@@ -16,6 +29,11 @@ dependencies = [
     "python-dotenv>=1.0",
     "authlib>=1.3",
 ]
+
+[project.urls]
+Homepage = "https://github.com/olefredrik/wenche"
+Repository = "https://github.com/olefredrik/wenche"
+Issues = "https://github.com/olefredrik/wenche/issues"
 
 [project.scripts]
 wenche = "wenche.cli:main"
