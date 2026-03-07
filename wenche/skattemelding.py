@@ -9,8 +9,6 @@ Se modulens docstring i skattemelding.py for detaljer.
 """
 
 import math
-import os
-from pathlib import Path
 
 import yaml
 
