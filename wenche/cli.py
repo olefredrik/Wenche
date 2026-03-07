@@ -6,6 +6,7 @@ Bruk:
   wenche logout
   wenche send-aarsregnskap [--config config.yaml] [--dry-run]
   wenche send-aksjonaerregister [--config config.yaml] [--dry-run]
+  wenche generer-skattemelding [--config config.yaml] [--ut skattemelding.txt]
   wenche send-skattemelding
 """
 
@@ -134,11 +135,49 @@ def send_aksjonaerregister(config_fil: str, dry_run: bool):
 # Skattemelding
 # ---------------------------------------------------------------------------
 
+@main.command("generer-skattemelding")
+@click.option(
+    "--config",
+    "config_fil",
+    default="config.yaml",
+    show_default=True,
+    help="Sti til konfigurasjonsfilen.",
+)
+@click.option(
+    "--ut",
+    "ut_fil",
+    default=None,
+    help="Lagre sammendrag til fil i stedet for å skrive til skjermen.",
+)
+def generer_skattemelding(config_fil: str, ut_fil: str | None):
+    """Generer ferdig utfylt RF-1167 og RF-1028 fra config.yaml."""
+    click.echo(f"Leser konfigurasjon fra {config_fil}...")
+    try:
+        regnskap, konfig = skattemelding.les_config(config_fil)
+    except FileNotFoundError:
+        click.echo(
+            f"Feil: finner ikke {config_fil}.\n"
+            "Kopier config.example.yaml til config.yaml og fyll inn dine verdier.",
+            err=True,
+        )
+        raise SystemExit(1)
+
+    tekst = skattemelding.generer(regnskap, konfig)
+
+    if ut_fil:
+        from pathlib import Path
+        Path(ut_fil).write_text(tekst, encoding="utf-8")
+        click.echo(f"Skattemelding lagret til {ut_fil}")
+    else:
+        click.echo(tekst)
+
+
 @main.command("send-skattemelding")
 def send_skattemelding():
     """Send inn skattemelding for AS (ikke implementert ennå)."""
-    try:
-        skattemelding.send_inn(None, None)
-    except NotImplementedError as e:
-        click.echo(str(e))
-        raise SystemExit(1)
+    click.echo(
+        "Innsending via API krever registrering som systemleverandør hos Skatteetaten.\n"
+        "Bruk 'wenche generer-skattemelding' for å generere et ferdig utfylt sammendrag\n"
+        "som du kan sende inn manuelt på https://www.skatteetaten.no/"
+    )
+    raise SystemExit(1)

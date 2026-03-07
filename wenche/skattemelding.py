@@ -1,43 +1,275 @@
 """
-Innsending av skattemelding for AS via Skatteetaten/Altinn.
+Generering av skattemelding for AS (RF-1028 og RF-1167).
 
-STATUS: Krever registrering som systemleverandør hos Skatteetaten.
-Modulen er klargjort for implementasjon, men kan ikke sende inn
-til Skatteetatens API uten en godkjent systemleverandør-klient.
+Wenche produserer et ferdig utfylt sammendrag lokalt som du bruker som
+referanse når du leverer skattemeldingen manuelt på skatteetaten.no.
 
-Slik registrerer du deg:
-  1. Gå til https://skatteetaten.github.io/api-dokumentasjon/
-  2. Les dokumentasjonen for "Skattemelding for næringsdrivende"
-  3. Registrer systemet ditt som systemleverandør
-  4. Oppdater .env med SKATTEETATEN_CLIENT_ID og konfigurer
-     Maskinporten-tilgang
-
-Fristen for skattemelding for AS er normalt 31. mai.
+Innsending via API krever registrering som systemleverandør hos Skatteetaten.
+Se modulens docstring i skattemelding.py for detaljer.
 """
 
+import math
 import os
+from pathlib import Path
 
-from wenche.altinn_client import AltinnClient
-from wenche.models import Aarsregnskap
+import yaml
+
+from wenche.models import (
+    Aarsregnskap,
+    SkattemeldingKonfig,
+    Selskap,
+    Resultatregnskap,
+    Driftsinntekter,
+    Driftskostnader,
+    Finansposter,
+    Balanse,
+    Eiendeler,
+    Anleggsmidler,
+    Omloepmidler,
+    EgenkapitalOgGjeld,
+    Egenkapital,
+    LangsiktigGjeld,
+    KortsiktigGjeld,
+)
+
+SKATTESATS = 0.22  # 22 % selskapsskatt
 
 
-def send_inn(
-    regnskap: Aarsregnskap,
-    klient: AltinnClient,
-    dry_run: bool = False,
-) -> None:
-    """
-    Sender inn skattemelding for AS.
+def les_config(config_fil: str) -> tuple[Aarsregnskap, SkattemeldingKonfig]:
+    """Leser config.yaml og returnerer (Aarsregnskap, SkattemeldingKonfig)."""
+    with open(config_fil, encoding="utf-8") as f:
+        raw = yaml.safe_load(f)
 
-    Ikke implementert ennå — avventer registrering som systemleverandør.
-    """
-    raise NotImplementedError(
-        "\nSkattemelding via API krever registrering som systemleverandør hos Skatteetaten.\n"
-        "\nSlik kommer du i gang:\n"
-        "  1. Les dokumentasjonen: https://skatteetaten.github.io/api-dokumentasjon/\n"
-        "  2. Registrer deg som systemleverandør (gratis)\n"
-        "  3. Implementer Maskinporten-autentisering i wenche/auth.py\n"
-        "  4. Implementer skattemelding-innsending her\n"
-        "\nInntil videre kan du sende inn skattemeldingen manuelt på:\n"
-        "  https://www.skatteetaten.no/"
+    s = raw["selskap"]
+    selskap = Selskap(
+        navn=s["navn"],
+        org_nummer=str(s["org_nummer"]),
+        daglig_leder=s["daglig_leder"],
+        styreleder=s["styreleder"],
+        forretningsadresse=s["forretningsadresse"],
+        stiftelsesaar=int(s["stiftelsesaar"]),
+        aksjekapital=int(s["aksjekapital"]),
     )
+
+    rr = raw["resultatregnskap"]
+    resultatregnskap = Resultatregnskap(
+        driftsinntekter=Driftsinntekter(**rr["driftsinntekter"]),
+        driftskostnader=Driftskostnader(**rr["driftskostnader"]),
+        finansposter=Finansposter(**rr["finansposter"]),
+    )
+
+    b = raw["balanse"]
+    balanse = Balanse(
+        eiendeler=Eiendeler(
+            anleggsmidler=Anleggsmidler(**b["eiendeler"]["anleggsmidler"]),
+            omloepmidler=Omloepmidler(**b["eiendeler"]["omloepmidler"]),
+        ),
+        egenkapital_og_gjeld=EgenkapitalOgGjeld(
+            egenkapital=Egenkapital(**b["egenkapital_og_gjeld"]["egenkapital"]),
+            langsiktig_gjeld=LangsiktigGjeld(
+                **b["egenkapital_og_gjeld"]["langsiktig_gjeld"]
+            ),
+            kortsiktig_gjeld=KortsiktigGjeld(
+                **b["egenkapital_og_gjeld"]["kortsiktig_gjeld"]
+            ),
+        ),
+    )
+
+    regnskap = Aarsregnskap(
+        selskap=selskap,
+        regnskapsaar=int(raw["regnskapsaar"]),
+        resultatregnskap=resultatregnskap,
+        balanse=balanse,
+    )
+
+    sm_raw = raw.get("skattemelding", {})
+    konfig = SkattemeldingKonfig(
+        underskudd_til_fremfoering=int(sm_raw.get("underskudd_til_fremfoering", 0)),
+        anvend_fritaksmetoden=bool(sm_raw.get("anvend_fritaksmetoden", True)),
+    )
+
+    return regnskap, konfig
+
+
+def _nok(beloep: int) -> str:
+    """Formaterer beløp som NOK med tusenskilletegn."""
+    return f"{beloep:>12,} kr".replace(",", " ")
+
+
+def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
+    """
+    Genererer et ferdig utfylt sammendrag for RF-1167 og RF-1028.
+    Returnerer teksten som streng.
+    """
+    r = regnskap.resultatregnskap
+    b = regnskap.balanse
+    s = regnskap.selskap
+    år = regnskap.regnskapsaar
+
+    # --- RF-1167: Næringsoppgave ---
+
+    driftsinntekter = r.driftsinntekter.sum
+    driftskostnader = r.driftskostnader.sum
+    driftsresultat = r.driftsresultat
+
+    fin_inntekter = r.finansposter.sum_inntekter
+    fin_kostnader = r.finansposter.sum_kostnader
+    resultat_foer_skatt = r.resultat_foer_skatt
+
+    # --- RF-1028: Skatteberegning ---
+
+    # Fritaksmetoden: utbytte fra datterselskap er 97 % skattefritt.
+    # 3 % (sjablonregel) er skattepliktig inntekt.
+    utbytte = r.finansposter.utbytte_fra_datterselskap
+    if konfig.anvend_fritaksmetoden and utbytte > 0:
+        skattepliktig_utbytte = math.ceil(utbytte * 0.03)
+        fritatt_utbytte = utbytte - skattepliktig_utbytte
+    else:
+        skattepliktig_utbytte = utbytte
+        fritatt_utbytte = 0
+
+    # Skattepliktig inntekt før underskuddsfradrag
+    andre_finansinntekter = r.finansposter.andre_finansinntekter
+    skattepliktig_inntekt_brutto = (
+        driftsresultat
+        + skattepliktig_utbytte
+        + andre_finansinntekter
+        - fin_kostnader
+    )
+
+    # Fradrag for fremførbart underskudd (kun hvis positiv inntekt)
+    if skattepliktig_inntekt_brutto > 0 and konfig.underskudd_til_fremfoering > 0:
+        fradrag_underskudd = min(
+            konfig.underskudd_til_fremfoering, skattepliktig_inntekt_brutto
+        )
+    else:
+        fradrag_underskudd = 0
+
+    skattepliktig_inntekt_netto = skattepliktig_inntekt_brutto - fradrag_underskudd
+
+    # Underskudd til fremføring neste år
+    if skattepliktig_inntekt_brutto < 0:
+        nytt_underskudd = konfig.underskudd_til_fremfoering + abs(
+            skattepliktig_inntekt_brutto
+        )
+    else:
+        nytt_underskudd = konfig.underskudd_til_fremfoering - fradrag_underskudd
+
+    # Beregnet skatt
+    if skattepliktig_inntekt_netto > 0:
+        beregnet_skatt = math.ceil(skattepliktig_inntekt_netto * SKATTESATS)
+    else:
+        beregnet_skatt = 0
+
+    # --- Balansesjekk ---
+    i_balanse = b.er_i_balanse()
+    differanse = b.differanse()
+
+    # --- Bygg rapport ---
+    linje = "─" * 60
+    bred = "═" * 60
+
+    linjer = [
+        bred,
+        f"  SKATTEMELDING FOR AS — {år}",
+        f"  {s.navn}  |  Org.nr. {s.org_nummer}",
+        bred,
+        "",
+        linje,
+        "  RF-1167  NÆRINGSOPPGAVE",
+        linje,
+        "",
+        "  DRIFTSINNTEKTER",
+        f"    Salgsinntekter               {_nok(r.driftsinntekter.salgsinntekter)}",
+        f"    Andre driftsinntekter        {_nok(r.driftsinntekter.andre_driftsinntekter)}",
+        f"  Sum driftsinntekter            {_nok(driftsinntekter)}",
+        "",
+        "  DRIFTSKOSTNADER",
+        f"    Lønnskostnader               {_nok(r.driftskostnader.loennskostnader)}",
+        f"    Avskrivninger                {_nok(r.driftskostnader.avskrivninger)}",
+        f"    Andre driftskostnader        {_nok(r.driftskostnader.andre_driftskostnader)}",
+        f"  Sum driftskostnader            {_nok(driftskostnader)}",
+        "",
+        f"  DRIFTSRESULTAT                 {_nok(driftsresultat)}",
+        "",
+        "  FINANSPOSTER",
+        f"    Utbytte fra datterselskap    {_nok(utbytte)}",
+        f"    Andre finansinntekter        {_nok(andre_finansinntekter)}",
+        f"    Rentekostnader               {_nok(r.finansposter.rentekostnader)}",
+        f"    Andre finanskostnader        {_nok(r.finansposter.andre_finanskostnader)}",
+        "",
+        f"  RESULTAT FØR SKATT             {_nok(resultat_foer_skatt)}",
+        "",
+        linje,
+        "  RF-1028  SKATTEMELDING FOR AS",
+        linje,
+        "",
+        "  INNTEKTER OG FRADRAG",
+        f"    Driftsresultat               {_nok(driftsresultat)}",
+    ]
+
+    if konfig.anvend_fritaksmetoden and utbytte > 0:
+        linjer += [
+            f"    Utbytte (fritatt, 97 %)      {_nok(fritatt_utbytte)}",
+            f"    Utbytte (sjablonregel, 3 %)  {_nok(skattepliktig_utbytte)}",
+        ]
+    else:
+        linjer += [
+            f"    Utbytte                      {_nok(utbytte)}",
+        ]
+
+    linjer += [
+        f"    Andre finansinntekter        {_nok(andre_finansinntekter)}",
+        f"    Finanskostnader             -{_nok(fin_kostnader)}",
+        f"  Skattepliktig inntekt (brutto) {_nok(skattepliktig_inntekt_brutto)}",
+    ]
+
+    if fradrag_underskudd > 0:
+        linjer += [
+            f"  Fradrag: fremf. underskudd  -{_nok(fradrag_underskudd)}",
+        ]
+
+    linjer += [
+        f"  SKATTEPLIKTIG INNTEKT (NETTO)  {_nok(skattepliktig_inntekt_netto)}",
+        "",
+        f"  Beregnet skatt (22 %)          {_nok(beregnet_skatt)}",
+        "",
+    ]
+
+    if nytt_underskudd > 0:
+        linjer.append(
+            f"  Underskudd til fremføring      {_nok(nytt_underskudd)}"
+        )
+        linjer.append("  (føres på skattemeldingen under «Underskudd til fremføring»)")
+        linjer.append("")
+
+    linjer += [
+        linje,
+        "  BALANSE — KONTROLL",
+        linje,
+        "",
+        f"    Sum eiendeler                {_nok(b.eiendeler.sum)}",
+        f"    Sum egenkapital og gjeld     {_nok(b.egenkapital_og_gjeld.sum)}",
+    ]
+
+    if i_balanse:
+        linjer.append("    Balanse: OK")
+    else:
+        linjer.append(f"    ADVARSEL: Balansen stemmer ikke! Differanse: {_nok(differanse)}")
+
+    linjer += [
+        "",
+        bred,
+        "  NESTE STEG",
+        bred,
+        "",
+        "  1. Gå til https://www.skatteetaten.no/ og logg inn med BankID.",
+        "  2. Åpne skattemeldingen for AS for " + str(år) + ".",
+        "  3. Fyll inn tallene fra RF-1167 og RF-1028 ovenfor.",
+        "  4. Kontroller at skatteetaten beregner samme skatt.",
+        "  5. Send inn innen 31. mai.",
+        "",
+        bred,
+    ]
+
+    return "\n".join(linjer) + "\n"

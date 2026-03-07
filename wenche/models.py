@@ -223,3 +223,13 @@ class Aksjonaerregisteroppgave:
     @property
     def totalt_utbytte_utbetalt(self) -> int:
         return sum(a.utbytte_utbetalt for a in self.aksjonaerer)
+
+
+# ---------------------------------------------------------------------------
+# Skattemelding-konfigurasjon
+# ---------------------------------------------------------------------------
+
+@dataclass
+class SkattemeldingKonfig:
+    underskudd_til_fremfoering: int = 0   # Ubenyttet underskudd fra tidligere år
+    anvend_fritaksmetoden: bool = True    # True for holdingselskaper som eier aksjer

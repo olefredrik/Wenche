@@ -54,6 +54,11 @@ balanse:
       skyldige_offentlige_avgifter: 0
       annen_kortsiktig_gjeld: 0
 
+# --- Skattemelding ---
+skattemelding:
+  underskudd_til_fremfoering: 0   # Fremførbart underskudd fra tidligere år (NOK)
+  anvend_fritaksmetoden: true      # Sett til true for holdingselskaper som eier aksjer
+
 # --- Aksjonærregister ---
 aksjonaerer:
   - navn: "Ola Nordmann"
