@@ -1,4 +1,11 @@
 {
   "version": "0.2",
-  "language": "en,nb"
+  "language": "en,nb",
+  "dictionaries": ["nb-no"],
+  "dictionaryDefinitions": [
+    {
+      "name": "nb-no",
+      "path": "./node_modules/@cspell/dict-nb-no/cspell-ext.json"
+    }
+  ]
 }

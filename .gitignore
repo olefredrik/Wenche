@@ -20,3 +20,4 @@ venv/
 # Genererte filer
 *.xml
 *.xbrl
+node_modules/

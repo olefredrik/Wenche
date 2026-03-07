@@ -1,21 +1,34 @@
 # Wenche
 
-Wenche er et enkelt kommandolinjeverktøy for elektronisk innsending av regnskap og skattedokumenter til norske myndigheter via Altinn. Verktøyet er laget for holdingselskaper og småaksjeselskaper med lav aktivitet som ikke har behov for et fullverdig regnskapsprogram.
+Wenche er et enkelt kommandolinjeverktøy for holdingselskaper og småaksjeselskaper som må levere regnskap og skattedokumenter til norske myndigheter. Verktøyet hjelper deg å fylle ut og sende inn de obligatoriske skjemaene uten behov for et fullverdig regnskapsprogram.
 
 Autentisering skjer via Maskinporten med et selvgenerert RSA-nøkkelpar — ingen virksomhetssertifikat eller BankID-innlogging nødvendig.
 
-## Støttede innsendinger
+## Hva er støttet?
 
-| Innsending | Mottaker | Status |
-|---|---|---|
-| Årsregnskap | Brønnøysundregistrene | Implementert |
-| Aksjonærregisteroppgave (RF-1086) | Skatteetaten via Altinn | Implementert |
-| Skattemelding for AS | Skatteetaten | Planlagt (fase 2) |
+Alle AS plikter å levere tre ting hvert år. Wenche hjelper med alle tre:
+
+| Hva | Til hvem | Frist | Status |
+|---|---|---|---|
+| **Årsregnskap** | Brønnøysundregistrene | 31. juli | Automatisk innsending |
+| **Aksjonærregisteroppgave** (RF-1086) | Skatteetaten via Altinn | 31. januar | Automatisk innsending |
+| **Skattemelding for AS** (RF-1028 + RF-1167) | Skatteetaten | 31. mai | Genereres lokalt — sendes inn manuelt |
+
+> **Merk om skattemeldingen:** Automatisk innsending av skattemelding krever registrering som systemleverandør hos Skatteetaten. Wenche genererer i stedet et ferdig utfylt sammendrag som du raskt kopierer inn på skatteetaten.no.
+
+## Hva er de ulike skjemaene?
+
+Har du aldri hørt om disse skjemaene? Her er en kort forklaring:
+
+- **Årsregnskapet** er en oppsummering av selskapets økonomi — hva selskapet eier, hva det skylder, og hva det tjente eller tapte i løpet av året. Dette er offentlig informasjon.
+- **Aksjonærregisteroppgaven (RF-1086)** forteller Skatteetaten hvem som eier aksjer i selskapet og om det er utbetalt utbytte. Brukes blant annet til å forhåndsutfylle aksjonærenes personlige skattemelding.
+- **Næringsoppgaven (RF-1167)** er en detaljert oppstilling av selskapets inntekter og kostnader for skatteformål. Grunnlaget for skatteberegningen.
+- **Skattemeldingen for AS (RF-1028)** er selve skattemeldingen der Skatteetaten beregner om selskapet skylder skatt. For holdingselskaper som eier aksjer i andre selskaper gjelder **fritaksmetoden**: utbytte fra datterselskaper er i praksis 97 % skattefritt.
 
 ## Forutsetninger
 
 - Python 3.11 eller nyere (sjekk med `python3 --version`, installer via `brew install python@3.11` om nødvendig)
-- Registrert Maskinporten-klient hos Digdir (se [Registrer Maskinporten-klient](#registrer-maskinporten-klient))
+- Registrert Maskinporten-klient hos Digdir (se [Registrer Maskinporten-klient](#registrer-maskinporten-klient)) — kun nødvendig for automatisk innsending
 - OpenSSL (følger med macOS og de fleste Linux-distribusjoner)
 
 ## Installasjon
@@ -38,6 +51,8 @@ source .venv/bin/activate
 
 ### 1. Generer RSA-nøkkelpar
 
+Dette er nøklene som brukes til å identifisere deg overfor Maskinporten. Tenk på dem som brukernavn og passord, men sikrere.
+
 ```bash
 openssl genrsa -out maskinporten_privat.pem 2048
 openssl rsa -in maskinporten_privat.pem -pubout -out maskinporten_offentlig.pem
@@ -51,7 +66,7 @@ Den private nøkkelen (`maskinporten_privat.pem`) skal aldri deles eller legges 
 cp config.example.yaml config.yaml
 ```
 
-Fyll inn selskapsinfo, regnskapstall og aksjonærdata. Filen er kommentert og selvforklarende.
+Åpne `config.yaml` og fyll inn selskapets opplysninger, regnskapstall og aksjonærdata. Filen er kommentert og selvforklarende. Alle beløp oppgis i hele kroner (NOK).
 
 ### 3. Miljøvariabler
 
@@ -78,7 +93,7 @@ WENCHE_ENV=test
 
 ### Registrer Maskinporten-klient
 
-Wenche bruker Maskinporten for maskin-til-maskin-autentisering. Registrering er gratis.
+Wenche bruker Maskinporten for maskin-til-maskin-autentisering. Registrering er gratis og tar ca. 15 minutter.
 
 **Steg 1 — Søk om tilgang**
 
@@ -107,27 +122,69 @@ Nøkkelen vil vises i listen med en UUID (f.eks. `9bc5078c-...`). Kopier denne U
 
 ## Bruk
 
-### Test uten innsending (anbefalt første gang)
+### Skattemelding (frist 31. mai)
 
-Generer og valider dokumentene lokalt uten å sende noe til Altinn:
+Wenche genererer et ferdig utfylt sammendrag av RF-1167 (næringsoppgaven) og RF-1028 (skattemeldingen) basert på tallene i `config.yaml`.
+
+```bash
+wenche generer-skattemelding
+```
+
+Du kan også lagre sammendraget til en fil:
+
+```bash
+wenche generer-skattemelding --ut skattemelding.txt
+```
+
+Sammendraget inneholder:
+- Alle felt i næringsoppgaven (RF-1167) ferdig utfylt
+- Skatteberegning med fritaksmetoden der det er aktuelt
+- Beregnet skatt (22 %)
+- Fremførbart underskudd hvis selskapet gikk med tap
+- Konkrete instruksjoner for hva du gjør videre på skatteetaten.no
+
+**Sende inn manuelt:**
+1. Gå til [skatteetaten.no](https://www.skatteetaten.no/) og logg inn med BankID
+2. Åpne skattemeldingen for AS for gjeldende regnskapsår
+3. Fyll inn tallene fra sammendraget Wenche har generert
+4. Kontroller at Skatteetaten beregner samme skatt
+5. Send inn
+
+### Årsregnskap (frist 31. juli)
+
+Test uten innsending først (anbefalt):
 
 ```bash
 wenche send-aarsregnskap --dry-run
-wenche send-aksjonaerregister --dry-run
 ```
 
-`--dry-run` lagrer de genererte filene i gjeldende mappe slik at du kan inspisere dem.
+`--dry-run` lagrer det genererte iXBRL-dokumentet lokalt slik at du kan inspisere det.
 
-### Send inn
+Send inn til Brønnøysundregistrene:
 
 ```bash
 wenche login
 wenche send-aarsregnskap
+wenche logout
+```
+
+### Aksjonærregisteroppgave (frist 31. januar)
+
+Test uten innsending:
+
+```bash
+wenche send-aksjonaerregister --dry-run
+```
+
+Send inn til Altinn:
+
+```bash
+wenche login
 wenche send-aksjonaerregister
 wenche logout
 ```
 
-`wenche login` autentiserer mot Maskinporten med din private nøkkel. Tokenet gjenbrukes for påfølgende kommandoer i samme sesjon.
+`wenche login` autentiserer mot Maskinporten med din private nøkkel og lagrer et token lokalt. Tokenet gjenbrukes for påfølgende kommandoer i samme sesjon.
 
 ### Alle kommandoer
 
@@ -137,13 +194,17 @@ wenche --help
 Kommandoer:
   login                    Autentiser mot Maskinporten med RSA-nokkel
   logout                   Logg ut og slett lagret token
+  generer-skattemelding    Generer ferdig utfylt RF-1167 og RF-1028 fra config.yaml
   send-aarsregnskap        Send inn arsregnskap til Bronnoysundregistrene
   send-aksjonaerregister   Send inn aksjonaerregisteroppgave (RF-1086)
-  send-skattemelding       Send inn skattemelding for AS (ikke tilgjengelig enna)
 
-Alternativer:
+Alternativer (send-aarsregnskap og send-aksjonaerregister):
   --config TEXT            Sti til konfigurasjonsfil [standard: config.yaml]
   --dry-run                Generer dokument lokalt uten a sende til Altinn
+
+Alternativer (generer-skattemelding):
+  --config TEXT            Sti til konfigurasjonsfil [standard: config.yaml]
+  --ut TEXT                Lagre sammendrag til fil
 ```
 
 ## Frister
@@ -151,21 +212,21 @@ Alternativer:
 | Innsending | Frist |
 |---|---|
 | Aksjonærregisteroppgave | 31. januar |
-| Årsregnskap | 31. juli |
 | Skattemelding for AS | 31. mai |
+| Årsregnskap | 31. juli |
 
 ## Sikkerhet
 
 - `.env` og `config.yaml` skal aldri legges i git (de er lagt til i `.gitignore`)
 - Innloggingstokenet lagres i `~/.wenche/token.json` med rettigheter begrenset til din bruker
-- Wenche sender aldri data andre steder enn til ID-porten og Altinn
+- Wenche sender aldri data andre steder enn til Maskinporten og Altinn
 
 ## Bidra
 
 Bidrag er velkomne. Åpne gjerne en issue eller pull request. Særlig nyttig:
 
 - Verifisering av iXBRL-format mot Brønnøysundregistrenes gjeldende taksonomi
-- Implementasjon av skattemelding (krever systemleverandør-registrering hos Skatteetaten)
+- Implementasjon av automatisk skattemeldingsinnsending (krever systemleverandør-registrering hos Skatteetaten)
 - Testing mot Altinn testmiljø (tt02)
 
 ## Lisens
