@@ -286,29 +286,97 @@ def _sjekk_konfig() -> list[tuple[bool, str, str]]:
 with fane_oppsett:
     st.subheader("Steg 1 av 6 — Oppsett og tilkobling")
     st.caption(
-        "Verifiser at Wenche er riktig konfigurert før du fyller inn selskapsinformasjon. "
-        "Du trenger en gyldig Maskinporten-klient for å sende inn til Altinn."
+        "Fyll inn Maskinporten-konfigurasjonen din og test tilkoblingen mot Altinn "
+        "før du begynner å fylle inn selskapsinformasjon."
     )
 
-    st.markdown("#### Konfigurasjon")
+    # --- Statusoversikt ---
+    st.markdown("#### Status")
     sjekker = _sjekk_konfig()
     alle_ok = all(ok for ok, _, _ in sjekker)
-
     for ok, tittel, detalj in sjekker:
         if ok:
             st.success(f"**{tittel}** — {detalj}")
         else:
             st.error(f"**{tittel}** — {detalj}")
 
+    # --- Konfigurasjonsskjema ---
+    st.markdown("---")
+    st.markdown("#### Konfigurasjon")
+    st.caption(
+        "Verdiene lagres i `.env`-filen i arbeidsmappen din og brukes automatisk ved neste oppstart."
+    )
+
+    dot_env_fil = Path(".env")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        inp_client_id = st.text_input(
+            "Klient-ID (MASKINPORTEN_CLIENT_ID)",
+            value=os.getenv("MASKINPORTEN_CLIENT_ID", ""),
+            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+            help="UUID fra Digdirs selvbetjeningsportal under Maskinporten-klienten.",
+        )
+        inp_kid = st.text_input(
+            "Nøkkel-ID (MASKINPORTEN_KID)",
+            value=os.getenv("MASKINPORTEN_KID", ""),
+            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+            help="UUID som portalen tildelte nøkkelen din — synlig i nøkkellisten under klienten.",
+        )
+    with col2:
+        inp_env = st.selectbox(
+            "Miljø (WENCHE_ENV)",
+            options=["prod", "test"],
+            index=0 if os.getenv("WENCHE_ENV", "prod") == "prod" else 1,
+            help="Velg 'test' for å bruke Altinn tt02-testmiljøet.",
+        )
+        opplastet_nokkel = st.file_uploader(
+            "Last opp privat nøkkel (.pem)",
+            type=["pem"],
+            help="Din maskinporten_privat.pem-fil. Lagres lokalt — sendes aldri til noen server.",
+        )
+
+    if st.button("Lagre konfigurasjon", type="primary"):
+        dot_env_fil.touch(exist_ok=True)
+        from dotenv import set_key
+        endringer = False
+
+        if inp_client_id:
+            set_key(str(dot_env_fil), "MASKINPORTEN_CLIENT_ID", inp_client_id)
+            os.environ["MASKINPORTEN_CLIENT_ID"] = inp_client_id
+            endringer = True
+
+        if inp_kid:
+            set_key(str(dot_env_fil), "MASKINPORTEN_KID", inp_kid)
+            os.environ["MASKINPORTEN_KID"] = inp_kid
+            endringer = True
+
+        set_key(str(dot_env_fil), "WENCHE_ENV", inp_env)
+        os.environ["WENCHE_ENV"] = inp_env
+        endringer = True
+
+        if opplastet_nokkel is not None:
+            nokkel_sti = Path("maskinporten_privat.pem")
+            nokkel_sti.write_bytes(opplastet_nokkel.read())
+            nokkel_sti.chmod(0o600)
+            set_key(str(dot_env_fil), "MASKINPORTEN_PRIVAT_NOKKEL", str(nokkel_sti))
+            os.environ["MASKINPORTEN_PRIVAT_NOKKEL"] = str(nokkel_sti)
+            endringer = True
+
+        if endringer:
+            st.success("Konfigurasjon lagret. Statusoversikten oppdateres ved neste lasting.")
+            st.rerun()
+
+    # --- Tilkoblingstest ---
     st.markdown("---")
     st.markdown("#### Tilkoblingstest")
     st.caption(
-        "Testen henter et midlertidig token fra Maskinporten og veksler det mot et Altinn-token. "
+        "Henter et midlertidig token fra Maskinporten og veksler det mot et Altinn-token. "
         "Ingen data sendes inn."
     )
 
     if not alle_ok:
-        st.warning("Fiks konfigurasjonsfeilene ovenfor før du tester tilkoblingen.")
+        st.warning("Fiks konfigurasjonsfeilene ovenfor og lagre før du tester tilkoblingen.")
     else:
         if st.button("Test tilkobling mot Altinn", type="primary"):
             with st.spinner("Kobler til Maskinporten og Altinn..."):
@@ -316,7 +384,7 @@ with fane_oppsett:
                     auth.login()
                     st.success(
                         "Tilkobling OK — Maskinporten og Altinn svarte som forventet. "
-                        "Du kan nå fylle inn selskapsinformasjon og sende inn."
+                        "Gå videre til steg 2 for å fylle inn selskapsinformasjon."
                     )
                 except RuntimeError as e:
                     st.error(str(e))
