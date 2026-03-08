@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "wenche"
-version = "0.1.5"
+version = "0.2.0"
 description = "Enkel innsending av årsregnskap, skattemelding og aksjonærregisteroppgave til Altinn for holdingselskaper"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -29,6 +29,10 @@ dependencies = [
     "python-dotenv>=1.0",
     "authlib>=1.3",
 ]
+
+[project.optional-dependencies]
+ui = ["streamlit>=1.30"]
+dev = ["pytest>=8.0"]
 
 [project.urls]
 Homepage = "https://github.com/olefredrik/wenche"

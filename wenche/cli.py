@@ -2,6 +2,7 @@
 Wenche — kommandolinjegrensesnitt.
 
 Bruk:
+  wenche ui
   wenche login
   wenche logout
   wenche send-aarsregnskap [--config config.yaml] [--dry-run]
@@ -27,6 +28,25 @@ def main():
 # ---------------------------------------------------------------------------
 # Autentisering
 # ---------------------------------------------------------------------------
+
+@main.command()
+def ui():
+    """Start webgrensesnitt i nettleseren (krever pip install wenche[ui])."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    app = Path(__file__).parent / "ui.py"
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "streamlit", "run", str(app)], check=True
+        )
+    except FileNotFoundError:
+        click.echo(
+            "Streamlit er ikke installert. Kjør:\n  pip install wenche[ui]", err=True
+        )
+        raise SystemExit(1)
+
 
 @main.command()
 def login():

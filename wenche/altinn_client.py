@@ -10,14 +10,16 @@ import os
 
 import httpx
 
-_ENV = os.getenv("WENCHE_ENV", "prod")
-
-if _ENV == "test":
-    _BASE = "https://platform.tt02.altinn.no"
-    _APPS_BASE = "https://{org}.apps.tt02.altinn.no"
-else:
-    _BASE = "https://platform.altinn.no"
-    _APPS_BASE = "https://{org}.apps.altinn.no"
+_BASES = {
+    "test": {
+        "platform": "https://platform.tt02.altinn.no",
+        "apps": "https://{org}.apps.tt02.altinn.no",
+    },
+    "prod": {
+        "platform": "https://platform.altinn.no",
+        "apps": "https://{org}.apps.altinn.no",
+    },
+}
 
 # Altinn 3-apper for hver innsendingstype
 # Org er etaten som eier appen, app er appnavnet i Altinn Studio.
@@ -39,7 +41,13 @@ APPS = {
 
 
 class AltinnClient:
-    def __init__(self, altinn_token: str):
+    def __init__(self, altinn_token: str, env: str | None = None):
+        if env is None:
+            env = os.getenv("WENCHE_ENV", "prod")
+        if env not in _BASES:
+            raise ValueError(f"Ugyldig env: {env!r}. Bruk 'prod' eller 'test'.")
+        self._env = env
+        self._apps_base = _BASES[env]["apps"]
         self._token = altinn_token
         self._http = httpx.Client(
             headers={
@@ -51,7 +59,7 @@ class AltinnClient:
 
     def _app_base(self, app_key: str) -> str:
         cfg = APPS[app_key]
-        return _APPS_BASE.format(org=cfg["org"]) + f"/{cfg['org']}/{cfg['app']}"
+        return self._apps_base.format(org=cfg["org"]) + f"/{cfg['org']}/{cfg['app']}"
 
     def opprett_instans(self, app_key: str, org_nummer: str) -> dict:
         """Oppretter en ny instans for gitt innsendingstype."""

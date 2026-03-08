@@ -60,6 +60,22 @@ pip install wenche
 
 Wenche er nå tilgjengelig som kommandoen `wenche` i terminalen din. Husk å aktivere miljøet (`source .venv/bin/activate`) i nye terminalvinduer.
 
+### Webgrensesnitt (valgfritt)
+
+Foretrekker du å fylle ut skjemaer i nettleseren fremfor terminalen? Installer Wenche med UI-støtte:
+
+```bash
+pip install "wenche[ui]"
+```
+
+Start deretter webgrensesnittet:
+
+```bash
+wenche ui
+```
+
+En nettleser åpner seg automatisk. Du kan fylle inn selskapsinformasjon og regnskapstall i skjemaene, laste ned dokumenter og sende inn direkte fra grensesnittet — ingen konfigurasjonsfil nødvendig.
+
 ### For utviklere
 
 Vil du bidra til koden eller kjøre siste versjon fra GitHub?
@@ -69,8 +85,16 @@ git clone https://github.com/olefredrik/wenche.git
 cd wenche
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e .
+pip install -e ".[dev]"
 ```
+
+Kjør testsuiten for å verifisere at alt fungerer:
+
+```bash
+pytest tests/ -v
+```
+
+Testene kjøres også automatisk på GitHub ved push og pull request.
 
 ## Oppsett
 
