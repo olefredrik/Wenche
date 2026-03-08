@@ -6,7 +6,7 @@ repo_name: olefredrik/Wenche
 
 theme:
   name: material
-  language: no
+  language: nb
   palette:
     - scheme: default
       primary: indigo
