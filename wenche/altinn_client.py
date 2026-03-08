@@ -65,21 +65,23 @@ class AltinnClient:
         print(f"Instans opprettet: {instans['id']}")
         return instans
 
-    def last_opp_data(
+    def oppdater_data_element(
         self,
         app_key: str,
         instans: dict,
+        data_type: str,
         data: bytes,
         content_type: str,
-        data_type: str = "default",
     ) -> dict:
-        """Laster opp skjemadata til en eksisterende instans."""
-        instance_id = instans["id"]          # format: partyId/instanceGuid
-        url = (
-            f"{self._app_base(app_key)}/instances/{instance_id}"
-            f"/data?dataType={data_type}"
-        )
-        resp = self._http.post(
+        """
+        Oppdaterer et eksisterende data-element i instansen med PUT.
+        Altinn oppretter data-elementene automatisk ved instansoppretting;
+        vi finner riktig element via dataType og erstatter innholdet.
+        """
+        instance_id = instans["id"]
+        element_id = self._finn_data_element_id(instans, data_type)
+        url = f"{self._app_base(app_key)}/instances/{instance_id}/data/{element_id}"
+        resp = self._http.put(
             url,
             content=data,
             headers={"Content-Type": content_type},
@@ -87,13 +89,32 @@ class AltinnClient:
         resp.raise_for_status()
         return resp.json()
 
+    def _finn_data_element_id(self, instans: dict, data_type: str) -> str:
+        """Finner data-element ID for gitt dataType i instansens data-array."""
+        for element in instans.get("data", []):
+            if element.get("dataType") == data_type:
+                return element["id"]
+        raise ValueError(
+            f"Fant ikke data-element med dataType='{data_type}' i instansen. "
+            f"Tilgjengelige typer: {[e.get('dataType') for e in instans.get('data', [])]}"
+        )
+
     def fullfoor_instans(self, app_key: str, instans: dict) -> None:
-        """Sender inn instansen (setter prosess til neste steg — 'submit')."""
+        """
+        Fullfører innsending i to steg:
+          1. confirm — bekrefter og flytter instansen til signeringssteg
+          2. sign    — signerer og sender inn
+        """
         instance_id = instans["id"]
         url = f"{self._app_base(app_key)}/instances/{instance_id}/process/next"
-        resp = self._http.put(url)
+
+        resp = self._http.put(url, json={"action": "confirm"})
         resp.raise_for_status()
-        print("Innsending fullfort.")
+        print("Instans bekreftet (confirm).")
+
+        resp = self._http.put(url, json={"action": "sign"})
+        resp.raise_for_status()
+        print("Innsending signert og fullfort.")
 
     def hent_status(self, app_key: str, instans: dict) -> dict:
         """Henter status for en instans."""

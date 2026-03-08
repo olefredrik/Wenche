@@ -4,6 +4,7 @@ Fylles ut fra config.yaml og valideres før innsending.
 """
 
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Optional
 
 
@@ -194,6 +195,9 @@ class Aarsregnskap:
     regnskapsaar: int
     resultatregnskap: Resultatregnskap
     balanse: Balanse
+    fastsettelsesdato: Optional[date] = None   # Dato styret godkjente regnskapet; standard: i dag
+    signatar: Optional[str] = None              # Navn på den som signerer; standard: daglig_leder
+    revideres: bool = False                     # True hvis regnskapet er revidert
 
 
 # ---------------------------------------------------------------------------

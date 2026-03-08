@@ -21,7 +21,7 @@ from wenche.models import (
     Resultatregnskap,
     Selskap,
 )
-from wenche.xbrl import generer_ixbrl
+from wenche.brg_xml import generer_hovedskjema, generer_underskjema
 
 
 def les_config(config_fil: str) -> Aarsregnskap:
@@ -122,7 +122,14 @@ def send_inn(regnskap: Aarsregnskap, klient: AltinnClient, dry_run: bool = False
     """
     Sender inn årsregnskapet til Brønnøysundregistrene via Altinn.
 
-    dry_run=True genererer og validerer iXBRL-dokumentet uten å sende.
+    Flyten er:
+      1. Opprett instans → Altinn oppretter data-elementer automatisk
+      2. PUT Hovedskjema (selskapsinfo, periode, prinsipper)
+      3. PUT Underskjema (resultatregnskap og balanse)
+      4. process/next med action=confirm
+      5. process/next med action=sign
+
+    dry_run=True skriver XML-filene lokalt uten å sende til Altinn.
     """
     feil = valider(regnskap)
     if feil:
@@ -133,25 +140,41 @@ def send_inn(regnskap: Aarsregnskap, klient: AltinnClient, dry_run: bool = False
 
     print("Validering OK.")
 
-    ixbrl = generer_ixbrl(regnskap)
-    print(f"iXBRL-dokument generert ({len(ixbrl):,} bytes).")
+    hovedskjema = generer_hovedskjema(regnskap)
+    underskjema = generer_underskjema(regnskap)
+    org = regnskap.selskap.org_nummer
+    aar = regnskap.regnskapsaar
+    print(f"XML generert: Hovedskjema {len(hovedskjema):,} bytes, Underskjema {len(underskjema):,} bytes.")
 
     if dry_run:
-        utfil = f"aarsregnskap_{regnskap.regnskapsaar}_{regnskap.selskap.org_nummer}.html"
-        with open(utfil, "wb") as f:
-            f.write(ixbrl)
-        print(f"Dry-run: dokument lagret til {utfil} — ingenting sendt til Altinn.")
+        hoved_fil = f"aarsregnskap_{aar}_{org}_hovedskjema.xml"
+        under_fil = f"aarsregnskap_{aar}_{org}_underskjema.xml"
+        with open(hoved_fil, "wb") as f:
+            f.write(hovedskjema)
+        with open(under_fil, "wb") as f:
+            f.write(underskjema)
+        print(f"Dry-run: filer lagret til {hoved_fil} og {under_fil} — ingenting sendt til Altinn.")
         return
 
     print("Sender årsregnskap til Brønnøysundregistrene via Altinn...")
-    instans = klient.opprett_instans("aarsregnskap", regnskap.selskap.org_nummer)
-    klient.last_opp_data(
-        "aarsregnskap",
-        instans,
-        data=ixbrl,
-        content_type="application/xhtml+xml",
-        data_type="aarsregnskap",
+    instans = klient.opprett_instans("aarsregnskap", org)
+
+    klient.oppdater_data_element(
+        "aarsregnskap", instans,
+        data_type="Hovedskjema",
+        data=hovedskjema,
+        content_type="application/xml",
     )
+    print("Hovedskjema lastet opp.")
+
+    klient.oppdater_data_element(
+        "aarsregnskap", instans,
+        data_type="Underskjema",
+        data=underskjema,
+        content_type="application/xml",
+    )
+    print("Underskjema lastet opp.")
+
     klient.fullfoor_instans("aarsregnskap", instans)
 
     status = klient.hent_status("aarsregnskap", instans)
