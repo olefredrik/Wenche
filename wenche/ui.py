@@ -2,7 +2,7 @@
 Wenche — webgrensesnitt (Streamlit).
 
 Start med: wenche ui
-For testmiljø: WENCHE_ENV=test wenche ui
+Miljøvalg (test/prod) gjøres i selve grensesnittet.
 """
 
 import os
@@ -554,14 +554,16 @@ with fane_generer:
     st.divider()
     st.subheader("Send til Altinn")
 
-    env = os.getenv("WENCHE_ENV", "prod")
-    if env == "test":
-        st.info("Miljø: **Testmiljø (tt02)** — ingen ekte innsending")
-    else:
-        st.warning(
-            "Miljø: **Produksjon** — innsending er bindende. "
-            "Start med `WENCHE_ENV=test wenche ui` for å teste mot testmiljøet først."
-        )
+    env_valg = st.radio(
+        "Miljø",
+        options=["test", "prod"],
+        format_func=lambda v: "Testmiljø (tt02) — ingen ekte innsending" if v == "test" else "Produksjon — innsending er bindende",
+        horizontal=True,
+        index=0,
+    )
+    env = env_valg
+    if env == "prod":
+        st.warning("Du har valgt produksjonsmiljøet. Innsending er bindende og kan ikke trekkes tilbake.")
 
     def hent_token():
         try:
@@ -584,7 +586,7 @@ with fane_generer:
                 if token:
                     try:
                         with st.spinner("Sender årsregnskap til Altinn..."):
-                            with AltinnClient(token) as klient:
+                            with AltinnClient(token, env=env) as klient:
                                 ar_modul.send_inn(regnskap, klient)
                         st.success(
                             f"Årsregnskap for {regnskap.regnskapsaar} sendt inn til "
@@ -622,7 +624,7 @@ with fane_generer:
                 if token:
                     try:
                         with st.spinner("Sender aksjonærregister til Altinn..."):
-                            with AltinnClient(token) as klient:
+                            with AltinnClient(token, env=env) as klient:
                                 akr_modul.send_inn(oppgave, klient)
                         st.success(
                             f"Aksjonærregisteroppgave for {int(st.session_state['regnskapsaar'])} sendt inn."
