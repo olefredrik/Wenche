@@ -7,7 +7,6 @@ aksjonærregisteroppgave.
 """
 
 import os
-from typing import Any
 
 import httpx
 
@@ -54,22 +53,8 @@ class AltinnClient:
         cfg = APPS[app_key]
         return _APPS_BASE.format(org=cfg["org"]) + f"/{cfg['org']}/{cfg['app']}"
 
-    def _hent_party_id(self, org_nummer: str) -> str:
-        """Slår opp Altinn party ID for et organisasjonsnummer."""
-        url = f"{_BASE}/register/api/v1/parties"
-        resp = self._http.get(url, params={"orgNo": org_nummer})
-        resp.raise_for_status()
-        parties = resp.json()
-        if not parties:
-            raise RuntimeError(
-                f"Fant ingen Altinn-part for organisasjonsnummer {org_nummer}.\n"
-                "Sjekk at organisasjonsnummeret er korrekt og at du har rettigheter i Altinn."
-            )
-        return str(parties[0]["partyId"])
-
     def opprett_instans(self, app_key: str, org_nummer: str) -> dict:
         """Oppretter en ny instans for gitt innsendingstype."""
-        party_id = self._hent_party_id(org_nummer)
         url = f"{self._app_base(app_key)}/instances"
         payload = {
             "instanceOwner": {"organisationNumber": org_nummer},
