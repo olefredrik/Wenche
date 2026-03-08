@@ -1,69 +1,84 @@
 # Wenche — konfigurasjonsfil
 # Kopier denne til config.yaml og fyll inn dine egne verdier.
 # config.yaml skal IKKE legges i git (se .gitignore).
+#
+# Bruker du webgrensesnittet (wenche ui) trenger du ikke redigere denne filen
+# manuelt — all informasjon kan fylles inn direkte i nettleseren.
 
 selskap:
   navn: "Mitt Holding AS"
-  org_nummer: "123456789"         # 9 siffer uten mellomrom
+  org_nummer: "123456789"           # 9 siffer uten mellomrom
   daglig_leder: "Ola Nordmann"
-  styreleder: "Ola Nordmann"
+  styreleder: "Ola Nordmann"        # Kan være samme person som daglig leder
   forretningsadresse: "Gateveien 1, 0001 Oslo"
   stiftelsesaar: 2020
-  aksjekapital: 30000             # NOK
+  aksjekapital: 30000               # NOK — fra stiftelsesdokumentene
 
-regnskapsaar: 2025
+regnskapsaar: 2025                  # Året regnskapet gjelder for
 
 # --- Resultatregnskap ---
+# Alle beløp i hele kroner (NOK). Bruk 0 for poster som ikke er aktuelle.
+
 resultatregnskap:
   driftsinntekter:
-    salgsinntekter: 0
-    andre_driftsinntekter: 0
+    salgsinntekter: 0               # Inntekter fra salg av varer eller tjenester
+    andre_driftsinntekter: 0        # Andre løpende driftsinntekter
 
   driftskostnader:
-    loennskostnader: 0
-    avskrivninger: 0
-    andre_driftskostnader: 5500   # Bank- og regnskapsgebyrer
+    loennskostnader: 0              # Lønn, arbeidsgiveravgift og lignende
+    avskrivninger: 0                # Planmessige avskrivninger på anleggsmidler
+    andre_driftskostnader: 5500     # Bank- og regnskapsgebyrer, kontorkostnader o.l.
 
   finansposter:
-    utbytte_fra_datterselskap: 0
-    andre_finansinntekter: 0
-    rentekostnader: 0
-    andre_finanskostnader: 0
+    utbytte_fra_datterselskap: 0    # Utbytte mottatt fra datterselskaper (fritaksmetoden)
+    andre_finansinntekter: 0        # Renteinntekter og andre finansinntekter
+    rentekostnader: 0               # Renter på lån
+    andre_finanskostnader: 0        # Andre finanskostnader
 
 # --- Balanse ---
+# Balansen skal gå opp: sum eiendeler = sum egenkapital og gjeld.
+# Stemmer ikke tallene, vil Wenche gi en advarsel.
+
 balanse:
   eiendeler:
     anleggsmidler:
-      aksjer_i_datterselskap: 100000
-      andre_aksjer: 0
-      langsiktige_fordringer: 0
+      aksjer_i_datterselskap: 100000  # Kostpris for aksjer i heleide datterselskaper
+      andre_aksjer: 0                 # Aksjer i selskaper der du eier under 90 %
+      langsiktige_fordringer: 0       # Lån gitt til andre med løpetid over 1 år
     omloepmidler:
-      kortsiktige_fordringer: 0
-      bankinnskudd: 1200
+      kortsiktige_fordringer: 0       # Kundefordringer og andre kortsiktige krav
+      bankinnskudd: 1200              # Saldo på driftskonto per 31.12
 
   egenkapital_og_gjeld:
     egenkapital:
-      aksjekapital: 30000
-      overkursfond: 0
-      annen_egenkapital: -34300   # Negativ ved underskudd
+      aksjekapital: 30000             # Innbetalt aksjekapital (fra stiftelsesdokumentene)
+      overkursfond: 0                 # Innbetalt over pålydende ved emisjon
+      annen_egenkapital: -34300       # Akkumulert overskudd/underskudd. Negativ = underskudd
     langsiktig_gjeld:
-      laan_fra_aksjonaer: 105500  # Private lån fra eier
-      andre_langsiktige_laan: 0
+      laan_fra_aksjonaer: 105500      # Lån fra eier med avtalt løpetid over 1 år
+      andre_langsiktige_laan: 0       # Banklån og andre lån med løpetid over 1 år
     kortsiktig_gjeld:
-      leverandoergjeld: 0
-      skyldige_offentlige_avgifter: 0
-      annen_kortsiktig_gjeld: 0
+      leverandoergjeld: 0             # Ubetalte fakturaer per 31.12
+      skyldige_offentlige_avgifter: 0 # Skyldig mva, arbeidsgiveravgift o.l.
+      annen_kortsiktig_gjeld: 0       # Annen gjeld med forfall innen 1 år
 
 # --- Skattemelding ---
+
 skattemelding:
-  underskudd_til_fremfoering: 0   # Fremførbart underskudd fra tidligere år (NOK)
-  anvend_fritaksmetoden: true      # Sett til true for holdingselskaper som eier aksjer
+  underskudd_til_fremfoering: 0     # Fremførbart underskudd fra tidligere år (NOK).
+                                    # Finnes i fjorårets skattemelding (RF-1028).
+  anvend_fritaksmetoden: true       # true for holdingselskaper som eier aksjer i
+                                    # datterselskaper. Gjør at 97 % av utbytte er skattefritt.
 
 # --- Aksjonærregister ---
+# List opp alle aksjonærer per 31.12 i regnskapsåret.
+# Fødselsnummer brukes av Skatteetaten til å forhåndsutfylle aksjonærenes skattemelding.
+
 aksjonaerer:
   - navn: "Ola Nordmann"
-    fodselsnummer: "01010112345"  # 11 siffer
+    fodselsnummer: "01010112345"        # 11 siffer — personnummer
     antall_aksjer: 100
     aksjeklasse: "ordinære"
-    utbytte_utbetalt: 0           # NOK utbetalt i regnskapsåret
-    innbetalt_kapital_per_aksje: 300  # Aksjekapital / antall aksjer
+    utbytte_utbetalt: 0                 # Utbytte utbetalt til denne aksjonæren i NOK
+    innbetalt_kapital_per_aksje: 300    # Aksjekapital (NOK) / antall aksjer.
+                                        # Eks: 30 000 kr / 100 aksjer = 300 kr per aksje

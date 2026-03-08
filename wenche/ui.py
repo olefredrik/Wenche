@@ -392,7 +392,7 @@ with fane_oppsett:
     st.markdown("---")
     st.markdown(
         "Har du ikke satt opp Maskinporten ennå? "
-        "Se [installasjonsveiledningen](https://github.com/olefredrik/wenche#registrer-maskinporten-klient) på GitHub."
+        "Se [oppsettsveiledningen](https://olefredrik.github.io/Wenche/oppsett/) i dokumentasjonen."
     )
 
 
@@ -453,7 +453,11 @@ with fane_regnskap:
 
     with col2:
         st.markdown("**Finansposter**")
-        st.number_input("Utbytte fra datterselskap", min_value=0, step=1000, key="utbytte_fra_datterselskap")
+        st.number_input(
+            "Utbytte fra datterselskap",
+            min_value=0, step=1000, key="utbytte_fra_datterselskap",
+            help="Utbytte mottatt fra heleide datterselskaper i regnskapsåret. Inngår i vurderingen av fritaksmetoden.",
+        )
         st.number_input("Andre finansinntekter", min_value=0, step=1000, key="andre_finansinntekter")
         st.number_input("Rentekostnader", min_value=0, step=1000, key="rentekostnader")
         st.number_input("Andre finanskostnader", min_value=0, step=1000, key="andre_finanskostnader")
@@ -473,7 +477,11 @@ with fane_regnskap:
     with col1:
         st.markdown("**Eiendeler**")
         st.markdown("*Anleggsmidler*")
-        st.number_input("Aksjer i datterselskap", min_value=0, step=1000, key="aksjer_i_datterselskap")
+        st.number_input(
+            "Aksjer i datterselskap",
+            min_value=0, step=1000, key="aksjer_i_datterselskap",
+            help="Kostpris for aksjer i heleide datterselskaper (typisk over 90 % eierandel).",
+        )
         st.number_input("Andre aksjer", min_value=0, step=1000, key="andre_aksjer")
         st.number_input("Langsiktige fordringer", min_value=0, step=1000, key="langsiktige_fordringer")
         sum_anleggsmidler = (
@@ -533,7 +541,7 @@ with fane_regnskap:
 
 with fane_aksjonaerer:
     st.subheader("Steg 4 av 6 — Aksjonærer")
-    st.caption("Fyll inn opplysninger om aksjonærene. Fortsett til steg 4 når du er ferdig.")
+    st.caption("Fyll inn opplysninger om aksjonærene. Fortsett til steg 5 når du er ferdig.")
     st.number_input("Antall aksjonærer", min_value=1, max_value=20, key="antall_aksjonaerer")
     antall = int(st.session_state["antall_aksjonaerer"])
 
@@ -555,7 +563,10 @@ with fane_aksjonaerer:
             with c2:
                 st.text_input("Aksjeklasse", key=f"a_klasse_{i}")
                 st.number_input("Utbytte utbetalt (NOK)", min_value=0, key=f"a_utbytte_{i}")
-                st.number_input("Innbetalt kapital per aksje (NOK)", min_value=0, key=f"a_kap_{i}")
+                st.number_input(
+                    "Innbetalt kapital per aksje (NOK)", min_value=0, key=f"a_kap_{i}",
+                    help="Aksjekapital delt på antall aksjer. Eks: 30 000 kr / 100 aksjer = 300 kr per aksje.",
+                )
 
 
 # ---------------------------------------------------------------------------
@@ -569,7 +580,8 @@ with fane_dokumenter:
     col1, col2 = st.columns(2)
     with col1:
         st.number_input(
-            "Fremførbart underskudd fra tidligere år (NOK)", min_value=0, step=1000, key="underskudd"
+            "Fremførbart underskudd fra tidligere år (NOK)", min_value=0, step=1000, key="underskudd",
+            help="Finnes i fjorårets skattemelding (RF-1028). Sett til 0 hvis selskapet er nytt eller ikke har fremførbart underskudd.",
         )
     with col2:
         st.checkbox(
