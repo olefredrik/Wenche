@@ -32,6 +32,7 @@ dependencies = [
 
 [project.optional-dependencies]
 ui = ["streamlit>=1.30"]
+dev = ["pytest>=8.0"]
 
 [project.urls]
 Homepage = "https://github.com/olefredrik/wenche"
