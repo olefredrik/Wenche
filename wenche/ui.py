@@ -33,7 +33,7 @@ from wenche.models import (
 from wenche import skattemelding as sm_modul
 from wenche import aarsregnskap as ar_modul
 from wenche import aksjonaerregister as akr_modul
-from wenche import auth
+from wenche import auth, systembruker
 from wenche.altinn_client import AltinnClient
 from wenche.brg_xml import generer_hovedskjema, generer_underskjema
 
@@ -265,6 +265,13 @@ def _sjekk_konfig() -> list[tuple[bool, str, str]]:
         "Satt" if kid else "Mangler — legg til i .env-filen",
     ))
 
+    orgnr = os.getenv("ORG_NUMMER")
+    resultater.append((
+        bool(orgnr),
+        "ORG_NUMMER",
+        "Satt" if orgnr else "Mangler — legg til i konfigurasjonsskjemaet over",
+    ))
+
     nokkel_sti = os.getenv("MASKINPORTEN_PRIVAT_NOKKEL", "maskinporten_privat.pem")
     nokkel_ok = Path(nokkel_sti).exists()
     resultater.append((
@@ -312,6 +319,12 @@ with fane_oppsett:
             placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
             help="UUID som portalen tildelte nøkkelen din — synlig i nøkkellisten under klienten.",
         )
+        inp_orgnr = st.text_input(
+            "Organisasjonsnummer (ORG_NUMMER)",
+            value=os.getenv("ORG_NUMMER", ""),
+            placeholder="123456789",
+            help="Organisasjonsnummeret til selskapet som er registrert som API-konsument i Maskinporten.",
+        )
     with col2:
         inp_env = st.selectbox(
             "Miljø (WENCHE_ENV)",
@@ -338,6 +351,11 @@ with fane_oppsett:
         if inp_kid:
             set_key(str(dot_env_fil), "MASKINPORTEN_KID", inp_kid)
             os.environ["MASKINPORTEN_KID"] = inp_kid
+            endringer = True
+
+        if inp_orgnr:
+            set_key(str(dot_env_fil), "ORG_NUMMER", inp_orgnr)
+            os.environ["ORG_NUMMER"] = inp_orgnr
             endringer = True
 
         set_key(str(dot_env_fil), "WENCHE_ENV", inp_env)
@@ -388,6 +406,49 @@ with fane_oppsett:
                     st.error(str(e))
                 except Exception as e:
                     st.error(f"Uventet feil: {e}")
+
+    # --- Systembruker-oppsett ---
+    st.markdown("---")
+    st.markdown("#### Systembruker-oppsett")
+    st.caption(
+        "Altinn 3 krever at Wenche er registrert som et system og at organisasjonen din "
+        "har godkjent en systembruker. Dette gjøres én gang per miljø."
+    )
+
+    if not alle_ok:
+        st.warning("Fiks konfigurasjonsfeilene ovenfor og lagre før du setter opp systembruker.")
+    else:
+        col_sb1, col_sb2 = st.columns(2)
+        with col_sb1:
+            st.markdown("**Steg A — Registrer system**")
+            st.caption("Registrerer Wenche i Altinns systemregister. Kan kjøres på nytt uten skade.")
+            if st.button("Registrer Wenche i systemregisteret", use_container_width=True):
+                with st.spinner("Registrerer system..."):
+                    try:
+                        token = auth.login_admin()
+                        orgnr = os.getenv("ORG_NUMMER")
+                        client_id = os.getenv("MASKINPORTEN_CLIENT_ID")
+                        svar = systembruker.registrer_system(token, orgnr, client_id)
+                        if svar.get("oppdatert"):
+                            st.success("System oppdatert i systemregisteret.")
+                        else:
+                            st.success("System registrert i systemregisteret.")
+                    except Exception as e:
+                        st.error(f"Feil: {e}")
+
+        with col_sb2:
+            st.markdown("**Steg B — Opprett systembruker**")
+            st.caption("Sender en forespørsel til organisasjonen. Du får en lenke du må åpne og godkjenne.")
+            if st.button("Opprett systembrukerforespørsel", use_container_width=True):
+                with st.spinner("Oppretter forespørsel..."):
+                    try:
+                        token = auth.login_admin()
+                        orgnr = os.getenv("ORG_NUMMER")
+                        svar = systembruker.opprett_forespørsel(token, orgnr, orgnr)
+                        st.success(f"Forespørsel opprettet (status: {svar['status']})")
+                        st.info(f"Godkjenn systembrukeren her:\n\n{svar['confirmUrl']}")
+                    except Exception as e:
+                        st.error(f"Feil: {e}")
 
     st.markdown("---")
     st.markdown(

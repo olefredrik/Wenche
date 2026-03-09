@@ -14,7 +14,7 @@ Bruk:
 import click
 
 from wenche import __version__
-from wenche import auth, aarsregnskap, aksjonaerregister, skattemelding
+from wenche import auth, aarsregnskap, aksjonaerregister, skattemelding, systembruker
 from wenche.altinn_client import AltinnClient
 
 
@@ -58,6 +58,55 @@ def login():
 def logout():
     """Logg ut og slett lagret token."""
     auth.logout()
+
+
+@main.command("registrer-system")
+def registrer_system():
+    """Registrer Wenche i Altinns systemregister (kjøres én gang per miljø)."""
+    import os
+    client_id = os.getenv("MASKINPORTEN_CLIENT_ID")
+    org_nummer = os.getenv("ORG_NUMMER")
+    if not client_id or not org_nummer:
+        click.echo(
+            "Feil: MASKINPORTEN_CLIENT_ID og ORG_NUMMER må være satt i .env.", err=True
+        )
+        raise SystemExit(1)
+
+    click.echo("Henter Maskinporten admin-token...")
+    token = auth.login_admin()
+    sid = systembruker.system_id(org_nummer)
+    click.echo(f"Registrerer system '{sid}' i Altinn...")
+    try:
+        svar = systembruker.registrer_system(token, org_nummer, client_id)
+        if svar.get("oppdatert"):
+            click.echo(f"System '{sid}' oppdatert i Altinn.")
+        else:
+            click.echo(f"System registrert: {svar}")
+    except Exception as e:
+        click.echo(f"Feil ved registrering: {e}", err=True)
+        raise SystemExit(1)
+
+
+@main.command("opprett-systembruker")
+def opprett_systembruker():
+    """Opprett systembrukerforespørsel og få godkjenningslenke."""
+    import os
+    org_nummer = os.getenv("ORG_NUMMER")
+    if not org_nummer:
+        click.echo("Feil: ORG_NUMMER må være satt i .env.", err=True)
+        raise SystemExit(1)
+
+    click.echo("Henter Maskinporten admin-token...")
+    token = auth.login_admin()
+    click.echo(f"Oppretter systembrukerforespørsel for {org_nummer}...")
+    try:
+        svar = systembruker.opprett_forespørsel(token, org_nummer, org_nummer)
+        click.echo(f"\nForespørsel opprettet (ID: {svar['id']})")
+        click.echo(f"Status: {svar['status']}")
+        click.echo(f"\nGodkjenn her:\n  {svar['confirmUrl']}")
+    except Exception as e:
+        click.echo(f"Feil ved oppretting av systembruker: {e}", err=True)
+        raise SystemExit(1)
 
 
 # ---------------------------------------------------------------------------

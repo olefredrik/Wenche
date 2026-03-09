@@ -117,11 +117,13 @@ class AltinnClient:
         url = f"{self._app_base(app_key)}/instances/{instance_id}/process/next"
 
         resp = self._http.put(url, json={"action": "confirm"})
-        resp.raise_for_status()
+        if not resp.is_success:
+            raise RuntimeError(f"{resp.status_code} {resp.reason_phrase}:\n{resp.text}")
         print("Instans bekreftet (confirm).")
 
         resp = self._http.put(url, json={"action": "sign"})
-        resp.raise_for_status()
+        if not resp.is_success:
+            raise RuntimeError(f"{resp.status_code} {resp.reason_phrase}:\n{resp.text}")
         print("Innsending signert og fullfort.")
 
     def hent_status(self, app_key: str, instans: dict) -> dict:

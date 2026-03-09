@@ -48,7 +48,16 @@ Logg inn på [selvbetjeningsportalen.digdir.no](https://selvbetjeningsportalen.d
 3. Klikk **Ny integrasjon** og fyll ut:
     - Visningsnavn: `wenche`
     - Access token levetid: `120`
-4. Legg til scopes: `altinn:instances.read` og `altinn:instances.write`
+4. Legg til følgende scopes:
+
+    | Scope | Formål |
+    |---|---|
+    | `altinn:instances.read` | Lese instanser ved innsending |
+    | `altinn:instances.write` | Opprette instanser ved innsending |
+    | `altinn:authentication/systemregister.write` | Registrere Wenche som leverandørsystem (steg 5) |
+    | `altinn:authentication/systemuser.request.read` | Sjekke status for systembrukerforespørsel (steg 5) |
+    | `altinn:authentication/systemuser.request.write` | Opprette systembrukerforespørsel (steg 5) |
+
 5. Kopier **klient-ID** — du trenger den i steg 3
 
 ### 2c. Last opp offentlig nøkkel
@@ -103,9 +112,34 @@ cp config.example.yaml config.yaml
 
 ---
 
+## Steg 5 — Registrer Wenche som leverandørsystem
+
+Altinn 3 krever at Wenche er registrert som et leverandørsystem, og at organisasjonen din har godkjent en systembruker. Dette gjøres **én gang per miljø** (test/prod).
+
+!!! note "Bruker du webgrensesnittet?"
+    Disse stegene kan gjøres direkte i nettleseren: start `wenche ui` og gå til **Oppsett → Systembruker-oppsett**.
+
+### 5a. Registrer system
+
+```bash
+wenche registrer-system
+```
+
+Registrerer Wenche i Altinns systemregister med riktige tilgangsrettigheter. Kan kjøres på nytt uten skade — oppdaterer automatisk hvis systemet allerede finnes.
+
+### 5b. Opprett systembrukerforespørsel
+
+```bash
+wenche opprett-systembruker
+```
+
+Oppretter en forespørsel og skriver ut en `confirmUrl`. Åpne lenken i nettleseren, logg inn med TestID (testmiljø) eller ID-porten (produksjon), og godkjenn tilgangen.
+
+---
+
 ## Verifiser oppsett
 
-Test at alt er konfigurert riktig:
+Når forespørselen er godkjent, test at innlogging fungerer:
 
 ```bash
 wenche login
@@ -114,7 +148,7 @@ wenche login
 Vellykket utskrift:
 
 ```
-Autentiserer mot Maskinporten...
+Autentiserer mot Maskinporten (systembruker)...
 Maskinporten-token mottatt. Henter Altinn-token...
 Autentisering vellykket.
 ```
@@ -125,6 +159,6 @@ Logg deretter ut igjen:
 wenche logout
 ```
 
-Får du en feilmelding, dobbeltsjekk at klient-ID og KID i `.env` stemmer med det som vises i selvbetjeningsportalen, og at den offentlige nøkkelen er lastet opp under riktig klient.
+Får du feilen `invalid_altinn_customer_configuration` betyr det at systembrukeren ikke er godkjent ennå — fullfør steg 5b. Dobbeltsjekk ellers at klient-ID og KID i `.env` stemmer med det som vises i selvbetjeningsportalen.
 
 [Gå videre til bruk →](bruk.md){ .md-button .md-button--primary }

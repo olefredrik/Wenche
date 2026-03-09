@@ -9,11 +9,14 @@ Wenche kan brukes enten via **kommandolinjen** eller via **webgrensesnittet** (`
 Innsending av årsregnskap og aksjonærregisteroppgave krever innlogging mot Maskinporten:
 
 ```bash
-wenche login     # Autentiserer og lagrer token lokalt
+wenche login     # Autentiserer med systembruker-token og lagrer Altinn-token lokalt
 wenche logout    # Sletter lagret token
 ```
 
 Tokenet lagres i `~/.wenche/token.json` og gjenbrukes automatisk for påfølgende kommandoer. Bruker du webgrensesnittet håndteres innlogging derfra.
+
+!!! note "Systembruker må settes opp først"
+    `wenche login` forutsetter at systembrukeren er godkjent (steg 5 i [oppsett](oppsett.md)). Får du feilen `invalid_altinn_customer_configuration` betyr det at systembrukeren ikke er godkjent ennå.
 
 ---
 
@@ -112,6 +115,8 @@ Sammendraget inneholder:
 wenche --help
 
 Kommandoer:
+  registrer-system         Registrer Wenche i Altinns systemregister (en gang per miljo)
+  opprett-systembruker     Opprett systembrukerforespørsel og fa godkjenningslenke
   login                    Autentiser mot Maskinporten med RSA-nokkel
   logout                   Logg ut og slett lagret token
   generer-skattemelding    Generer ferdig utfylt RF-1167 og RF-1028

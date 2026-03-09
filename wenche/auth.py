@@ -37,59 +37,65 @@ else:
         "https://platform.altinn.no/authentication/api/v1/exchange/maskinporten"
     )
 
+# Scopes for innsending av instanser
 SCOPES = "altinn:instances.read altinn:instances.write"
+
+# Scopes for administrasjon av systemregister og systembruker
+ADMIN_SCOPES = (
+    "altinn:authentication/systemregister.write "
+    "altinn:authentication/systemuser.request.read "
+    "altinn:authentication/systemuser.request.write"
+)
 TOKEN_FILE = Path.home() / ".wenche" / "token.json"
 
 
-def _lag_jwt(client_id: str, private_key_pem: bytes, kid: str) -> str:
-    """Lager et signert JWT for Maskinporten JWT grant-flyten."""
+def _lag_jwt(
+    client_id: str,
+    private_key_pem: bytes,
+    kid: str,
+    scopes: str = SCOPES,
+    org_nummer: str | None = None,
+) -> str:
+    """
+    Lager et signert JWT for Maskinporten JWT grant-flyten.
+
+    Hvis org_nummer er oppgitt, legges authorization_details til i JWT-et
+    for å hente et systembruker-token.
+    """
     now = int(time.time())
     claims = {
         "iss": client_id,
+        "sub": client_id,
         "aud": MASKINPORTEN_AUD,
-        "scope": SCOPES,
+        "scope": scopes,
         "iat": now,
         "exp": now + 119,  # Maskinporten tillater maks 120 sekunder
         "jti": str(uuid.uuid4()),
     }
+    if org_nummer:
+        claims["authorization_details"] = [
+            {
+                "type": "urn:altinn:systemuser",
+                "systemuser_org": {
+                    "authority": "iso6523-actorid-upis",
+                    "ID": f"0192:{org_nummer}",
+                },
+            }
+        ]
     header = {"alg": "RS256", "kid": kid}
     token = jwt.encode(header, claims, private_key_pem)
     return token.decode() if isinstance(token, bytes) else token
 
 
-def login() -> dict:
-    """
-    Autentiserer mot Maskinporten og veksler mot Altinn-token.
-    Returnerer {'maskinporten_token': str, 'altinn_token': str}
-    """
-    client_id = os.getenv("MASKINPORTEN_CLIENT_ID")
-    if not client_id:
-        raise RuntimeError(
-            "MASKINPORTEN_CLIENT_ID mangler.\n"
-            "Kopier .env.example til .env og fyll inn din klient-ID fra Digdirs selvbetjeningsportal."
-        )
-
-    kid = os.getenv("MASKINPORTEN_KID")
-    if not kid:
-        raise RuntimeError(
-            "MASKINPORTEN_KID mangler.\n"
-            "Finn nøkkel-ID (UUID) i Digdirs selvbetjeningsportal under klientens nøkler og legg den i .env."
-        )
-
-    nokkel_sti = os.getenv("MASKINPORTEN_PRIVAT_NOKKEL", "maskinporten_privat.pem")
-    try:
-        private_key_pem = Path(nokkel_sti).read_bytes()
-    except FileNotFoundError:
-        raise RuntimeError(
-            f"Finner ikke privat nøkkel: {nokkel_sti}\n"
-            "Generer nøkkelpar med:\n"
-            "  openssl genrsa -out maskinporten_privat.pem 2048\n"
-            "  openssl rsa -in maskinporten_privat.pem -pubout -out maskinporten_offentlig.pem"
-        )
-
-    print("Autentiserer mot Maskinporten...")
-    assertion = _lag_jwt(client_id, private_key_pem, kid)
-
+def _hent_maskinporten_token(
+    client_id: str,
+    private_key_pem: bytes,
+    kid: str,
+    scopes: str = SCOPES,
+    org_nummer: str | None = None,
+) -> str:
+    """Henter et Maskinporten access token."""
+    assertion = _lag_jwt(client_id, private_key_pem, kid, scopes=scopes, org_nummer=org_nummer)
     resp = httpx.post(
         MASKINPORTEN_TOKEN_URL,
         data={
@@ -100,13 +106,56 @@ def login() -> dict:
         timeout=15,
     )
     if resp.status_code != 200:
+        raise RuntimeError(f"Maskinporten svarte {resp.status_code}:\n{resp.text}")
+    return resp.json()["access_token"]
+
+
+def _les_nokkel(nokkel_sti: str) -> bytes:
+    try:
+        return Path(nokkel_sti).read_bytes()
+    except FileNotFoundError:
         raise RuntimeError(
-            f"Maskinporten svarte {resp.status_code}:\n{resp.text}"
+            f"Finner ikke privat nøkkel: {nokkel_sti}\n"
+            "Generer nøkkelpar med:\n"
+            "  openssl genrsa -out maskinporten_privat.pem 2048\n"
+            "  openssl rsa -in maskinporten_privat.pem -pubout -out maskinporten_offentlig.pem"
         )
-    maskinporten_token = resp.json()["access_token"]
+
+
+def _les_påkrevd_env(navn: str, hjelpetekst: str) -> str:
+    verdi = os.getenv(navn)
+    if not verdi:
+        raise RuntimeError(f"{navn} mangler.\n{hjelpetekst}")
+    return verdi
+
+
+def login() -> dict:
+    """
+    Autentiserer mot Maskinporten med systembruker-token og veksler mot Altinn-token.
+
+    Krever ORG_NUMMER i .env. Returnerer {'maskinporten_token': str, 'altinn_token': str}.
+    """
+    client_id = _les_påkrevd_env(
+        "MASKINPORTEN_CLIENT_ID",
+        "Kopier .env.example til .env og fyll inn din klient-ID fra Digdirs selvbetjeningsportal.",
+    )
+    kid = _les_påkrevd_env(
+        "MASKINPORTEN_KID",
+        "Finn nøkkel-ID (UUID) i Digdirs selvbetjeningsportal under klientens nøkler og legg den i .env.",
+    )
+    org_nummer = _les_påkrevd_env(
+        "ORG_NUMMER",
+        "Legg til ORG_NUMMER=<ditt organisasjonsnummer> i .env.",
+    )
+    nokkel_sti = os.getenv("MASKINPORTEN_PRIVAT_NOKKEL", "maskinporten_privat.pem")
+    private_key_pem = _les_nokkel(nokkel_sti)
+
+    print("Autentiserer mot Maskinporten (systembruker)...")
+    maskinporten_token = _hent_maskinporten_token(
+        client_id, private_key_pem, kid, org_nummer=org_nummer
+    )
 
     print("Maskinporten-token mottatt. Henter Altinn-token...")
-
     altinn_resp = httpx.get(
         ALTINN_EXCHANGE_URL,
         headers={"Authorization": f"Bearer {maskinporten_token}"},
@@ -126,6 +175,26 @@ def login() -> dict:
 
     print("Autentisering vellykket.\n")
     return tokens
+
+
+def login_admin() -> str:
+    """
+    Henter et Maskinporten-token med admin-scopes for systemregister og systembruker.
+
+    Returnerer rått Maskinporten access token (ikke vekslet mot Altinn).
+    """
+    client_id = _les_påkrevd_env(
+        "MASKINPORTEN_CLIENT_ID",
+        "Kopier .env.example til .env og fyll inn din klient-ID fra Digdirs selvbetjeningsportal.",
+    )
+    kid = _les_påkrevd_env(
+        "MASKINPORTEN_KID",
+        "Finn nøkkel-ID (UUID) i Digdirs selvbetjeningsportal under klientens nøkler og legg den i .env.",
+    )
+    nokkel_sti = os.getenv("MASKINPORTEN_PRIVAT_NOKKEL", "maskinporten_privat.pem")
+    private_key_pem = _les_nokkel(nokkel_sti)
+
+    return _hent_maskinporten_token(client_id, private_key_pem, kid, scopes=ADMIN_SCOPES)
 
 
 def get_altinn_token() -> str:
