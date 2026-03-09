@@ -22,6 +22,9 @@ Tokenet lagres i `~/.wenche/token.json` og gjenbrukes automatisk for påfølgend
 
 ## Skattemelding (frist 31. mai)
 
+!!! note "Skattemeldingen sendes ikke digitalt"
+    Wenche genererer et sammendrag som du fyller inn manuelt på [skatteetaten.no](https://www.skatteetaten.no/). Digital innsending av skattemelding støttes ikke.
+
 Wenche genererer et ferdig utfylt sammendrag av RF-1167 (næringsoppgaven) og RF-1028 (skattemeldingen).
 
 === "Kommandolinje"

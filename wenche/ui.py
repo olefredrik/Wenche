@@ -227,6 +227,21 @@ def lagre_config():
         yaml.dump(data, f, allow_unicode=True, sort_keys=False)
 
 
+_WENCHE_DIR = Path.home() / ".wenche"
+_REQUEST_ID_FIL = _WENCHE_DIR / "systembruker_request_id.txt"
+
+
+def _lagre_request_id(request_id: str) -> None:
+    _WENCHE_DIR.mkdir(exist_ok=True)
+    _REQUEST_ID_FIL.write_text(request_id, encoding="utf-8")
+
+
+def _les_request_id() -> str:
+    if _REQUEST_ID_FIL.exists():
+        return _REQUEST_ID_FIL.read_text(encoding="utf-8").strip()
+    return ""
+
+
 # ---------------------------------------------------------------------------
 # Side-oppsett
 # ---------------------------------------------------------------------------
@@ -442,10 +457,36 @@ with fane_oppsett:
                         token = auth.login_admin()
                         orgnr = os.getenv("ORG_NUMMER")
                         svar = systembruker.opprett_forespørsel(token, orgnr, orgnr)
+                        request_id = svar.get("id", "")
+                        if request_id:
+                            _lagre_request_id(request_id)
                         st.success(f"Forespørsel opprettet (status: {svar['status']})")
                         st.info(f"**Steg 3 — Godkjenn i nettleseren**\n\nÅpne lenken nedenfor, logg inn og godkjenn tilgangen for organisasjonen din:\n\n{svar['confirmUrl']}")
                     except Exception as e:
                         st.error(f"Feil: {e}")
+
+            st.markdown("**Sjekk godkjenningsstatus**")
+            st.caption("Sjekker om systembrukerforespørselen er godkjent av organisasjonen.")
+            if st.button("Sjekk status"):
+                request_id = _les_request_id()
+                if not request_id:
+                    st.warning("Ingen lagret forespørsels-ID. Opprett en systembrukerforespørsel først (steg 2).")
+                else:
+                    with st.spinner("Henter status..."):
+                        try:
+                            token = auth.login_admin()
+                            svar = systembruker.hent_forespørsel_status(token, request_id)
+                            status = svar.get("status", "ukjent")
+                            if status == "Accepted":
+                                st.success(f"Systembruker er godkjent. Du kan nå logge inn og sende inn dokumenter.")
+                            elif status == "New":
+                                st.info(f"Forespørselen venter på godkjenning. Bruk lenken fra steg 2 til å godkjenne i nettleseren.")
+                            elif status == "Rejected":
+                                st.error(f"Forespørselen ble avvist. Opprett en ny forespørsel.")
+                            else:
+                                st.info(f"Status: {status}")
+                        except Exception as e:
+                            st.error(f"Feil: {e}")
 
         st.markdown(
             "Trenger du hjelp? Se [oppsettsveiledningen](https://olefredrik.github.io/Wenche/oppsett/) i dokumentasjonen."
@@ -814,7 +855,14 @@ with fane_send:
         try:
             return auth.get_altinn_token()
         except RuntimeError as e:
-            st.error(f"Autentisering feilet:\n\n{e}")
+            feilmelding = str(e)
+            if "invalid_altinn_customer_configuration" in feilmelding:
+                st.error(
+                    "Systembrukeren er ikke godkjent ennå. "
+                    "Gå til **1. Oppsett → Systembruker-oppsett** og fullfør steg 2–3."
+                )
+            else:
+                st.error(f"Autentisering feilet:\n\n{feilmelding}")
             return None
 
     st.divider()

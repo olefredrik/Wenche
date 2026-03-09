@@ -20,4 +20,6 @@ venv/
 # Genererte filer
 *.xml
 *.xbrl
+*.html
+*.txt
 node_modules/

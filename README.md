@@ -25,6 +25,10 @@ Fullstendig veiledning for installasjon, oppsett og bruk:
 
 **[Les dokumentasjonen →](https://olefredrik.github.io/Wenche/)**
 
+## Ansvarsfraskrivelse
+
+Wenche er et hjelpeverktøy for enkle holdingselskaper og er i aktiv utvikling. Det er ikke en erstatning for profesjonell regnskapsbistand. Kontroller alltid at genererte dokumenter er korrekte før innsending — du er selv ansvarlig for at innsendte opplysninger er riktige.
+
 ## Bidra
 
 Bidrag er velkomne. Åpne gjerne en issue eller pull request.
