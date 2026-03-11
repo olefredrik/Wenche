@@ -198,6 +198,8 @@ class Aarsregnskap:
     fastsettelsesdato: Optional[date] = None   # Dato styret godkjente regnskapet; standard: i dag
     signatar: Optional[str] = None              # Navn på den som signerer; standard: daglig_leder
     revideres: bool = False                     # True hvis regnskapet er revidert
+    foregaaende_aar_resultat: Resultatregnskap = field(default_factory=Resultatregnskap)
+    foregaaende_aar_balanse: Balanse = field(default_factory=Balanse)
 
 
 # ---------------------------------------------------------------------------

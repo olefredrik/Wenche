@@ -87,21 +87,23 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
     """
     r = regnskap.resultatregnskap
     b = regnskap.balanse
+    fr = regnskap.foregaaende_aar_resultat
+    fb = regnskap.foregaaende_aar_balanse
 
     # Hjelpefunksjon: lager linjeelement med altinnRowId kun hvis verdi != 0
     def linje(tag: str, verdi: int, besk: str, orid_besk: str,
-              orid_aarets: str, orid_fjor: str) -> str:
-        if verdi == 0:
+              orid_aarets: str, orid_fjor: str, fjor_verdi: int = 0) -> str:
+        if verdi == 0 and fjor_verdi == 0:
             return ""
         return (
             f'<{tag} altinnRowId="{_row_id()}">'
             f'<beskrivelse orid="{orid_besk}">{besk}</beskrivelse>'
             f'<aarets orid="{orid_aarets}">{verdi}</aarets>'
-            f'<fjoraarets orid="{orid_fjor}">0</fjoraarets>'
+            f'<fjoraarets orid="{orid_fjor}">{fjor_verdi}</fjoraarets>'
             f'</{tag}>'
         )
 
-    # Beregnede verdier
+    # Inneværende år
     di = r.driftsinntekter
     dk = r.driftskostnader
     fp = r.finansposter
@@ -111,6 +113,17 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
     ek = b.egenkapital_og_gjeld.egenkapital
     lg = b.egenkapital_og_gjeld.langsiktig_gjeld
     kg = b.egenkapital_og_gjeld.kortsiktig_gjeld
+
+    # Foregående år
+    fdi = fr.driftsinntekter
+    fdk = fr.driftskostnader
+    ffp = fr.finansposter
+    fei = fb.eiendeler
+    fam = fei.anleggsmidler
+    fom = fei.omloepmidler
+    fek = fb.egenkapital_og_gjeld.egenkapital
+    flg = fb.egenkapital_og_gjeld.langsiktig_gjeld
+    fkg = fb.egenkapital_og_gjeld.kortsiktig_gjeld
 
     netto_finans = fp.sum_inntekter - fp.sum_kostnader
     sum_gjeld = lg.sum + kg.sum
@@ -136,23 +149,23 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
     <resultatregnskapDriftsresultat>
       <driftsresultat>
         <aarets orid="146">{r.driftsresultat}</aarets>
-        <fjoraarets orid="7026">0</fjoraarets>
+        <fjoraarets orid="7026">{fr.driftsresultat}</fjoraarets>
       </driftsresultat>
       <inntekt>
-        {linje("salgsinntekt", di.salgsinntekter, "Salgsinntekter", "28998", "1340", "7965")}
-        {linje("driftsinntekt", di.andre_driftsinntekter, "Andre driftsinntekter", "28999", "7709", "7966")}
+        {linje("salgsinntekt", di.salgsinntekter, "Salgsinntekter", "28998", "1340", "7965", fdi.salgsinntekter)}
+        {linje("driftsinntekt", di.andre_driftsinntekter, "Andre driftsinntekter", "28999", "7709", "7966", fdi.andre_driftsinntekter)}
         <driftsinntektSum>
           <aarets orid="72">{di.sum}</aarets>
-          <fjoraarets orid="6972">0</fjoraarets>
+          <fjoraarets orid="6972">{fdi.sum}</fjoraarets>
         </driftsinntektSum>
       </inntekt>
       <kostnad>
-        {linje("loennskostnad", dk.loennskostnader, "Lønnskostnader", "29001", "81", "6979")}
-        {linje("avskrivning", dk.avskrivninger, "Avskrivninger", "29002", "2139", "10181")}
-        {linje("annenDriftskostnad", dk.andre_driftskostnader, "Andre driftskostnader", "29003", "82", "7023")}
+        {linje("loennskostnad", dk.loennskostnader, "Lønnskostnader", "29001", "81", "6979", fdk.loennskostnader)}
+        {linje("avskrivning", dk.avskrivninger, "Avskrivninger", "29002", "2139", "10181", fdk.avskrivninger)}
+        {linje("annenDriftskostnad", dk.andre_driftskostnader, "Andre driftskostnader", "29003", "82", "7023", fdk.andre_driftskostnader)}
         <sumDriftskostnad>
           <aarets orid="17126">{dk.sum}</aarets>
-          <fjoraarets orid="17127">0</fjoraarets>
+          <fjoraarets orid="17127">{fdk.sum}</fjoraarets>
         </sumDriftskostnad>
       </kostnad>
     </resultatregnskapDriftsresultat>
@@ -160,22 +173,22 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
     <resultatregnskapFinansinntekt>
       <nettoFinans>
         <aarets orid="158">{netto_finans}</aarets>
-        <fjoraarets orid="7999">0</fjoraarets>
+        <fjoraarets orid="7999">{ffp.sum_inntekter - ffp.sum_kostnader}</fjoraarets>
       </nettoFinans>
       <finansinntekt>
-        {linje("investeringDatterforetakTilknyttetSelskap", fp.utbytte_fra_datterselskap, "Utbytte fra datterselskap", "29004", "27934", "27935")}
-        {linje("annenRenteinntekt", fp.andre_finansinntekter, "Andre finansinntekter", "29006", "152", "7032")}
+        {linje("investeringDatterforetakTilknyttetSelskap", fp.utbytte_fra_datterselskap, "Utbytte fra datterselskap", "29004", "27934", "27935", ffp.utbytte_fra_datterselskap)}
+        {linje("annenRenteinntekt", fp.andre_finansinntekter, "Andre finansinntekter", "29006", "152", "7032", ffp.andre_finansinntekter)}
         <sumFinansinntekter>
           <aarets orid="153">{fp.sum_inntekter}</aarets>
-          <fjoraarets orid="7993">0</fjoraarets>
+          <fjoraarets orid="7993">{ffp.sum_inntekter}</fjoraarets>
         </sumFinansinntekter>
       </finansinntekt>
       <finanskostnad>
-        {linje("rentekostnad", fp.rentekostnader, "Rentekostnader", "29009", "7037", "7038")}
-        {linje("annenFinanskostnad", fp.andre_finanskostnader, "Andre finanskostnader", "29011", "156", "7041")}
+        {linje("rentekostnad", fp.rentekostnader, "Rentekostnader", "29009", "7037", "7038", ffp.rentekostnader)}
+        {linje("annenFinanskostnad", fp.andre_finanskostnader, "Andre finanskostnader", "29011", "156", "7041", ffp.andre_finanskostnader)}
         <sumFinanskostnader>
           <aarets orid="17130">{fp.sum_kostnader}</aarets>
-          <fjoraarets orid="17131">0</fjoraarets>
+          <fjoraarets orid="17131">{ffp.sum_kostnader}</fjoraarets>
         </sumFinanskostnader>
       </finanskostnad>
     </resultatregnskapFinansinntekt>
@@ -184,17 +197,17 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
       <resultat>
         <resultatFoerSkattekostnad>
           <aarets orid="167">{r.resultat_foer_skatt}</aarets>
-          <fjoraarets orid="7042">0</fjoraarets>
+          <fjoraarets orid="7042">{fr.resultat_foer_skatt}</fjoraarets>
         </resultatFoerSkattekostnad>
         <aarsresultat>
           <aarets orid="172">{r.aarsresultat}</aarets>
-          <fjoraarets orid="7054">0</fjoraarets>
+          <fjoraarets orid="7054">{fr.aarsresultat}</fjoraarets>
         </aarsresultat>
       </resultat>
       <overfoeringer>
         <sumOverfoeringerOgDisponeringer>
           <aarets orid="7067">{r.aarsresultat}</aarets>
-          <fjoraarets orid="7068">0</fjoraarets>
+          <fjoraarets orid="7068">{fr.aarsresultat}</fjoraarets>
         </sumOverfoeringerOgDisponeringer>
       </overfoeringer>
     </resultatregnskapResultat>
@@ -202,43 +215,43 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
     <balanseAnleggsmidlerOmloepsmidler>
       <sumEiendeler>
         <aarets orid="219">{ei.sum}</aarets>
-        <fjoraarets orid="7127">0</fjoraarets>
+        <fjoraarets orid="7127">{fei.sum}</fjoraarets>
       </sumEiendeler>
       <balanseAnleggsmidler>
         <sumAnleggsmidler>
           <aarets orid="217">{am.sum}</aarets>
-          <fjoraarets orid="7108">0</fjoraarets>
+          <fjoraarets orid="7108">{fam.sum}</fjoraarets>
         </sumAnleggsmidler>
         <balanseFinansielleAnleggsmidler>
-          {linje("investeringDatterselskap", am.aksjer_i_datterselskap, "Aksjer i datterselskap", "29017", "9686", "10289")}
-          {linje("investeringAnnetForetakSammeKonsern", am.andre_aksjer, "Andre aksjer", "29018", "7727", "8012")}
-          {linje("laanForetakSammeKonsern", am.langsiktige_fordringer, "Langsiktige fordringer", "29019", "6500", "7093")}
+          {linje("investeringDatterselskap", am.aksjer_i_datterselskap, "Aksjer i datterselskap", "29017", "9686", "10289", fam.aksjer_i_datterselskap)}
+          {linje("investeringAnnetForetakSammeKonsern", am.andre_aksjer, "Andre aksjer", "29018", "7727", "8012", fam.andre_aksjer)}
+          {linje("laanForetakSammeKonsern", am.langsiktige_fordringer, "Langsiktige fordringer", "29019", "6500", "7093", fam.langsiktige_fordringer)}
           <sumFinansielleAnleggsmidler>
             <aarets orid="5267">{am.sum}</aarets>
-            <fjoraarets orid="8014">0</fjoraarets>
+            <fjoraarets orid="8014">{fam.sum}</fjoraarets>
           </sumFinansielleAnleggsmidler>
         </balanseFinansielleAnleggsmidler>
       </balanseAnleggsmidler>
       <balanseOmloepsmidler>
         <sumOmloepsmidler>
           <aarets orid="194">{om.sum}</aarets>
-          <fjoraarets orid="7126">0</fjoraarets>
+          <fjoraarets orid="7126">{fom.sum}</fjoraarets>
         </sumOmloepsmidler>
         <balanseOmloepsmidlerVarerFordringer>
           <fordringer>
-            {linje("andreFordringer", om.kortsiktige_fordringer, "Kortsiktige fordringer", "29028", "282", "7112")}
+            {linje("andreFordringer", om.kortsiktige_fordringer, "Kortsiktige fordringer", "29028", "282", "7112", fom.kortsiktige_fordringer)}
             <sumFordringer>
               <aarets orid="80">{om.kortsiktige_fordringer}</aarets>
-              <fjoraarets orid="8015">0</fjoraarets>
+              <fjoraarets orid="8015">{fom.kortsiktige_fordringer}</fjoraarets>
             </sumFordringer>
           </fordringer>
         </balanseOmloepsmidlerVarerFordringer>
         <balanseOmloepsmidlerInvesteringerBankinnskuddKontanter>
           <bankinnskuddKontanter>
-            {linje("bankinnskuddKontanter", om.bankinnskudd, "Bankinnskudd", "29031", "786", "8019")}
+            {linje("bankinnskuddKontanter", om.bankinnskudd, "Bankinnskudd", "29031", "786", "8019", fom.bankinnskudd)}
             <sumBankinnskuddKontanter>
               <aarets orid="29042">{om.bankinnskudd}</aarets>
-              <fjoraarets orid="29043">0</fjoraarets>
+              <fjoraarets orid="29043">{fom.bankinnskudd}</fjoraarets>
             </sumBankinnskuddKontanter>
           </bankinnskuddKontanter>
         </balanseOmloepsmidlerInvesteringerBankinnskuddKontanter>
@@ -248,55 +261,55 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
     <balanseEgenkapitalGjeld>
       <sumEgenkapitalGjeld>
         <aarets orid="251">{b.egenkapital_og_gjeld.sum}</aarets>
-        <fjoraarets orid="7185">0</fjoraarets>
+        <fjoraarets orid="7185">{fb.egenkapital_og_gjeld.sum}</fjoraarets>
       </sumEgenkapitalGjeld>
       <balanseEgenkapitalInnskuttOpptjentEgenkapital>
         <innskuttEgenkapital>
-          {linje("selskapskapital", ek.aksjekapital, "Aksjekapital", "29032", "20488", "20489")}
-          {linje("overkursfond", ek.overkursfond, "Overkursfond", "29033", "2585", "7135")}
+          {linje("selskapskapital", ek.aksjekapital, "Aksjekapital", "29032", "20488", "20489", fek.aksjekapital)}
+          {linje("overkursfond", ek.overkursfond, "Overkursfond", "29033", "2585", "7135", fek.overkursfond)}
           <sumInnskuttEgenkapital>
             <aarets orid="3730">{sum_innskutt_ek}</aarets>
-            <fjoraarets orid="9984">0</fjoraarets>
+            <fjoraarets orid="9984">{fek.aksjekapital + fek.overkursfond}</fjoraarets>
           </sumInnskuttEgenkapital>
         </innskuttEgenkapital>
         <opptjentEgenkaiptal>
-          {linje("annenEgenkapital", ek.annen_egenkapital, "Annen egenkapital", "29034", "3274", "7140")}
+          {linje("annenEgenkapital", ek.annen_egenkapital, "Annen egenkapital", "29034", "3274", "7140", fek.annen_egenkapital)}
           <sumOpptjentEgenkapital>
             <aarets orid="9702">{ek.annen_egenkapital}</aarets>
-            <fjoraarets orid="9985">0</fjoraarets>
+            <fjoraarets orid="9985">{fek.annen_egenkapital}</fjoraarets>
           </sumOpptjentEgenkapital>
           <sumEgenkapital>
             <aarets orid="250">{ek.sum}</aarets>
-            <fjoraarets orid="7142">0</fjoraarets>
+            <fjoraarets orid="7142">{fek.sum}</fjoraarets>
           </sumEgenkapital>
         </opptjentEgenkaiptal>
       </balanseEgenkapitalInnskuttOpptjentEgenkapital>
       <balanseGjeldOversikt>
         <sumGjeld>
           <aarets orid="1119">{sum_gjeld}</aarets>
-          <fjoraarets orid="7184">0</fjoraarets>
+          <fjoraarets orid="7184">{flg.sum + fkg.sum}</fjoraarets>
         </sumGjeld>
         <balanseGjeldAvsetningerForpliktelserAnnenLangsiktigGjeld>
           <sumLangsiktigGjeld>
             <aarets orid="86">{lg.sum}</aarets>
-            <fjoraarets orid="7156">0</fjoraarets>
+            <fjoraarets orid="7156">{flg.sum}</fjoraarets>
           </sumLangsiktigGjeld>
           <annenLangsiktigGjeld>
-            {linje("langsiktigKonserngjeld", lg.laan_fra_aksjonaer, "Lån fra aksjonær", "29035", "2256", "7152")}
-            {linje("oevrigLangsiktigGjeld", lg.andre_langsiktige_laan, "Andre langsiktige lån", "29036", "242", "7155")}
+            {linje("langsiktigKonserngjeld", lg.laan_fra_aksjonaer, "Lån fra aksjonær", "29035", "2256", "7152", flg.laan_fra_aksjonaer)}
+            {linje("oevrigLangsiktigGjeld", lg.andre_langsiktige_laan, "Andre langsiktige lån", "29036", "242", "7155", flg.andre_langsiktige_laan)}
             <sumAnnenLangsiktigGjeld>
               <aarets orid="25019">{lg.sum}</aarets>
-              <fjoraarets orid="25020">0</fjoraarets>
+              <fjoraarets orid="25020">{flg.sum}</fjoraarets>
             </sumAnnenLangsiktigGjeld>
           </annenLangsiktigGjeld>
         </balanseGjeldAvsetningerForpliktelserAnnenLangsiktigGjeld>
         <balanseKortsiktigGjeld>
-          {linje("leverandoergjeld", kg.leverandoergjeld, "Leverandørgjeld", "29037", "220", "7162")}
-          {linje("skyldigeOffentligeAvgifter", kg.skyldige_offentlige_avgifter, "Skyldige offentlige avgifter", "29039", "225", "7170")}
-          {linje("annenKortsiktigGjeld", kg.annen_kortsiktig_gjeld, "Annen kortsiktig gjeld", "29040", "236", "7182")}
+          {linje("leverandoergjeld", kg.leverandoergjeld, "Leverandørgjeld", "29037", "220", "7162", fkg.leverandoergjeld)}
+          {linje("skyldigeOffentligeAvgifter", kg.skyldige_offentlige_avgifter, "Skyldige offentlige avgifter", "29039", "225", "7170", fkg.skyldige_offentlige_avgifter)}
+          {linje("annenKortsiktigGjeld", kg.annen_kortsiktig_gjeld, "Annen kortsiktig gjeld", "29040", "236", "7182", fkg.annen_kortsiktig_gjeld)}
           <sumKortsiktigGjeld>
             <aarets orid="85">{kg.sum}</aarets>
-            <fjoraarets orid="7183">0</fjoraarets>
+            <fjoraarets orid="7183">{fkg.sum}</fjoraarets>
           </sumKortsiktigGjeld>
         </balanseKortsiktigGjeld>
       </balanseGjeldOversikt>

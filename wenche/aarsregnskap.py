@@ -24,6 +24,58 @@ from wenche.models import (
 from wenche.brg_xml import generer_hovedskjema, generer_underskjema
 
 
+def _les_resultat(r: dict) -> Resultatregnskap:
+    return Resultatregnskap(
+        driftsinntekter=Driftsinntekter(
+            salgsinntekter=r["driftsinntekter"].get("salgsinntekter", 0),
+            andre_driftsinntekter=r["driftsinntekter"].get("andre_driftsinntekter", 0),
+        ),
+        driftskostnader=Driftskostnader(
+            loennskostnader=r["driftskostnader"].get("loennskostnader", 0),
+            avskrivninger=r["driftskostnader"].get("avskrivninger", 0),
+            andre_driftskostnader=r["driftskostnader"].get("andre_driftskostnader", 0),
+        ),
+        finansposter=Finansposter(
+            utbytte_fra_datterselskap=r["finansposter"].get("utbytte_fra_datterselskap", 0),
+            andre_finansinntekter=r["finansposter"].get("andre_finansinntekter", 0),
+            rentekostnader=r["finansposter"].get("rentekostnader", 0),
+            andre_finanskostnader=r["finansposter"].get("andre_finanskostnader", 0),
+        ),
+    )
+
+
+def _les_balanse(b: dict) -> Balanse:
+    return Balanse(
+        eiendeler=Eiendeler(
+            anleggsmidler=Anleggsmidler(
+                aksjer_i_datterselskap=b["eiendeler"]["anleggsmidler"].get("aksjer_i_datterselskap", 0),
+                andre_aksjer=b["eiendeler"]["anleggsmidler"].get("andre_aksjer", 0),
+                langsiktige_fordringer=b["eiendeler"]["anleggsmidler"].get("langsiktige_fordringer", 0),
+            ),
+            omloepmidler=Omloepmidler(
+                kortsiktige_fordringer=b["eiendeler"]["omloepmidler"].get("kortsiktige_fordringer", 0),
+                bankinnskudd=b["eiendeler"]["omloepmidler"].get("bankinnskudd", 0),
+            ),
+        ),
+        egenkapital_og_gjeld=EgenkapitalOgGjeld(
+            egenkapital=Egenkapital(
+                aksjekapital=b["egenkapital_og_gjeld"]["egenkapital"].get("aksjekapital", 0),
+                overkursfond=b["egenkapital_og_gjeld"]["egenkapital"].get("overkursfond", 0),
+                annen_egenkapital=b["egenkapital_og_gjeld"]["egenkapital"].get("annen_egenkapital", 0),
+            ),
+            langsiktig_gjeld=LangsiktigGjeld(
+                laan_fra_aksjonaer=b["egenkapital_og_gjeld"]["langsiktig_gjeld"].get("laan_fra_aksjonaer", 0),
+                andre_langsiktige_laan=b["egenkapital_og_gjeld"]["langsiktig_gjeld"].get("andre_langsiktige_laan", 0),
+            ),
+            kortsiktig_gjeld=KortsiktigGjeld(
+                leverandoergjeld=b["egenkapital_og_gjeld"]["kortsiktig_gjeld"].get("leverandoergjeld", 0),
+                skyldige_offentlige_avgifter=b["egenkapital_og_gjeld"]["kortsiktig_gjeld"].get("skyldige_offentlige_avgifter", 0),
+                annen_kortsiktig_gjeld=b["egenkapital_og_gjeld"]["kortsiktig_gjeld"].get("annen_kortsiktig_gjeld", 0),
+            ),
+        ),
+    )
+
+
 def les_config(config_fil: str) -> Aarsregnskap:
     """Leser config.yaml og returnerer et Aarsregnskap-objekt."""
     with open(config_fil, encoding="utf-8") as f:
@@ -40,61 +92,20 @@ def les_config(config_fil: str) -> Aarsregnskap:
         aksjekapital=s["aksjekapital"],
     )
 
-    r = cfg["resultatregnskap"]
-    resultat = Resultatregnskap(
-        driftsinntekter=Driftsinntekter(
-            salgsinntekter=r["driftsinntekter"]["salgsinntekter"],
-            andre_driftsinntekter=r["driftsinntekter"]["andre_driftsinntekter"],
-        ),
-        driftskostnader=Driftskostnader(
-            loennskostnader=r["driftskostnader"]["loennskostnader"],
-            avskrivninger=r["driftskostnader"]["avskrivninger"],
-            andre_driftskostnader=r["driftskostnader"]["andre_driftskostnader"],
-        ),
-        finansposter=Finansposter(
-            utbytte_fra_datterselskap=r["finansposter"]["utbytte_fra_datterselskap"],
-            andre_finansinntekter=r["finansposter"]["andre_finansinntekter"],
-            rentekostnader=r["finansposter"]["rentekostnader"],
-            andre_finanskostnader=r["finansposter"]["andre_finanskostnader"],
-        ),
-    )
+    resultat = _les_resultat(cfg["resultatregnskap"])
+    balanse = _les_balanse(cfg["balanse"])
 
-    b = cfg["balanse"]
-    balanse = Balanse(
-        eiendeler=Eiendeler(
-            anleggsmidler=Anleggsmidler(
-                aksjer_i_datterselskap=b["eiendeler"]["anleggsmidler"]["aksjer_i_datterselskap"],
-                andre_aksjer=b["eiendeler"]["anleggsmidler"]["andre_aksjer"],
-                langsiktige_fordringer=b["eiendeler"]["anleggsmidler"]["langsiktige_fordringer"],
-            ),
-            omloepmidler=Omloepmidler(
-                kortsiktige_fordringer=b["eiendeler"]["omloepmidler"]["kortsiktige_fordringer"],
-                bankinnskudd=b["eiendeler"]["omloepmidler"]["bankinnskudd"],
-            ),
-        ),
-        egenkapital_og_gjeld=EgenkapitalOgGjeld(
-            egenkapital=Egenkapital(
-                aksjekapital=b["egenkapital_og_gjeld"]["egenkapital"]["aksjekapital"],
-                overkursfond=b["egenkapital_og_gjeld"]["egenkapital"]["overkursfond"],
-                annen_egenkapital=b["egenkapital_og_gjeld"]["egenkapital"]["annen_egenkapital"],
-            ),
-            langsiktig_gjeld=LangsiktigGjeld(
-                laan_fra_aksjonaer=b["egenkapital_og_gjeld"]["langsiktig_gjeld"]["laan_fra_aksjonaer"],
-                andre_langsiktige_laan=b["egenkapital_og_gjeld"]["langsiktig_gjeld"]["andre_langsiktige_laan"],
-            ),
-            kortsiktig_gjeld=KortsiktigGjeld(
-                leverandoergjeld=b["egenkapital_og_gjeld"]["kortsiktig_gjeld"]["leverandoergjeld"],
-                skyldige_offentlige_avgifter=b["egenkapital_og_gjeld"]["kortsiktig_gjeld"]["skyldige_offentlige_avgifter"],
-                annen_kortsiktig_gjeld=b["egenkapital_og_gjeld"]["kortsiktig_gjeld"]["annen_kortsiktig_gjeld"],
-            ),
-        ),
-    )
+    fa = cfg.get("foregaaende_aar", {})
+    foregaaende_resultat = _les_resultat(fa["resultatregnskap"]) if "resultatregnskap" in fa else Resultatregnskap()
+    foregaaende_balanse = _les_balanse(fa["balanse"]) if "balanse" in fa else Balanse()
 
     return Aarsregnskap(
         selskap=selskap,
         regnskapsaar=cfg["regnskapsaar"],
         resultatregnskap=resultat,
         balanse=balanse,
+        foregaaende_aar_resultat=foregaaende_resultat,
+        foregaaende_aar_balanse=foregaaende_balanse,
     )
 
 

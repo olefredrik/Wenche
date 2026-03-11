@@ -12,15 +12,16 @@ import math
 
 import yaml
 
+from wenche.aarsregnskap import _les_resultat, _les_balanse
 from wenche.models import (
     Aarsregnskap,
+    Balanse,
+    Resultatregnskap,
     SkattemeldingKonfig,
     Selskap,
-    Resultatregnskap,
     Driftsinntekter,
     Driftskostnader,
     Finansposter,
-    Balanse,
     Eiendeler,
     Anleggsmidler,
     Omloepmidler,
@@ -49,35 +50,20 @@ def les_config(config_fil: str) -> tuple[Aarsregnskap, SkattemeldingKonfig]:
         aksjekapital=int(s["aksjekapital"]),
     )
 
-    rr = raw["resultatregnskap"]
-    resultatregnskap = Resultatregnskap(
-        driftsinntekter=Driftsinntekter(**rr["driftsinntekter"]),
-        driftskostnader=Driftskostnader(**rr["driftskostnader"]),
-        finansposter=Finansposter(**rr["finansposter"]),
-    )
+    resultatregnskap = _les_resultat(raw["resultatregnskap"])
+    balanse = _les_balanse(raw["balanse"])
 
-    b = raw["balanse"]
-    balanse = Balanse(
-        eiendeler=Eiendeler(
-            anleggsmidler=Anleggsmidler(**b["eiendeler"]["anleggsmidler"]),
-            omloepmidler=Omloepmidler(**b["eiendeler"]["omloepmidler"]),
-        ),
-        egenkapital_og_gjeld=EgenkapitalOgGjeld(
-            egenkapital=Egenkapital(**b["egenkapital_og_gjeld"]["egenkapital"]),
-            langsiktig_gjeld=LangsiktigGjeld(
-                **b["egenkapital_og_gjeld"]["langsiktig_gjeld"]
-            ),
-            kortsiktig_gjeld=KortsiktigGjeld(
-                **b["egenkapital_og_gjeld"]["kortsiktig_gjeld"]
-            ),
-        ),
-    )
+    fa = raw.get("foregaaende_aar", {})
+    foregaaende_resultat = _les_resultat(fa["resultatregnskap"]) if "resultatregnskap" in fa else Resultatregnskap()
+    foregaaende_balanse = _les_balanse(fa["balanse"]) if "balanse" in fa else Balanse()
 
     regnskap = Aarsregnskap(
         selskap=selskap,
         regnskapsaar=int(raw["regnskapsaar"]),
         resultatregnskap=resultatregnskap,
         balanse=balanse,
+        foregaaende_aar_resultat=foregaaende_resultat,
+        foregaaende_aar_balanse=foregaaende_balanse,
     )
 
     sm_raw = raw.get("skattemelding", {})
@@ -95,6 +81,11 @@ def _nok(beloep: int) -> str:
     return f"{beloep:>12,} kr".replace(",", " ")
 
 
+def _nok2(aarets: int, fjoraarets: int) -> str:
+    """Formaterer to beløp side om side (inneværende og foregående år)."""
+    return f"{aarets:>12,} kr   {fjoraarets:>12,} kr".replace(",", " ")
+
+
 def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
     """
     Genererer et ferdig utfylt sammendrag for RF-1167 og RF-1028.
@@ -104,6 +95,9 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
     b = regnskap.balanse
     s = regnskap.selskap
     år = regnskap.regnskapsaar
+    fr = regnskap.foregaaende_aar_resultat
+    fb = regnskap.foregaaende_aar_balanse
+    har_fjoraar = fr != Resultatregnskap() or fb != Balanse()
 
     # --- RF-1167: Næringsoppgave ---
 
@@ -295,6 +289,31 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
         f"  SUM EGENKAPITAL OG GJELD       {_nok(b.egenkapital_og_gjeld.sum)}",
         "",
     ]
+
+    if har_fjoraar:
+        netto_finans_fjor = fr.finansposter.sum_inntekter - fr.finansposter.sum_kostnader
+        linjer += [
+            "",
+            linje,
+            f"  RF-1167  SAMMENLIGNINGSTALL  (rskl. § 6-6)",
+            linje,
+            f"                                 {år:>12}   {år - 1:>12}",
+            f"  Sum driftsinntekter          {_nok2(r.driftsinntekter.sum, fr.driftsinntekter.sum)}",
+            f"  Sum driftskostnader          {_nok2(r.driftskostnader.sum, fr.driftskostnader.sum)}",
+            f"  Driftsresultat               {_nok2(r.driftsresultat, fr.driftsresultat)}",
+            f"  Netto finansposter           {_nok2(r.finansposter.sum_inntekter - r.finansposter.sum_kostnader, netto_finans_fjor)}",
+            f"  RESULTAT FØR SKATT           {_nok2(r.resultat_foer_skatt, fr.resultat_foer_skatt)}",
+            f"  SUM EIENDELER                {_nok2(b.eiendeler.sum, fb.eiendeler.sum)}",
+            f"  SUM EGENKAPITAL OG GJELD     {_nok2(b.egenkapital_og_gjeld.sum, fb.egenkapital_og_gjeld.sum)}",
+            "",
+        ]
+    else:
+        linjer += [
+            "",
+            f"  NB: Sammenligningstall for {år - 1} er ikke lagt inn.",
+            f"  Legg til 'foregaaende_aar' i config.yaml (påkrevd, jf. rskl. § 6-6).",
+            "",
+        ]
 
     if i_balanse:
         linjer.append("  Balansekontroll: OK")

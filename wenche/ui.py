@@ -78,6 +78,29 @@ _DEFAULTS = {
     "fritaksmetoden": False,
     "eierandel_datterselskap": 100,
     "antall_aksjonaerer": 1,
+    # Foregående år (sammenligningstall, rskl. § 6-6)
+    "f_salgsinntekter": 0,
+    "f_andre_driftsinntekter": 0,
+    "f_loennskostnader": 0,
+    "f_avskrivninger": 0,
+    "f_andre_driftskostnader": 0,
+    "f_utbytte_fra_datterselskap": 0,
+    "f_andre_finansinntekter": 0,
+    "f_rentekostnader": 0,
+    "f_andre_finanskostnader": 0,
+    "f_aksjer_i_datterselskap": 0,
+    "f_andre_aksjer": 0,
+    "f_langsiktige_fordringer": 0,
+    "f_kortsiktige_fordringer": 0,
+    "f_bankinnskudd": 0,
+    "f_ek_aksjekapital": 0,
+    "f_overkursfond": 0,
+    "f_annen_egenkapital": 0,
+    "f_laan_fra_aksjonaer": 0,
+    "f_andre_langsiktige_laan": 0,
+    "f_leverandoergjeld": 0,
+    "f_skyldige_offentlige_avgifter": 0,
+    "f_annen_kortsiktig_gjeld": 0,
 }
 
 if "initialisert" not in st.session_state:
@@ -131,6 +154,37 @@ if "initialisert" not in st.session_state:
             verdier["underskudd"] = int(sm.get("underskudd_til_fremfoering", 0))
             verdier["fritaksmetoden"] = bool(sm.get("anvend_fritaksmetoden", False))
             verdier["eierandel_datterselskap"] = int(sm.get("eierandel_datterselskap", 100))
+
+            fa = cfg.get("foregaaende_aar", {})
+            frr = fa.get("resultatregnskap", {})
+            fb_ = fa.get("balanse", {})
+            fanl = fb_.get("eiendeler", {}).get("anleggsmidler", {})
+            foml = fb_.get("eiendeler", {}).get("omloepmidler", {})
+            fek_ = fb_.get("egenkapital_og_gjeld", {}).get("egenkapital", {})
+            flg_ = fb_.get("egenkapital_og_gjeld", {}).get("langsiktig_gjeld", {})
+            fkg_ = fb_.get("egenkapital_og_gjeld", {}).get("kortsiktig_gjeld", {})
+            verdier["f_salgsinntekter"] = int(frr.get("driftsinntekter", {}).get("salgsinntekter", 0))
+            verdier["f_andre_driftsinntekter"] = int(frr.get("driftsinntekter", {}).get("andre_driftsinntekter", 0))
+            verdier["f_loennskostnader"] = int(frr.get("driftskostnader", {}).get("loennskostnader", 0))
+            verdier["f_avskrivninger"] = int(frr.get("driftskostnader", {}).get("avskrivninger", 0))
+            verdier["f_andre_driftskostnader"] = int(frr.get("driftskostnader", {}).get("andre_driftskostnader", 0))
+            verdier["f_utbytte_fra_datterselskap"] = int(frr.get("finansposter", {}).get("utbytte_fra_datterselskap", 0))
+            verdier["f_andre_finansinntekter"] = int(frr.get("finansposter", {}).get("andre_finansinntekter", 0))
+            verdier["f_rentekostnader"] = int(frr.get("finansposter", {}).get("rentekostnader", 0))
+            verdier["f_andre_finanskostnader"] = int(frr.get("finansposter", {}).get("andre_finanskostnader", 0))
+            verdier["f_aksjer_i_datterselskap"] = int(fanl.get("aksjer_i_datterselskap", 0))
+            verdier["f_andre_aksjer"] = int(fanl.get("andre_aksjer", 0))
+            verdier["f_langsiktige_fordringer"] = int(fanl.get("langsiktige_fordringer", 0))
+            verdier["f_kortsiktige_fordringer"] = int(foml.get("kortsiktige_fordringer", 0))
+            verdier["f_bankinnskudd"] = int(foml.get("bankinnskudd", 0))
+            verdier["f_ek_aksjekapital"] = int(fek_.get("aksjekapital", 0))
+            verdier["f_overkursfond"] = int(fek_.get("overkursfond", 0))
+            verdier["f_annen_egenkapital"] = int(fek_.get("annen_egenkapital", 0))
+            verdier["f_laan_fra_aksjonaer"] = int(flg_.get("laan_fra_aksjonaer", 0))
+            verdier["f_andre_langsiktige_laan"] = int(flg_.get("andre_langsiktige_laan", 0))
+            verdier["f_leverandoergjeld"] = int(fkg_.get("leverandoergjeld", 0))
+            verdier["f_skyldige_offentlige_avgifter"] = int(fkg_.get("skyldige_offentlige_avgifter", 0))
+            verdier["f_annen_kortsiktig_gjeld"] = int(fkg_.get("annen_kortsiktig_gjeld", 0))
 
             aksjonaerer_raw = cfg.get("aksjonaerer", [])
             verdier["antall_aksjonaerer"] = len(aksjonaerer_raw)
@@ -206,6 +260,54 @@ def lagre_config():
                     "leverandoergjeld": int(st.session_state["leverandoergjeld"]),
                     "skyldige_offentlige_avgifter": int(st.session_state["skyldige_offentlige_avgifter"]),
                     "annen_kortsiktig_gjeld": int(st.session_state["annen_kortsiktig_gjeld"]),
+                },
+            },
+        },
+        "foregaaende_aar": {
+            "resultatregnskap": {
+                "driftsinntekter": {
+                    "salgsinntekter": int(st.session_state["f_salgsinntekter"]),
+                    "andre_driftsinntekter": int(st.session_state["f_andre_driftsinntekter"]),
+                },
+                "driftskostnader": {
+                    "loennskostnader": int(st.session_state["f_loennskostnader"]),
+                    "avskrivninger": int(st.session_state["f_avskrivninger"]),
+                    "andre_driftskostnader": int(st.session_state["f_andre_driftskostnader"]),
+                },
+                "finansposter": {
+                    "utbytte_fra_datterselskap": int(st.session_state["f_utbytte_fra_datterselskap"]),
+                    "andre_finansinntekter": int(st.session_state["f_andre_finansinntekter"]),
+                    "rentekostnader": int(st.session_state["f_rentekostnader"]),
+                    "andre_finanskostnader": int(st.session_state["f_andre_finanskostnader"]),
+                },
+            },
+            "balanse": {
+                "eiendeler": {
+                    "anleggsmidler": {
+                        "aksjer_i_datterselskap": int(st.session_state["f_aksjer_i_datterselskap"]),
+                        "andre_aksjer": int(st.session_state["f_andre_aksjer"]),
+                        "langsiktige_fordringer": int(st.session_state["f_langsiktige_fordringer"]),
+                    },
+                    "omloepmidler": {
+                        "kortsiktige_fordringer": int(st.session_state["f_kortsiktige_fordringer"]),
+                        "bankinnskudd": int(st.session_state["f_bankinnskudd"]),
+                    },
+                },
+                "egenkapital_og_gjeld": {
+                    "egenkapital": {
+                        "aksjekapital": int(st.session_state["f_ek_aksjekapital"]),
+                        "overkursfond": int(st.session_state["f_overkursfond"]),
+                        "annen_egenkapital": int(st.session_state["f_annen_egenkapital"]),
+                    },
+                    "langsiktig_gjeld": {
+                        "laan_fra_aksjonaer": int(st.session_state["f_laan_fra_aksjonaer"]),
+                        "andre_langsiktige_laan": int(st.session_state["f_andre_langsiktige_laan"]),
+                    },
+                    "kortsiktig_gjeld": {
+                        "leverandoergjeld": int(st.session_state["f_leverandoergjeld"]),
+                        "skyldige_offentlige_avgifter": int(st.session_state["f_skyldige_offentlige_avgifter"]),
+                        "annen_kortsiktig_gjeld": int(st.session_state["f_annen_kortsiktig_gjeld"]),
+                    },
                 },
             },
         },
@@ -640,6 +742,44 @@ with fane_regnskap:
     else:
         st.error(f"Balansen stemmer ikke. Differanse: {differanse:,} kr".replace(",", " "))
 
+    st.divider()
+    with st.expander("Sammenligningstall — foregående år (påkrevd, rskl. § 6-6)", expanded=False):
+        st.caption(
+            "Fyll inn tilsvarende tall fra fjorårets regnskap. "
+            "Disse brukes som sammenligningstall i årsregnskapet som sendes til Brønnøysundregistrene."
+        )
+        st.subheader("Resultatregnskap")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.number_input("Salgsinntekter", step=1000, key="f_salgsinntekter")
+            st.number_input("Andre driftsinntekter", step=1000, key="f_andre_driftsinntekter")
+            st.number_input("Lønnskostnader", step=1000, key="f_loennskostnader")
+            st.number_input("Avskrivninger", step=1000, key="f_avskrivninger")
+            st.number_input("Andre driftskostnader", step=1000, key="f_andre_driftskostnader")
+        with col2:
+            st.number_input("Utbytte fra datterselskap", step=1000, key="f_utbytte_fra_datterselskap")
+            st.number_input("Andre finansinntekter", step=1000, key="f_andre_finansinntekter")
+            st.number_input("Rentekostnader", step=1000, key="f_rentekostnader")
+            st.number_input("Andre finanskostnader", step=1000, key="f_andre_finanskostnader")
+
+        st.subheader("Balanse")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.number_input("Aksjer i datterselskap", step=1000, key="f_aksjer_i_datterselskap")
+            st.number_input("Andre aksjer", step=1000, key="f_andre_aksjer")
+            st.number_input("Langsiktige fordringer", step=1000, key="f_langsiktige_fordringer")
+            st.number_input("Kortsiktige fordringer", step=1000, key="f_kortsiktige_fordringer")
+            st.number_input("Bankinnskudd", step=1000, key="f_bankinnskudd")
+        with col2:
+            st.number_input("Aksjekapital", step=1000, key="f_ek_aksjekapital")
+            st.number_input("Overkursfond", step=1000, key="f_overkursfond")
+            st.number_input("Annen egenkapital", step=1000, key="f_annen_egenkapital")
+            st.number_input("Lån fra aksjonær", step=1000, key="f_laan_fra_aksjonaer")
+            st.number_input("Andre langsiktige lån", step=1000, key="f_andre_langsiktige_laan")
+            st.number_input("Leverandørgjeld", step=1000, key="f_leverandoergjeld")
+            st.number_input("Skyldige offentlige avgifter", step=1000, key="f_skyldige_offentlige_avgifter")
+            st.number_input("Annen kortsiktig gjeld", step=1000, key="f_annen_kortsiktig_gjeld")
+
 
 # ---------------------------------------------------------------------------
 # Fane 3: Aksjonærer
@@ -775,6 +915,52 @@ with fane_dokumenter:
                         leverandoergjeld=int(st.session_state["leverandoergjeld"]),
                         skyldige_offentlige_avgifter=int(st.session_state["skyldige_offentlige_avgifter"]),
                         annen_kortsiktig_gjeld=int(st.session_state["annen_kortsiktig_gjeld"]),
+                    ),
+                ),
+            ),
+            foregaaende_aar_resultat=Resultatregnskap(
+                driftsinntekter=Driftsinntekter(
+                    salgsinntekter=int(st.session_state["f_salgsinntekter"]),
+                    andre_driftsinntekter=int(st.session_state["f_andre_driftsinntekter"]),
+                ),
+                driftskostnader=Driftskostnader(
+                    loennskostnader=int(st.session_state["f_loennskostnader"]),
+                    avskrivninger=int(st.session_state["f_avskrivninger"]),
+                    andre_driftskostnader=int(st.session_state["f_andre_driftskostnader"]),
+                ),
+                finansposter=Finansposter(
+                    utbytte_fra_datterselskap=int(st.session_state["f_utbytte_fra_datterselskap"]),
+                    andre_finansinntekter=int(st.session_state["f_andre_finansinntekter"]),
+                    rentekostnader=int(st.session_state["f_rentekostnader"]),
+                    andre_finanskostnader=int(st.session_state["f_andre_finanskostnader"]),
+                ),
+            ),
+            foregaaende_aar_balanse=Balanse(
+                eiendeler=Eiendeler(
+                    anleggsmidler=Anleggsmidler(
+                        aksjer_i_datterselskap=int(st.session_state["f_aksjer_i_datterselskap"]),
+                        andre_aksjer=int(st.session_state["f_andre_aksjer"]),
+                        langsiktige_fordringer=int(st.session_state["f_langsiktige_fordringer"]),
+                    ),
+                    omloepmidler=Omloepmidler(
+                        kortsiktige_fordringer=int(st.session_state["f_kortsiktige_fordringer"]),
+                        bankinnskudd=int(st.session_state["f_bankinnskudd"]),
+                    ),
+                ),
+                egenkapital_og_gjeld=EgenkapitalOgGjeld(
+                    egenkapital=Egenkapital(
+                        aksjekapital=int(st.session_state["f_ek_aksjekapital"]),
+                        overkursfond=int(st.session_state["f_overkursfond"]),
+                        annen_egenkapital=int(st.session_state["f_annen_egenkapital"]),
+                    ),
+                    langsiktig_gjeld=LangsiktigGjeld(
+                        laan_fra_aksjonaer=int(st.session_state["f_laan_fra_aksjonaer"]),
+                        andre_langsiktige_laan=int(st.session_state["f_andre_langsiktige_laan"]),
+                    ),
+                    kortsiktig_gjeld=KortsiktigGjeld(
+                        leverandoergjeld=int(st.session_state["f_leverandoergjeld"]),
+                        skyldige_offentlige_avgifter=int(st.session_state["f_skyldige_offentlige_avgifter"]),
+                        annen_kortsiktig_gjeld=int(st.session_state["f_annen_kortsiktig_gjeld"]),
                     ),
                 ),
             ),

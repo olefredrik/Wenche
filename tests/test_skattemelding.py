@@ -100,6 +100,26 @@ def test_balansekontroll_ok(eksempel_regnskap):
     assert "Balansekontroll: OK" in tekst
 
 
+def test_sammenligningstall_vises_naar_tilgjengelig(eksempel_regnskap):
+    """Når foregående år er fylt inn, skal sammenligningstall vises i rapporten."""
+    from wenche.models import Resultatregnskap, Driftskostnader
+    eksempel_regnskap.foregaaende_aar_resultat = Resultatregnskap(
+        driftskostnader=Driftskostnader(andre_driftskostnader=4000)
+    )
+    konfig = SkattemeldingKonfig()
+    tekst = generer(eksempel_regnskap, konfig)
+    assert "SAMMENLIGNINGSTALL" in tekst
+    assert "§ 6-6" in tekst
+
+
+def test_advarsel_naar_sammenligningstall_mangler(eksempel_regnskap):
+    """Når foregående år ikke er fylt inn, skal rapporten advare om manglende sammenligningstall."""
+    konfig = SkattemeldingKonfig()
+    tekst = generer(eksempel_regnskap, konfig)
+    assert "Sammenligningstall" in tekst
+    assert "§ 6-6" in tekst
+
+
 def test_balansekontroll_advarsel():
     """Ubalansert balanse skal gi advarsel i rapporten."""
     from wenche.models import (
