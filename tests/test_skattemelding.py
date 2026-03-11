@@ -40,19 +40,35 @@ def test_ingen_skatt_ved_underskudd(eksempel_regnskap):
     assert _skatt_linje(tekst).endswith("0 kr")
 
 
-def test_fritaksmetoden_reduserer_skattepliktig_utbytte(regnskap_med_utbytte):
-    """Med fritaksmetoden er 97 % av utbytte fra datterselskap skattefritt."""
-    konfig = SkattemeldingKonfig(anvend_fritaksmetoden=True)
+def test_fritaksmetoden_under_90_prosent_eierandel(regnskap_med_utbytte):
+    """Ved eierandel < 90 % gjelder sjablonregelen: 3 % er skattepliktig."""
+    konfig = SkattemeldingKonfig(anvend_fritaksmetoden=True, eierandel_datterselskap=50)
     tekst = generer(regnskap_med_utbytte, konfig)
     assert "fritatt, 97 %" in tekst
     assert "sjablonregel, 3 %" in tekst
 
 
-def test_fritaksmetoden_skattepliktig_beloep(regnskap_med_utbytte):
+def test_fritaksmetoden_over_90_prosent_eierandel(regnskap_med_utbytte):
+    """Ved eierandel ≥ 90 % er hele utbyttet fritatt — ingen sjablonregel."""
+    konfig = SkattemeldingKonfig(anvend_fritaksmetoden=True, eierandel_datterselskap=100)
+    tekst = generer(regnskap_med_utbytte, konfig)
+    assert "100 % fritatt" in tekst
+    assert "sjablonregel" not in tekst
+
+
+def test_fritaksmetoden_under_90_skattepliktig_beloep(regnskap_med_utbytte):
     """3 % av 100 000 kr utbytte = 3 000 kr skattepliktig; skatt = 0 (inntekt = -2 500)."""
     # Driftsresultat = -5500, skattepliktig utbytte = ceil(100000 * 0.03) = 3000
     # Skattepliktig inntekt = -5500 + 3000 = -2500 → ingen skatt
-    konfig = SkattemeldingKonfig(anvend_fritaksmetoden=True)
+    konfig = SkattemeldingKonfig(anvend_fritaksmetoden=True, eierandel_datterselskap=50)
+    tekst = generer(regnskap_med_utbytte, konfig)
+    assert _skatt_linje(tekst).endswith("0 kr")
+
+
+def test_fritaksmetoden_over_90_ingen_skatt(regnskap_med_utbytte):
+    """Ved eierandel ≥ 90 % og negativt driftsresultat skal det ikke beregnes skatt."""
+    # Driftsresultat = -5500, skattepliktig utbytte = 0 → ingen skatt
+    konfig = SkattemeldingKonfig(anvend_fritaksmetoden=True, eierandel_datterselskap=100)
     tekst = generer(regnskap_med_utbytte, konfig)
     assert _skatt_linje(tekst).endswith("0 kr")
 

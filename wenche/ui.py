@@ -76,6 +76,7 @@ _DEFAULTS = {
     "annen_kortsiktig_gjeld": 0,
     "underskudd": 0,
     "fritaksmetoden": False,
+    "eierandel_datterselskap": 100,
     "antall_aksjonaerer": 1,
 }
 
@@ -129,6 +130,7 @@ if "initialisert" not in st.session_state:
             sm = cfg.get("skattemelding", {})
             verdier["underskudd"] = int(sm.get("underskudd_til_fremfoering", 0))
             verdier["fritaksmetoden"] = bool(sm.get("anvend_fritaksmetoden", False))
+            verdier["eierandel_datterselskap"] = int(sm.get("eierandel_datterselskap", 100))
 
             aksjonaerer_raw = cfg.get("aksjonaerer", [])
             verdier["antall_aksjonaerer"] = len(aksjonaerer_raw)
@@ -210,6 +212,7 @@ def lagre_config():
         "skattemelding": {
             "underskudd_til_fremfoering": int(st.session_state["underskudd"]),
             "anvend_fritaksmetoden": bool(st.session_state["fritaksmetoden"]),
+            "eierandel_datterselskap": int(st.session_state["eierandel_datterselskap"]),
         },
         "aksjonaerer": [
             {
@@ -692,10 +695,23 @@ with fane_dokumenter:
             key="fritaksmetoden",
             help=(
                 "Gjelder dersom selskapet har mottatt utbytte fra datterselskaper. "
-                "Med fritaksmetoden er 97 % av utbyttet skattefritt — kun 3 % (sjablonregelen) "
-                "regnes som skattepliktig inntekt. Hjemlet i skatteloven § 2-38."
+                "Ved eierandel ≥ 90 % er hele utbyttet skattefritt. "
+                "Ved eierandel < 90 % er 3 % skattepliktig (sjablonregelen, sktl. § 2-38 sjette ledd)."
             ),
         )
+        if st.session_state["fritaksmetoden"]:
+            st.number_input(
+                "Eierandel i datterselskap (%)",
+                min_value=0,
+                max_value=100,
+                step=1,
+                key="eierandel_datterselskap",
+                help=(
+                    "Selskapets eierandel i datterselskapet som utbytte er mottatt fra. "
+                    "Ved eierandel ≥ 90 % er hele utbyttet fritatt (0 % skattepliktig). "
+                    "Ved eierandel < 90 % gjelder sjablonregelen: 3 % er skattepliktig."
+                ),
+            )
         if int(st.session_state.get("utbytte_fra_datterselskap", 0)) > 0 and not st.session_state["fritaksmetoden"]:
             st.info(
                 "Du har ført utbytte fra datterselskap. Husk å krysse av for fritaksmetoden "
@@ -772,6 +788,7 @@ with fane_dokumenter:
             konfig = SkattemeldingKonfig(
                 underskudd_til_fremfoering=int(st.session_state["underskudd"]),
                 anvend_fritaksmetoden=bool(st.session_state["fritaksmetoden"]),
+                eierandel_datterselskap=int(st.session_state["eierandel_datterselskap"]),
             )
             tekst = sm_modul.generer(regnskap, konfig)
             st.code(tekst, language=None)

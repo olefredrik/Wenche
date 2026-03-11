@@ -68,7 +68,10 @@ skattemelding:
   underskudd_til_fremfoering: 0     # Fremførbart underskudd fra tidligere år (NOK).
                                     # Finnes i fjorårets skattemelding (RF-1028).
   anvend_fritaksmetoden: true       # true for holdingselskaper som eier aksjer i
-                                    # datterselskaper. Gjør at 97 % av utbytte er skattefritt.
+                                    # datterselskaper (skatteloven § 2-38).
+  eierandel_datterselskap: 100      # Eierandel i datterselskapet (prosent, 0–100).
+                                    # ≥ 90 %: hele utbyttet er skattefritt.
+                                    # < 90 %: 3 % er skattepliktig (sjablonregelen).
 
 # --- Aksjonærregister ---
 # List opp alle aksjonærer per 31.12 i regnskapsåret.

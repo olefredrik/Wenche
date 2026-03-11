@@ -237,3 +237,4 @@ class Aksjonaerregisteroppgave:
 class SkattemeldingKonfig:
     underskudd_til_fremfoering: int = 0   # Ubenyttet underskudd fra tidligere år
     anvend_fritaksmetoden: bool = True    # True for holdingselskaper som eier aksjer
+    eierandel_datterselskap: int = 100    # Eierandel i datterselskap (prosent, 0–100)

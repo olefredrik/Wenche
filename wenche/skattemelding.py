@@ -84,6 +84,7 @@ def les_config(config_fil: str) -> tuple[Aarsregnskap, SkattemeldingKonfig]:
     konfig = SkattemeldingKonfig(
         underskudd_til_fremfoering=int(sm_raw.get("underskudd_til_fremfoering", 0)),
         anvend_fritaksmetoden=bool(sm_raw.get("anvend_fritaksmetoden", True)),
+        eierandel_datterselskap=int(sm_raw.get("eierandel_datterselskap", 100)),
     )
 
     return regnskap, konfig
@@ -116,12 +117,18 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
 
     # --- RF-1028: Skatteberegning ---
 
-    # Fritaksmetoden: utbytte fra datterselskap er 97 % skattefritt.
-    # 3 % (sjablonregel) er skattepliktig inntekt.
+    # Fritaksmetoden (sktl. § 2-38): utbytte fra kvalifiserende selskaper er skattefritt.
+    # Ved eierandel < 90 % gjelder sjablonregelen (§ 2-38 sjette ledd): 3 % er skattepliktig.
+    # Ved eierandel ≥ 90 % er hele utbyttet fritatt (0 % skattepliktig).
+    # Merk: dette er basert på faglig vurdering — sjekk alltid mot gjeldende regelverk.
     utbytte = r.finansposter.utbytte_fra_datterselskap
     if konfig.anvend_fritaksmetoden and utbytte > 0:
-        skattepliktig_utbytte = math.ceil(utbytte * 0.03)
-        fritatt_utbytte = utbytte - skattepliktig_utbytte
+        if konfig.eierandel_datterselskap >= 90:
+            skattepliktig_utbytte = 0
+            fritatt_utbytte = utbytte
+        else:
+            skattepliktig_utbytte = math.ceil(utbytte * 0.03)
+            fritatt_utbytte = utbytte - skattepliktig_utbytte
     else:
         skattepliktig_utbytte = utbytte
         fritatt_utbytte = 0
@@ -197,6 +204,8 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
         f"    Andre finanskostnader        {_nok(r.finansposter.andre_finanskostnader)}",
         "",
         f"  RESULTAT FØR SKATT             {_nok(resultat_foer_skatt)}",
+        f"  Skattekostnad                  {_nok(-beregnet_skatt)}",
+        f"  ÅRSRESULTAT                    {_nok(resultat_foer_skatt - beregnet_skatt)}",
         "",
         linje,
         "  RF-1028  SKATTEMELDING FOR AS",
@@ -207,10 +216,15 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
     ]
 
     if konfig.anvend_fritaksmetoden and utbytte > 0:
-        linjer += [
-            f"    Utbytte (fritatt, 97 %)      {_nok(fritatt_utbytte)}",
-            f"    Utbytte (sjablonregel, 3 %)  {_nok(skattepliktig_utbytte)}",
-        ]
+        if konfig.eierandel_datterselskap >= 90:
+            linjer += [
+                f"    Utbytte (100 % fritatt)      {_nok(fritatt_utbytte)}",
+            ]
+        else:
+            linjer += [
+                f"    Utbytte (fritatt, 97 %)      {_nok(fritatt_utbytte)}",
+                f"    Utbytte (sjablonregel, 3 %)  {_nok(skattepliktig_utbytte)}",
+            ]
     else:
         linjer += [
             f"    Utbytte                      {_nok(utbytte)}",
@@ -286,6 +300,14 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
         linjer.append("  Balansekontroll: OK")
     else:
         linjer.append(f"  ADVARSEL: Balansen stemmer ikke! Differanse: {_nok(differanse)}")
+
+    if beregnet_skatt > 0:
+        linjer += [
+            "",
+            f"  NB: Beregnet skatt er {_nok(beregnet_skatt).strip()}. Husk å føre dette",
+            "  som «Skyldig skatt» (konto 2500) under kortsiktig gjeld i balansen,",
+            "  og kontroller at balansen fortsatt går opp.",
+        ]
 
     linjer += [
         "",
