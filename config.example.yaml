@@ -62,6 +62,47 @@ balanse:
       skyldige_offentlige_avgifter: 0 # Skyldig mva, arbeidsgiveravgift o.l.
       annen_kortsiktig_gjeld: 0       # Annen gjeld med forfall innen 1 år
 
+# --- Foregående år (sammenligningstall) ---
+# Obligatorisk etter regnskapslovens § 6-6.
+# Kopier inn tilsvarende tall fra fjorårets regnskap.
+# Dersom selskapet ble stiftet i inneværende år, kan seksjonen utelates.
+
+foregaaende_aar:
+  resultatregnskap:
+    driftsinntekter:
+      salgsinntekter: 0
+      andre_driftsinntekter: 0
+    driftskostnader:
+      loennskostnader: 0
+      avskrivninger: 0
+      andre_driftskostnader: 0
+    finansposter:
+      utbytte_fra_datterselskap: 0
+      andre_finansinntekter: 0
+      rentekostnader: 0
+      andre_finanskostnader: 0
+  balanse:
+    eiendeler:
+      anleggsmidler:
+        aksjer_i_datterselskap: 0
+        andre_aksjer: 0
+        langsiktige_fordringer: 0
+      omloepmidler:
+        kortsiktige_fordringer: 0
+        bankinnskudd: 0
+    egenkapital_og_gjeld:
+      egenkapital:
+        aksjekapital: 0
+        overkursfond: 0
+        annen_egenkapital: 0
+      langsiktig_gjeld:
+        laan_fra_aksjonaer: 0
+        andre_langsiktige_laan: 0
+      kortsiktig_gjeld:
+        leverandoergjeld: 0
+        skyldige_offentlige_avgifter: 0
+        annen_kortsiktig_gjeld: 0
+
 # --- Skattemelding ---
 
 skattemelding:
