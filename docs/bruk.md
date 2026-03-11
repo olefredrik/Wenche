@@ -50,7 +50,18 @@ Sammendraget inneholder:
 - Alle felt i næringsoppgaven (RF-1167) ferdig utfylt
 - Skatteberegning med fritaksmetoden der det er aktuelt
 - Beregnet skatt (22 %)
+- Skattekostnad ført i resultatregnskapet
 - Fremførbart underskudd hvis selskapet gikk med tap
+- **Egenkapitalnote** (rskl. § 7-2b) med bevegelse per egenkapitalpost (inngående balanse, årsresultat, utbytte og utgående balanse)
+
+!!! info "Fritaksmetoden og sjablonregelen"
+    Wenche håndterer **to tilfeller** avhengig av eierandel i datterselskapet (`eierandel_datterselskap` i config.yaml):
+
+    - **Eierandel ≥ 90 %:** Hele utbyttet er skattefritt (fritaksmetoden, sktl. § 2-38).
+    - **Eierandel < 90 %:** 3 % av utbyttet er skattepliktig (sjablonregelen, sktl. § 2-38 sjette ledd). Skatteberegningen justeres automatisk.
+
+!!! info "Egenkapitalnote"
+    Egenkapitalnoten (rskl. § 7-2b) vises automatisk når `foregaaende_aar` er utfylt i `config.yaml`. Uten sammenligningstall vises kun utgående balanse med en advarsel om at inngående tall mangler.
 
 **Send inn manuelt:**
 
@@ -92,6 +103,9 @@ Sammendraget inneholder:
 
 !!! note "Signering skjer i Altinn, ikke i Wenche"
     Wenche laster opp regnskapet og klargjør det for signering. Selve signeringen må gjøres av daglig leder eller styreleder i Altinn med BankID — dette er et juridisk krav og kan ikke gjøres maskinelt.
+
+!!! info "Sammenligningstall (rskl. § 6-6)"
+    Årsregnskapet inkluderer automatisk sammenligningstall fra foregående år når `foregaaende_aar` er utfylt i `config.yaml`. Dette er obligatorisk etter regnskapsloven § 6-6. For selskaper stiftet i inneværende regnskapsår kan seksjonen utelates.
 
 ---
 

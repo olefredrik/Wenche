@@ -24,6 +24,27 @@ Alle AS plikter å levere tre ting hvert år:
 - **Næringsoppgaven (RF-1167)** er en detaljert oppstilling av selskapets inntekter og kostnader for skatteformål, og er grunnlaget for skatteberegningen.
 - **Skattemeldingen for AS (RF-1028)** er selve skattemeldingen. For holdingselskaper gjelder **fritaksmetoden**: utbytte fra datterselskaper er i praksis 97 % skattefritt.
 
+## Hvem passer Wenche for?
+
+Wenche er laget for **enkle holdingselskaper og småaksjeselskaper** — typisk et personlig investeringsselskap uten ansatte som eier aksjer i ett eller flere datterselskaper.
+
+**Passer godt for selskaper som:**
+
+- Ikke har ansatte (eller har én daglig leder uten komplekse lønnsforhold)
+- Kun eier aksjer og finansielle instrumenter — ingen varelager eller produksjonsmidler
+- Er alene i strukturen, dvs. ikke morselskap med plikt til konsernregnskap
+- Har et enkelt noteapparat (aksjenote og egenkapitalbevegelse dekkes av Wenche)
+
+**Passer ikke for selskaper som:**
+
+- Er morselskap og har plikt til å avlegge konsernregnskap
+- Har varelager, produksjonsutstyr eller mange anleggsmidler med avskrivningsplan
+- Krever revisor (Wenche støtter reviderte regnskap, men genererer ikke revisjonsberetning)
+- Har mange ansatte med komplekse lønns- og pensjonsforhold
+
+!!! warning "Wenche er ikke et fullverdig regnskapssystem"
+    Wenche er et **innsendingsverktøy** — det hjelper deg å fylle ut og sende inn dokumenter du allerede har tallene til. Det erstatter ikke en autorisert regnskapsfører eller et fullstendig regnskapsprogram. Skatteberegningene bør alltid verifiseres mot gjeldende regelverk, og regelverket endres jevnlig.
+
 ## Kom i gang
 
 [Installasjon →](installasjon.md){ .md-button .md-button--primary }
