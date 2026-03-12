@@ -93,7 +93,7 @@ Sammendraget inneholder:
     wenche logout
     ```
 
-    Wenche skriver ut en Altinn-lenke når opplastingen er ferdig. Åpne lenken i nettleseren og signer med BankID for å fullføre innsendingen.
+    Wenche skriver ut en lenke til Altinn-innboksen når opplastingen er ferdig. Åpne lenken i nettleseren, finn skjemaet i innboksen og signer med BankID for å fullføre innsendingen.
 
 === "Webgrensesnitt"
 
@@ -111,15 +111,18 @@ Sammendraget inneholder:
 
 ## Aksjonærregisteroppgave (frist 31. januar)
 
+!!! warning "Midlertidig utilgjengelig"
+    Digital innsending av aksjonærregisteroppgave (RF-1086) via Wenche er for øyeblikket blokkert fordi Skatteetaten ikke har aktivert systembruker-delegering for sin Altinn-app. Koden er ferdig på Wenche sin side, men innsending er ikke mulig før SKD aktiverer støtten. Vi følger saken og oppdaterer dokumentasjonen så snart det er løst.
+
 === "Kommandolinje"
 
-    Test uten innsending:
+    Test og generer XML lokalt:
 
     ```bash
     wenche send-aksjonaerregister --dry-run
     ```
 
-    Send inn:
+    Innsending (krever at SKD har aktivert systembruker-støtte):
 
     ```bash
     wenche login
