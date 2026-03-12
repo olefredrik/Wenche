@@ -46,8 +46,8 @@ def generer_hovedskjema(regnskap: Aarsregnskap) -> bytes:
       <navn orid="1">{s.navn}</navn>
     </enhet>
     <opplysningerInnsending>
-      <systemNavn orid="39007">Wenche</systemNavn>
       <noteMaskinellBehandling orid="37499">Maskinell innsending</noteMaskinellBehandling>
+      <systemNavn orid="39007">Wenche</systemNavn>
     </opplysningerInnsending>
   </Innsender>
   <Skjemainnhold>
@@ -223,9 +223,12 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
           <fjoraarets orid="7108">{fam.sum}</fjoraarets>
         </sumAnleggsmidler>
         <balanseFinansielleAnleggsmidler>
-          {linje("investeringDatterselskap", am.aksjer_i_datterselskap, "Aksjer i datterselskap", "29017", "9686", "10289", fam.aksjer_i_datterselskap)}
-          {linje("investeringAnnetForetakSammeKonsern", am.andre_aksjer, "Andre aksjer", "29018", "7727", "8012", fam.andre_aksjer)}
-          {linje("laanForetakSammeKonsern", am.langsiktige_fordringer, "Langsiktige fordringer", "29019", "6500", "7093", fam.langsiktige_fordringer)}
+          <investeringDatterselskap>
+            <aarets orid="9686">{am.aksjer_i_datterselskap}</aarets>
+            <fjoraarets orid="10289">{fam.aksjer_i_datterselskap}</fjoraarets>
+          </investeringDatterselskap>
+          {linje("investeringAksjerAndeler", am.andre_aksjer, "Andre aksjer", "29018", "7727", "8012", fam.andre_aksjer)}
+          {linje("annenFordring", am.langsiktige_fordringer, "Langsiktige fordringer", "29019", "6500", "7093", fam.langsiktige_fordringer)}
           <sumFinansielleAnleggsmidler>
             <aarets orid="5267">{am.sum}</aarets>
             <fjoraarets orid="8014">{fam.sum}</fjoraarets>

@@ -136,3 +136,34 @@ def test_underskjema_returnerer_bytes(eksempel_regnskap):
 
 def test_hovedskjema_returnerer_bytes(eksempel_regnskap):
     assert isinstance(generer_hovedskjema(eksempel_regnskap), bytes)
+
+
+def test_hovedskjema_inneholder_system_navn(eksempel_regnskap):
+    root = _parse(generer_hovedskjema(eksempel_regnskap))
+    system_navn = root.find(f".//{{{NS_HOVED}}}systemNavn")
+    assert system_navn is not None
+    assert system_navn.text == "Wenche"
+
+
+def test_hovedskjema_inneholder_note_maskinell_behandling(eksempel_regnskap):
+    root = _parse(generer_hovedskjema(eksempel_regnskap))
+    note = root.find(f".//{{{NS_HOVED}}}noteMaskinellBehandling")
+    assert note is not None
+
+
+def test_underskjema_antall_aarsverk_er_med(eksempel_regnskap):
+    root = _parse(generer_underskjema(eksempel_regnskap))
+    aarsverk = root.find(f".//{{{NS_UNDER}}}antallAarsverk")
+    assert aarsverk is not None
+    assert aarsverk.text == "0"
+
+
+def test_underskjema_sum_overfoeringer_lik_aarsresultat(eksempel_regnskap):
+    """sumOverfoeringerOgDisponeringer skal være lik årsresultatet, ikke 0."""
+    root = _parse(generer_underskjema(eksempel_regnskap))
+    sum_overfoeringer = root.find(
+        f".//{{{NS_UNDER}}}sumOverfoeringerOgDisponeringer/{{{NS_UNDER}}}aarets"
+    )
+    assert sum_overfoeringer is not None
+    # årsresultat = driftsresultat + netto finans = -5500 + 0 = -5500
+    assert int(sum_overfoeringer.text) == -5500

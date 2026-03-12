@@ -109,6 +109,7 @@ def opprett_systembruker():
         raise SystemExit(1)
 
 
+
 # ---------------------------------------------------------------------------
 # Årsregnskap
 # ---------------------------------------------------------------------------
@@ -197,7 +198,9 @@ def send_aksjonaerregister(config_fil: str, dry_run: bool):
 
     token = auth.get_altinn_token()
     with AltinnClient(token) as klient:
-        aksjonaerregister.send_inn(oppgave, klient)
+        sign_url = aksjonaerregister.send_inn(oppgave, klient)
+    if sign_url:
+        click.echo(f"\nSigner i Altinn: {sign_url}")
 
 
 # ---------------------------------------------------------------------------

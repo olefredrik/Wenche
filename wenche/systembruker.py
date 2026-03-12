@@ -23,16 +23,16 @@ _BASES = {
 
 _SYSTEM_NAVN = "wenche"
 
-# Ressurs-ID for BRG årsregnskap-appen i Altinns ressursregister.
-# Altinn 3-apper får ressurs-ID på formatet app_{org}_{appnavn}.
-_BRG_RESSURS = "app_brg_aarsregnskap-vanlig-202406"
-
+# Ressurs-IDer for Altinn 3-apper. Format: app_{org}_{appnavn}.
+# Merk: Apper må eksplisitt aktivere systembruker-støtte i Altinn.
+# app_skd_a2-1051-241111 støtter ikke systembruker-delegering ennå (per mars 2026).
+# Inntil SKD aktiverer dette, sender vi kun inn årsregnskap via systembrukerflyten.
 _RIGHTS = [
     {
         "resource": [
-            {"id": "urn:altinn:resource", "value": _BRG_RESSURS}
+            {"id": "urn:altinn:resource", "value": "app_brg_aarsregnskap-vanlig-202406"}
         ]
-    }
+    },
 ]
 
 
@@ -116,7 +116,7 @@ def opprett_forespørsel(
     payload = {
         "systemId": sid,
         "partyOrgNo": org_nummer,
-        "integrationTitle": "Wenche årsregnskap",
+        "integrationTitle": "Wenche",
         "rights": _RIGHTS,
     }
     resp = httpx.post(
@@ -142,3 +142,22 @@ def hent_forespørsel_status(maskinporten_token: str, request_id: str) -> dict:
     )
     resp.raise_for_status()
     return resp.json()
+
+
+def hent_systembrukere(maskinporten_token: str, vendor_orgnr: str) -> list[dict]:
+    """
+    Henter alle godkjente systembrukere for Wenche-systemet.
+
+    Returnerer en liste med systembruker-objekter fra Altinn.
+    """
+    sid = system_id(vendor_orgnr)
+    resp = httpx.get(
+        f"{_base()}/authentication/api/v1/systemuser/vendor/bysystem/{sid}",
+        headers={"Authorization": f"Bearer {maskinporten_token}"},
+        timeout=15,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    return data.get("data", data) if isinstance(data, dict) else data
+
+

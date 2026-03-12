@@ -121,11 +121,12 @@ def send_inn(
     oppgave: Aksjonaerregisteroppgave,
     klient: AltinnClient,
     dry_run: bool = False,
-) -> None:
+) -> str | None:
     """
     Sender inn aksjonærregisteroppgaven via Altinn.
 
     dry_run=True genererer XML uten å sende til Altinn.
+    Returnerer Altinn-lenke for signering, eller None ved dry_run.
     """
     feil = valider(oppgave)
     if feil:
@@ -144,19 +145,19 @@ def send_inn(
         with open(utfil, "wb") as f:
             f.write(xml_data)
         print(f"Dry-run: XML lagret til {utfil} — ingenting sendt til Altinn.")
-        return
+        return None
 
     print("Sender aksjonærregisteroppgave til Altinn...")
     instans = klient.opprett_instans("aksjonaerregister", oppgave.selskap.org_nummer)
-    klient.last_opp_data(
+    klient.oppdater_data_element(
         "aksjonaerregister",
         instans,
+        data_type="rf1086",
         data=xml_data,
         content_type="application/xml",
-        data_type="rf1086",
     )
-    klient.fullfoor_instans("aksjonaerregister", instans)
+    sign_url = klient.fullfoor_instans("aksjonaerregister", instans)
 
-    status = klient.hent_status("aksjonaerregister", instans)
-    print(f"Status: {status.get('status', {}).get('value', 'ukjent')}")
-    print("Aksjonærregisteroppgave sendt inn.")
+    print(f"Aksjonærregisteroppgave lastet opp og klar for signering.")
+    print(f"Signer i Altinn: {sign_url}")
+    return sign_url

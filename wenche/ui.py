@@ -1137,9 +1137,14 @@ with fane_send:
                     try:
                         with st.spinner("Sender aksjonærregister til Altinn..."):
                             with AltinnClient(token, env=env) as klient:
-                                akr_modul.send_inn(oppgave, klient)
+                                sign_url = akr_modul.send_inn(oppgave, klient)
                         st.success(
-                            f"Aksjonærregisteroppgave for {int(st.session_state['regnskapsaar'])} sendt inn."
+                            f"Aksjonærregisteroppgave for {int(st.session_state['regnskapsaar'])} er lastet opp og klar for signering."
                         )
+                        st.info(
+                            "Dokumentet venter på din signatur i Altinn. "
+                            "Logg inn med BankID og signer for å fullføre innsendingen."
+                        )
+                        st.link_button("Signer i Altinn", sign_url, type="primary")
                     except Exception as e:
                         st.error(f"Innsending feilet:\n\n{e}")
