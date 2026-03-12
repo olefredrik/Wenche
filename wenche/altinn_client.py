@@ -15,11 +15,13 @@ _BASES = {
         "platform": "https://platform.tt02.altinn.no",
         "apps": "https://{org}.apps.tt02.altinn.no",
         "web": "https://tt02.altinn.no",
+        "inbox": "https://af.tt02.altinn.no/inbox",
     },
     "prod": {
         "platform": "https://platform.altinn.no",
         "apps": "https://{org}.apps.altinn.no",
         "web": "https://altinn.no",
+        "inbox": "https://af.altinn.no/inbox",
     },
 }
 
@@ -51,6 +53,7 @@ class AltinnClient:
         self._env = env
         self._apps_base = _BASES[env]["apps"]
         self._altinn_web = _BASES[env]["web"]
+        self._altinn_inbox = _BASES[env]["inbox"]
         self._token = altinn_token
         self._http = httpx.Client(
             headers={
@@ -125,7 +128,7 @@ class AltinnClient:
             raise RuntimeError(f"{resp.status_code} {resp.reason_phrase}:\n{resp.text}")
         print("Instans klar for signering.")
 
-        return f"{self._altinn_web}/skjema/{instance_id}"
+        return self._altinn_inbox
 
     def hent_status(self, app_key: str, instans: dict) -> dict:
         """Henter status for en instans."""

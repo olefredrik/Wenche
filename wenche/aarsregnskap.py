@@ -177,8 +177,8 @@ def send_inn(regnskap: Aarsregnskap, klient: AltinnClient, dry_run: bool = False
     )
     print("Underskjema lastet opp.")
 
-    sign_url = klient.fullfoor_instans("aarsregnskap", instans)
+    inbox_url = klient.fullfoor_instans("aarsregnskap", instans)
 
     print(f"Årsregnskap lastet opp og klar for signering.")
-    print(f"Signer i Altinn: {sign_url}")
-    return sign_url
+    print(f"Finn skjemaet i Altinn-innboksen og signer der: {inbox_url}")
+    return inbox_url
