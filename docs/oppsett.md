@@ -50,8 +50,7 @@ Gå til [samarbeid.digdir.no](https://samarbeid.digdir.no) og søk om tilgang so
 Logg inn på riktig portal og følg stegene under:
 
 1. Velg **Klienter** → **Maskinporten & KRR**
-2. Velg **Klienter** → **Maskinporten & KRR**
-3. Klikk **Ny integrasjon** og fyll ut:
+2. Klikk **Ny integrasjon** og fyll ut:
     - Visningsnavn: `wenche`
     - Access token levetid: `120`
 4. Legg til følgende scopes:
