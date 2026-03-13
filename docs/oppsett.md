@@ -41,12 +41,15 @@ Gå til [samarbeid.digdir.no](https://samarbeid.digdir.no) og søk om tilgang so
 
 ### 2b. Opprett integrasjon
 
-Logg inn på [selvbetjeningsportalen.digdir.no](https://selvbetjeningsportalen.digdir.no):
-
 !!! info "Produksjon eller test?"
-    De fleste trenger kun å sette opp **Produksjon**. Test-miljøet (Altinn tt02) er for utviklere som vil teste innsending uten å sende ekte data til myndighetene. Du oppretter én klient per miljø, men tilgangen til selvbetjeningsportalen er felles — du velger miljø øverst i portalen.
+    De fleste trenger kun å sette opp **Produksjon**. Test-miljøet (Altinn tt02) er for utviklere som vil teste innsending uten å sende ekte data til myndighetene. De to miljøene har hver sin portal:
 
-1. Velg **Produksjon** øverst i portalen (eller **Test** hvis du skal sette opp testmiljøet)
+    - **Produksjon:** [selvbetjeningsportalen.digdir.no](https://selvbetjeningsportalen.digdir.no)
+    - **Test:** [sjolvbetjening.test.samarbeid.digdir.no](https://sjolvbetjening.test.samarbeid.digdir.no)
+
+Logg inn på riktig portal og følg stegene under:
+
+1. Velg **Klienter** → **Maskinporten & KRR**
 2. Velg **Klienter** → **Maskinporten & KRR**
 3. Klikk **Ny integrasjon** og fyll ut:
     - Visningsnavn: `wenche`
