@@ -21,7 +21,7 @@ _BASES = {
     "prod": "https://platform.altinn.no",
 }
 
-_SYSTEM_NAVN = "wenche"
+_SYSTEM_NAVN = "wenche2"
 
 # Ressurser Wenche-systemet trenger tilgang til.
 # BRG årsregnskap: Altinn 3-app, ressurs-ID på format app_{org}_{appnavn}.

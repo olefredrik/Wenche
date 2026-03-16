@@ -5,7 +5,7 @@ Skatteetaten har eget REST-API for innrapportering — uavhengig av Altinn-insta
 Autentisering skjer med Maskinporten-token direkte (ikke vekslet mot Altinn).
 
 Innsendingsflyt:
-  1. POST /{år}/1086H        — send Hovedskjema, få tilbake hovedskjemaid
+  1. POST /{år}/1086H        — send Hovedskjema, få tilbake hovedskjemaId
   2. POST /{år}/{id}/1086U   — send Underskjema for hver aksjonær
   3. POST /{år}/{id}/bekreft — bekreft at alle underskjema er innsendt
 
@@ -44,7 +44,7 @@ class SkdAksjonaerClient:
         """
         Sender Hovedskjema (RF-1086) til SKD.
 
-        Returnerer hovedskjemaid (UUID) som brukes i påfølgende kall.
+        Returnerer hovedskjemaId (UUID) som brukes i påfølgende kall.
         """
         resp = self._http.post(
             f"{self._base}/{regnskapsaar}/1086H",
@@ -55,14 +55,19 @@ class SkdAksjonaerClient:
             raise RuntimeError(
                 f"Feil ved innsending av Hovedskjema: {resp.status_code}\n{resp.text}"
             )
-        return resp.json()["hovedskjemaid"]
+        data = resp.json()
+        if "hovedskjemaId" not in data:
+            raise RuntimeError(
+                f"Uventet respons fra SKD (mangler 'hovedskjemaId'):\n{data}"
+            )
+        return data["hovedskjemaId"]
 
     def send_underskjema(
-        self, regnskapsaar: int, hovedskjemaid: str, xml: bytes
+        self, regnskapsaar: int, hovedskjemaId: str, xml: bytes
     ) -> None:
         """Sender Underskjema (RF-1086-U) for én aksjonær."""
         resp = self._http.post(
-            f"{self._base}/{regnskapsaar}/{hovedskjemaid}/1086U",
+            f"{self._base}/{regnskapsaar}/{hovedskjemaId}/1086U",
             content=xml,
             headers=self._headers(),
         )
@@ -71,18 +76,17 @@ class SkdAksjonaerClient:
                 f"Feil ved innsending av Underskjema: {resp.status_code}\n{resp.text}"
             )
 
-    def bekreft(
-        self, regnskapsaar: int, hovedskjemaid: str, antall_underskjema: int
-    ) -> dict:
+    def bekreft(self, regnskapsaar: int, hovedskjemaId: str, antall_underskjema: int) -> dict:
         """
         Bekrefter at alle underskjema er innsendt.
 
         Returnerer forsendelse-ID og dialog-ID fra SKD.
         """
+        headers = {k: v for k, v in self._headers().items() if k != "Content-Type"}
         resp = self._http.post(
-            f"{self._base}/{regnskapsaar}/{hovedskjemaid}/bekreft",
+            f"{self._base}/{regnskapsaar}/{hovedskjemaId}/bekreft",
             params={"antall_underskjema": antall_underskjema},
-            headers=self._headers(),
+            headers=headers,
         )
         if not resp.is_success:
             raise RuntimeError(

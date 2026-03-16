@@ -290,9 +290,7 @@ def send_inn(
         klient.send_underskjema(oppgave.regnskapsaar, hovedskjemaid, xml)
 
     print("Bekrefter innsending...")
-    svar = klient.bekreft(
-        oppgave.regnskapsaar, hovedskjemaid, len(under_xmler)
-    )
+    svar = klient.bekreft(oppgave.regnskapsaar, hovedskjemaid, len(under_xmler))
     print(f"Aksjonærregisteroppgave sendt inn.")
     print(f"Forsendelse-ID: {svar.get('forsendelseId')}")
     return svar
