@@ -113,12 +113,17 @@ Sammendraget inneholder:
 
 Wenche sender RF-1086 direkte til Skatteetatens eget REST-API — ikke via Altinn-instansflyt. Innsendingen er maskinell og krever ikke manuell signering.
 
-!!! note "Forutsetning: tilgang til SKDs API"
-    Innsending krever at Maskinporten-klienten din har fått scopet `skatteetaten:innrapporteringaksjonaerregisteroppgave` innvilget av Skatteetaten. Se [steg 2d i oppsett](oppsett.md#2d-sok-om-tilgang-til-skds-api-for-aksjonaerregisteroppgave) for hvordan du søker om tilgang.
+!!! note "Forutsetninger"
+    - Maskinporten-klienten din må ha fått scopet `skatteetaten:innrapporteringaksjonaerregisteroppgave` innvilget. Se [steg 2d i oppsett](oppsett.md#2d-sok-om-tilgang-til-skds-api-for-aksjonaerregisteroppgave).
+    - Systembrukeren for din organisasjon må inkludere SKD-rettigheten. Denne settes opp automatisk av `wenche opprett-systembruker` — se [steg 5 i oppsett](oppsett.md#steg-5-registrer-systembruker-i-altinn).
+    - `kontakt_epost` må være utfylt under `selskap` i `config.yaml` (eller i Wenche UI under **Selskap**).
+
+!!! warning "Testmiljø krever syntetiske testdata"
+    Bruker du `WENCHE_ENV=test` må systembrukeren tilhøre en syntetisk testorganisasjon fra Tenor, og `SKD_TEST_ORG_NUMMER` må være satt i `.env`. Se [steg 5b i oppsett](oppsett.md#5b-opprett-systembrukerforespørsel) for fullstendig veiledning.
 
 === "Kommandolinje"
 
-    Test og generer XML lokalt:
+    Test og generer XML lokalt uten å sende:
 
     ```bash
     wenche send-aksjonaerregister --dry-run

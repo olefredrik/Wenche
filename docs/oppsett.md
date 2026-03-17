@@ -1,14 +1,15 @@
 # Oppsett
 
-Wenche bruker Maskinporten for å autentisere deg som konsument overfor Altinn — uten nettleserinnlogging. Oppsettet består av fire steg:
+Wenche bruker Maskinporten for å autentisere deg som konsument overfor Altinn og Skatteetaten — uten nettleserinnlogging. Oppsettet består av fem steg:
 
 1. Generer et RSA-nøkkelpar lokalt
 2. Registrer en Maskinporten-klient hos Digdir
 3. Konfigurer miljøvariabler (`.env`)
 4. Fyll ut selskapsinformasjon (`config.yaml`)
+5. Registrer systembruker i Altinn
 
 !!! note "Bruker du webgrensesnittet?"
-    Steg 3 og 4 kan gjøres direkte i nettleseren: start `wenche ui` og gå til fanen **Oppsett**. Steg 1 og 2 må uansett gjøres manuelt — de krever terminalkommandoer og registrering hos Digdir.
+    Steg 3 og 4 kan gjøres direkte i nettleseren: start `wenche ui` og gå til fanen **Oppsett**. Steg 1, 2 og 5 må uansett gjøres manuelt — de krever terminalkommandoer og registrering hos Digdir og Altinn.
 
 ---
 
@@ -42,54 +43,64 @@ Gå til [samarbeid.digdir.no](https://samarbeid.digdir.no) og søk om tilgang so
 ### 2b. Opprett integrasjon
 
 !!! info "Produksjon eller test?"
-    De fleste trenger kun å sette opp **Produksjon**. Test-miljøet (Altinn tt02) er for utviklere som vil teste innsending uten å sende ekte data til myndighetene. De to miljøene har hver sin portal:
+    De fleste trenger kun å sette opp **Produksjon**. Testmiljøet (Altinn tt02) er for utviklere som vil teste innsending uten å sende ekte data til myndighetene. De to miljøene har hver sin portal:
 
     - **Produksjon:** [selvbetjeningsportalen.digdir.no](https://selvbetjeningsportalen.digdir.no)
     - **Test:** [sjolvbetjening.test.samarbeid.digdir.no](https://sjolvbetjening.test.samarbeid.digdir.no)
 
+    Setter du opp begge miljøene, gjenta steg 2b og 2c i begge portaler.
+
 Logg inn på riktig portal og følg stegene under:
 
 1. Velg **Klienter** → **Maskinporten & KRR**
-2. Velg **Klienter** → **Maskinporten & KRR**
-3. Klikk **Ny integrasjon** og fyll ut:
+2. Klikk **Ny integrasjon** og fyll ut:
     - Visningsnavn: `wenche`
     - Access token levetid: `120`
-4. Legg til følgende scopes:
+3. Legg til følgende scopes:
 
     | Scope | Formål |
     |---|---|
-    | `altinn:instances.read` | Lese instanser ved innsending |
-    | `altinn:instances.write` | Opprette instanser ved innsending |
+    | `altinn:instances.read` | Lese instanser ved innsending av årsregnskap |
+    | `altinn:instances.write` | Opprette instanser ved innsending av årsregnskap |
     | `altinn:authentication/systemregister.write` | Registrere Wenche som leverandørsystem (steg 5) |
     | `altinn:authentication/systemuser.request.read` | Sjekke status for systembrukerforespørsel (steg 5) |
     | `altinn:authentication/systemuser.request.write` | Opprette systembrukerforespørsel (steg 5) |
 
     !!! note "Aksjonærregisteroppgave krever ekstra scope"
-        Innsending av aksjonærregisteroppgave (RF-1086) bruker SKDs eget REST-API og krever scopet `skatteetaten:innrapporteringaksjonaerregisteroppgave`. Dette scopet tildeles av Skatteetaten og er ikke tilgjengelig i Digdirs selvbetjeningsportal — se steg 2d.
+        Innsending av aksjonærregisteroppgave (RF-1086) bruker SKDs eget REST-API og krever scopet `skatteetaten:innrapporteringaksjonaerregisteroppgave`. Dette scopet søkes om separat — se steg 2d.
 
-5. Kopier **klient-ID** — du trenger den i steg 3
-
-### 2d. Søk om tilgang til SKDs API for aksjonærregisteroppgave
-
-For å sende inn aksjonærregisteroppgave (RF-1086) må Skatteetaten gi klienten din tilgang til scopet `skatteetaten:innrapporteringaksjonaerregisteroppgave`.
-
-1. Gå til [SKDs brukerstøtteportal](https://eksternjira.sits.no/plugins/servlet/desk/site/global) og logg inn
-2. Opprett en ny sak under **Innrapportering → Aksjonærregisteret**
-3. Oppgi følgende i henvendelsen:
-    - At du ønsker tilgang til scopet `skatteetaten:innrapporteringaksjonaerregisteroppgave`
-    - Din Maskinporten klient-ID
-    - Om du ønsker tilgang til testmiljø, produksjon, eller begge
-
-Når SKD har innvilget tilgangen vil scopet bli synlig på klienten din i Digdirs selvbetjeningsportal.
-
-!!! info "Behandlingstid"
-    SKD behandler vanligvis slike forespørsler innen noen virkedager.
+4. Kopier **klient-ID** — du trenger den i steg 3
 
 ### 2c. Last opp offentlig nøkkel
 
 Under klienten, klikk **Legg til nøkkel** og lim inn innholdet i `maskinporten_offentlig.pem`. Lagre klienten.
 
 Nøkkelen vil vises i listen med en UUID (f.eks. `9bc5078c-...`). Kopier denne UUID-en — dette er din **KID**, som du trenger i steg 3.
+
+### 2d. Søk om tilgang til SKDs API for aksjonærregisteroppgave
+
+!!! note "Valgfritt"
+    Dette steget er kun nødvendig dersom du skal sende inn aksjonærregisteroppgave (RF-1086). Hopp over om du bare bruker Wenche til årsregnskap og skattemelding.
+
+Scopet `skatteetaten:innrapporteringaksjonaerregisteroppgave` søkes om i to omganger:
+
+**Del 1 — Søk om tilgang hos Skatteetaten**
+
+1. Gå til [SKDs brukerstøtteportal](https://eksternjira.sits.no/plugins/servlet/desk/site/global) og logg inn
+2. Opprett en ny sak under **Innrapportering → Aksjonærregisteret**, kategori **Teknisk**
+3. Oppgi i henvendelsen:
+    - At du ønsker tilgang til scopet `skatteetaten:innrapporteringaksjonaerregisteroppgave`
+    - Organisasjonsnummeret ditt
+    - Om du ønsker tilgang til testmiljø, produksjon, eller begge
+
+SKD behandler vanligvis slike forespørsler innen noen virkedager.
+
+**Del 2 — Legg til scope i Digdirs selvbetjeningsportal**
+
+Når SKD bekrefter at tilgangen er innvilget, logg inn i Digdirs selvbetjeningsportal (se steg 2b) og legg til scopet `skatteetaten:innrapporteringaksjonaerregisteroppgave` på Maskinporten-klienten din. Scopet vil nå være søkbart i portalen.
+
+!!! warning "Begge steg er nødvendige"
+    Tilgangen fra SKD aktiveres ikke automatisk på klienten. Du må eksplisitt legge til scopet i Digdirs portal etter at SKD har innvilget det.
 
 ---
 
@@ -107,6 +118,7 @@ cp .env.example .env
 MASKINPORTEN_CLIENT_ID=din-klient-id-her
 MASKINPORTEN_KID=uuid-fra-portalen-her
 MASKINPORTEN_PRIVAT_NOKKEL=maskinporten_privat.pem
+ORG_NUMMER=ditt-organisasjonsnummer
 WENCHE_ENV=prod
 ```
 
@@ -118,6 +130,7 @@ WENCHE_ENV=prod
 | `MASKINPORTEN_CLIENT_ID` | Klient-ID fra selvbetjeningsportalen |
 | `MASKINPORTEN_KID` | UUID som portalen tildelte nøkkelen din |
 | `MASKINPORTEN_PRIVAT_NOKKEL` | Sti til din private nøkkelfil (standard: `maskinporten_privat.pem`) |
+| `ORG_NUMMER` | Ditt organisasjonsnummer (9 siffer) |
 | `WENCHE_ENV` | `prod` for produksjon, `test` for Altinn tt02-testmiljø |
 
 ---
@@ -137,7 +150,7 @@ cp config.example.yaml config.yaml
 
 ---
 
-## Steg 5 — Registrer Wenche som leverandørsystem
+## Steg 5 — Registrer systembruker i Altinn
 
 Altinn 3 krever at Wenche er registrert som et leverandørsystem, og at organisasjonen din har godkjent en systembruker. Dette gjøres **én gang per miljø** (test/prod).
 
@@ -154,15 +167,51 @@ Registrerer Wenche i Altinns systemregister med riktige tilgangsrettigheter. Kan
 
 ### 5b. Opprett systembrukerforespørsel
 
-```bash
-wenche opprett-systembruker
-```
+=== "Produksjon"
 
-Oppretter en forespørsel og skriver ut en `confirmUrl`. Åpne lenken i nettleseren, logg inn med TestID (testmiljø) eller ID-porten (produksjon), og godkjenn tilgangen.
+    ```bash
+    wenche opprett-systembruker
+    ```
 
----
+    Oppretter en forespørsel på ditt eget organisasjonsnummer (`ORG_NUMMER` fra `.env`) og skriver ut en `confirmUrl`. Åpne lenken i nettleseren, logg inn med ID-porten, og godkjenn tilgangen.
 
-## Verifiser oppsett
+=== "Testmiljø (tt02)"
+
+    Altinns testmiljø bruker syntetiske testdata. Din egen organisasjon finnes ikke i testregisteret, og du må bruke en **syntetisk testorganisasjon fra Tenor**.
+
+    **1. Finn en syntetisk test-AS i Tenor**
+
+    Gå til [Tenor testdatasøk](https://www.skatteetaten.no/skjema/testdata/) og søk frem et aksjeselskap (AS). Noter deg:
+
+    - Organisasjonsnummeret til selskapet
+    - Fødselsnummeret til daglig leder (finnes under **Kildedata → rollegrupper → DAGL**)
+
+    **2. Opprett systembrukerforespørsel for Tenor-org**
+
+    ```bash
+    wenche opprett-systembruker --org <tenor-orgnr>
+    ```
+
+    Erstatt `<tenor-orgnr>` med organisasjonsnummeret du fant i Tenor.
+
+    **3. Godkjenn forespørselen**
+
+    Kommandoen skriver ut en `confirmUrl`. Åpne lenken i nettleseren og logg inn med **TestID** (syntetisk BankID) ved å bruke fødselsnummeret til daglig leder fra steg 1.
+
+    **4. Konfigurer testmiljøet i `.env`**
+
+    Legg til følgende linje i `.env`:
+
+    ```
+    SKD_TEST_ORG_NUMMER=<tenor-orgnr>
+    ```
+
+    Wenche bruker da automatisk Tenor-org-et i XML-en og i Maskinporten-tokenet når `WENCHE_ENV=test`.
+
+    !!! info "Hvorfor syntetiske data i test?"
+        Skatteetaten og Altinns testmiljø er populert med data fra Tenor. Din reelle organisasjon eksisterer ikke i testregisteret, og innsending vil feile på bekreftelsessteget. Bruk av syntetisk org i test er ikke en begrensning i Wenche — det er et krav fra SKD og Altinn.
+
+### 5c. Verifiser oppsett
 
 Når forespørselen er godkjent, test at innlogging fungerer:
 
