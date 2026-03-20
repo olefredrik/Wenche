@@ -239,8 +239,9 @@ class Aksjonaerregisteroppgave:
 
 @dataclass
 class LaanTilNaerstaaende:
-    mottaker: str
-    beloep: int
+    motpart: str                    # Navn på nærstående part (aksjonær, styremedlem e.l.)
+    saldo: int                      # Utestående saldo per 31.12 (NOK)
+    retning: str = "långiver"       # "långiver" = selskapet lånte ut; "låntaker" = selskapet lånte inn
     rente_prosent: float = 0.0
     sikkerhet: str = ""
 

@@ -14,7 +14,19 @@ Notene skal oppbevares av selskapet og er en del av det fullstendige
 det signerte årsregnskapet.
 """
 
-from wenche.models import Aarsregnskap, Noter
+from wenche.models import Aarsregnskap, LaanTilNaerstaaende, Noter
+
+
+def _formater_laan(laan: LaanTilNaerstaaende, aar: int) -> list[str]:
+    linjer = []
+    if laan.retning == "långiver":
+        linjer.append(f"  Lån fra selskapet til: {laan.motpart}")
+    else:
+        linjer.append(f"  Lån fra nærstående til selskapet: {laan.motpart}")
+    linjer.append(f"  Saldo per 31.12.{aar}: {laan.saldo:,} kr".replace(",", "\u202f"))
+    linjer.append(f"  Rentesats:              {laan.rente_prosent:.2f} %")
+    linjer.append(f"  Sikkerhet:              {laan.sikkerhet if laan.sikkerhet else 'Ingen'}")
+    return linjer
 
 
 def generer(regnskap: Aarsregnskap, noter: Noter) -> str:
@@ -80,29 +92,24 @@ def generer(regnskap: Aarsregnskap, noter: Noter) -> str:
     linje()
 
     # ------------------------------------------------------------------
-    # Note 3 — Lån og sikkerhetsstillelse til nærstående (rskl. § 7-45)
+    # Note 3 — Lån og sikkerhetsstillelse til/fra nærstående (rskl. § 7-45)
     # ------------------------------------------------------------------
-    linje("NOTE 3 — LÅN TIL NÆRSTÅENDE (rskl. § 7-45)")
+    linje("NOTE 3 — LÅN TIL/FRA NÆRSTÅENDE (rskl. § 7-45)")
     linje("-" * 60)
     if not noter.laan_til_naerstaaende:
         linje(
-            "Selskapet har ikke ytet lån til aksjonærer, styremedlemmer "
-            "eller andre nærstående parter."
+            "Selskapet har ikke lån til eller fra aksjonærer, "
+            "styremedlemmer eller andre nærstående parter."
         )
     else:
         linje(
-            "Selskapet har følgende lån til nærstående parter "
-            "per 31.12." + str(aar) + ":"
+            f"Følgende lån mellom selskapet og nærstående parter "
+            f"er registrert per 31.12.{aar}:"
         )
         linje()
         for laan in noter.laan_til_naerstaaende:
-            linje(f"  Mottaker:  {laan.mottaker}")
-            linje(f"  Beløp:     {laan.beloep:,} kr".replace(",", "\u202f"))
-            linje(f"  Rente:     {laan.rente_prosent:.2f} %")
-            if laan.sikkerhet:
-                linje(f"  Sikkerhet: {laan.sikkerhet}")
-            else:
-                linje("  Sikkerhet: Ingen")
+            for l in _formater_laan(laan, aar):
+                linje(l)
             linje()
     linje()
 

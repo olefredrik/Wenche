@@ -210,8 +210,10 @@ if "initialisert" not in st.session_state:
             laan_raw = noter_cfg.get("laan_til_naerstaaende", [])
             verdier["antall_laan_naerstaaende"] = len(laan_raw)
             for i, laan in enumerate(laan_raw):
-                verdier[f"laan_mottaker_{i}"] = laan.get("mottaker", "")
-                verdier[f"laan_beloep_{i}"] = int(laan.get("beloep", 0))
+                # støtt både gammelt felt "mottaker" og nytt "motpart"
+                verdier[f"laan_motpart_{i}"] = laan.get("motpart", laan.get("mottaker", ""))
+                verdier[f"laan_saldo_{i}"] = int(laan.get("saldo", laan.get("beloep", 0)))
+                verdier[f"laan_retning_{i}"] = laan.get("retning", "långiver")
                 verdier[f"laan_rente_{i}"] = float(laan.get("rente_prosent", 0.0))
                 verdier[f"laan_sikkerhet_{i}"] = laan.get("sikkerhet", "")
         except Exception:
@@ -351,8 +353,9 @@ def lagre_config():
             "antall_ansatte": int(st.session_state.get("antall_ansatte", 0)),
             "laan_til_naerstaaende": [
                 {
-                    "mottaker": st.session_state.get(f"laan_mottaker_{i}", ""),
-                    "beloep": int(st.session_state.get(f"laan_beloep_{i}", 0)),
+                    "motpart": st.session_state.get(f"laan_motpart_{i}", ""),
+                    "saldo": int(st.session_state.get(f"laan_saldo_{i}", 0)),
+                    "retning": st.session_state.get(f"laan_retning_{i}", "långiver"),
                     "rente_prosent": float(st.session_state.get(f"laan_rente_{i}", 0.0)),
                     "sikkerhet": st.session_state.get(f"laan_sikkerhet_{i}", ""),
                 }
@@ -1129,29 +1132,59 @@ with fane_dokumenter:
         )
     with col_n2:
         st.number_input(
-            "Antall lån til nærstående",
+            "Antall lån mellom selskapet og nærstående parter",
             min_value=0,
             max_value=10,
             step=1,
             key="antall_laan_naerstaaende",
             help=(
-                "Lån ytet av selskapet til aksjonærer, styremedlemmer eller andre nærstående. "
-                "Sett til 0 dersom selskapet ikke har slike lån."
+                "Tell opp hvor mange lån som eksisterer mellom selskapet og nærstående parter "
+                "(aksjonærer, styremedlemmer, ledende ansatte). "
+                "Gjelder begge retninger: lån selskapet har gitt ut, og lån det har mottatt. "
+                "Har samme person gitt flere lån, summerer du saldoen til én post. "
+                "Sett til 0 dersom det ikke finnes slike lån."
             ),
         )
 
     antall_laan = int(st.session_state.get("antall_laan_naerstaaende", 0))
+    if antall_laan > 0:
+        st.caption(
+            "Fyll inn én post per nærstående part. "
+            "Har samme person gitt eller mottatt flere lån, "
+            "fører du den samlede utestående saldoen per 31.12 som ett beløp."
+        )
     for i in range(antall_laan):
-        if f"laan_mottaker_{i}" not in st.session_state:
-            st.session_state[f"laan_mottaker_{i}"] = ""
-            st.session_state[f"laan_beloep_{i}"] = 0
+        if f"laan_motpart_{i}" not in st.session_state:
+            st.session_state[f"laan_motpart_{i}"] = ""
+            st.session_state[f"laan_saldo_{i}"] = 0
+            st.session_state[f"laan_retning_{i}"] = "långiver"
             st.session_state[f"laan_rente_{i}"] = 0.0
             st.session_state[f"laan_sikkerhet_{i}"] = ""
         with st.expander(f"Lån {i + 1}", expanded=True):
+            st.selectbox(
+                "Selskapets rolle",
+                options=["långiver", "låntaker"],
+                format_func=lambda v: (
+                    "Selskapet er långiver — har gitt lån til nærstående"
+                    if v == "långiver"
+                    else "Selskapet er låntaker — nærstående har gitt lån til selskapet"
+                ),
+                key=f"laan_retning_{i}",
+                help=(
+                    "Velg retning på lånet. "
+                    "Eks: du har lånt penger til holdingselskapet ditt → velg 'Selskapet er låntaker'."
+                ),
+            )
             lc1, lc2 = st.columns(2)
             with lc1:
-                st.text_input("Mottaker (navn)", key=f"laan_mottaker_{i}")
-                st.number_input("Beløp (NOK)", min_value=0, step=1000, key=f"laan_beloep_{i}")
+                st.text_input("Nærstående part (navn)", key=f"laan_motpart_{i}")
+                st.number_input(
+                    "Utestående saldo per 31.12 (NOK)",
+                    min_value=0,
+                    step=1000,
+                    key=f"laan_saldo_{i}",
+                    help="Samlet gjenstående beløp per 31. desember i regnskapsåret.",
+                )
             with lc2:
                 st.number_input("Rentesats (%)", min_value=0.0, step=0.1, format="%.2f", key=f"laan_rente_{i}")
                 st.text_input(
@@ -1166,8 +1199,9 @@ with fane_dokumenter:
             antall_ansatte=int(st.session_state.get("antall_ansatte", 0)),
             laan_til_naerstaaende=[
                 LaanTilNaerstaaende(
-                    mottaker=st.session_state.get(f"laan_mottaker_{j}", ""),
-                    beloep=int(st.session_state.get(f"laan_beloep_{j}", 0)),
+                    motpart=st.session_state.get(f"laan_motpart_{j}", ""),
+                    saldo=int(st.session_state.get(f"laan_saldo_{j}", 0)),
+                    retning=st.session_state.get(f"laan_retning_{j}", "långiver"),
                     rente_prosent=float(st.session_state.get(f"laan_rente_{j}", 0.0)),
                     sikkerhet=st.session_state.get(f"laan_sikkerhet_{j}", ""),
                 )
