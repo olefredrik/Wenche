@@ -24,7 +24,9 @@ from wenche.models import (
     Eiendeler,
     Finansposter,
     KortsiktigGjeld,
+    LaanTilNaerstaaende,
     LangsiktigGjeld,
+    Noter,
     Omloepmidler,
     Resultatregnskap,
     Selskap,
@@ -33,6 +35,7 @@ from wenche.models import (
 from wenche import skattemelding as sm_modul
 from wenche import aarsregnskap as ar_modul
 from wenche import aksjonaerregister as akr_modul
+from wenche import noter as noter_modul
 from wenche import auth, systembruker
 from wenche.altinn_client import AltinnClient
 from wenche.brg_xml import generer_hovedskjema, generer_underskjema
@@ -80,6 +83,9 @@ _DEFAULTS = {
     "fritaksmetoden": False,
     "eierandel_datterselskap": 100,
     "antall_aksjonaerer": 1,
+    # Noter (rskl. §§ 7-35, 7-43, 7-45, 7-46)
+    "antall_ansatte": 0,
+    "antall_laan_naerstaaende": 0,
     # Foregående år (sammenligningstall, rskl. § 6-6)
     "f_salgsinntekter": 0,
     "f_andre_driftsinntekter": 0,
@@ -198,6 +204,16 @@ if "initialisert" not in st.session_state:
                 verdier[f"a_klasse_{i}"] = a.get("aksjeklasse", "ordinære")
                 verdier[f"a_utbytte_{i}"] = int(a.get("utbytte_utbetalt", 0))
                 verdier[f"a_kap_{i}"] = int(a.get("innbetalt_kapital_per_aksje", 0))
+
+            noter_cfg = cfg.get("noter", {})
+            verdier["antall_ansatte"] = int(noter_cfg.get("antall_ansatte", 0))
+            laan_raw = noter_cfg.get("laan_til_naerstaaende", [])
+            verdier["antall_laan_naerstaaende"] = len(laan_raw)
+            for i, laan in enumerate(laan_raw):
+                verdier[f"laan_mottaker_{i}"] = laan.get("mottaker", "")
+                verdier[f"laan_beloep_{i}"] = int(laan.get("beloep", 0))
+                verdier[f"laan_rente_{i}"] = float(laan.get("rente_prosent", 0.0))
+                verdier[f"laan_sikkerhet_{i}"] = laan.get("sikkerhet", "")
         except Exception:
             pass  # Feil i config.yaml — bruk defaults
 
@@ -331,6 +347,18 @@ def lagre_config():
             }
             for i in range(antall)
         ],
+        "noter": {
+            "antall_ansatte": int(st.session_state.get("antall_ansatte", 0)),
+            "laan_til_naerstaaende": [
+                {
+                    "mottaker": st.session_state.get(f"laan_mottaker_{i}", ""),
+                    "beloep": int(st.session_state.get(f"laan_beloep_{i}", 0)),
+                    "rente_prosent": float(st.session_state.get(f"laan_rente_{i}", 0.0)),
+                    "sikkerhet": st.session_state.get(f"laan_sikkerhet_{i}", ""),
+                }
+                for i in range(int(st.session_state.get("antall_laan_naerstaaende", 0)))
+            ],
+        },
     }
     with open(CONFIG_FIL, "w", encoding="utf-8") as f:
         yaml.dump(data, f, allow_unicode=True, sort_keys=False)
@@ -1072,6 +1100,90 @@ with fane_dokumenter:
                         file_name=f"{base}_underskjema_{i}.xml",
                         mime="application/xml",
                     )
+
+    st.divider()
+    st.subheader("Obligatoriske noter")
+    st.info(
+        "**Hva er notene?**  \n"
+        "Regnskapsloven krever at alle foretak utarbeider noter til årsregnskapet. "
+        "For små foretak gjelder minimumskravene i §§ 7-35 (regnskapsprinsipper), "
+        "7-43 (ansatte), 7-45 (lån til nærstående) og 7-46 (fortsatt drift).  \n\n"
+        "**Hva er notene ikke?**  \n"
+        "Notene sendes **ikke** inn digitalt til Brønnøysundregistrene — "
+        "skjemaet RR-0002 har ingen felt for fritekstnoter.  \n\n"
+        "**Hvordan bruke notene?**  \n"
+        "Last ned tekstfilen, les gjennom og tilpass innholdet ved behov. "
+        "Notene skal undertegnes av styret samtidig som årsregnskapet fastsettes, "
+        "og oppbevares av selskapet. De skal fremlegges på forespørsel fra "
+        "Brønnøysundregistrene, revisor eller andre med lovlig interesse."
+    )
+
+    col_n1, col_n2 = st.columns(2)
+    with col_n1:
+        st.number_input(
+            "Antall ansatte i regnskapsåret",
+            min_value=0,
+            step=1,
+            key="antall_ansatte",
+            help="Brukes i note 2 (rskl. § 7-43). Sett til 0 for holdingselskaper uten ansatte.",
+        )
+    with col_n2:
+        st.number_input(
+            "Antall lån til nærstående",
+            min_value=0,
+            max_value=10,
+            step=1,
+            key="antall_laan_naerstaaende",
+            help=(
+                "Lån ytet av selskapet til aksjonærer, styremedlemmer eller andre nærstående. "
+                "Sett til 0 dersom selskapet ikke har slike lån."
+            ),
+        )
+
+    antall_laan = int(st.session_state.get("antall_laan_naerstaaende", 0))
+    for i in range(antall_laan):
+        if f"laan_mottaker_{i}" not in st.session_state:
+            st.session_state[f"laan_mottaker_{i}"] = ""
+            st.session_state[f"laan_beloep_{i}"] = 0
+            st.session_state[f"laan_rente_{i}"] = 0.0
+            st.session_state[f"laan_sikkerhet_{i}"] = ""
+        with st.expander(f"Lån {i + 1}", expanded=True):
+            lc1, lc2 = st.columns(2)
+            with lc1:
+                st.text_input("Mottaker (navn)", key=f"laan_mottaker_{i}")
+                st.number_input("Beløp (NOK)", min_value=0, step=1000, key=f"laan_beloep_{i}")
+            with lc2:
+                st.number_input("Rentesats (%)", min_value=0.0, step=0.1, format="%.2f", key=f"laan_rente_{i}")
+                st.text_input(
+                    "Sikkerhet",
+                    key=f"laan_sikkerhet_{i}",
+                    help="F.eks. 'pant i aksjer', 'personlig kausjon' eller la stå tomt.",
+                )
+
+    if st.button("Last ned noter", use_container_width=False):
+        regnskap = bygg_regnskap()
+        noter = Noter(
+            antall_ansatte=int(st.session_state.get("antall_ansatte", 0)),
+            laan_til_naerstaaende=[
+                LaanTilNaerstaaende(
+                    mottaker=st.session_state.get(f"laan_mottaker_{j}", ""),
+                    beloep=int(st.session_state.get(f"laan_beloep_{j}", 0)),
+                    rente_prosent=float(st.session_state.get(f"laan_rente_{j}", 0.0)),
+                    sikkerhet=st.session_state.get(f"laan_sikkerhet_{j}", ""),
+                )
+                for j in range(antall_laan)
+            ],
+        )
+        tekst = noter_modul.generer(regnskap, noter)
+        st.code(tekst, language=None)
+        orgnr = st.session_state["org_nummer"]
+        aar = int(st.session_state["regnskapsaar"])
+        st.download_button(
+            "Last ned noter.txt",
+            data=tekst.encode("utf-8"),
+            file_name=f"noter_{aar}_{orgnr}.txt",
+            mime="text/plain",
+        )
 
 # ---------------------------------------------------------------------------
 # Fane 5: Send til Altinn

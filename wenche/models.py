@@ -234,6 +234,24 @@ class Aksjonaerregisteroppgave:
 
 
 # ---------------------------------------------------------------------------
+# Obligatoriske noter (rskl. §§ 7-35, 7-43, 7-45, 7-46)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class LaanTilNaerstaaende:
+    mottaker: str
+    beloep: int
+    rente_prosent: float = 0.0
+    sikkerhet: str = ""
+
+
+@dataclass
+class Noter:
+    antall_ansatte: int = 0
+    laan_til_naerstaaende: list[LaanTilNaerstaaende] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
 # Skattemelding-konfigurasjon
 # ---------------------------------------------------------------------------
 
