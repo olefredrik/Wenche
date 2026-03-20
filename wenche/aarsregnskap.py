@@ -100,7 +100,7 @@ def les_config(config_fil: str) -> Aarsregnskap:
     foregaaende_balanse = _les_balanse(fa["balanse"]) if "balanse" in fa else Balanse()
 
     utbytte_utbetalt = sum(
-        int(a.get("utbytte_utbetalt", 0)) for a in cfg.get("aksjonaerer", [])
+        float(a.get("utbytte_utbetalt", 0)) for a in cfg.get("aksjonaerer", [])
     )
 
     return Aarsregnskap(
@@ -125,7 +125,7 @@ def valider(regnskap: Aarsregnskap) -> list[str]:
         diff = regnskap.balanse.differanse()
         feil.append(
             f"Balansen går ikke opp: eiendeler og egenkapital+gjeld "
-            f"avviker med {diff:+,} NOK."
+            f"avviker med {diff:+,.2f} NOK."
         )
 
     if len(regnskap.selskap.org_nummer.replace(" ", "")) != 9:
