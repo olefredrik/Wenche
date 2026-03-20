@@ -1128,8 +1128,18 @@ with fane_dokumenter:
             min_value=0,
             step=1,
             key="antall_ansatte",
-            help="Brukes i note 2 (rskl. § 7-43). Sett til 0 for holdingselskaper uten ansatte.",
+            help=(
+                "Tell bare med personer som mottar lønn fra selskapet. "
+                "Rollen som daglig leder eller styreleder gir ikke ansettelsesforhold "
+                "med mindre det faktisk utbetales lønn. "
+                "For et passivt holdingselskap uten lønnsutbetalinger er riktig svar 0."
+            ),
         )
+        if int(st.session_state.get("antall_ansatte", 0)) == 0:
+            st.caption(
+                "Typisk 0 for passive holdingselskaper. Daglig leder og styreleder "
+                "uten lønn regnes ikke som ansatte."
+            )
     with col_n2:
         st.number_input(
             "Antall lån mellom selskapet og nærstående parter",
