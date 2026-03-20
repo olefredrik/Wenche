@@ -136,4 +136,34 @@ def generer(regnskap: Aarsregnskap, noter: Noter) -> str:
         "skal oppbevares av selskapet og fremlegges på forespørsel."
     )
 
+    # ------------------------------------------------------------------
+    # Signaturblokk
+    # ------------------------------------------------------------------
+    linje()
+    linje()
+    dato_str = (
+        regnskap.fastsettelsesdato.strftime("%d.%m.%Y")
+        if regnskap.fastsettelsesdato
+        else "________________"
+    )
+    linje(f"Fastsatt av styret den {dato_str}")
+    linje()
+
+    styreleder = selskap.styreleder
+    daglig_leder = selskap.daglig_leder
+    signatar = regnskap.signatar or styreleder
+
+    linje()
+    linje("________________________")
+    linje(signatar)
+    if daglig_leder and daglig_leder != styreleder:
+        linje("Styreleder")
+        linje()
+        linje()
+        linje("________________________")
+        linje(daglig_leder)
+        linje("Daglig leder")
+    else:
+        linje("Styreleder / Daglig leder")
+
     return "\n".join(linjer)
