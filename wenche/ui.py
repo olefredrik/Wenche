@@ -801,7 +801,7 @@ with fane_regnskap:
 with fane_aksjonaerer:
     st.subheader("Steg 4 av 6 — Aksjonærer")
     st.caption("Fyll inn opplysninger om aksjonærene. Fortsett til steg 5 når du er ferdig.")
-    st.number_input("Antall aksjonærer", min_value=1, max_value=20, key="antall_aksjonaerer")
+    st.number_input("Antall aksjonærer", min_value=1, max_value=20, step=1, key="antall_aksjonaerer")
     antall = int(st.session_state["antall_aksjonaerer"])
 
     for i in range(antall):
