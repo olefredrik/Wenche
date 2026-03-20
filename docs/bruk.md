@@ -145,6 +145,44 @@ Wenche sender RF-1086 direkte til Skatteetatens eget REST-API — ikke via Altin
 
 ---
 
+## Obligatoriske noter (rskl. §§ 7-35, 7-43, 7-45, 7-46)
+
+Regnskapsloven krever at alle foretak utarbeider noter til årsregnskapet. For små foretak gjelder minimumskravene i fire paragrafer:
+
+| §     | Note                          | Innhold                                                              |
+|-------|-------------------------------|----------------------------------------------------------------------|
+| 7-35  | Regnskapsprinsipper           | Hvordan regnskapet er satt opp og hvilke vurderingsprinsipper som er brukt |
+| 7-43  | Ansatte og lønnskostnader     | Antall ansatte, samlede lønnskostnader og godtgjørelse til ledelse  |
+| 7-45  | Lån til nærstående            | Lån ytet til aksjonærer, styremedlemmer eller andre nærstående parter |
+| 7-46  | Fortsatt drift                | Bekreftelse på at forutsetningen om fortsatt drift er til stede      |
+
+### Hva er notene?
+
+Notene er en juridisk del av årsregnskapet. Styret fastsetter regnskapet inkludert noter, og de bør undertegnes eller arkiveres sammen med det signerte årsregnskapet.
+
+### Hva er notene ikke?
+
+Notene sendes **ikke** inn digitalt til Brønnøysundregistrene. Skjemaet RR-0002 har ingen felt for fritekstnoter — det er kun tall som overføres via Altinn. Notene er et dokument du oppbevarer selv.
+
+### Hvordan bruke notene i Wenche?
+
+=== "Webgrensesnitt"
+
+    1. Gå til fanen **Dokumenter** og scroll ned til **Obligatoriske noter**
+    2. Fyll inn antall ansatte (typisk 0 for holdingselskaper)
+    3. Fyll inn eventuelle lån til nærstående (aksjonærer, styremedlemmer)
+    4. Klikk **Last ned noter** — du får en forhåndsvisning og en nedlastingsknapp for `noter_ÅÅÅÅ_ORGNR.txt`
+    5. Les gjennom teksten og tilpass om nødvendig
+    6. Arkiver filen sammen med det signerte årsregnskapet
+
+!!! note "Tilpass gjerne noteteksten"
+    Wenche genererer et standardoppsett som passer de fleste holdingselskaper. Har selskapet særskilte forhold som bør beskrives — for eksempel eierskapsbegrensninger, konsernforhold eller pantsettelse av aksjer — bør du tilpasse teksten i den nedlastede filen.
+
+!!! warning "Notene er obligatoriske, men ikke verifiserbart fullstendige"
+    Wenche dekker minimumskravene etter NRS 8 (God regnskapsskikk for små foretak). For selskaper med mer komplekse forhold kan ytterligere noter være påkrevd. Ved tvil, kontakt en regnskapsfører eller revisor.
+
+---
+
 ## Alle kommandoer
 
 ```

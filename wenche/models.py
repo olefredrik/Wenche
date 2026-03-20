@@ -234,6 +234,25 @@ class Aksjonaerregisteroppgave:
 
 
 # ---------------------------------------------------------------------------
+# Obligatoriske noter (rskl. §§ 7-35, 7-43, 7-45, 7-46)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class LaanTilNaerstaaende:
+    motpart: str                    # Navn på nærstående part (aksjonær, styremedlem e.l.)
+    saldo: int                      # Utestående saldo per 31.12 (NOK)
+    retning: str = "långiver"       # "långiver" = selskapet lånte ut; "låntaker" = selskapet lånte inn
+    rente_prosent: float = 0.0
+    sikkerhet: str = ""
+
+
+@dataclass
+class Noter:
+    antall_ansatte: int = 0
+    laan_til_naerstaaende: list[LaanTilNaerstaaende] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
 # Skattemelding-konfigurasjon
 # ---------------------------------------------------------------------------
 
