@@ -1175,6 +1175,13 @@ with fane_dokumenter:
                     "Eks: du har lånt penger til holdingselskapet ditt → velg 'Selskapet er låntaker'."
                 ),
             )
+            if st.session_state.get(f"laan_retning_{i}") == "långiver":
+                st.warning(
+                    "**Merk:** Lån fra AS til personlig aksjonær beskattes løpende som utbytte "
+                    "etter skatteloven § 5-22 (gjeldende fra 1. oktober 2022). "
+                    "Kontroller at dette er hensyntatt i skattemeldingen.",
+                    icon="⚠️",
+                )
             lc1, lc2 = st.columns(2)
             with lc1:
                 st.text_input("Nærstående part (navn)", key=f"laan_motpart_{i}")
@@ -1186,7 +1193,18 @@ with fane_dokumenter:
                     help="Samlet gjenstående beløp per 31. desember i regnskapsåret.",
                 )
             with lc2:
-                st.number_input("Rentesats (%)", min_value=0.0, step=0.1, format="%.2f", key=f"laan_rente_{i}")
+                st.number_input(
+                    "Rentesats (%)",
+                    min_value=0.0,
+                    step=0.1,
+                    format="%.2f",
+                    key=f"laan_rente_{i}",
+                    help=(
+                        "0 % er lovlig for lån fra aksjonær til selskapet. "
+                        "For lån fra selskapet til aksjonær gjelder sktl. § 5-22 "
+                        "— hele lånet beskattes uavhengig av rentesats."
+                    ),
+                )
                 st.text_input(
                     "Sikkerhet",
                     key=f"laan_sikkerhet_{i}",
