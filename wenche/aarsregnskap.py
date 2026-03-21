@@ -21,7 +21,7 @@ from wenche.models import (
     Resultatregnskap,
     Selskap,
 )
-from wenche.brg_xml import generer_hovedskjema, generer_underskjema
+from wenche.brg_xml import generer_aksjenote_vedlegg, generer_hovedskjema, generer_underskjema
 
 
 def _les_resultat(r: dict) -> Resultatregnskap:
@@ -177,10 +177,6 @@ def send_inn(regnskap: Aarsregnskap, klient: AltinnClient, dry_run: bool = False
     print("Sender årsregnskap til Brønnøysundregistrene via Altinn...")
     instans = klient.opprett_instans("aarsregnskap", org)
 
-    print("DEBUG — data-elementer i ny instans:")
-    for el in instans.get("data", []):
-        print(f"  dataType={el.get('dataType')!r}  locked={el.get('locked')}  id={el.get('id')!r}")
-
     klient.oppdater_data_element(
         "aarsregnskap", instans,
         data_type="Hovedskjema",
@@ -196,6 +192,18 @@ def send_inn(regnskap: Aarsregnskap, klient: AltinnClient, dry_run: bool = False
         content_type="application/xml",
     )
     print("Underskjema lastet opp.")
+
+    if regnskap.balanse.eiendeler.anleggsmidler.andre_aksjer > 0:
+        vedlegg = generer_aksjenote_vedlegg(regnskap)
+        vedlegg_element = klient.last_opp_vedlegg(
+            "aarsregnskap", instans,
+            data=vedlegg,
+            content_type="application/pdf",
+            filnavn=f"aksjenote_{aar}_{org}.pdf",
+        )
+        print("Aksjenote (Vedlegg) lastet opp. Venter på virusskanning...")
+        klient.vent_paa_filskanning("aarsregnskap", instans, vedlegg_element["id"])
+        print("Virusskanning fullført.")
 
     inbox_url = klient.fullfoor_instans("aarsregnskap", instans)
 

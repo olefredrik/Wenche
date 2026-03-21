@@ -19,6 +19,78 @@ def _row_id() -> str:
     return str(uuid.uuid4())
 
 
+# ---------------------------------------------------------------------------
+# Minimal PDF-generator (ingen eksterne avhengigheter)
+# ---------------------------------------------------------------------------
+
+def _lag_pdf(linjer: list[str]) -> bytes:
+    """
+    Bygger en minimal men gyldig PDF med gitt tekstinnhold.
+    Bruker WinAnsiEncoding (latin-1) som dekker norske tegn (æ, ø, å).
+    """
+    def _pdf_str(s: str) -> bytes:
+        enc = s.encode("latin-1", errors="replace")
+        escaped = enc.replace(b"\\", b"\\\\").replace(b"(", b"\\(").replace(b")", b"\\)")
+        return b"(" + escaped + b")"
+
+    stream_parts: list[bytes] = [b"BT", b"/F1 11 Tf", b"50 790 Td", b"16 TL"]
+    for linje in linjer:
+        stream_parts.append(_pdf_str(linje) + b" Tj T*")
+    stream_parts.append(b"ET")
+    stream = b"\n".join(stream_parts)
+
+    obj1 = b"<</Type /Catalog /Pages 2 0 R>>"
+    obj2 = b"<</Type /Pages /Kids [3 0 R] /Count 1>>"
+    obj3 = b"<</Type /Page /Parent 2 0 R /Resources <</Font <</F1 4 0 R>>>> /MediaBox [0 0 595 842] /Contents 5 0 R>>"
+    obj4 = b"<</Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding>>"
+    obj5 = f"<</Length {len(stream)}>>\nstream\n".encode() + stream + b"\nendstream"
+
+    objects = [obj1, obj2, obj3, obj4, obj5]
+    pdf = b"%PDF-1.4\n"
+    offsets: list[int] = []
+    for i, obj in enumerate(objects, 1):
+        offsets.append(len(pdf))
+        pdf += f"{i} 0 obj\n".encode() + obj + b"\nendobj\n"
+
+    xref_offset = len(pdf)
+    pdf += b"xref\n"
+    pdf += f"0 {len(objects) + 1}\n".encode()
+    pdf += b"0000000000 65535 f \n"
+    for off in offsets:
+        pdf += f"{off:010d} 00000 n \n".encode()
+    pdf += f"trailer\n<</Size {len(objects) + 1} /Root 1 0 R>>\n".encode()
+    pdf += f"startxref\n{xref_offset}\n%%EOF\n".encode()
+    return pdf
+
+
+def generer_aksjenote_vedlegg(regnskap: Aarsregnskap) -> bytes:
+    """
+    Genererer aksjenote som PDF-vedlegg (dataType=Vedlegg).
+
+    BRG krever Vedlegg når selskapet har andre aksjer og andeler
+    (investeringAksjerAndeler > 0) i Underskjema-XML.
+    Noten dokumenterer investeringen etter rskl. § 7-36.
+    """
+    s = regnskap.selskap
+    aar = regnskap.regnskapsaar
+    beloep = round(regnskap.balanse.eiendeler.anleggsmidler.andre_aksjer)
+
+    linjer = [
+        f"Note til årsregnskap — {s.navn}",
+        f"Organisasjonsnummer: {s.org_nummer}",
+        f"Regnskapsår: {aar}",
+        "",
+        "Note — Andre aksjer og andeler (rskl. § 7-36)",
+        "",
+        "Selskapet eier aksjer og andeler i andre foretak.",
+        f"Bokført verdi per 31.12.{aar}: {beloep:,} kr".replace(",", " "),
+        "",
+        "Investeringene er vurdert til kostpris.",
+        "Fritaksmetoden (sktl. § 2-38) vurderes for mottatt utbytte.",
+    ]
+    return _lag_pdf(linjer)
+
+
 def generer_hovedskjema(regnskap: Aarsregnskap) -> bytes:
     """
     Genererer Hovedskjema XML (dataType=Hovedskjema, dataFormatId=1266).
