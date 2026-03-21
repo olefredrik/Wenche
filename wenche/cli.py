@@ -256,6 +256,55 @@ def generer_skattemelding(config_fil: str, ut_fil: str | None):
         click.echo(tekst)
 
 
+# ---------------------------------------------------------------------------
+# SAF-T import
+# ---------------------------------------------------------------------------
+
+@main.command("importer-saft")
+@click.argument("saft_fil", metavar="SAF-T-FIL")
+@click.option(
+    "--ut",
+    "ut_fil",
+    default="config.yaml",
+    show_default=True,
+    help="Sti til config.yaml-filen som skal skrives.",
+)
+def importer_saft(saft_fil: str, ut_fil: str):
+    """
+    Importer SAF-T Financial XML og generer config.yaml.
+
+    SAF-T-FIL er stien til SAF-T-filen eksportert fra regnskapssystemet
+    (Fiken, Tripletex, Visma, Uni Micro, PowerOffice Go, etc.).
+
+    Felter som ikke finnes i SAF-T (daglig_leder, styreleder, stiftelsesaar,
+    aksjonaerer) må fylles inn manuelt i config.yaml etterpå.
+    """
+    import yaml
+    from wenche.saft import importer
+
+    click.echo(f"Importerer SAF-T-fil: {saft_fil}")
+    try:
+        data = importer(saft_fil)
+    except Exception as e:
+        click.echo(f"Feil ved import: {e}", err=True)
+        raise SystemExit(1)
+
+    from pathlib import Path
+    Path(ut_fil).write_text(
+        yaml.dump(data, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+    click.echo(f"config.yaml skrevet til {ut_fil}")
+    click.echo(
+        "\nHusk å fylle inn følgende manuelt i config.yaml:\n"
+        "  - selskap.daglig_leder\n"
+        "  - selskap.styreleder\n"
+        "  - selskap.stiftelsesaar\n"
+        "  - aksjonaerer (navn, fødselsnummer, antall aksjer, utbytte)\n"
+        "  - foregaaende_aar.resultatregnskap (er ikke tilgjengelig i SAF-T)"
+    )
+
+
 @main.command("send-skattemelding")
 def send_skattemelding():
     """Send inn skattemelding for AS (ikke implementert ennå)."""

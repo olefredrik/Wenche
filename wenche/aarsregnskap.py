@@ -21,7 +21,7 @@ from wenche.models import (
     Resultatregnskap,
     Selskap,
 )
-from wenche.brg_xml import generer_hovedskjema, generer_underskjema
+from wenche.brg_xml import generer_aksjenote_vedlegg, generer_hovedskjema, generer_underskjema
 
 
 def _les_resultat(r: dict) -> Resultatregnskap:
@@ -100,7 +100,7 @@ def les_config(config_fil: str) -> Aarsregnskap:
     foregaaende_balanse = _les_balanse(fa["balanse"]) if "balanse" in fa else Balanse()
 
     utbytte_utbetalt = sum(
-        int(a.get("utbytte_utbetalt", 0)) for a in cfg.get("aksjonaerer", [])
+        float(a.get("utbytte_utbetalt", 0)) for a in cfg.get("aksjonaerer", [])
     )
 
     return Aarsregnskap(
@@ -125,7 +125,7 @@ def valider(regnskap: Aarsregnskap) -> list[str]:
         diff = regnskap.balanse.differanse()
         feil.append(
             f"Balansen går ikke opp: eiendeler og egenkapital+gjeld "
-            f"avviker med {diff:+,} NOK."
+            f"avviker med {diff:+,.2f} NOK."
         )
 
     if len(regnskap.selskap.org_nummer.replace(" ", "")) != 9:
@@ -192,6 +192,18 @@ def send_inn(regnskap: Aarsregnskap, klient: AltinnClient, dry_run: bool = False
         content_type="application/xml",
     )
     print("Underskjema lastet opp.")
+
+    if regnskap.balanse.eiendeler.anleggsmidler.andre_aksjer > 0:
+        vedlegg = generer_aksjenote_vedlegg(regnskap)
+        vedlegg_element = klient.last_opp_vedlegg(
+            "aarsregnskap", instans,
+            data=vedlegg,
+            content_type="application/pdf",
+            filnavn=f"aksjenote_{aar}_{org}.pdf",
+        )
+        print("Aksjenote (Vedlegg) lastet opp. Venter på virusskanning...")
+        klient.vent_paa_filskanning("aarsregnskap", instans, vedlegg_element["id"])
+        print("Virusskanning fullført.")
 
     inbox_url = klient.fullfoor_instans("aarsregnskap", instans)
 

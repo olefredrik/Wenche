@@ -23,7 +23,8 @@ def _formater_laan(laan: LaanTilNaerstaaende, aar: int) -> list[str]:
         linjer.append(f"  Lån fra selskapet til: {laan.motpart}")
     else:
         linjer.append(f"  Lån fra nærstående til selskapet: {laan.motpart}")
-    linjer.append(f"  Saldo per 31.12.{aar}: {laan.saldo:,} kr".replace(",", "\u202f"))
+    saldo_str = f"{laan.saldo:,.2f}" if laan.saldo != round(laan.saldo) else f"{round(laan.saldo):,}"
+    linjer.append(f"  Saldo per 31.12.{aar}: {saldo_str} kr".replace(",", "\u202f"))
     linjer.append(f"  Rentesats:              {laan.rente_prosent:.2f} %")
     linjer.append(f"  Sikkerhet:              {laan.sikkerhet if laan.sikkerhet else 'Ingen'}")
     return linjer

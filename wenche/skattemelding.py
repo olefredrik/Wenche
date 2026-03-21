@@ -47,7 +47,7 @@ def les_config(config_fil: str) -> tuple[Aarsregnskap, SkattemeldingKonfig]:
         styreleder=s["styreleder"],
         forretningsadresse=s["forretningsadresse"],
         stiftelsesaar=int(s["stiftelsesaar"]),
-        aksjekapital=int(s["aksjekapital"]),
+        aksjekapital=float(s["aksjekapital"]),
     )
 
     resultatregnskap = _les_resultat(raw["resultatregnskap"])
@@ -58,7 +58,7 @@ def les_config(config_fil: str) -> tuple[Aarsregnskap, SkattemeldingKonfig]:
     foregaaende_balanse = _les_balanse(fa["balanse"]) if "balanse" in fa else Balanse()
 
     utbytte_utbetalt = sum(
-        int(a.get("utbytte_utbetalt", 0)) for a in raw.get("aksjonaerer", [])
+        float(a.get("utbytte_utbetalt", 0)) for a in raw.get("aksjonaerer", [])
     )
 
     regnskap = Aarsregnskap(
@@ -73,7 +73,7 @@ def les_config(config_fil: str) -> tuple[Aarsregnskap, SkattemeldingKonfig]:
 
     sm_raw = raw.get("skattemelding", {})
     konfig = SkattemeldingKonfig(
-        underskudd_til_fremfoering=int(sm_raw.get("underskudd_til_fremfoering", 0)),
+        underskudd_til_fremfoering=float(sm_raw.get("underskudd_til_fremfoering", 0)),
         anvend_fritaksmetoden=bool(sm_raw.get("anvend_fritaksmetoden", True)),
         eierandel_datterselskap=int(sm_raw.get("eierandel_datterselskap", 100)),
     )
@@ -81,14 +81,14 @@ def les_config(config_fil: str) -> tuple[Aarsregnskap, SkattemeldingKonfig]:
     return regnskap, konfig
 
 
-def _nok(beloep: int) -> str:
-    """Formaterer beløp som NOK med tusenskilletegn."""
-    return f"{beloep:>12,} kr".replace(",", " ")
+def _nok(beloep: float) -> str:
+    """Formaterer beløp som NOK med tusenskilletegn (rundes til nærmeste krone)."""
+    return f"{round(beloep):>12,} kr".replace(",", " ")
 
 
-def _nok2(aarets: int, fjoraarets: int) -> str:
+def _nok2(aarets: float, fjoraarets: float) -> str:
     """Formaterer to beløp side om side (inneværende og foregående år)."""
-    return f"{aarets:>12,} kr   {fjoraarets:>12,} kr".replace(",", " ")
+    return f"{round(aarets):>12,} kr   {round(fjoraarets):>12,} kr".replace(",", " ")
 
 
 def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
@@ -322,10 +322,10 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
 
     # --- Egenkapitalnote (rskl. § 7-2b) ---
 
-    def _ekk(v: int) -> str:
-        return f"{v:>12,}".replace(",", " ")
+    def _ekk(v: float) -> str:
+        return f"{round(v):>12,}".replace(",", " ")
 
-    def _ek_rad(label: str, ak: int, ok: int, aek: int) -> str:
+    def _ek_rad(label: str, ak: float, ok: float, aek: float) -> str:
         s = ak + ok + aek
         return f"  {label:<20}{_ekk(ak)}{_ekk(ok)}{_ekk(aek)}{_ekk(s)}"
 

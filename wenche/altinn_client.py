@@ -7,6 +7,7 @@ aksjonærregisteroppgave.
 """
 
 import os
+import time
 
 import httpx
 
@@ -113,6 +114,70 @@ class AltinnClient:
             f"Tilgjengelige typer: {[e.get('dataType') for e in instans.get('data', [])]}"
         )
 
+    def vent_paa_filskanning(
+        self,
+        app_key: str,
+        instans: dict,
+        element_id: str,
+        maks_forsok: int = 10,
+        ventetid: float = 2.0,
+    ) -> None:
+        """
+        Venter til Altinns virusskanning av et data-element er fullført.
+
+        Altinn skanner alle opplastede filer asynkront. process/next feiler med
+        DataElementFileScanPending hvis skanningen ikke er ferdig. Denne metoden
+        poller data-elementet inntil fileScanResult == 'Clean', eller kaster
+        RuntimeError ved infisert fil eller tidsavbrudd.
+        """
+        instance_id = instans["id"]
+        inst_url = f"{self._app_base(app_key)}/instances/{instance_id}"
+        for forsok in range(maks_forsok):
+            resp = self._http.get(inst_url)
+            resp.raise_for_status()
+            data_elementer = resp.json().get("data", [])
+            element = next((el for el in data_elementer if el.get("id") == element_id), None)
+            resultat = element.get("fileScanResult") if element else None
+            if resultat == "Clean":
+                return
+            if resultat == "Infected":
+                raise RuntimeError("Vedlegg ble avvist av Altinns virusskanning.")
+            # Pending eller None — vent og prøv igjen
+            time.sleep(ventetid)
+        raise RuntimeError(
+            f"Altinns virusskanning av Vedlegg ble ikke ferdig etter "
+            f"{maks_forsok * ventetid:.0f} sekunder."
+        )
+
+    def last_opp_vedlegg(
+        self,
+        app_key: str,
+        instans: dict,
+        data: bytes,
+        content_type: str,
+        filnavn: str,
+    ) -> dict:
+        """
+        Laster opp et nytt Vedlegg-element til instansen via POST.
+
+        Altinn oppretter ikke Vedlegg automatisk ved instansoppretting,
+        så vi bruker POST for å legge til et nytt data-element.
+        """
+        instance_id = instans["id"]
+        url = f"{self._app_base(app_key)}/instances/{instance_id}/data"
+        params = {"datatype": "Vedlegg"}
+        resp = self._http.post(
+            url,
+            content=data,
+            headers={
+                "Content-Type": content_type,
+                "Content-Disposition": f'attachment; filename="{filnavn}"',
+            },
+            params=params,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
     def fullfoor_instans(self, app_key: str, instans: dict) -> str:
         """
         Avanserer instansen til signeringssteget og returnerer Altinn-lenken
@@ -122,7 +187,6 @@ class AltinnClient:
         """
         instance_id = instans["id"]
         url = f"{self._app_base(app_key)}/instances/{instance_id}/process/next"
-
         resp = self._http.put(url)
         if not resp.is_success:
             raise RuntimeError(f"{resp.status_code} {resp.reason_phrase}:\n{resp.text}")

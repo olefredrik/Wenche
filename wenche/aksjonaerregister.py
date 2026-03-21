@@ -72,7 +72,7 @@ def generer_hovedskjema_xml(
     org = innsending_org or s.org_nummer
     aar = oppgave.regnskapsaar
     totalt_aksjer = oppgave.totalt_antall_aksjer
-    paalydende = s.aksjekapital // totalt_aksjer if totalt_aksjer > 0 else 0
+    paalydende = round(s.aksjekapital) // totalt_aksjer if totalt_aksjer > 0 else 0
     stiftelsesdato = f"{s.stiftelsesaar}-01-01T00:00:00"
 
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
@@ -94,11 +94,11 @@ def generer_hovedskjema_xml(
     <Selskapsopplysninger-grp-2589 gruppeid="2589">
         <AksjekapitalForHeleSelskapet-grp-3443 gruppeid="3443">
             <AksjekapitalFjoraret-datadef-7129 orid="7129">0</AksjekapitalFjoraret-datadef-7129>
-            <Aksjekapital-datadef-87 orid="87">{s.aksjekapital}</Aksjekapital-datadef-87>
+            <Aksjekapital-datadef-87 orid="87">{round(s.aksjekapital)}</Aksjekapital-datadef-87>
         </AksjekapitalForHeleSelskapet-grp-3443>
         <AksjekapitalIDenneAksjeklassen-grp-3444 gruppeid="3444">
             <AksjekapitalISINAksjetypeFjoraret-datadef-17663 orid="17663">0</AksjekapitalISINAksjetypeFjoraret-datadef-17663>
-            <AksjekapitalISINAksjetype-datadef-17664 orid="17664">{s.aksjekapital}</AksjekapitalISINAksjetype-datadef-17664>
+            <AksjekapitalISINAksjetype-datadef-17664 orid="17664">{round(s.aksjekapital)}</AksjekapitalISINAksjetype-datadef-17664>
         </AksjekapitalIDenneAksjeklassen-grp-3444>
         <PalydendePerAksje-grp-3447 gruppeid="3447">
             <AksjeMvPalydendeFjoraret-datadef-23944 orid="23944">0</AksjeMvPalydendeFjoraret-datadef-23944>
@@ -110,7 +110,7 @@ def generer_hovedskjema_xml(
         </AntallAksjerIDenneAksjeklassen-grp-3445>
         <InnbetaltAksjekapitalIDenneAksjeklassen-grp-3446 gruppeid="3446">
             <AksjekapitalInnbetaltFjoraret-datadef-8020 orid="8020">0</AksjekapitalInnbetaltFjoraret-datadef-8020>
-            <AksjekapitalInnbetalt-datadef-5867 orid="5867">{s.aksjekapital}</AksjekapitalInnbetalt-datadef-5867>
+            <AksjekapitalInnbetalt-datadef-5867 orid="5867">{round(s.aksjekapital)}</AksjekapitalInnbetalt-datadef-5867>
         </InnbetaltAksjekapitalIDenneAksjeklassen-grp-3446>
         <InnbetaltOverkursIDenneAksjeklassen-grp-3448 gruppeid="3448">
             <AksjeOverkursISINAksjetypeFjoraret-datadef-17662 orid="17662">0</AksjeOverkursISINAksjetypeFjoraret-datadef-17662>
@@ -163,7 +163,7 @@ def generer_underskjema_xml(
     s = oppgave.selskap
     org = innsending_org or s.org_nummer
     aar = oppgave.regnskapsaar
-    anskaffelsesverdi = aksjonaer.innbetalt_kapital_per_aksje * aksjonaer.antall_aksjer
+    anskaffelsesverdi = round(aksjonaer.innbetalt_kapital_per_aksje * aksjonaer.antall_aksjer)
     stiftelsesdato = f"{s.stiftelsesaar}-01-01T00:00:00"
 
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
