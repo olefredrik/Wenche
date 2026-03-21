@@ -29,7 +29,7 @@ def _lag_pdf(linjer: list[str]) -> bytes:
     Bruker WinAnsiEncoding (latin-1) som dekker norske tegn (æ, ø, å).
     """
     def _pdf_str(s: str) -> bytes:
-        enc = s.encode("latin-1", errors="replace")
+        enc = s.encode("cp1252", errors="replace")
         escaped = enc.replace(b"\\", b"\\\\").replace(b"(", b"\\(").replace(b")", b"\\)")
         return b"(" + escaped + b")"
 
