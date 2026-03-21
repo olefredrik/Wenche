@@ -177,6 +177,10 @@ def send_inn(regnskap: Aarsregnskap, klient: AltinnClient, dry_run: bool = False
     print("Sender årsregnskap til Brønnøysundregistrene via Altinn...")
     instans = klient.opprett_instans("aarsregnskap", org)
 
+    print("DEBUG — data-elementer i ny instans:")
+    for el in instans.get("data", []):
+        print(f"  dataType={el.get('dataType')!r}  locked={el.get('locked')}  id={el.get('id')!r}")
+
     klient.oppdater_data_element(
         "aarsregnskap", instans,
         data_type="Hovedskjema",

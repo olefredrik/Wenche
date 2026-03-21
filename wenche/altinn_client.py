@@ -123,7 +123,20 @@ class AltinnClient:
         instance_id = instans["id"]
         url = f"{self._app_base(app_key)}/instances/{instance_id}/process/next"
 
-        resp = self._http.put(url)
+        val_url = f"{self._app_base(app_key)}/instances/{instance_id}/validate"
+        val_resp = self._http.get(val_url)
+        if val_resp.is_success:
+            issues = val_resp.json()
+            if issues:
+                print(f"DEBUG validate ({len(issues)} issues):")
+                for iss in issues:
+                    print(f"  [{iss.get('severity')}] {iss.get('code')}: {iss.get('description')} (field={iss.get('field')})")
+            else:
+                print("DEBUG validate: ingen valideringsfeil")
+        else:
+            print(f"DEBUG validate feilet: {val_resp.status_code} {val_resp.text[:200]}")
+
+        resp = self._http.put(url, json={"action": "confirm"})
         if not resp.is_success:
             raise RuntimeError(f"{resp.status_code} {resp.reason_phrase}:\n{resp.text}")
         print("Instans klar for signering.")

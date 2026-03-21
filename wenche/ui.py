@@ -672,12 +672,23 @@ with fane_selskap:
                     tmp_sti = tmp.name
                 try:
                     data = importer_saft_fil(tmp_sti)
+                    # Bevar felt som SAF-T ikke dekker (aksjonærer, ledelse, noter osv.)
+                    if os.path.exists(CONFIG_FIL):
+                        with open(CONFIG_FIL, encoding="utf-8") as f_eks:
+                            eksisterende = yaml.safe_load(f_eks) or {}
+                        for felt in ("daglig_leder", "styreleder", "stiftelsesaar", "kontakt_epost"):
+                            eks_verdi = eksisterende.get("selskap", {}).get(felt)
+                            if eks_verdi:
+                                data["selskap"][felt] = eks_verdi
+                        if eksisterende.get("aksjonaerer"):
+                            data["aksjonaerer"] = eksisterende["aksjonaerer"]
+                        if eksisterende.get("skattemelding"):
+                            data["skattemelding"] = eksisterende["skattemelding"]
+                        if eksisterende.get("noter"):
+                            data["noter"] = eksisterende["noter"]
                     with open(CONFIG_FIL, "w", encoding="utf-8") as f:
                         yaml.dump(data, f, allow_unicode=True, sort_keys=False)
-                    st.success(
-                        f"SAF-T importert og lagret til {CONFIG_FIL.resolve()}. "
-                        "Siden lastes nå inn på nytt med de importerte verdiene."
-                    )
+                    st.session_state["saft_import_ok"] = data["selskap"]["navn"]
                     st.session_state.pop("initialisert", None)
                     st.rerun()
                 except Exception as e:
@@ -685,6 +696,13 @@ with fane_selskap:
                 finally:
                     import os
                     os.unlink(tmp_sti)
+
+        if st.session_state.pop("saft_import_ok", None) is not None:
+            navn_importert = st.session_state.get("navn", "")
+            st.success(
+                f"SAF-T importert for **{navn_importert}**. "
+                "Feltene nedenfor er fylt ut automatisk — fyll inn det som mangler og lagre."
+            )
 
     st.divider()
     col1, col2 = st.columns(2)
@@ -717,47 +735,48 @@ with fane_selskap:
 with fane_regnskap:
     st.subheader("Steg 3 av 6 — Regnskap og balanse")
     st.caption("Fyll inn tall fra resultatregnskapet og balansen. Fortsett til steg 4 når du er ferdig.")
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
 
     with col1:
         st.markdown("**Driftsinntekter**")
-        st.number_input("Salgsinntekter", min_value=0, step=1000, key="salgsinntekter")
-        st.number_input("Andre driftsinntekter", min_value=0, step=1000, key="andre_driftsinntekter")
-        sum_driftsinntekter = st.session_state["salgsinntekter"] + st.session_state["andre_driftsinntekter"]
-        st.metric("Sum driftsinntekter", f"{sum_driftsinntekter:,} kr".replace(",", " "))
+        v_salgsinntekter = st.number_input("Salgsinntekter", min_value=0.0, step=1000.0, format="%.0f", key="salgsinntekter")
+        v_andre_driftsinntekter = st.number_input("Andre driftsinntekter", min_value=0.0, step=1000.0, format="%.0f", key="andre_driftsinntekter")
+        sum_driftsinntekter = v_salgsinntekter + v_andre_driftsinntekter
 
         st.markdown("**Driftskostnader**")
-        st.number_input("Lønnskostnader", min_value=0, step=1000, key="loennskostnader")
-        st.number_input("Avskrivninger", min_value=0, step=1000, key="avskrivninger")
-        st.number_input("Andre driftskostnader", min_value=0, step=500, key="andre_driftskostnader")
-        sum_driftskostnader = (
-            st.session_state["loennskostnader"]
-            + st.session_state["avskrivninger"]
-            + st.session_state["andre_driftskostnader"]
-        )
-        st.metric("Sum driftskostnader", f"{sum_driftskostnader:,} kr".replace(",", " "))
-
-        driftsresultat = sum_driftsinntekter - sum_driftskostnader
-        st.metric("Driftsresultat", f"{driftsresultat:,} kr".replace(",", " "))
+        v_loennskostnader = st.number_input("Lønnskostnader", min_value=0.0, step=1000.0, format="%.0f", key="loennskostnader")
+        v_avskrivninger = st.number_input("Avskrivninger", min_value=0.0, step=1000.0, format="%.0f", key="avskrivninger")
+        v_andre_driftskostnader = st.number_input("Andre driftskostnader", min_value=0.0, step=500.0, format="%.0f", key="andre_driftskostnader")
+        sum_driftskostnader = v_loennskostnader + v_avskrivninger + v_andre_driftskostnader
 
     with col2:
-        st.markdown("**Finansposter**")
-        st.number_input(
+        st.markdown("**Finansinntekter**")
+        v_utbytte_datter = st.number_input(
             "Utbytte fra datterselskap",
-            min_value=0, step=1000, key="utbytte_fra_datterselskap",
+            min_value=0.0, step=1000.0, format="%.0f", key="utbytte_fra_datterselskap",
             help="Utbytte mottatt fra heleide datterselskaper i regnskapsåret. Inngår i vurderingen av fritaksmetoden.",
         )
-        st.number_input("Andre finansinntekter", min_value=0, step=1000, key="andre_finansinntekter")
-        st.number_input("Rentekostnader", min_value=0, step=1000, key="rentekostnader")
-        st.number_input("Andre finanskostnader", min_value=0, step=1000, key="andre_finanskostnader")
-        resultat_foer_skatt = (
-            driftsresultat
-            + st.session_state["utbytte_fra_datterselskap"]
-            + st.session_state["andre_finansinntekter"]
-            - st.session_state["rentekostnader"]
-            - st.session_state["andre_finanskostnader"]
-        )
-        st.metric("Resultat før skatt", f"{resultat_foer_skatt:,} kr".replace(",", " "))
+        v_andre_finansinntekter = st.number_input("Andre finansinntekter", min_value=0.0, step=1000.0, format="%.0f", key="andre_finansinntekter")
+
+        st.markdown("**Finanskostnader**")
+        v_rentekostnader = st.number_input("Rentekostnader", min_value=0.0, step=1000.0, format="%.0f", key="rentekostnader")
+        v_andre_finanskostnader = st.number_input("Andre finanskostnader", min_value=0.0, step=1000.0, format="%.0f", key="andre_finanskostnader")
+
+    driftsresultat = sum_driftsinntekter - sum_driftskostnader
+    resultat_foer_skatt = (
+        driftsresultat
+        + v_utbytte_datter
+        + v_andre_finansinntekter
+        - v_rentekostnader
+        - v_andre_finanskostnader
+    )
+
+    with col3:
+        st.markdown("**Resultat**")
+        st.metric("Sum driftsinntekter", f"{sum_driftsinntekter:,.0f} kr".replace(",", " "))
+        st.metric("Sum driftskostnader", f"{sum_driftskostnader:,.0f} kr".replace(",", " "))
+        st.metric("Driftsresultat", f"{driftsresultat:,.0f} kr".replace(",", " "))
+        st.metric("Resultat før skatt", f"{resultat_foer_skatt:,.0f} kr".replace(",", " "))
 
     st.divider()
     st.subheader("Balanse")
@@ -766,62 +785,48 @@ with fane_regnskap:
     with col1:
         st.markdown("**Eiendeler**")
         st.markdown("*Anleggsmidler*")
-        st.number_input(
+        v_aksjer_datter = st.number_input(
             "Aksjer i datterselskap",
-            min_value=0, step=1000, key="aksjer_i_datterselskap",
+            min_value=0.0, step=1000.0, format="%.0f", key="aksjer_i_datterselskap",
             help="Kostpris for aksjer i heleide datterselskaper (typisk over 90 % eierandel).",
         )
-        st.number_input("Andre aksjer", min_value=0, step=1000, key="andre_aksjer")
-        st.number_input("Langsiktige fordringer", min_value=0, step=1000, key="langsiktige_fordringer")
-        sum_anleggsmidler = (
-            st.session_state["aksjer_i_datterselskap"]
-            + st.session_state["andre_aksjer"]
-            + st.session_state["langsiktige_fordringer"]
-        )
+        v_andre_aksjer = st.number_input("Andre aksjer", min_value=0.0, step=1000.0, format="%.0f", key="andre_aksjer")
+        v_langsiktige_fordringer = st.number_input("Langsiktige fordringer", min_value=0.0, step=1000.0, format="%.0f", key="langsiktige_fordringer")
+        sum_anleggsmidler = v_aksjer_datter + v_andre_aksjer + v_langsiktige_fordringer
 
         st.markdown("*Omløpsmidler*")
-        st.number_input("Kortsiktige fordringer", min_value=0, step=1000, key="kortsiktige_fordringer")
-        st.number_input("Bankinnskudd", min_value=0, step=100, key="bankinnskudd")
-        sum_omloepmidler = st.session_state["kortsiktige_fordringer"] + st.session_state["bankinnskudd"]
+        v_kortsiktige_fordringer = st.number_input("Kortsiktige fordringer", min_value=0.0, step=1000.0, format="%.0f", key="kortsiktige_fordringer")
+        v_bankinnskudd = st.number_input("Bankinnskudd", min_value=0.0, step=100.0, format="%.0f", key="bankinnskudd")
+        sum_omloepmidler = v_kortsiktige_fordringer + v_bankinnskudd
         sum_eiendeler = sum_anleggsmidler + sum_omloepmidler
-        st.metric("Sum eiendeler", f"{sum_eiendeler:,} kr".replace(",", " "))
+        st.metric("Sum eiendeler", f"{sum_eiendeler:,.0f} kr".replace(",", " "))
 
     with col2:
         st.markdown("**Egenkapital og gjeld**")
         st.markdown("*Egenkapital*")
-        st.number_input("Aksjekapital (balanse)", min_value=0, step=1000, key="ek_aksjekapital")
-        st.number_input("Overkursfond", step=1000, key="overkursfond")
-        st.number_input("Annen egenkapital (negativ ved underskudd)", step=1000, key="annen_egenkapital")
-        sum_egenkapital = (
-            st.session_state["ek_aksjekapital"]
-            + st.session_state["overkursfond"]
-            + st.session_state["annen_egenkapital"]
-        )
+        v_ek_aksjekapital = st.number_input("Aksjekapital (balanse)", min_value=0.0, step=1000.0, format="%.0f", key="ek_aksjekapital")
+        v_overkursfond = st.number_input("Overkursfond", step=1000.0, format="%.0f", key="overkursfond")
+        v_annen_egenkapital = st.number_input("Annen egenkapital (negativ ved underskudd)", step=1000.0, format="%.0f", key="annen_egenkapital")
+        sum_egenkapital = v_ek_aksjekapital + v_overkursfond + v_annen_egenkapital
 
         st.markdown("*Langsiktig gjeld*")
-        st.number_input("Lån fra aksjonær", min_value=0, step=1000, key="laan_fra_aksjonaer")
-        st.number_input("Andre langsiktige lån", min_value=0, step=1000, key="andre_langsiktige_laan")
-        sum_langsiktig_gjeld = (
-            st.session_state["laan_fra_aksjonaer"] + st.session_state["andre_langsiktige_laan"]
-        )
+        v_laan_fra_aksjonaer = st.number_input("Lån fra aksjonær", min_value=0.0, step=1000.0, format="%.0f", key="laan_fra_aksjonaer")
+        v_andre_langsiktige_laan = st.number_input("Andre langsiktige lån", min_value=0.0, step=1000.0, format="%.0f", key="andre_langsiktige_laan")
+        sum_langsiktig_gjeld = v_laan_fra_aksjonaer + v_andre_langsiktige_laan
 
         st.markdown("*Kortsiktig gjeld*")
-        st.number_input("Leverandørgjeld", min_value=0, step=1000, key="leverandoergjeld")
-        st.number_input("Skyldige offentlige avgifter", min_value=0, step=1000, key="skyldige_offentlige_avgifter")
-        st.number_input("Annen kortsiktig gjeld", min_value=0, step=1000, key="annen_kortsiktig_gjeld")
-        sum_kortsiktig_gjeld = (
-            st.session_state["leverandoergjeld"]
-            + st.session_state["skyldige_offentlige_avgifter"]
-            + st.session_state["annen_kortsiktig_gjeld"]
-        )
+        v_leverandoergjeld = st.number_input("Leverandørgjeld", min_value=0.0, step=1000.0, format="%.0f", key="leverandoergjeld")
+        v_skyldige = st.number_input("Skyldige offentlige avgifter", min_value=0.0, step=1000.0, format="%.0f", key="skyldige_offentlige_avgifter")
+        v_annen_kortsiktig = st.number_input("Annen kortsiktig gjeld", min_value=0.0, step=1000.0, format="%.0f", key="annen_kortsiktig_gjeld")
+        sum_kortsiktig_gjeld = v_leverandoergjeld + v_skyldige + v_annen_kortsiktig
         sum_ek_og_gjeld = sum_egenkapital + sum_langsiktig_gjeld + sum_kortsiktig_gjeld
-        st.metric("Sum egenkapital og gjeld", f"{sum_ek_og_gjeld:,} kr".replace(",", " "))
+        st.metric("Sum egenkapital og gjeld", f"{sum_ek_og_gjeld:,.0f} kr".replace(",", " "))
 
     differanse = sum_eiendeler - sum_ek_og_gjeld
     if abs(differanse) < 0.01:
         st.success("Balansen stemmer")
     else:
-        st.error(f"Balansen stemmer ikke. Differanse: {differanse:,.2f} kr".replace(",", " "))
+        st.error(f"Balansen stemmer ikke. Differanse: {differanse:,.0f} kr".replace(",", " "))
 
     st.divider()
     with st.expander("Sammenligningstall — foregående år (påkrevd, rskl. § 6-6)", expanded=False):
@@ -898,6 +903,11 @@ with fane_aksjonaerer:
                     "Innbetalt kapital per aksje (NOK)", min_value=0, key=f"a_kap_{i}",
                     help="Aksjekapital delt på antall aksjer. Eks: 30 000 kr / 100 aksjer = 300 kr per aksje.",
                 )
+
+    antall_vis = int(st.session_state.get("antall_aksjonaerer", 1))
+    mangler_navn = any(not st.session_state.get(f"a_navn_{i}", "") for i in range(antall_vis))
+    if mangler_navn:
+        st.warning("En eller flere aksjonærer mangler navn. Fyll inn og klikk **Lagre aksjonærer** — data lagres ikke automatisk ved siderefresh.")
 
     if st.button("Lagre aksjonærer", type="primary"):
         lagre_config()
