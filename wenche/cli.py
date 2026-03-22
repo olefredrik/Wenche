@@ -33,20 +33,14 @@ def main():
 @main.command()
 def ui():
     """Start webgrensesnitt i nettleseren (krever pip install wenche[ui])."""
-    import subprocess
-    import sys
-    from pathlib import Path
-
-    app = Path(__file__).parent / "ui.py"
     try:
-        subprocess.run(
-            [sys.executable, "-m", "streamlit", "run", str(app)], check=True
-        )
-    except FileNotFoundError:
+        from wenche.ui import run_app
+    except ImportError:
         click.echo(
-            "Streamlit er ikke installert. Kjør:\n  pip install wenche[ui]", err=True
+            "NiceGUI er ikke installert. Kjør:\n  pip install wenche[ui]", err=True
         )
         raise SystemExit(1)
+    run_app()
 
 
 @main.command()

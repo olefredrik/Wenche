@@ -21,40 +21,118 @@ Denne veiledningen tar deg gjennom en komplett innsending fra start til slutt. V
 
 ---
 
-## Steg 1 — Fyll ut config.yaml
+## Steg 1 — Start webgrensesnittet
 
-`config.example.yaml` i prosjektmappen er allerede fylt ut med tallene for Eksempel Holding AS. Kopier den for å følge denne veiledningen uten å endre noe:
+=== "Webgrensesnitt"
 
-```bash
-cp config.example.yaml config.yaml
-```
+    ```bash
+    wenche ui
+    ```
 
-Når du er klar til å levere ditt eget regnskap, åpner du `config.yaml` i en teksteditor og erstatter verdiene med dine egne tall. Se [Referanse](referanse.md) for beskrivelse av alle felt.
+    Wenche åpner `http://localhost:8080` i nettleseren. Du ser fem faner øverst: **Selskap**, **Regnskap**, **Aksjonærer**, **Dokumenter** og **Send til Altinn**.
 
-!!! tip "Balansen må gå opp"
-    Sum eiendeler skal være lik sum egenkapital og gjeld. Stemmer ikke tallene, gir Wenche deg en advarsel og viser differansen.
+=== "Kommandolinje"
+
+    Ingen oppstart nødvendig — alle kommandoer kjøres direkte i terminalen. Se neste steg.
 
 ---
 
-## Steg 2 — Generer skattemeldingen
+## Steg 2 — Fyll ut selskapsinformasjon
+
+=== "Webgrensesnitt"
+
+    Gå til fanen **Selskap** og fyll inn:
+
+    - **Selskapsnavn:** Eksempel Holding AS
+    - **Organisasjonsnummer:** 123456789
+    - **Daglig leder:** Kari Nordmann
+    - **Styreleder:** Kari Nordmann
+    - **Forretningsadresse:** Eksempelveien 1, 0001 Oslo
+    - **Stiftelsesår:** 2020
+    - **Aksjekapital:** 30 000
+    - **Regnskapsår:** 2024
+
+    Klikk **Lagre konfigurasjon**.
+
+    !!! tip "Har du SAF-T fra regnskapssystemet ditt?"
+        Klikk **Importer fra SAF-T Financial** øverst i fanen. Last opp XML-filen og Wenche fyller inn alle regnskapstall automatisk. Du må fortsatt fylle inn daglig leder, styreleder og aksjonærdata manuelt.
+
+=== "Kommandolinje"
+
+    Kopier eksempelfilen og rediger den:
+
+    ```bash
+    cp config.example.yaml config.yaml
+    ```
+
+    Åpne `config.yaml` i en teksteditor og erstatt verdiene under `selskap` med dine egne tall. Se [Referanse](referanse.md) for beskrivelse av alle felt.
+
+---
+
+## Steg 3 — Fyll ut regnskapstall
+
+=== "Webgrensesnitt"
+
+    Gå til fanen **Regnskap** og fyll inn tallene for Eksempel Holding AS:
+
+    **Resultatregnskap:**
+
+    - Utbytte fra datterselskap: 250 000
+    - Andre driftskostnader: 5 500
+
+    **Balanse — eiendeler:**
+
+    - Aksjer i datterselskap: (kostpris)
+    - Bankinnskudd: 1 200
+
+    **Balanse — egenkapital og gjeld:**
+
+    - Aksjekapital: 30 000
+    - Annen egenkapital: (akkumulert resultat)
+
+    Klikk **Lagre konfigurasjon**. Wenche viser en advarsel hvis balansen ikke går opp — sum eiendeler skal være lik sum egenkapital og gjeld.
+
+=== "Kommandolinje"
+
+    Fyll inn tallene direkte i `config.yaml` under `resultatregnskap` og `balanse`. Balansen må stemme — sum eiendeler = sum egenkapital og gjeld.
+
+---
+
+## Steg 4 — Fyll ut aksjonærdata
+
+=== "Webgrensesnitt"
+
+    Gå til fanen **Aksjonærer** og registrer aksjonærene per 31.12:
+
+    - **Navn:** Kari Nordmann
+    - **Fødselsnummer:** (11 siffer)
+    - **Antall aksjer:** 1 000
+    - **Aksjeklasse:** ordinære
+    - **Utbytte utbetalt:** (beløp, eller 0)
+
+    Klikk **Lagre konfigurasjon**.
+
+=== "Kommandolinje"
+
+    Fyll inn aksjonærene under `aksjonaerer` i `config.yaml`. Se [Referanse](referanse.md) for feltoversikt.
+
+---
+
+## Steg 5 — Generer skattemeldingen
 
 Skattemeldingen (RF-1167 + RF-1028) genereres lokalt og sendes inn manuelt på skatteetaten.no.
 
-```bash
-wenche generer-skattemelding
-```
+=== "Webgrensesnitt"
 
-Du skal se en utskrift som inneholder:
+    Gå til fanen **Dokumenter** og klikk **Last ned skattemelding**.
 
-- Næringsoppgave (RF-1167) med driftsinntekter, driftskostnader og finansposter
-- Skatteberegning — for Eksempel Holding AS med 100 % eierandel er utbyttet fritatt under fritaksmetoden, og skatten blir **0 kr**
-- Egenkapitalnote (rskl. § 7-2b) — vises automatisk når `foregaaende_aar` er utfylt
+    Sammendraget inneholder næringsoppgaven (RF-1167) og skatteberegningen. For Eksempel Holding AS med 100 % eierandel er utbyttet fritatt under fritaksmetoden — skatten blir **0 kr**.
 
-Lagre til fil for enklere kopiering:
+=== "Kommandolinje"
 
-```bash
-wenche generer-skattemelding --ut skattemelding_2024.txt
-```
+    ```bash
+    wenche generer-skattemelding --ut skattemelding_2024.txt
+    ```
 
 **Send inn manuelt:**
 
@@ -65,49 +143,54 @@ wenche generer-skattemelding --ut skattemelding_2024.txt
 
 ---
 
-## Steg 3 — Test årsregnskapet (dry-run)
+## Steg 6 — Send årsregnskapet
 
-Før du sender inn, kan du se hva Wenche vil sende til Brønnøysundregistrene:
+=== "Webgrensesnitt"
 
-```bash
-wenche send-aarsregnskap --dry-run
-```
+    Gå til fanen **Send til Altinn** og klikk **Send årsregnskap**.
 
-Dette genererer XML-dokumentene lokalt (`aarsregnskap_hovedskjema.xml` og `aarsregnskap_underskjema.xml`) uten å sende dem til Altinn. Nyttig for å verifisere at tallene er riktige.
+    Når opplastingen er ferdig vises knappen **Signer i Altinn**. Klikk den og signer med BankID som daglig leder eller styreleder.
 
----
+=== "Kommandolinje"
 
-## Steg 4 — Send årsregnskapet
+    Test uten å sende (anbefalt første gang):
 
-```bash
-wenche login
-wenche send-aarsregnskap
-wenche logout
-```
+    ```bash
+    wenche send-aarsregnskap --dry-run
+    ```
 
-Wenche laster opp årsregnskapet og skriver ut en lenke til Altinn når opplastingen er ferdig:
+    Send inn:
 
-```
-Årsregnskap lastet opp.
-Signer her: https://tt02.altinn.no/ui/...
-```
+    ```bash
+    wenche login
+    wenche send-aarsregnskap
+    wenche logout
+    ```
 
-Åpne lenken i nettleseren og signer med BankID som daglig leder eller styreleder. Signeringen fullfører innsendingen.
+    Wenche skriver ut en lenke til Altinn-innboksen. Åpne lenken og signer med BankID.
 
 !!! note "Signering skjer i Altinn, ikke i Wenche"
     Dette er et juridisk krav og kan ikke gjøres maskinelt.
 
 ---
 
-## Steg 5 — Send aksjonærregisteroppgaven
+## Steg 7 — Send aksjonærregisteroppgaven
 
-```bash
-wenche login
-wenche send-aksjonaerregister
-wenche logout
-```
+=== "Webgrensesnitt"
 
-Aksjonærregisteroppgaven (RF-1086) sendes automatisk til Skatteetaten via Altinn. Ingen manuell signering nødvendig.
+    Gå til fanen **Send til Altinn** og klikk **Send aksjonærregister til Skatteetaten**.
+
+    Forsendelse-ID vises i grensesnittet når innsendingen er fullført. Ingen manuell signering nødvendig.
+
+=== "Kommandolinje"
+
+    ```bash
+    wenche login
+    wenche send-aksjonaerregister
+    wenche logout
+    ```
+
+    Wenche skriver ut forsendelse-ID når innsendingen er fullført.
 
 ---
 
@@ -119,4 +202,4 @@ Du har nå:
 - [x] Sendt inn årsregnskapet til Brønnøysundregistrene
 - [x] Sendt inn aksjonærregisteroppgaven (RF-1086) til Skatteetaten
 
-Neste år gjentar du fra steg 1 med oppdaterte tall — og husk å fylle ut `foregaaende_aar` med årets tall for å få med sammenligningstall (rskl. § 6-6).
+Neste år gjentar du fra steg 2 med oppdaterte tall — og husk å fylle ut `foregaaende_aar` med årets tall for å få med sammenligningstall (rskl. § 6-6).

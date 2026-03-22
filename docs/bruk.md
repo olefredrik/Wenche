@@ -1,6 +1,6 @@
 # Bruk
 
-Wenche kan brukes enten via **kommandolinjen** eller via **webgrensesnittet** (`wenche ui`). Begge gir tilgang til de samme funksjonene.
+Wenche brukes primært via **webgrensesnittet** (`wenche ui`) — et grafisk grensesnitt i nettleseren der du fyller ut og sender inn alt. Kommandolinjen er tilgjengelig som alternativ for de som foretrekker det.
 
 ---
 
@@ -196,6 +196,7 @@ Kommandoer:
   generer-skattemelding    Generer ferdig utfylt RF-1167 og RF-1028
   send-aarsregnskap        Send inn arsregnskap til Bronnoysundregistrene
   send-aksjonaerregister   Send inn aksjonaerregisteroppgave (RF-1086)
+  importer-saft            Importer SAF-T Financial XML og generer config.yaml
   ui                       Start webgrensesnittet i nettleseren
 
 Alternativer (send-aarsregnskap og send-aksjonaerregister):
@@ -205,6 +206,10 @@ Alternativer (send-aarsregnskap og send-aksjonaerregister):
 Alternativer (generer-skattemelding):
   --config TEXT            Sti til konfigurasjonsfil [standard: config.yaml]
   --ut TEXT                Lagre sammendrag til fil
+
+Alternativer (importer-saft):
+  SAF-T-FIL                Sti til SAF-T Financial XML-fil (pakrevd argument)
+  --ut TEXT                Sti til config.yaml som skal skrives [standard: config.yaml]
 ```
 
 !!! note

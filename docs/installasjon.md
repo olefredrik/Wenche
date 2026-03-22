@@ -55,15 +55,11 @@ Viser kommandoen 3.10 eller lavere (eller du får feilmeldingen `command not fou
 
 Det anbefales å installere Wenche i et virtuelt miljø for å unngå konflikter med andre Python-pakker.
 
-=== "macOS / Linux — kommandolinje"
+!!! tip "Anbefalt: installer med webgrensesnitt"
+    De fleste brukere ønsker webgrensesnittet (`wenche ui`). Installer da `wenche[ui]` som vist under.
+    Vil du kun bruke kommandolinjen, kan du installere `wenche` uten ekstra avhengigheter.
 
-    ```bash
-    python3.11 -m venv .venv
-    source .venv/bin/activate
-    pip install wenche
-    ```
-
-=== "macOS / Linux — webgrensesnitt"
+=== "macOS / Linux"
 
     ```bash
     python3.11 -m venv .venv
@@ -71,15 +67,7 @@ Det anbefales å installere Wenche i et virtuelt miljø for å unngå konflikter
     pip install "wenche[ui]"
     ```
 
-=== "Windows — kommandolinje"
-
-    ```powershell
-    py -3.11 -m venv .venv
-    .venv\Scripts\Activate.ps1
-    pip install wenche
-    ```
-
-=== "Windows — webgrensesnitt"
+=== "Windows"
 
     ```powershell
     py -3.11 -m venv .venv
@@ -124,7 +112,7 @@ Har du installert `wenche[ui]`, starter du grensesnittet slik:
 wenche ui
 ```
 
-Streamlit starter og åpner `http://localhost:8501` i nettleseren. Åpnes ikke nettleseren automatisk, kan du lime inn adressen manuelt.
+Wenche åpner `http://localhost:8080` i nettleseren. Åpnes ikke nettleseren automatisk, kan du lime inn adressen manuelt.
 
 ## For utviklere
 
@@ -135,7 +123,7 @@ git clone https://github.com/olefredrik/wenche.git
 cd wenche
 python3.11 -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -e ".[dev,ui]"
 ```
 
 Kjør testsuiten:
