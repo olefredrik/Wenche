@@ -1,6 +1,6 @@
 # Bruk
 
-Wenche kan brukes enten via **kommandolinjen** eller via **webgrensesnittet** (`wenche ui`). Begge gir tilgang til de samme funksjonene.
+Wenche brukes primært via **webgrensesnittet** (`wenche ui`) — et grafisk grensesnitt i nettleseren der du fyller ut og sender inn alt. Kommandolinjen er tilgjengelig som alternativ for de som foretrekker det.
 
 ---
 

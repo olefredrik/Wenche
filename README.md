@@ -7,7 +7,9 @@
 ![Tester](https://github.com/olefredrik/Wenche/actions/workflows/test.yml/badge.svg)
 [![Dokumentasjon](https://img.shields.io/badge/docs-olefredrik.github.io%2FWenche-blue)](https://olefredrik.github.io/Wenche/)
 
-Wenche er et verktøy for holdingselskaper og småaksjeselskaper som må levere regnskap og skattedokumenter til norske myndigheter. Det kan brukes både fra kommandolinjen og via et grafisk webgrensesnitt — uten behov for et fullverdig regnskapsprogram.
+Wenche er et verktøy for holdingselskaper og småaksjeselskaper som må levere regnskap og skattedokumenter til norske myndigheter — uten behov for et fullverdig regnskapsprogram.
+
+Kjør `wenche ui` for å åpne et grafisk webgrensesnitt i nettleseren der du fyller ut og sender inn alt. Kommandolinjen er tilgjengelig for de som foretrekker det.
 
 Autentisering skjer via Maskinporten med et selvgenerert RSA-nøkkelpar — ingen virksomhetssertifikat eller BankID-innlogging nødvendig.
 
