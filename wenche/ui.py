@@ -715,7 +715,7 @@ def _bygg_oppsett_fane() -> None:
         pem_opplasting = ui.upload(
             label="Last opp privat nøkkel (.pem)",
             auto_upload=True,
-        ).classes("w-full").tooltip("Din maskinporten_privat.pem-fil. Lagres lokalt — sendes aldri til noen server.")
+        ).props("flat bordered").classes("w-full").tooltip("Din maskinporten_privat.pem-fil. Lagres lokalt — sendes aldri til noen server.")
 
     pem_bytes_holder: list[bytes] = []
 
@@ -796,7 +796,7 @@ def _bygg_oppsett_fane() -> None:
             n.type = "negative"
             n.timeout = 0
 
-    ui.button("Test tilkobling mot Altinn", on_click=test_tilkobling).props("color=primary")
+    ui.button("Test tilkobling mot Altinn", on_click=test_tilkobling).props("color=primary outline")
 
     # --- Systembruker-oppsett ---
     ui.separator().classes("my-4")
@@ -829,7 +829,7 @@ def _bygg_oppsett_fane() -> None:
                 n.timeout = 0
                 n.close_button = "Lukk"
 
-        ui.button("Registrer Wenche i systemregisteret", on_click=registrer_system)
+        ui.button("Registrer Wenche i systemregisteret", on_click=registrer_system).props("color=primary outline")
 
         seksjonstittel("Steg 2 — Opprett systembrukerforespørsel")
         godkjenn_url_label = ui.label("").classes("text-sm font-mono text-blue-700 break-all mt-1")
@@ -856,7 +856,7 @@ def _bygg_oppsett_fane() -> None:
                 n.timeout = 0
                 n.close_button = "Lukk"
 
-        ui.button("Opprett systembrukerforespørsel", on_click=opprett_forespørsel)
+        ui.button("Opprett systembrukerforespørsel", on_click=opprett_forespørsel).props("color=primary outline")
 
         seksjonstittel("Sjekk godkjenningsstatus")
 
@@ -893,7 +893,7 @@ def _bygg_oppsett_fane() -> None:
                 n.timeout = 0
                 n.close_button = "Lukk"
 
-        ui.button("Sjekk status", on_click=sjekk_status)
+        ui.button("Sjekk status", on_click=sjekk_status).props("color=primary outline")
 
 
 # ---------------------------------------------------------------------------
@@ -905,7 +905,11 @@ def _bygg_selskap_fane() -> None:
     ui.label("Fyll inn grunnleggende informasjon om selskapet.").classes("text-slate-500 text-sm mb-4")
 
     # SAF-T import
-    with ui.expansion("Importer fra SAF-T Financial (valgfritt, anbefalt for nye brukere)").classes("w-full mb-4"):
+    with ui.expansion(
+        "Importer fra SAF-T Financial",
+        caption="Anbefalt for nye brukere — fyll inn alle tall automatisk",
+        icon="file_upload",
+    ).props("bordered").classes("w-full mb-4"):
         ui.label(
             "SAF-T Financial er et standardisert revisjonsfilformat som brukes av alle norske regnskapssystemer "
             "(Fiken, Tripletex, Visma, Uni Micro, PowerOffice Go m.fl.). "
@@ -919,7 +923,7 @@ def _bygg_selskap_fane() -> None:
         saft_opplasting = ui.upload(
             label="Last opp SAF-T Financial XML-fil",
             auto_upload=True,
-        ).classes("w-full")
+        ).props("flat bordered").classes("w-full")
 
         def saft_mottatt(e):
             saft_bytes_holder.clear()
@@ -961,7 +965,7 @@ def _bygg_selskap_fane() -> None:
             except Exception as e:
                 ui.notify(f"Feil ved import: {e}", type="negative", timeout=0)
 
-        ui.button("Importer SAF-T", on_click=importer_saft).props("color=primary").classes("mt-2")
+        ui.button("Importer SAF-T", on_click=importer_saft).props("color=primary outline").classes("mt-2")
 
     ui.separator().classes("my-2")
 
@@ -1394,7 +1398,7 @@ def _bygg_dokumenter_fane() -> None:
             except Exception as e:
                 ui.notify(f"Feil: {e}", type="negative", timeout=0)
 
-        ui.button("Last ned noter", on_click=last_ned_noter).props("color=primary")
+        ui.button("Last ned noter", on_click=last_ned_noter).props("color=primary outline")
 
 
 # ---------------------------------------------------------------------------
@@ -1523,6 +1527,14 @@ def main() -> None:
         .q-tab__label { font-size: 0.8rem; }
         .q-expansion-item__content { padding: 0 16px 12px; }
         .q-notification__actions .q-btn { color: white !important; }
+        .q-btn { text-transform: none !important; letter-spacing: 0.01em !important; }
+        .q-tab__label { text-transform: none !important; }
+        .q-uploader__subtitle { display: none !important; }
+        .q-uploader { border: 1px solid #e2e8f0 !important; box-shadow: none !important; }
+        .q-uploader__header { background: #f8fafc !important; color: #475569 !important; }
+        .q-uploader__title { font-size: 0.875rem; font-weight: 500; }
+        .q-uploader__subtitle { font-size: 0.75rem; }
+        .q-uploader__list { min-height: 0 !important; }
     """)
     ui.add_head_html(
         '<link rel="preconnect" href="https://fonts.googleapis.com">'
