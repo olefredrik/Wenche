@@ -27,6 +27,10 @@ Tokenet lagres i `~/.wenche/token.json` og gjenbrukes automatisk for påfølgend
 
 Wenche genererer et ferdig utfylt sammendrag av RF-1167 (næringsoppgaven) og RF-1028 (skattemeldingen).
 
+=== "Webgrensesnitt"
+
+    Gå til fanen **Dokumenter** og klikk **Last ned skattemelding**.
+
 === "Kommandolinje"
 
     Genererer fra tallene i `config.yaml`:
@@ -40,10 +44,6 @@ Wenche genererer et ferdig utfylt sammendrag av RF-1167 (næringsoppgaven) og RF
     ```bash
     wenche generer-skattemelding --ut skattemelding.txt
     ```
-
-=== "Webgrensesnitt"
-
-    Gå til fanen **Dokumenter** og klikk **Last ned skattemelding**.
 
 Sammendraget inneholder:
 
@@ -75,6 +75,12 @@ Sammendraget inneholder:
 
 ## Årsregnskap (frist 31. juli)
 
+=== "Webgrensesnitt"
+
+    Gå til fanen **Send til Altinn** og klikk **Send årsregnskap**.
+
+    Når opplastingen er ferdig vises en knapp **Signer i Altinn**. Klikk den og signer med BankID for å fullføre innsendingen.
+
 === "Kommandolinje"
 
     Test uten innsending (anbefalt første gang):
@@ -94,12 +100,6 @@ Sammendraget inneholder:
     ```
 
     Wenche skriver ut en lenke til Altinn-innboksen når opplastingen er ferdig. Åpne lenken i nettleseren, finn skjemaet i innboksen og signer med BankID for å fullføre innsendingen.
-
-=== "Webgrensesnitt"
-
-    Gå til fanen **Send til Altinn** og klikk **Send årsregnskap**.
-
-    Når opplastingen er ferdig vises en knapp **Signer i Altinn**. Klikk den og signer med BankID for å fullføre innsendingen.
 
 !!! note "Signering skjer i Altinn, ikke i Wenche"
     Wenche laster opp regnskapet og klargjør det for signering. Selve signeringen må gjøres av daglig leder eller styreleder i Altinn med BankID — dette er et juridisk krav og kan ikke gjøres maskinelt.
@@ -121,6 +121,12 @@ Wenche sender RF-1086 direkte til Skatteetatens eget REST-API — ikke via Altin
 !!! warning "Testmiljø krever syntetiske testdata"
     Bruker du `WENCHE_ENV=test` må systembrukeren tilhøre en syntetisk testorganisasjon fra Tenor, og `SKD_TEST_ORG_NUMMER` må være satt i `.env`. Se [steg 5b i oppsett](oppsett.md#5b-opprett-systembrukerforespørsel) for fullstendig veiledning.
 
+=== "Webgrensesnitt"
+
+    Gå til fanen **Send til Altinn** og klikk **Send aksjonærregister til Skatteetaten**.
+
+    Forsendelse-ID vises i grensesnittet når innsendingen er fullført.
+
 === "Kommandolinje"
 
     Test og generer XML lokalt uten å sende:
@@ -136,12 +142,6 @@ Wenche sender RF-1086 direkte til Skatteetatens eget REST-API — ikke via Altin
     ```
 
     Wenche skriver ut forsendelse-ID når innsendingen er fullført.
-
-=== "Webgrensesnitt"
-
-    Gå til fanen **Send til Altinn** og klikk **Send aksjonærregister til Skatteetaten**.
-
-    Forsendelse-ID vises i grensesnittet når innsendingen er fullført.
 
 ---
 
