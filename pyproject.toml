@@ -31,7 +31,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-ui = ["streamlit>=1.30"]
+ui = ["nicegui>=2.0"]
 dev = ["pytest>=8.0", "mkdocs-material>=9.5"]
 
 [project.urls]
