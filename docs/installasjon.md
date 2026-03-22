@@ -135,7 +135,7 @@ git clone https://github.com/olefredrik/wenche.git
 cd wenche
 python3.11 -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -e ".[dev,ui]"
 ```
 
 Kjør testsuiten:

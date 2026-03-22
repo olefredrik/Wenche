@@ -233,6 +233,32 @@ wenche opprett-systembruker
 
 ---
 
+### `wenche importer-saft`
+
+Importerer en SAF-T Financial XML-fil og genererer `config.yaml` automatisk.
+
+```bash
+wenche importer-saft SAF-T-FIL [--ut FILSTI]
+```
+
+| Argument/alternativ | Beskrivelse |
+|---|---|
+| `SAF-T-FIL` | Sti til SAF-T Financial XML-filen eksportert fra regnskapssystemet (påkrevd) |
+| `--ut` | Sti til `config.yaml` som skal skrives. Standard: `config.yaml` |
+
+Etter import må følgende felt fylles inn manuelt i `config.yaml`:
+
+- `selskap.daglig_leder`
+- `selskap.styreleder`
+- `selskap.stiftelsesaar`
+- `aksjonaerer` (navn, fødselsnummer, antall aksjer, utbytte)
+- `foregaaende_aar.resultatregnskap` (er ikke tilgjengelig i SAF-T)
+
+!!! tip "Tilgjengelig i webgrensesnittet"
+    SAF-T-import er også tilgjengelig under fanen **Selskap** i `wenche ui`.
+
+---
+
 ### `wenche ui`
 
 Starter webgrensesnittet i nettleseren.
