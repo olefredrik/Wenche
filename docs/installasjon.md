@@ -124,7 +124,7 @@ Har du installert `wenche[ui]`, starter du grensesnittet slik:
 wenche ui
 ```
 
-Streamlit starter og åpner `http://localhost:8501` i nettleseren. Åpnes ikke nettleseren automatisk, kan du lime inn adressen manuelt.
+Wenche åpner `http://localhost:8080` i nettleseren. Åpnes ikke nettleseren automatisk, kan du lime inn adressen manuelt.
 
 ## For utviklere
 

@@ -241,4 +241,4 @@ Starter webgrensesnittet i nettleseren.
 wenche ui
 ```
 
-Åpner Streamlit på `http://localhost:8501`.
+Åpner webgrensesnittet på `http://localhost:8080`.
