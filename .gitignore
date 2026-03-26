@@ -17,6 +17,7 @@ venv/
 .vscode/
 .idea/
 .claude/
+.nicegui/
 
 # Genererte filer
 site/
