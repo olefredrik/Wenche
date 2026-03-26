@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema xmlns="no:skatteetaten:fastsetting:formueinntekt:skattemeldingognaeringsspesifikasjon:request:v2" xmlns:skatt="http://www.skatteetaten.no/xsd" xmlns:xsd="http://www.w3.org/2001/XMLSchema" attributeFormDefault="unqualified" elementFormDefault="qualified" targetNamespace="no:skatteetaten:fastsetting:formueinntekt:skattemeldingognaeringsspesifikasjon:request:v2">
+    <xsd:annotation>
+        <xsd:documentation>
+            <xsd:attribute fixed="2024-03-18T11:40:11.900+0100" name="generertDato"/>
+            <xsd:attribute fixed="v2" name="versjon"/>
+            <xsd:attribute fixed="" name="beskrivelse"/>
+            <xsd:attribute fixed="v2" name="modellnavn"/>
+            <xsd:attribute fixed="no:skatteetaten:fastsetting:formueinntekt:skattemeldingognaeringsspesifikasjon:request:v2" name="navnerom"/>
+            <xsd:attribute fixed="true" name="begrepsreferanse"/>
+            <xsd:attribute fixed="false" name="dokumentasjon"/>
+            <xsd:attribute fixed="false" name="nillable"/>
+            <xsd:attribute fixed="false" name="modellelement"/>
+            <xsd:attribute fixed="false" name="norskeTegn"/>
+        </xsd:documentation>
+    </xsd:annotation>
+    <xsd:element name="skattemeldingOgNaeringsspesifikasjonRequest" type="SkattemeldingOgNaeringsspesifikasjonRequest"/>
+    <xsd:complexType name="SkattemeldingOgNaeringsspesifikasjonRequest">
+        <xsd:sequence>
+            <xsd:element name="dokumenter" type="Dokumenter"/>
+            <xsd:element maxOccurs="unbounded" minOccurs="0" name="dokumentreferanseTilGjeldendeDokument" type="Dokumentreferanse"/>
+            <xsd:element name="inntektsaar" type="Inntektsaar"/>
+            <xsd:element minOccurs="0" name="innsendingsinformasjon" type="InformasjonVedInnsending"/>
+        </xsd:sequence>
+    </xsd:complexType>
+    <xsd:complexType name="Dokumenter">
+        <xsd:sequence>
+            <xsd:element maxOccurs="unbounded" name="dokument" type="Dokument"/>
+        </xsd:sequence>
+    </xsd:complexType>
+    <xsd:complexType name="InformasjonVedInnsending">
+        <xsd:sequence>
+            <xsd:element name="innsendingstype" type="Innsendingstype"/>
+            <xsd:element name="opprettetAv" type="Tekst"/>
+            <xsd:element minOccurs="0" name="tin" type="Tekst"/>
+            <xsd:element minOccurs="0" name="innsendingsformaal" type="Innsendingsformaal"/>
+        </xsd:sequence>
+    </xsd:complexType>
+    <xsd:complexType name="Dokument">
+        <xsd:sequence>
+            <xsd:element name="type" type="Dokumenttype"/>
+            <xsd:element name="encoding" type="Encodingtype"/>
+            <xsd:element name="content" type="Base64Binaer"/>
+            <xsd:element minOccurs="0" name="navneromVedForhaandsfastsetting" type="Tekst"/>
+        </xsd:sequence>
+    </xsd:complexType>
+    <xsd:complexType name="Dokumentreferanse">
+        <xsd:sequence>
+            <xsd:element name="dokumenttype" type="Dokumenttype"/>
+            <xsd:element name="dokumentidentifikator" type="Tekst"/>
+        </xsd:sequence>
+    </xsd:complexType>
+    <xsd:simpleType name="Dokumenttype">
+        <xsd:restriction base="xsd:string">
+            <xsd:enumeration value="skattemeldingPersonlig"/>
+            <xsd:enumeration value="skattemeldingUpersonlig"/>
+            <xsd:enumeration value="naeringsspesifikasjon"/>
+            <xsd:enumeration value="selskapsmeldingSdf"/>
+            <xsd:enumeration value="naeringsspesifikasjonReferanse"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="Encodingtype">
+        <xsd:restriction base="xsd:string">
+            <xsd:enumeration value="utf-8"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="Innsendingsformaal">
+        <xsd:restriction base="xsd:string">
+            <xsd:enumeration value="egenfastsetting"/>
+            <xsd:enumeration value="klage"/>
+            <xsd:enumeration value="endringsanmodning"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="Innsendingstype">
+        <xsd:restriction base="xsd:string">
+            <xsd:enumeration value="komplett"/>
+            <xsd:enumeration value="ikkeKomplett"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="Heltall" skatt:begrepsreferanse="https://data.skatteetaten.no/begrep/20b52af0-9fe1-11e5-a9f8-e4115b280940">
+        <xsd:restriction base="xsd:long"/>
+    </xsd:simpleType>
+    <xsd:simpleType name="Inntektsaar" skatt:begrepsreferanse="https://data.skatteetaten.no/begrep/fa86c460-d685-11e7-9676-0050568351d2">
+        <xsd:restriction base="Heltall">
+            <xsd:minInclusive value="1000"/>
+            <xsd:totalDigits value="4"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="Tekst" skatt:begrepsreferanse="https://data.skatteetaten.no/begrep/20b52af3-9fe1-11e5-a9f8-e4115b280940">
+        <xsd:restriction base="xsd:string">
+            <xsd:maxLength value="4000"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="Base64Binaer">
+        <xsd:restriction base="xsd:base64Binary"/>
+    </xsd:simpleType>
+</xsd:schema>

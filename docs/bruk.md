@@ -22,14 +22,11 @@ Tokenet lagres i `~/.wenche/token.json` og gjenbrukes automatisk for påfølgend
 
 ## Skattemelding (frist 31. mai)
 
-!!! note "Skattemeldingen sendes ikke digitalt"
-    Wenche genererer et sammendrag som du fyller inn manuelt på [skatteetaten.no](https://www.skatteetaten.no/). Digital innsending av skattemelding støttes ikke.
-
-Wenche genererer et ferdig utfylt sammendrag av RF-1167 (næringsoppgaven) og RF-1028 (skattemeldingen).
+Wenche genererer et ferdig utfylt sammendrag av RF-1167 (næringsoppgaven) og RF-1028 (skattemeldingen) og sender det inn digitalt til Skatteetaten.
 
 === "Webgrensesnitt"
 
-    Gå til fanen **Dokumenter** og klikk **Last ned skattemelding**.
+    Gå til fanen **Send til Altinn** og klikk **Send skattemelding til Skatteetaten**.
 
 === "Kommandolinje"
 
@@ -63,13 +60,23 @@ Sammendraget inneholder:
 !!! info "Egenkapitalnote"
     Egenkapitalnoten (rskl. § 7-2b) vises automatisk når `foregaaende_aar` er utfylt i `config.yaml`. Uten sammenligningstall vises kun utgående balanse med en advarsel om at inngående tall mangler.
 
-**Send inn manuelt:**
+!!! note "API-tilgang kreves"
+    Automatisk innsending av skattemelding krever at systemleverandøren er registrert hos Skatteetaten. Se [Søke om API-tilgang](#soke-om-api-tilgang) for fremgangsmåte.
 
-1. Gå til [skatteetaten.no](https://www.skatteetaten.no/) og logg inn med BankID
-2. Åpne skattemeldingen for AS for gjeldende regnskapsår
-3. Fyll inn tallene fra sammendraget Wenche har generert
-4. Kontroller at Skatteetaten beregner samme skatt
-5. Send inn
+---
+
+## Søke om API-tilgang for skattemelding { #soke-om-api-tilgang }
+
+Skatteetaten krever at systemleverandører søker om tilgang før automatisk innsending kan tas i bruk. Innsending via skjema på skatteetaten.no er avviklet.
+
+**Fremgangsmåte:**
+
+1. Gå til [Skatteetatens servicedesk](https://eksternjira.sits.no/servicedesk/customer/user/login)
+2. Send en henvendelse om tilgang til API for skattemelding
+3. Oppgi at du skal levere for eget selskap (ikke som systemleverandør for andre)
+4. Ved innvilgelse: aksepter bruksvilkårene og registrer integrasjonen i [Digdirs selvbetjeningsportal](https://samarbeid.digdir.no/) med scope `skatteetaten:formueinntekt/skattemelding`
+
+Teknisk dokumentasjon: [github.com/Skatteetaten/skattemeldingen](https://github.com/Skatteetaten/skattemeldingen)
 
 ---
 
