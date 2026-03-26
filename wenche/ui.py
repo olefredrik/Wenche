@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import tempfile
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 
 import yaml
@@ -581,16 +582,16 @@ def kr(v: float) -> str:
 def _sjekk_konfig() -> list[tuple[bool, str, str]]:
     resultater = []
     client_id = os.getenv("MASKINPORTEN_CLIENT_ID")
-    resultater.append((bool(client_id), "MASKINPORTEN_CLIENT_ID", "Satt" if client_id else "Mangler — legg til i .env-filen"))
+    resultater.append((bool(client_id), "MASKINPORTEN_CLIENT_ID", "Satt" if client_id else "Mangler. Legg til i .env-filen"))
     kid = os.getenv("MASKINPORTEN_KID")
-    resultater.append((bool(kid), "MASKINPORTEN_KID", "Satt" if kid else "Mangler — legg til i .env-filen"))
+    resultater.append((bool(kid), "MASKINPORTEN_KID", "Satt" if kid else "Mangler. Legg til i .env-filen"))
     orgnr = os.getenv("ORG_NUMMER")
-    resultater.append((bool(orgnr), "ORG_NUMMER", "Satt" if orgnr else "Mangler — legg til i .env-filen"))
+    resultater.append((bool(orgnr), "ORG_NUMMER", "Satt" if orgnr else "Mangler. Legg til i .env-filen"))
     nokkel_sti = os.getenv("MASKINPORTEN_PRIVAT_NOKKEL", "maskinporten_privat.pem")
     nokkel_ok = Path(nokkel_sti).exists()
     resultater.append((nokkel_ok, "Privat nøkkel", f"Funnet: {nokkel_sti}" if nokkel_ok else f"Finner ikke: {nokkel_sti}"))
     env = os.getenv("WENCHE_ENV", "prod")
-    resultater.append((True, "Miljø", f"{'Testmiljø (tt02)' if env == 'test' else 'Produksjon'} — endre med WENCHE_ENV=test i .env"))
+    resultater.append((True, "Miljø", f"{'Testmiljø (tt02)' if env == 'test' else 'Produksjon'}, endre med WENCHE_ENV=test i .env"))
     return resultater
 
 
@@ -668,11 +669,95 @@ def txt(label: str, attr: str, obj=None, placeholder: str = "", tooltip: str = "
 
 
 # ---------------------------------------------------------------------------
+# Fane 0: Hjem
+# ---------------------------------------------------------------------------
+
+def _frist_info(maaned: int, dag: int) -> tuple[str, str, str]:
+    """Returner (dato_tekst, status_tekst, farge) basert på dager til neste frist."""
+    today = date.today()
+    frist = date(today.year, maaned, dag)
+    if frist < today:
+        frist = date(today.year + 1, maaned, dag)
+    dager = (frist - today).days
+    dato_tekst = frist.strftime("%-d. %B %Y").replace(
+        "January", "januar").replace("February", "februar").replace(
+        "March", "mars").replace("April", "april").replace(
+        "May", "mai").replace("June", "juni").replace(
+        "July", "juli").replace("August", "august").replace(
+        "September", "september").replace("October", "oktober").replace(
+        "November", "november").replace("December", "desember")
+    if dager <= 30:
+        return dato_tekst, f"{dager} dager igjen", "red-600"
+    elif dager <= 60:
+        return dato_tekst, f"{dager} dager igjen", "amber-500"
+    else:
+        return dato_tekst, f"{dager} dager igjen", "green-600"
+
+
+def _fristkort(tittel: str, undertittel: str, maaned: int, dag: int, beskrivelse: str) -> None:
+    dato_tekst, status_tekst, farge = _frist_info(maaned, dag)
+    with ui.card().classes("w-full p-5 border border-slate-200 shadow-none rounded-xl"):
+        with ui.column().classes("gap-0 w-full"):
+            ui.label(tittel).classes("font-semibold text-slate-800 text-base")
+            ui.label(undertittel).classes("text-xs text-slate-500 mb-2")
+            ui.label(dato_tekst).classes(f"text-sm font-medium text-{farge}")
+            ui.label(status_tekst).classes(f"text-xs text-{farge}")
+        ui.separator().classes("my-3")
+        ui.label(beskrivelse).classes("text-sm text-slate-600")
+
+
+def _bygg_hjem_fane() -> None:
+    ui.label("Tid for å sende inn papirene igjen?").classes("text-2xl font-semibold mt-2 mb-1")
+    ui.label(
+        "Wenche ordner årsregnskap, skattemelding og aksjonærregisteroppgave "
+        "for holdingselskapet ditt. Fyll ut tallene i steg 1–5, send inn i steg 6."
+    ).classes("text-slate-500 text-sm mb-2")
+    with ui.row().classes("gap-1 mb-6 flex-wrap"):
+        ui.label("Første gang? Ta en titt i").classes("text-sm text-slate-500")
+        ui.link("dokumentasjonen", "https://olefredrik.github.io/Wenche/", new_tab=True).classes("text-sm")
+        ui.label(", der finner du hjelp til å sette opp alt riktig.").classes("text-sm text-slate-500")
+
+    ui.label("Frister").classes("text-lg font-semibold mb-3")
+    with ui.grid(columns=3).classes("w-full gap-4"):
+        _fristkort(
+            "Skattemelding",
+            "RF-1167 + RF-1028",
+            5, 31,
+            "Genereres i steg 5 og sendes inn manuelt på skatteetaten.no. "
+            "Wenche beregner skatten og fyller ut næringsoppgaven automatisk.",
+        )
+        _fristkort(
+            "Årsregnskap",
+            "Brønnøysundregistrene",
+            7, 31,
+            "Sendes digitalt via Altinn i steg 6. "
+            "Krever signering med BankID av daglig leder eller styreleder.",
+        )
+        _fristkort(
+            "Aksjonærregisteroppgave",
+            "RF-1086, Skatteetaten",
+            1, 31,
+            "Sendes maskinelt til Skatteetatens API via steg 6. "
+            "Ingen manuell signering nødvendig.",
+        )
+
+    ui.separator().classes("my-6")
+    ui.label("Ansvarsfraskrivelse").classes("text-sm font-semibold text-slate-700 mb-1")
+    ui.label(
+        "Wenche er et hjelpeverktøy for enkle holdingselskaper og er i aktiv utvikling. "
+        "Det er ikke en erstatning for profesjonell regnskapsbistand. "
+        "Kontroller alltid at genererte dokumenter er korrekte før innsending. "
+        "Du er selv ansvarlig for at innsendte opplysninger er riktige."
+    ).classes("text-xs text-slate-500")
+
+
+# ---------------------------------------------------------------------------
 # Fane 1: Oppsett
 # ---------------------------------------------------------------------------
 
 def _bygg_oppsett_fane() -> None:
-    ui.label("Steg 1 av 6 — Oppsett og tilkobling").classes("text-lg font-semibold mt-2")
+    ui.label("Steg 1 av 6").classes("text-xs text-slate-400 mt-2 uppercase tracking-wide")
+    ui.label("Oppsett og tilkobling").classes("text-lg font-semibold")
     ui.label(
         "Fyll inn Maskinporten-konfigurasjonen og test tilkoblingen mot Altinn."
     ).classes("text-slate-500 text-sm mb-4")
@@ -702,7 +787,7 @@ def _bygg_oppsett_fane() -> None:
             "Nøkkel-ID",
             value=os.getenv("MASKINPORTEN_KID", ""),
             placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-        ).classes("w-full").tooltip("UUID-en portalen tildelte nøkkelen din — synlig i nøkkellisten under klienten.")
+        ).classes("w-full").tooltip("UUID-en portalen tildelte nøkkelen din, synlig i nøkkellisten under klienten.")
 
         ui.label("").classes("w-full")  # placeholder for grid-justering
 
@@ -715,14 +800,14 @@ def _bygg_oppsett_fane() -> None:
         pem_opplasting = ui.upload(
             label="Last opp privat nøkkel (.pem)",
             auto_upload=True,
-        ).props("flat bordered").classes("w-full").tooltip("Din maskinporten_privat.pem-fil. Lagres lokalt — sendes aldri til noen server.")
+        ).props("flat bordered").classes("w-full").tooltip("Din maskinporten_privat.pem-fil. Lagres lokalt og sendes aldri til noen server.")
 
     pem_bytes_holder: list[bytes] = []
 
     def pem_mottatt(e):
         pem_bytes_holder.clear()
         pem_bytes_holder.append(e.content.read())
-        ui.notify("Nøkkelfil lastet opp — klikk 'Lagre konfigurasjon' for å lagre.", type="info")
+        ui.notify("Nøkkelfil lastet opp. Klikk 'Lagre konfigurasjon' for å lagre.", type="info")
 
     pem_opplasting.on_upload(pem_mottatt)
 
@@ -760,7 +845,7 @@ def _bygg_oppsett_fane() -> None:
         sjekker = _sjekk_konfig()
         for ok, tittel, detalj in sjekker:
             ikon = "✅" if ok else "⚠️"
-            ui.label(f"{ikon}  {tittel} — {detalj}").classes(
+            ui.label(f"{ikon}  {tittel}: {detalj}").classes(
                 "text-sm " + ("text-green-700" if ok else "text-amber-700")
             )
 
@@ -781,7 +866,7 @@ def _bygg_oppsett_fane() -> None:
         n = ui.notification("Kobler til Maskinporten og Altinn...", spinner=True, timeout=None)
         try:
             await run.io_bound(auth.login)
-            n.message = "Tilkobling OK — Maskinporten og Altinn svarte som forventet."
+            n.message = "Tilkobling OK. Maskinporten og Altinn svarte som forventet."
             n.spinner = False
             n.type = "positive"
             n.timeout = 6
@@ -803,10 +888,10 @@ def _bygg_oppsett_fane() -> None:
     with ui.expansion("Systembruker-oppsett (gjøres én gang per miljø)").classes("w-full"):
         ui.label(
             "Altinn 3 krever at Wenche er registrert som leverandørsystem og at organisasjonen din "
-            "har godkjent en systembruker. Dette gjøres én gang — og på nytt hvis du bytter miljø."
+            "har godkjent en systembruker. Dette gjøres én gang, og på nytt hvis du bytter miljø."
         ).classes("text-sm text-slate-500 mb-3")
 
-        seksjonstittel("Steg 1 — Registrer Wenche i systemregisteret")
+        seksjonstittel("Steg 1. Registrer Wenche i systemregisteret")
         ui.label(
             "Registrerer Wenche i Altinns systemregister. Kan kjøres på nytt uten skade."
         ).classes("text-sm text-slate-500 mb-2")
@@ -831,7 +916,7 @@ def _bygg_oppsett_fane() -> None:
 
         ui.button("Registrer Wenche i systemregisteret", on_click=registrer_system).props("color=primary outline")
 
-        seksjonstittel("Steg 2 — Opprett systembrukerforespørsel")
+        seksjonstittel("Steg 2. Opprett systembrukerforespørsel")
         godkjenn_url_label = ui.label("").classes("text-sm font-mono text-blue-700 break-all mt-1")
 
         async def opprett_forespørsel():
@@ -901,13 +986,14 @@ def _bygg_oppsett_fane() -> None:
 # ---------------------------------------------------------------------------
 
 def _bygg_selskap_fane() -> None:
-    ui.label("Steg 2 av 6 — Selskapsopplysninger").classes("text-lg font-semibold mt-2")
+    ui.label("Steg 2 av 6").classes("text-xs text-slate-400 mt-2 uppercase tracking-wide")
+    ui.label("Selskapsopplysninger").classes("text-lg font-semibold")
     ui.label("Fyll inn grunnleggende informasjon om selskapet.").classes("text-slate-500 text-sm mb-4")
 
     # SAF-T import
     with ui.expansion(
         "Importer fra SAF-T Financial",
-        caption="Anbefalt for nye brukere — fyll inn alle tall automatisk",
+        caption="Anbefalt for nye brukere, fyll inn alle tall automatisk",
         icon="file_upload",
     ).props("bordered").classes("w-full mb-4"):
         ui.label(
@@ -998,7 +1084,8 @@ def _bygg_selskap_fane() -> None:
 # ---------------------------------------------------------------------------
 
 def _bygg_regnskap_fane() -> None:
-    ui.label("Steg 3 av 6 — Regnskap og balanse").classes("text-lg font-semibold mt-2")
+    ui.label("Steg 3 av 6").classes("text-xs text-slate-400 mt-2 uppercase tracking-wide")
+    ui.label("Regnskap og balanse").classes("text-lg font-semibold")
     ui.label("Fyll inn tall fra resultatregnskapet og balansen.").classes("text-slate-500 text-sm mb-4")
 
     # Samlede metrikker (oppdateres reaktivt)
@@ -1102,7 +1189,7 @@ def _bygg_regnskap_fane() -> None:
 
     # Sammenligningstall — foregående år
     ui.separator().classes("my-6")
-    with ui.expansion("Sammenligningstall — foregående år (påkrevd, rskl. § 6-6)").classes("w-full"):
+    with ui.expansion("Sammenligningstall, foregående år (påkrevd, rskl. § 6-6)").classes("w-full"):
         ui.label(
             "Fyll inn tilsvarende tall fra fjorårets regnskap. "
             "Disse brukes som sammenligningstall i årsregnskapet til Brønnøysundregistrene."
@@ -1153,14 +1240,15 @@ def _bygg_regnskap_fane() -> None:
 # ---------------------------------------------------------------------------
 
 def _bygg_aksjonaer_fane() -> None:
-    ui.label("Steg 4 av 6 — Aksjonærer").classes("text-lg font-semibold mt-2")
+    ui.label("Steg 4 av 6").classes("text-xs text-slate-400 mt-2 uppercase tracking-wide")
+    ui.label("Aksjonærer").classes("text-lg font-semibold")
     ui.label("Fyll inn opplysninger om aksjonærene.").classes("text-slate-500 text-sm mb-4")
 
     @ui.refreshable
     def aksjonaer_liste() -> None:
         for i, a in enumerate(state.aksjonaerer):
             with ui.expansion(
-                f"Aksjonær {i + 1}" + (f" — {a.navn}" if a.navn else ""),
+                f"Aksjonær {i + 1}" + (f", {a.navn}" if a.navn else ""),
                 value=(i == 0),
             ).classes("w-full mb-2"):
                 with ui.grid(columns=2).classes("w-full gap-4"):
@@ -1213,7 +1301,8 @@ def _bygg_aksjonaer_fane() -> None:
 # ---------------------------------------------------------------------------
 
 def _bygg_dokumenter_fane() -> None:
-    ui.label("Steg 5 av 6 — Last ned dokumenter").classes("text-lg font-semibold mt-2")
+    ui.label("Steg 5 av 6").classes("text-xs text-slate-400 mt-2 uppercase tracking-wide")
+    ui.label("Last ned dokumenter").classes("text-lg font-semibold")
     ui.label(
         "Generer og last ned dokumentene for gjennomgang. Gå til steg 6 når du er klar til å sende inn."
     ).classes("text-slate-500 text-sm mb-4")
@@ -1302,6 +1391,10 @@ def _bygg_dokumenter_fane() -> None:
 
         ui.button("Last ned aksjonærregister (XML)", on_click=last_ned_aksjonaerregister).props("color=primary outline").classes("w-full")
 
+    with ui.column().classes("gap-0 mt-1"):
+        ui.label("Skattemeldingen sendes manuelt på skatteetaten.no —").classes("text-xs text-slate-500")
+        ui.link("Se fremgangsmåte →", "https://olefredrik.github.io/Wenche/bruk/#skattemelding-frist-31-mai", new_tab=True).classes("text-xs")
+
     # Obligatoriske noter
     ui.separator().classes("my-6")
     seksjonstittel("Obligatoriske noter")
@@ -1309,7 +1402,7 @@ def _bygg_dokumenter_fane() -> None:
         "Regnskapsloven krever at alle foretak utarbeider noter til årsregnskapet. "
         "For små foretak gjelder §§ 7-35 (regnskapsprinsipper), 7-43 (ansatte), "
         "7-45 (lån til nærstående) og 7-46 (fortsatt drift). "
-        "Notene sendes ikke inn digitalt — de skal undertegnes av styret og oppbevares av selskapet."
+        "Notene sendes ikke inn digitalt. De skal undertegnes av styret og oppbevares av selskapet."
     ).classes("text-sm text-slate-600 mb-3")
 
     with ui.grid(columns=2).classes("w-full gap-4 mb-4"):
@@ -1328,13 +1421,13 @@ def _bygg_dokumenter_fane() -> None:
     def laan_liste() -> None:
         for i, l in enumerate(state.laan_til_naerstaaende):
             with ui.expansion(
-                f"Lån {i + 1}" + (f" — {l.motpart}" if l.motpart else ""),
+                f"Lån {i + 1}" + (f", {l.motpart}" if l.motpart else ""),
                 value=True,
             ).classes("w-full mb-2"):
                 ui.select(
                     {
-                        "långiver": "Selskapet er långiver — har gitt lån til nærstående",
-                        "låntaker": "Selskapet er låntaker — nærstående har gitt lån til selskapet",
+                        "långiver": "Selskapet er långiver, har gitt lån til nærstående",
+                        "låntaker": "Selskapet er låntaker, nærstående har gitt lån til selskapet",
                     },
                     label="Selskapets rolle",
                     value=l.retning,
@@ -1406,7 +1499,8 @@ def _bygg_dokumenter_fane() -> None:
 # ---------------------------------------------------------------------------
 
 def _bygg_send_fane() -> None:
-    ui.label("Steg 6 av 6 — Send til Altinn").classes("text-lg font-semibold mt-2")
+    ui.label("Steg 6 av 6").classes("text-xs text-slate-400 mt-2 uppercase tracking-wide")
+    ui.label("Send til Altinn").classes("text-lg font-semibold")
     ui.label(
         "Send dokumentene digitalt til Brønnøysundregistrene og Skatteetaten via Altinn."
     ).classes("text-slate-500 text-sm mb-4")
@@ -1420,7 +1514,7 @@ def _bygg_send_fane() -> None:
         prod_advarsel.set_visibility(e.value == "prod")
 
     env_valg = ui.radio(
-        {"test": "Testmiljø (tt02) — ingen ekte innsending", "prod": "Produksjon — innsending er bindende"},
+        {"test": "Testmiljø (tt02), ingen ekte innsending", "prod": "Produksjon, innsending er bindende"},
         value="test",
         on_change=env_endret,
     ).classes("mb-2")
@@ -1545,7 +1639,14 @@ def main() -> None:
         ui.label("Wenche").classes("text-xl font-semibold tracking-tight")
         ui.label("Innsending til norske myndigheter").classes("text-sm text-slate-400")
 
+    with ui.footer().classes("bg-white border-t border-slate-200 px-6 py-3"):
+        with ui.row().classes("items-center justify-center gap-1 text-xs text-slate-400 w-full"):
+            ui.label("Wenche er utviklet av Ole Fredrik Lie og tilgjengelig som")
+            ui.link("åpen kildekode", "https://github.com/olefredrik/Wenche", new_tab=True).classes("text-xs text-slate-400")
+            ui.label("under MIT-lisens.")
+
     with ui.tabs().classes("w-full bg-white shadow-sm") as tabs:
+        t_hjem = ui.tab("Hjem")
         t_oppsett = ui.tab("1. Oppsett")
         t_selskap = ui.tab("2. Selskap")
         t_regnskap = ui.tab("3. Regnskap")
@@ -1553,7 +1654,9 @@ def main() -> None:
         t_dokumenter = ui.tab("5. Dokumenter")
         t_send = ui.tab("6. Send til Altinn")
 
-    with ui.tab_panels(tabs, value=t_oppsett).classes("w-full max-w-5xl mx-auto px-4 py-6"):
+    with ui.tab_panels(tabs, value=t_hjem).classes("w-full max-w-5xl mx-auto px-4 py-6"):
+        with ui.tab_panel(t_hjem):
+            _bygg_hjem_fane()
         with ui.tab_panel(t_oppsett):
             _bygg_oppsett_fane()
         with ui.tab_panel(t_selskap):
@@ -1578,5 +1681,5 @@ def run_app() -> None:
         port=8080,
         reload=False,
         show=True,
-        favicon="🏢",
+        favicon="👵",
     )
