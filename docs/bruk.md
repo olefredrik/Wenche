@@ -30,16 +30,22 @@ Wenche genererer et ferdig utfylt sammendrag av RF-1167 (næringsoppgaven) og RF
 
 === "Kommandolinje"
 
-    Genererer fra tallene i `config.yaml`:
+    Send inn digitalt (krever API-tilgang, se under):
+
+    ```bash
+    wenche send-skattemelding
+    ```
+
+    Test lokalt uten å sende (skriver `skattemelding.xml` og `naeringsspesifikasjon.xml`):
+
+    ```bash
+    wenche send-skattemelding --dry-run
+    ```
+
+    Generer tekstsammendrag for gjennomlesing:
 
     ```bash
     wenche generer-skattemelding
-    ```
-
-    Lagre til fil:
-
-    ```bash
-    wenche generer-skattemelding --ut skattemelding.txt
     ```
 
 Sammendraget inneholder:
@@ -200,13 +206,14 @@ Kommandoer:
   opprett-systembruker     Opprett systembrukerforespørsel og fa godkjenningslenke
   login                    Autentiser mot Maskinporten med RSA-nokkel
   logout                   Logg ut og slett lagret token
-  generer-skattemelding    Generer ferdig utfylt RF-1167 og RF-1028
+  generer-skattemelding    Generer ferdig utfylt RF-1167 og RF-1028 som tekstsammendrag
+  send-skattemelding       Send inn skattemelding for AS til Skatteetaten via Altinn3
   send-aarsregnskap        Send inn arsregnskap til Bronnoysundregistrene
   send-aksjonaerregister   Send inn aksjonaerregisteroppgave (RF-1086)
   importer-saft            Importer SAF-T Financial XML og generer config.yaml
   ui                       Start webgrensesnittet i nettleseren
 
-Alternativer (send-aarsregnskap og send-aksjonaerregister):
+Alternativer (send-aarsregnskap, send-aksjonaerregister og send-skattemelding):
   --config TEXT            Sti til konfigurasjonsfil [standard: config.yaml]
   --dry-run                Generer dokument lokalt uten a sende til Altinn
 
