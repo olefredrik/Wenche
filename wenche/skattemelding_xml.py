@@ -13,7 +13,7 @@ næringsoppgaven — disse settes ikke av Wenche.
 
 from __future__ import annotations
 
-from xml.etree.ElementTree import Element, SubElement, tostring
+from xml.etree.ElementTree import Element, SubElement, fromstring, tostring
 
 _NS = (
     "urn:no:skatteetaten:fastsetting:formueinntekt:"
@@ -53,3 +53,23 @@ def generer_skattemelding_upersonlig(
         SubElement(fremfoert, "beloepSomHeltall").text = str(round(fremfoert_underskudd))
 
     return tostring(root, encoding="unicode").encode("utf-8")
+
+
+def hent_partsnummer(skattemelding_xml: bytes) -> int:
+    """
+    Henter partsnummer fra en skattemeldingUpersonlig XML.
+
+    Partsnummer er Skatteetatens interne ID for selskapet og hentes
+    fra forhåndsutfylt skattemelding (GET /api/skattemelding/v2/{år}/{orgnr}).
+
+    Raises:
+        ValueError: hvis partsnummer ikke finnes i XML-en.
+    """
+    root = fromstring(skattemelding_xml.decode("utf-8"))
+    element = root.find(f"{{{_NS}}}partsnummer")
+    if element is None or not element.text:
+        raise ValueError(
+            "Fant ikke <partsnummer> i skattemelding-XML-en. "
+            "Kontroller at XML-en er en gyldig skattemeldingUpersonlig v5."
+        )
+    return int(element.text)
