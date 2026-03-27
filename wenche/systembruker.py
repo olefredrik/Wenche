@@ -153,6 +153,26 @@ def hent_forespørsel_status(maskinporten_token: str, request_id: str) -> dict:
     return resp.json()
 
 
+def slett_systembruker(maskinporten_token: str, systembruker_id: str) -> None:
+    """
+    Sletter en godkjent systembruker via vendor-API-et.
+
+    Nødvendig når systemet har fått nye rettigheter og eksisterende
+    systembruker må erstattes med en ny (Altinn tillater ikke å opprette
+    ny forespørsel så lenge det finnes en aktiv systembruker).
+
+    Args:
+        systembruker_id: UUID-en til systembrukeren (fra hent_systembrukere).
+    """
+    resp = httpx.delete(
+        f"{_base()}/authentication/api/v1/systemuser/vendor/{systembruker_id}",
+        headers={"Authorization": f"Bearer {maskinporten_token}"},
+        timeout=15,
+    )
+    if not resp.is_success:
+        raise RuntimeError(f"{resp.status_code} {resp.reason_phrase}:\n{resp.text}")
+
+
 def hent_systembrukere(maskinporten_token: str, vendor_orgnr: str) -> list[dict]:
     """
     Henter alle godkjente systembrukere for Wenche-systemet.
