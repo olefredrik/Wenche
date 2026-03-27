@@ -17,6 +17,7 @@ Scope: skatteetaten:formueinntekt/skattemelding, altinn:instances.read/write
 from __future__ import annotations
 
 import httpx
+import json
 
 from wenche.altinn_client import AltinnClient
 from wenche.skattemelding_konvolutt import generer_konvolutt
@@ -127,6 +128,15 @@ class SkdSkattemeldingClient:
         with AltinnClient(altinn_token, env=self._env) as altinn:
             print("Oppretter Altinn3-instans...")
             instans = altinn.opprett_instans("skattemelding", orgnr)
+
+            print("Setter inntektsaar i Skattemeldingsapp_v2-modellen...")
+            altinn.oppdater_data_element(
+                "skattemelding",
+                instans,
+                "Skattemeldingsapp_v2",
+                json.dumps({"inntektsaar": inntektsaar}).encode(),
+                "application/json",
+            )
 
             print("Laster opp skattemelding-konvolutt...")
             altinn.last_opp_skattemelding_data(instans, konvolutt)

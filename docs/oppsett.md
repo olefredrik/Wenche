@@ -220,7 +220,7 @@ Registrerer Wenche i Altinns systemregister med riktige tilgangsrettigheter. Kan
 
     **1. Finn en syntetisk test-AS i Tenor**
 
-    Gå til [Tenor testdatasøk](https://www.skatteetaten.no/skjema/testdata/) og søk frem et aksjeselskap (AS). Noter deg:
+    Gå til [Tenor testdatasøk](https://www.skatteetaten.no/testdata/) og søk frem et aksjeselskap (AS). Noter deg:
 
     - Organisasjonsnummeret til selskapet
     - Fødselsnummeret til daglig leder (finnes under **Kildedata → rollegrupper → DAGL**)

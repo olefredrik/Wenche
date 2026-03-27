@@ -929,15 +929,22 @@ def _bygg_oppsett_fane() -> None:
             n = ui.notification("Henter systembrukere...", spinner=True, timeout=None)
             try:
                 token = await run.io_bound(auth.login_admin)
-                orgnr = os.getenv("ORG_NUMMER")
-                brukere = await run.io_bound(systembruker.hent_systembrukere, token, orgnr)
+                vendor_orgnr = os.getenv("ORG_NUMMER")
+                env = os.getenv("WENCHE_ENV", "prod")
+                orgnr = os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr) if env == "test" else vendor_orgnr
+                brukere = await run.io_bound(systembruker.hent_systembrukere, token, vendor_orgnr)
                 if not brukere:
                     n.message = "Ingen aktive systembrukere funnet. Bruk steg 2 for å opprette ny."
                     n.spinner = False
                     n.type = "info"
                     n.timeout = 6
                     return
-                bruker_id = brukere[0]["id"]
+                # Finn systembrukeren for riktig party-org (i test: SKD_TEST_ORG_NUMMER)
+                treff = next(
+                    (b for b in brukere if b.get("reporteeOrgNo") == orgnr),
+                    brukere[0],
+                )
+                bruker_id = treff["id"]
                 # Send kun den nye skattemelding-rettigheten.
                 # Altinn-API-et krever at uendrede rettigheter utelates fra changerequest.
                 svar = await run.io_bound(
@@ -970,8 +977,10 @@ def _bygg_oppsett_fane() -> None:
             n = ui.notification("Oppretter systembrukerforespørsel...", spinner=True, timeout=None)
             try:
                 token = await run.io_bound(auth.login_admin)
-                orgnr = os.getenv("ORG_NUMMER")
-                svar = await run.io_bound(systembruker.opprett_forespørsel, token, orgnr, orgnr)
+                vendor_orgnr = os.getenv("ORG_NUMMER")
+                env = os.getenv("WENCHE_ENV", "prod")
+                party_orgnr = os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr) if env == "test" else vendor_orgnr
+                svar = await run.io_bound(systembruker.opprett_forespørsel, token, vendor_orgnr, party_orgnr)
                 request_id = svar.get("id", "")
                 if request_id:
                     _lagre_request_id(request_id)
@@ -1657,8 +1666,12 @@ def _bygg_send_fane() -> None:
 
             def _hent_og_send():
                 with SkdSkattemeldingClient(tokens["maskinporten_token"], env=env_valg.value) as skd:
-                    forhåndsutfylt = skd.hent_forhåndsutfylt(int(state.regnskapsaar), orgnr)
-                    partsnummer = hent_partsnummer(forhåndsutfylt)
+                    test_partsnummer = os.getenv("SKD_TEST_PARTSNUMMER") if env_valg.value == "test" else None
+                    if test_partsnummer:
+                        partsnummer = int(test_partsnummer)
+                    else:
+                        forhåndsutfylt = skd.hent_forhåndsutfylt(int(state.regnskapsaar), orgnr)
+                        partsnummer = hent_partsnummer(forhåndsutfylt)
                     skattemelding_xml = generer_skattemelding_upersonlig(
                         partsnummer=partsnummer,
                         inntektsaar=int(state.regnskapsaar),

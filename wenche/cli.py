@@ -96,7 +96,9 @@ def opprett_systembruker(org: str | None):
     if not vendor_orgnr:
         click.echo("Feil: ORG_NUMMER må være satt i .env.", err=True)
         raise SystemExit(1)
-    org_nummer = org or vendor_orgnr
+    env = os.getenv("WENCHE_ENV", "prod")
+    default_org = os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr) if env == "test" else vendor_orgnr
+    org_nummer = org or default_org
 
     click.echo("Henter Maskinporten admin-token...")
     token = auth.login_admin()
@@ -339,9 +341,14 @@ def send_skattemelding(config_fil: str, dry_run: bool):
     tokens = auth.get_skd_skattemelding_tokens()
 
     with SkdSkattemeldingClient(tokens["maskinporten_token"], env=env) as skd:
-        click.echo("Henter forhåndsutfylt skattemelding...")
-        forhåndsutfylt = skd.hent_forhåndsutfylt(regnskap.regnskapsaar, orgnr)
-        partsnummer = hent_partsnummer(forhåndsutfylt)
+        test_partsnummer = os.getenv("SKD_TEST_PARTSNUMMER") if env == "test" else None
+        if test_partsnummer:
+            click.echo(f"Bruker SKD_TEST_PARTSNUMMER={test_partsnummer} (hopper over forhåndsutfylt)")
+            partsnummer = int(test_partsnummer)
+        else:
+            click.echo("Henter forhåndsutfylt skattemelding...")
+            forhåndsutfylt = skd.hent_forhåndsutfylt(regnskap.regnskapsaar, orgnr)
+            partsnummer = hent_partsnummer(forhåndsutfylt)
         click.echo(f"Partsnummer: {partsnummer}")
 
         skattemelding_xml = generer_skattemelding_upersonlig(
