@@ -45,14 +45,19 @@ Gå til [samarbeid.digdir.no](https://samarbeid.digdir.no) og søk om tilgang so
 !!! info "Produksjon eller test?"
     De fleste trenger kun å sette opp **Produksjon**. Testmiljøet (Altinn tt02) er for utviklere som vil teste innsending uten å sende ekte data til myndighetene. De to miljøene har hver sin portal:
 
-    - **Produksjon:** [selvbetjeningsportalen.digdir.no](https://selvbetjeningsportalen.digdir.no)
+    - **Produksjon:** [sjolvbetjening.samarbeid.digdir.no](https://sjolvbetjening.samarbeid.digdir.no)
     - **Test:** [sjolvbetjening.test.samarbeid.digdir.no](https://sjolvbetjening.test.samarbeid.digdir.no)
 
     Setter du opp begge miljøene, gjenta steg 2b og 2c i begge portaler.
 
-Logg inn på riktig portal og følg stegene under:
+Logg inn på riktig portal. Du vil bli bedt om å velge innloggingsmetode — velg **Med organisasjonsnummer** (ikke «Med syntetisk organisasjon»). Det forutsetter at du har fått tildelt rettigheter til selvbetjening av APIer og integrasjoner i Altinn, noe som skjer automatisk når du søker om tilgang som Maskinporten-konsument i steg 2a.
 
-1. Velg **Klienter** → **Maskinporten & KRR**
+!!! warning "Ikke velg «Scopes» i menyen"
+    «Scopes» i venstremenyen er for API-tilbydere som oppretter egne scopes. Du er konsument og skal ikke dit. Naviger via **Mine klienter** i stedet.
+
+Følg stegene under:
+
+1. Velg **Mine klienter** og klikk på Wenche-klienten din, eller klikk **Ny integrasjon** for å opprette en ny. Velg **Maskinporten & KRR** som integrasjonstype.
 2. Klikk **Ny integrasjon** og fyll ut:
     - Visningsnavn: `wenche`
     - Access token levetid: `120`
@@ -66,8 +71,13 @@ Logg inn på riktig portal og følg stegene under:
     | `altinn:authentication/systemuser.request.read` | Sjekke status for systembrukerforespørsel (steg 5) |
     | `altinn:authentication/systemuser.request.write` | Opprette systembrukerforespørsel (steg 5) |
 
-    !!! note "Aksjonærregisteroppgave krever ekstra scope"
-        Innsending av aksjonærregisteroppgave (RF-1086) bruker SKDs eget REST-API og krever scopet `skatteetaten:innrapporteringaksjonaerregisteroppgave`. Dette scopet søkes om separat — se steg 2d.
+    !!! note "Aksjonærregisteroppgave og skattemelding krever ekstra scopes"
+        Disse søkes om separat og legges til på klienten etter at tilgang er innvilget:
+
+        | Scope | Formål |
+        |---|---|
+        | `skatteetaten:innrapporteringaksjonaerregisteroppgave` | Aksjonærregisteroppgave (RF-1086) — se steg 2d |
+        | `skatteetaten:formueinntekt/skattemelding` | Skattemelding for AS — se steg 2e |
 
 4. Kopier **klient-ID** — du trenger den i steg 3
 
@@ -98,6 +108,31 @@ SKD behandler vanligvis slike forespørsler innen noen virkedager.
 **Del 2 — Legg til scope i Digdirs selvbetjeningsportal**
 
 Når SKD bekrefter at tilgangen er innvilget, logg inn i Digdirs selvbetjeningsportal (se steg 2b) og legg til scopet `skatteetaten:innrapporteringaksjonaerregisteroppgave` på Maskinporten-klienten din. Scopet vil nå være søkbart i portalen.
+
+!!! warning "Begge steg er nødvendige"
+    Tilgangen fra SKD aktiveres ikke automatisk på klienten. Du må eksplisitt legge til scopet i Digdirs portal etter at SKD har innvilget det.
+
+### 2e. Søk om tilgang til SKDs API for skattemelding
+
+!!! note "Valgfritt"
+    Dette steget er kun nødvendig dersom du skal sende inn skattemelding for AS. Hopp over om du bare bruker Wenche til årsregnskap og aksjonærregisteroppgave.
+
+Scopet `skatteetaten:formueinntekt/skattemelding` søkes om i to omganger:
+
+**Del 1 — Søk om tilgang hos Skatteetaten**
+
+1. Gå til [SKDs brukerstøtteportal](https://eksternjira.sits.no/plugins/servlet/desk/site/global) og logg inn
+2. Opprett en ny sak under **Innrapportering → Skattemelding**, kategori **Teknisk**
+3. Oppgi i henvendelsen:
+    - At du ønsker tilgang til scopet `skatteetaten:formueinntekt/skattemelding`
+    - Organisasjonsnummeret ditt
+    - Om du ønsker tilgang til testmiljø, produksjon, eller begge
+
+SKD behandler vanligvis slike forespørsler innen noen virkedager.
+
+**Del 2 — Legg til scope i Digdirs selvbetjeningsportal**
+
+Når SKD bekrefter at tilgangen er innvilget, logg inn i Digdirs selvbetjeningsportal (se steg 2b) og legg til scopet `skatteetaten:formueinntekt/skattemelding` på Maskinporten-klienten din. Scopet vil nå være søkbart i portalen.
 
 !!! warning "Begge steg er nødvendige"
     Tilgangen fra SKD aktiveres ikke automatisk på klienten. Du må eksplisitt legge til scopet i Digdirs portal etter at SKD har innvilget det.
