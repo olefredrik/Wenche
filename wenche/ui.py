@@ -918,30 +918,38 @@ def _bygg_oppsett_fane() -> None:
 
         ui.button("Registrer Wenche i systemregisteret", on_click=registrer_system).props("color=primary outline")
 
-        seksjonstittel("Steg 1b. Slett eksisterende systembruker (kun ved oppdatering)")
+        seksjonstittel("Steg 1b. Oppdater rettigheter på eksisterende systembruker")
         ui.label(
             "Hvis systembrukeren allerede er godkjent og du har lagt til nye rettigheter, "
-            "må den slettes før du kan opprette en ny forespørsel."
+            "send en endringsforespørsel. Eksisterende rettigheter beholdes — kun nye legges til."
         ).classes("text-sm text-slate-500 mb-2")
+        endrings_url_label = ui.label("").classes("text-sm font-mono text-blue-700 break-all mt-1")
 
-        async def slett_eksisterende_systembruker():
+        async def oppdater_systembruker():
             n = ui.notification("Henter systembrukere...", spinner=True, timeout=None)
             try:
                 token = await run.io_bound(auth.login_admin)
                 orgnr = os.getenv("ORG_NUMMER")
                 brukere = await run.io_bound(systembruker.hent_systembrukere, token, orgnr)
                 if not brukere:
-                    n.message = "Ingen aktive systembrukere funnet."
+                    n.message = "Ingen aktive systembrukere funnet. Bruk steg 2 for å opprette ny."
                     n.spinner = False
                     n.type = "info"
-                    n.timeout = 5
+                    n.timeout = 6
                     return
-                for bruker in brukere:
-                    await run.io_bound(systembruker.slett_systembruker, token, bruker["id"])
-                n.message = f"{len(brukere)} systembruker(e) slettet. Opprett ny forespørsel i steg 2."
+                bruker_id = brukere[0]["id"]
+                svar = await run.io_bound(
+                    systembruker.opprett_endringsforespørsel,
+                    token,
+                    bruker_id,
+                    systembruker._RIGHTS,
+                )
+                confirm_url = svar.get("confirmUrl") or svar.get("ConfirmUrl", "")
+                endrings_url_label.set_text(f"Godkjenn her: {confirm_url}")
+                n.message = f"Endringsforespørsel opprettet (status: {svar.get('status', '')})"
                 n.spinner = False
                 n.type = "positive"
-                n.timeout = 6
+                n.timeout = 5
             except Exception as e:
                 n.message = f"Feil: {e}"
                 n.spinner = False
@@ -949,7 +957,7 @@ def _bygg_oppsett_fane() -> None:
                 n.timeout = 0
                 n.close_button = "Lukk"
 
-        ui.button("Slett eksisterende systembruker", on_click=slett_eksisterende_systembruker).props("color=negative outline")
+        ui.button("Oppdater systembruker-rettigheter", on_click=oppdater_systembruker).props("color=primary outline")
 
         seksjonstittel("Steg 2. Opprett systembrukerforespørsel")
         godkjenn_url_label = ui.label("").classes("text-sm font-mono text-blue-700 break-all mt-1")

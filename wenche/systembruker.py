@@ -13,6 +13,7 @@ Ved innsending bruker wenche login et systembruker-token fra Maskinporten.
 """
 
 import os
+import uuid
 
 import httpx
 
@@ -153,24 +154,43 @@ def hent_forespørsel_status(maskinporten_token: str, request_id: str) -> dict:
     return resp.json()
 
 
-def slett_systembruker(maskinporten_token: str, systembruker_id: str) -> None:
+def opprett_endringsforespørsel(
+    maskinporten_token: str, systembruker_id: str, required_rights: list[dict]
+) -> dict:
     """
-    Sletter en godkjent systembruker via vendor-API-et.
+    Sender en endringsforespørsel for en eksisterende systembruker via vendor-API-et.
 
-    Nødvendig når systemet har fått nye rettigheter og eksisterende
-    systembruker må erstattes med en ny (Altinn tillater ikke å opprette
-    ny forespørsel så lenge det finnes en aktiv systembruker).
+    Brukes når systemet har fått nye rettigheter — oppdaterer systembrukeren
+    uten å slette den. Returnerer svar med confirmUrl som brukeren må godkjenne.
+
+    API: POST /authentication/api/v1/systemuser/changerequest/vendor
+         ?correlation-id={uuid}&system-user-id={systemUserId}
+    Body: {"requiredRights": [...], "unwantedRights": []}
 
     Args:
-        systembruker_id: UUID-en til systembrukeren (fra hent_systembrukere).
+        systembruker_id:  UUID-en til systembrukeren (fra hent_systembrukere).
+        required_rights:  Liste med rettigheter som skal legges til (samme format som _RIGHTS).
     """
-    resp = httpx.delete(
-        f"{_base()}/authentication/api/v1/systemuser/vendor/{systembruker_id}",
-        headers={"Authorization": f"Bearer {maskinporten_token}"},
+    payload = {
+        "requiredRights": required_rights,
+        "unwantedRights": [],
+    }
+    resp = httpx.post(
+        f"{_base()}/authentication/api/v1/systemuser/changerequest/vendor",
+        params={
+            "correlation-id": str(uuid.uuid4()),
+            "system-user-id": systembruker_id,
+        },
+        json=payload,
+        headers={
+            "Authorization": f"Bearer {maskinporten_token}",
+            "Content-Type": "application/json",
+        },
         timeout=15,
     )
     if not resp.is_success:
         raise RuntimeError(f"{resp.status_code} {resp.reason_phrase}:\n{resp.text}")
+    return resp.json()
 
 
 def hent_systembrukere(maskinporten_token: str, vendor_orgnr: str) -> list[dict]:
