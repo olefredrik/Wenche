@@ -725,7 +725,7 @@ def _bygg_hjem_fane() -> None:
             "Skattemelding",
             "RF-1167 + RF-1028",
             5, 31,
-            "Genereres i steg 5 og sendes inn manuelt på skatteetaten.no. "
+            "Sendes digitalt via Altinn i steg 6. "
             "Wenche beregner skatten og fyller ut næringsoppgaven automatisk.",
         )
         _fristkort(
