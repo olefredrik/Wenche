@@ -938,11 +938,13 @@ def _bygg_oppsett_fane() -> None:
                     n.timeout = 6
                     return
                 bruker_id = brukere[0]["id"]
+                # Send kun den nye skattemelding-rettigheten.
+                # Altinn-API-et krever at uendrede rettigheter utelates fra changerequest.
                 svar = await run.io_bound(
                     systembruker.opprett_endringsforespørsel,
                     token,
                     bruker_id,
-                    systembruker._RIGHTS,
+                    [systembruker._SKATTEMELDING_RETT],
                 )
                 confirm_url = svar.get("confirmUrl") or svar.get("ConfirmUrl", "")
                 endrings_url_label.set_text(f"Godkjenn her: {confirm_url}")

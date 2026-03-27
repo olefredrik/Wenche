@@ -27,6 +27,12 @@ _SYSTEM_NAVN = "wenche2"
 # Ressurser Wenche-systemet trenger tilgang til.
 # BRG årsregnskap: Altinn 3-app, ressurs-ID på format app_{org}_{appnavn}.
 # SKD aksjonærregisteroppgave: SKDs eget REST-API, ressurs-ID fra SKDs API-dokumentasjon.
+_SKATTEMELDING_RETT = {
+    "resource": [
+        {"id": "urn:altinn:resource", "value": "app_skd_formueinntekt-skattemelding-v2"}
+    ]
+}
+
 _RIGHTS = [
     {
         "resource": [
@@ -38,11 +44,7 @@ _RIGHTS = [
             {"id": "urn:altinn:resource", "value": "ske-innrapportering-aksjonaerregisteroppgave"}
         ]
     },
-    {
-        "resource": [
-            {"id": "urn:altinn:resource", "value": "app_skd_formueinntekt-skattemelding-v2"}
-        ]
-    },
+    _SKATTEMELDING_RETT,
 ]
 
 
