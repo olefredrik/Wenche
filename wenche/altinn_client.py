@@ -40,7 +40,7 @@ APPS = {
     },
     "skattemelding": {
         "org": "skd",
-        "app": "formueinntekt-selskapsmelding",       # TODO: verifiser eksakt appnavn
+        "app": "formueinntekt-skattemelding-v2",
     },
 }
 
@@ -176,6 +176,43 @@ class AltinnClient:
             params=params,
         )
         resp.raise_for_status()
+        return resp.json()
+
+    def last_opp_skattemelding_data(
+        self,
+        instans: dict,
+        konvolutt: bytes,
+    ) -> dict:
+        """
+        Laster opp skattemelding-konvolutten til Altinn3.
+
+        Skattemeldingen krever POST (ikke PUT) med Content-Type: text/xml og
+        Content-Disposition uten anførselstegn rundt filnavnet — dette er
+        spesifikt for SKDs formueinntekt-skattemelding-v2-app.
+        """
+        instance_id = instans["id"]
+        url = (
+            f"{self._app_base('skattemelding')}/instances/{instance_id}/data"
+            "?dataType=skattemeldingOgNaeringsspesifikasjon"
+        )
+        resp = self._http.post(
+            url,
+            content=konvolutt,
+            headers={
+                "Content-Type": "text/xml",
+                "Content-Disposition": "attachment; filename=skattemelding.xml",
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def neste_prosesssteg(self, app_key: str, instans: dict) -> dict:
+        """Avanserer instansen ett prosesssteg (PUT /process/next)."""
+        instance_id = instans["id"]
+        url = f"{self._app_base(app_key)}/instances/{instance_id}/process/next"
+        resp = self._http.put(url)
+        if not resp.is_success:
+            raise RuntimeError(f"{resp.status_code} {resp.reason_phrase}:\n{resp.text}")
         return resp.json()
 
     def fullfoor_instans(self, app_key: str, instans: dict) -> str:

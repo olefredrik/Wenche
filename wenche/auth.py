@@ -49,6 +49,12 @@ ADMIN_SCOPES = (
 
 # Scope for innsending av aksjonærregisteroppgave direkte til SKDs API
 SKD_AKSJONAER_SCOPE = "skatteetaten:innrapporteringaksjonaerregisteroppgave"
+
+# Scopes for skattemelding: direkte mot SKDs API + Altinn3-instanser
+SKD_SKATTEMELDING_SCOPE = (
+    "skatteetaten:formueinntekt/skattemelding "
+    "altinn:instances.read altinn:instances.write"
+)
 TOKEN_FILE = Path.home() / ".wenche" / "token.json"
 
 
@@ -237,6 +243,53 @@ def get_skd_aksjonaer_token() -> str:
     return _hent_maskinporten_token(
         client_id, private_key_pem, kid, scopes=SKD_AKSJONAER_SCOPE, org_nummer=org_nummer
     )
+
+
+def get_skd_skattemelding_tokens() -> dict:
+    """
+    Henter tokens for skattemelding-API.
+
+    Returnerer {'maskinporten_token': str, 'altinn_token': str}.
+    Maskinporten-token brukes direkte mot SKDs forhåndsutfylt- og valider-API.
+    Altinn-token brukes for Altinn3-instansoperasjoner.
+
+    I testmiljø brukes SKD_TEST_ORG_NUMMER som systembruker-org.
+    """
+    client_id = _les_påkrevd_env(
+        "MASKINPORTEN_CLIENT_ID",
+        "Kopier .env.example til .env og fyll inn din klient-ID fra Digdirs selvbetjeningsportal.",
+    )
+    kid = _les_påkrevd_env(
+        "MASKINPORTEN_KID",
+        "Finn nøkkel-ID (UUID) i Digdirs selvbetjeningsportal under klientens nøkler og legg den i .env.",
+    )
+    vendor_orgnr = _les_påkrevd_env(
+        "ORG_NUMMER",
+        "Legg til ORG_NUMMER=<ditt organisasjonsnummer> i .env.",
+    )
+    env = os.getenv("WENCHE_ENV", "prod")
+    org_nummer = os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr) if env == "test" else vendor_orgnr
+    nokkel_sti = os.getenv("MASKINPORTEN_PRIVAT_NOKKEL", "maskinporten_privat.pem")
+    private_key_pem = _les_nokkel(nokkel_sti)
+
+    maskinporten_token = _hent_maskinporten_token(
+        client_id, private_key_pem, kid,
+        scopes=SKD_SKATTEMELDING_SCOPE,
+        org_nummer=org_nummer,
+    )
+
+    altinn_resp = httpx.get(
+        ALTINN_EXCHANGE_URL,
+        headers={"Authorization": f"Bearer {maskinporten_token}"},
+        timeout=15,
+    )
+    altinn_resp.raise_for_status()
+    altinn_token = altinn_resp.text.strip().strip('"')
+
+    return {
+        "maskinporten_token": maskinporten_token,
+        "altinn_token": altinn_token,
+    }
 
 
 def logout():

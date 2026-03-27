@@ -136,7 +136,10 @@ Liste over alle aksjonærer per 31.12 i regnskapsåret.
 | `MASKINPORTEN_CLIENT_ID` | ja | Klient-ID fra Digdir selvbetjeningsportal |
 | `MASKINPORTEN_KID` | ja | UUID som portalen tildelte den offentlige nøkkelen |
 | `MASKINPORTEN_PRIVAT_NOKKEL` | ja | Sti til privat nøkkelfil. Standard: `maskinporten_privat.pem` |
+| `ORG_NUMMER` | ja | Organisasjonsnummeret til leverandøren (deg/selskapet som bruker Wenche), 9 siffer |
 | `WENCHE_ENV` | nei | `prod` for produksjon, `test` for Altinn tt02-testmiljø. Standard: `prod` |
+| `SKD_TEST_ORG_NUMMER` | nei | Organisasjonsnummeret til en syntetisk testorganisasjon fra Tenor. Brukes i testmiljø (`WENCHE_ENV=test`) som mottaker for systembrukerforespørsel og i XML-innsending til SKD |
+| `SKD_TEST_PARTSNUMMER` | nei | Partsnummer fra Tenor for testorganisasjonen. Setter man denne hopper Wenche over kallet til SKDs forhåndsutfylt-API (som ikke alltid har data for syntetiske org i test) og bruker partsnummeret direkte |
 
 ---
 
@@ -206,6 +209,23 @@ wenche send-aksjonaerregister [--config FILSTI] [--dry-run]
 |---|---|
 | `--config` | Sti til konfigurasjonsfil. Standard: `config.yaml` |
 | `--dry-run` | Genererer XML lokalt uten å sende til Altinn |
+
+---
+
+### `wenche send-skattemelding`
+
+Sender inn skattemelding for AS til Skatteetaten via Altinn3.
+
+```bash
+wenche send-skattemelding [--config FILSTI] [--dry-run]
+```
+
+| Alternativ | Beskrivelse |
+|---|---|
+| `--config` | Sti til konfigurasjonsfil. Standard: `config.yaml` |
+| `--dry-run` | Henter forhåndsutfylt og genererer XML lokalt (`skattemelding.xml` og `naeringsspesifikasjon.xml`) uten å sende |
+
+Krever at Maskinporten-klienten har fått scopet `skatteetaten:formueinntekt/skattemelding` innvilget. Se [steg 2e i oppsett](oppsett.md#2e-sok-om-tilgang-til-skds-api-for-skattemelding).
 
 ---
 

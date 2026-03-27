@@ -47,6 +47,9 @@ from wenche.models import (
     SkattemeldingKonfig,
 )
 from wenche.skd_client import SkdAksjonaerClient
+from wenche.skd_skattemelding_client import SkdSkattemeldingClient
+from wenche.skattemelding_xml import generer_skattemelding_upersonlig, hent_partsnummer
+from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
 
 CONFIG_FIL = Path("config.yaml")
 _WENCHE_DIR = Path.home() / ".wenche"
@@ -723,8 +726,7 @@ def _bygg_hjem_fane() -> None:
             "Skattemelding",
             "RF-1167 + RF-1028",
             5, 31,
-            "Genereres i steg 5 og sendes inn manuelt på skatteetaten.no. "
-            "Wenche beregner skatten og fyller ut næringsoppgaven automatisk.",
+            "Wenche beregner skatten og sender skattemeldingen digitalt via Altinn i steg 6.",
         )
         _fristkort(
             "Årsregnskap",
@@ -916,20 +918,76 @@ def _bygg_oppsett_fane() -> None:
 
         ui.button("Registrer Wenche i systemregisteret", on_click=registrer_system).props("color=primary outline")
 
+        seksjonstittel("Steg 1b. Oppdater rettigheter på eksisterende systembruker")
+        ui.label(
+            "Hvis systembrukeren allerede er godkjent og du har lagt til nye rettigheter, "
+            "send en endringsforespørsel. Eksisterende rettigheter beholdes — kun nye legges til."
+        ).classes("text-sm text-slate-500 mb-2")
+        endrings_url_container = ui.element("div")
+
+        async def oppdater_systembruker():
+            n = ui.notification("Henter systembrukere...", spinner=True, timeout=None)
+            try:
+                token = await run.io_bound(auth.login_admin)
+                vendor_orgnr = os.getenv("ORG_NUMMER")
+                env = os.getenv("WENCHE_ENV", "prod")
+                orgnr = os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr) if env == "test" else vendor_orgnr
+                brukere = await run.io_bound(systembruker.hent_systembrukere, token, vendor_orgnr)
+                if not brukere:
+                    n.message = "Ingen aktive systembrukere funnet. Bruk steg 2 for å opprette ny."
+                    n.spinner = False
+                    n.type = "info"
+                    n.timeout = 6
+                    return
+                # Finn systembrukeren for riktig party-org (i test: SKD_TEST_ORG_NUMMER)
+                treff = next(
+                    (b for b in brukere if b.get("reporteeOrgNo") == orgnr),
+                    brukere[0],
+                )
+                bruker_id = treff["id"]
+                # Send kun den nye skattemelding-rettigheten.
+                # Altinn-API-et krever at uendrede rettigheter utelates fra changerequest.
+                svar = await run.io_bound(
+                    systembruker.opprett_endringsforespørsel,
+                    token,
+                    bruker_id,
+                    [systembruker._SKATTEMELDING_RETT],
+                )
+                confirm_url = svar.get("confirmUrl") or svar.get("ConfirmUrl", "")
+                endrings_url_container.clear()
+                with endrings_url_container:
+                    ui.link("Godkjenn i Altinn →", confirm_url, new_tab=True).classes("text-blue-600 font-medium text-sm")
+                n.message = f"Endringsforespørsel opprettet (status: {svar.get('status', '')})"
+                n.spinner = False
+                n.type = "positive"
+                n.timeout = 5
+            except Exception as e:
+                n.message = f"Feil: {e}"
+                n.spinner = False
+                n.type = "negative"
+                n.timeout = 0
+                n.close_button = "Lukk"
+
+        ui.button("Oppdater systembruker-rettigheter", on_click=oppdater_systembruker).props("color=primary outline")
+
         seksjonstittel("Steg 2. Opprett systembrukerforespørsel")
-        godkjenn_url_label = ui.label("").classes("text-sm font-mono text-blue-700 break-all mt-1")
+        godkjenn_url_container = ui.element("div")
 
         async def opprett_forespørsel():
             n = ui.notification("Oppretter systembrukerforespørsel...", spinner=True, timeout=None)
             try:
                 token = await run.io_bound(auth.login_admin)
-                orgnr = os.getenv("ORG_NUMMER")
-                svar = await run.io_bound(systembruker.opprett_forespørsel, token, orgnr, orgnr)
+                vendor_orgnr = os.getenv("ORG_NUMMER")
+                env = os.getenv("WENCHE_ENV", "prod")
+                party_orgnr = os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr) if env == "test" else vendor_orgnr
+                svar = await run.io_bound(systembruker.opprett_forespørsel, token, vendor_orgnr, party_orgnr)
                 request_id = svar.get("id", "")
                 if request_id:
                     _lagre_request_id(request_id)
                 confirm_url = svar.get("confirmUrl", "")
-                godkjenn_url_label.set_text(f"Godkjenn her: {confirm_url}")
+                godkjenn_url_container.clear()
+                with godkjenn_url_container:
+                    ui.link("Godkjenn i Altinn →", confirm_url, new_tab=True).classes("text-blue-600 font-medium text-sm")
                 n.message = f"Forespørsel opprettet (status: {svar['status']})"
                 n.spinner = False
                 n.type = "positive"
@@ -1392,8 +1450,7 @@ def _bygg_dokumenter_fane() -> None:
         ui.button("Last ned aksjonærregister (XML)", on_click=last_ned_aksjonaerregister).props("color=primary outline").classes("w-full")
 
     with ui.column().classes("gap-0 mt-1"):
-        ui.label("Skattemeldingen sendes manuelt på skatteetaten.no —").classes("text-xs text-slate-500")
-        ui.link("Se fremgangsmåte →", "https://olefredrik.github.io/Wenche/bruk/#skattemelding-frist-31-mai", new_tab=True).classes("text-xs")
+        ui.label("Skattemeldingen sendes digitalt via «Send til Altinn»-fanen, eller manuelt på skatteetaten.no.").classes("text-xs text-slate-500")
 
     # Obligatoriske noter
     ui.separator().classes("my-6")
@@ -1599,11 +1656,59 @@ def _bygg_send_fane() -> None:
             n.timeout = 0
             n.close_button = "Lukk"
 
+    async def send_skattemelding():
+        regnskap = state.bygg_regnskap()
+        orgnr = os.getenv("SKD_TEST_ORG_NUMMER", state.org_nummer) if env_valg.value == "test" else state.org_nummer
+        n = ui.notification("Henter tokens for skattemelding...", spinner=True, timeout=None)
+        try:
+            tokens = await run.io_bound(auth.get_skd_skattemelding_tokens)
+            n.message = "Henter forhåndsutfylt skattemelding..."
+
+            def _hent_og_send():
+                with SkdSkattemeldingClient(tokens["maskinporten_token"], env=env_valg.value) as skd:
+                    test_partsnummer = os.getenv("SKD_TEST_PARTSNUMMER") if env_valg.value == "test" else None
+                    if test_partsnummer:
+                        partsnummer = int(test_partsnummer)
+                    else:
+                        forhåndsutfylt = skd.hent_forhåndsutfylt(int(state.regnskapsaar), orgnr)
+                        partsnummer = hent_partsnummer(forhåndsutfylt)
+                    skattemelding_xml = generer_skattemelding_upersonlig(
+                        partsnummer=partsnummer,
+                        inntektsaar=int(state.regnskapsaar),
+                        fremfoert_underskudd=int(state.underskudd),
+                    )
+                    naeringsspesifikasjon_xml = generer_naeringsspesifikasjon(regnskap, partsnummer)
+                    return skd.send(
+                        inntektsaar=int(state.regnskapsaar),
+                        orgnr=orgnr,
+                        skattemelding_xml=skattemelding_xml,
+                        altinn_token=tokens["altinn_token"],
+                        naeringsspesifikasjon_xml=naeringsspesifikasjon_xml,
+                    )
+
+            n.message = "Sender skattemelding via Altinn3..."
+            instans_id = await run.io_bound(_hent_og_send)
+            n.message = f"Skattemelding for {state.regnskapsaar} er sendt til Skatteetaten."
+            n.spinner = False
+            n.type = "positive"
+            n.timeout = 0
+            n.close_button = "Lukk"
+            ui.notify(f"Instans-ID: {instans_id}", type="info")
+        except Exception as e:
+            n.message = f"Innsending feilet: {e}"
+            n.spinner = False
+            n.type = "negative"
+            n.timeout = 0
+            n.close_button = "Lukk"
+
     ui.separator().classes("my-4")
-    with ui.grid(columns=2).classes("w-full gap-4"):
+    with ui.grid(columns=3).classes("w-full gap-4"):
         ui.button("Send årsregnskap til Altinn", on_click=send_aarsregnskap).props("color=primary").classes("w-full")
         ui.button(
             "Send aksjonærregister til Skatteetaten", on_click=send_aksjonaerregister
+        ).props("color=primary").classes("w-full")
+        ui.button(
+            "Send skattemelding til Skatteetaten", on_click=send_skattemelding
         ).props("color=primary").classes("w-full")
 
     aarsregnskap_resultat = ui.column().classes("mt-3")

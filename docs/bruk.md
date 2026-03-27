@@ -22,27 +22,30 @@ Tokenet lagres i `~/.wenche/token.json` og gjenbrukes automatisk for påfølgend
 
 ## Skattemelding (frist 31. mai)
 
-!!! note "Skattemeldingen sendes ikke digitalt"
-    Wenche genererer et sammendrag som du fyller inn manuelt på [skatteetaten.no](https://www.skatteetaten.no/). Digital innsending av skattemelding støttes ikke.
-
-Wenche genererer et ferdig utfylt sammendrag av RF-1167 (næringsoppgaven) og RF-1028 (skattemeldingen).
+Wenche genererer et ferdig utfylt sammendrag av RF-1167 (næringsoppgaven) og RF-1028 (skattemeldingen) og sender det inn digitalt til Skatteetaten.
 
 === "Webgrensesnitt"
 
-    Gå til fanen **Dokumenter** og klikk **Last ned skattemelding**.
+    Gå til fanen **Send til Altinn** og klikk **Send skattemelding til Skatteetaten**.
 
 === "Kommandolinje"
 
-    Genererer fra tallene i `config.yaml`:
+    Send inn digitalt (krever API-tilgang, se under):
+
+    ```bash
+    wenche send-skattemelding
+    ```
+
+    Test lokalt uten å sende (skriver `skattemelding.xml` og `naeringsspesifikasjon.xml`):
+
+    ```bash
+    wenche send-skattemelding --dry-run
+    ```
+
+    Generer tekstsammendrag for gjennomlesing:
 
     ```bash
     wenche generer-skattemelding
-    ```
-
-    Lagre til fil:
-
-    ```bash
-    wenche generer-skattemelding --ut skattemelding.txt
     ```
 
 Sammendraget inneholder:
@@ -63,13 +66,23 @@ Sammendraget inneholder:
 !!! info "Egenkapitalnote"
     Egenkapitalnoten (rskl. § 7-2b) vises automatisk når `foregaaende_aar` er utfylt i `config.yaml`. Uten sammenligningstall vises kun utgående balanse med en advarsel om at inngående tall mangler.
 
-**Send inn manuelt:**
+!!! note "API-tilgang kreves"
+    Automatisk innsending av skattemelding krever at systemleverandøren er registrert hos Skatteetaten. Se [Søke om API-tilgang](#soke-om-api-tilgang) for fremgangsmåte.
 
-1. Gå til [skatteetaten.no](https://www.skatteetaten.no/) og logg inn med BankID
-2. Åpne skattemeldingen for AS for gjeldende regnskapsår
-3. Fyll inn tallene fra sammendraget Wenche har generert
-4. Kontroller at Skatteetaten beregner samme skatt
-5. Send inn
+---
+
+## Søke om API-tilgang for skattemelding { #soke-om-api-tilgang }
+
+Skatteetaten krever at systemleverandører søker om tilgang før automatisk innsending kan tas i bruk. Innsending via skjema på skatteetaten.no er avviklet.
+
+**Fremgangsmåte:**
+
+1. Gå til [Skatteetatens servicedesk](https://eksternjira.sits.no/servicedesk/customer/user/login)
+2. Send en henvendelse om tilgang til API for skattemelding
+3. Oppgi at du skal levere for eget selskap (ikke som systemleverandør for andre)
+4. Ved innvilgelse: aksepter bruksvilkårene og registrer integrasjonen i [Digdirs selvbetjeningsportal](https://samarbeid.digdir.no/) med scope `skatteetaten:formueinntekt/skattemelding`
+
+Teknisk dokumentasjon: [github.com/Skatteetaten/skattemeldingen](https://github.com/Skatteetaten/skattemeldingen)
 
 ---
 
@@ -193,13 +206,14 @@ Kommandoer:
   opprett-systembruker     Opprett systembrukerforespørsel og fa godkjenningslenke
   login                    Autentiser mot Maskinporten med RSA-nokkel
   logout                   Logg ut og slett lagret token
-  generer-skattemelding    Generer ferdig utfylt RF-1167 og RF-1028
+  generer-skattemelding    Generer ferdig utfylt RF-1167 og RF-1028 som tekstsammendrag
+  send-skattemelding       Send inn skattemelding for AS til Skatteetaten via Altinn3
   send-aarsregnskap        Send inn arsregnskap til Bronnoysundregistrene
   send-aksjonaerregister   Send inn aksjonaerregisteroppgave (RF-1086)
   importer-saft            Importer SAF-T Financial XML og generer config.yaml
   ui                       Start webgrensesnittet i nettleseren
 
-Alternativer (send-aarsregnskap og send-aksjonaerregister):
+Alternativer (send-aarsregnskap, send-aksjonaerregister og send-skattemelding):
   --config TEXT            Sti til konfigurasjonsfil [standard: config.yaml]
   --dry-run                Generer dokument lokalt uten a sende til Altinn
 

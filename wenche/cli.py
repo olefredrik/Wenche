@@ -96,7 +96,9 @@ def opprett_systembruker(org: str | None):
     if not vendor_orgnr:
         click.echo("Feil: ORG_NUMMER må være satt i .env.", err=True)
         raise SystemExit(1)
-    org_nummer = org or vendor_orgnr
+    env = os.getenv("WENCHE_ENV", "prod")
+    default_org = os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr) if env == "test" else vendor_orgnr
+    org_nummer = org or default_org
 
     click.echo("Henter Maskinporten admin-token...")
     token = auth.login_admin()
@@ -300,11 +302,80 @@ def importer_saft(saft_fil: str, ut_fil: str):
 
 
 @main.command("send-skattemelding")
-def send_skattemelding():
-    """Send inn skattemelding for AS (ikke implementert ennå)."""
-    click.echo(
-        "Innsending via API krever registrering som systemleverandør hos Skatteetaten.\n"
-        "Bruk 'wenche generer-skattemelding' for å generere et ferdig utfylt sammendrag\n"
-        "som du kan sende inn manuelt på https://www.skatteetaten.no/"
-    )
-    raise SystemExit(1)
+@click.option(
+    "--config",
+    "config_fil",
+    default="config.yaml",
+    show_default=True,
+    help="Sti til konfigurasjonsfil.",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Hent forhåndsutfylt og generer XML lokalt uten å sende til Altinn.",
+)
+def send_skattemelding(config_fil: str, dry_run: bool):
+    """Send inn skattemelding for AS til Skatteetaten via Altinn3."""
+    import os
+    from pathlib import Path
+    from wenche.skattemelding import les_config
+    from wenche.skattemelding_xml import generer_skattemelding_upersonlig, hent_partsnummer
+    from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
+    from wenche.skd_skattemelding_client import SkdSkattemeldingClient
+
+    click.echo(f"Leser konfigurasjon fra {config_fil}...")
+    try:
+        regnskap, konfig = les_config(config_fil)
+    except FileNotFoundError:
+        click.echo(
+            f"Feil: finner ikke {config_fil}.\n"
+            "Kopier config.example.yaml til config.yaml og fyll inn selskapets opplysninger."
+        )
+        raise SystemExit(1)
+
+    env = os.getenv("WENCHE_ENV", "prod")
+    orgnr = os.getenv("SKD_TEST_ORG_NUMMER", regnskap.selskap.org_nummer) if env == "test" else regnskap.selskap.org_nummer
+
+    click.echo("Henter tokens for skattemelding...")
+    tokens = auth.get_skd_skattemelding_tokens()
+
+    with SkdSkattemeldingClient(tokens["maskinporten_token"], env=env) as skd:
+        test_partsnummer = os.getenv("SKD_TEST_PARTSNUMMER") if env == "test" else None
+        if test_partsnummer:
+            click.echo(f"Bruker SKD_TEST_PARTSNUMMER={test_partsnummer} (hopper over forhåndsutfylt)")
+            partsnummer = int(test_partsnummer)
+        else:
+            click.echo("Henter forhåndsutfylt skattemelding...")
+            forhåndsutfylt = skd.hent_forhåndsutfylt(regnskap.regnskapsaar, orgnr)
+            partsnummer = hent_partsnummer(forhåndsutfylt)
+        click.echo(f"Partsnummer: {partsnummer}")
+
+        skattemelding_xml = generer_skattemelding_upersonlig(
+            partsnummer=partsnummer,
+            inntektsaar=regnskap.regnskapsaar,
+            fremfoert_underskudd=int(konfig.underskudd_til_fremfoering),
+        )
+        naeringsspesifikasjon_xml = generer_naeringsspesifikasjon(regnskap, partsnummer)
+
+        if dry_run:
+            ut_fil = Path("skattemelding.xml")
+            ut_fil.write_bytes(skattemelding_xml)
+            ns_fil = Path("naeringsspesifikasjon.xml")
+            ns_fil.write_bytes(naeringsspesifikasjon_xml)
+            click.echo(
+                f"Dry-run: skattemelding XML lagret til {ut_fil}\n"
+                f"Dry-run: naeringsspesifikasjon XML lagret til {ns_fil}\n"
+                "Ingenting sendt."
+            )
+            return
+
+        instans_id = skd.send(
+            inntektsaar=regnskap.regnskapsaar,
+            orgnr=orgnr,
+            skattemelding_xml=skattemelding_xml,
+            altinn_token=tokens["altinn_token"],
+            naeringsspesifikasjon_xml=naeringsspesifikasjon_xml,
+        )
+
+    click.echo(f"\nSkattemelding sendt. Instans-ID: {instans_id}")
