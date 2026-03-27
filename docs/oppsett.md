@@ -35,10 +35,14 @@ Du skal nå ha to filer: `maskinporten_privat.pem` og `maskinporten_offentlig.pe
 
 ### 2a. Søk om tilgang
 
-Gå til [samarbeid.digdir.no](https://samarbeid.digdir.no) og søk om tilgang som **Maskinporten-konsument**. Du vil motta en e-post med bekreftelse og lenke til selvbetjeningsportalen.
+Gå til [sjolvbetjening.samarbeid.digdir.no](https://sjolvbetjening.samarbeid.digdir.no) og logg inn. Første gang du logger inn, vil du bli møtt av et skjema — **Be om tilgang**:
+
+1. Fyll inn organisasjonsnummeret ditt
+2. Kryss av **Opprette og endre integrasjoner i ID-porten/Maskinporten Selvbetjening**
+3. Klikk **Gå til Altinn for å fullføre** og godkjenn forespørselen i Altinn
 
 !!! info "Behandlingstid"
-    Tilgang til selvbetjeningsportalen gis vanligvis samme dag, men kan ta noe lenger tid. Steg 2b og 2c gjøres etter at du har fått tilgang.
+    Tilgang gis vanligvis samme dag, men kan ta noe lenger tid. Steg 2b og 2c gjøres etter at du har fått tilgang.
 
 ### 2b. Opprett integrasjon
 
