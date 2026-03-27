@@ -319,6 +319,7 @@ def send_skattemelding(config_fil: str, dry_run: bool):
     from pathlib import Path
     from wenche.skattemelding import les_config
     from wenche.skattemelding_xml import generer_skattemelding_upersonlig, hent_partsnummer
+    from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
     from wenche.skd_skattemelding_client import SkdSkattemeldingClient
 
     click.echo(f"Leser konfigurasjon fra {config_fil}...")
@@ -348,11 +349,18 @@ def send_skattemelding(config_fil: str, dry_run: bool):
             inntektsaar=regnskap.regnskapsaar,
             fremfoert_underskudd=int(konfig.underskudd_til_fremfoering),
         )
+        naeringsspesifikasjon_xml = generer_naeringsspesifikasjon(regnskap, partsnummer)
 
         if dry_run:
             ut_fil = Path("skattemelding.xml")
             ut_fil.write_bytes(skattemelding_xml)
-            click.echo(f"Dry-run: skattemelding XML lagret til {ut_fil} — ingenting sendt.")
+            ns_fil = Path("naeringsspesifikasjon.xml")
+            ns_fil.write_bytes(naeringsspesifikasjon_xml)
+            click.echo(
+                f"Dry-run: skattemelding XML lagret til {ut_fil}\n"
+                f"Dry-run: naeringsspesifikasjon XML lagret til {ns_fil}\n"
+                "Ingenting sendt."
+            )
             return
 
         instans_id = skd.send(
@@ -360,6 +368,7 @@ def send_skattemelding(config_fil: str, dry_run: bool):
             orgnr=orgnr,
             skattemelding_xml=skattemelding_xml,
             altinn_token=tokens["altinn_token"],
+            naeringsspesifikasjon_xml=naeringsspesifikasjon_xml,
         )
 
     click.echo(f"\nSkattemelding sendt. Instans-ID: {instans_id}")

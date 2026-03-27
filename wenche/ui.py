@@ -49,6 +49,7 @@ from wenche.models import (
 from wenche.skd_client import SkdAksjonaerClient
 from wenche.skd_skattemelding_client import SkdSkattemeldingClient
 from wenche.skattemelding_xml import generer_skattemelding_upersonlig, hent_partsnummer
+from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
 
 CONFIG_FIL = Path("config.yaml")
 _WENCHE_DIR = Path.home() / ".wenche"
@@ -1600,6 +1601,7 @@ def _bygg_send_fane() -> None:
             n.close_button = "Lukk"
 
     async def send_skattemelding():
+        regnskap = state.bygg_regnskap()
         orgnr = os.getenv("SKD_TEST_ORG_NUMMER", state.org_nummer) if env_valg.value == "test" else state.org_nummer
         n = ui.notification("Henter tokens for skattemelding...", spinner=True, timeout=None)
         try:
@@ -1610,16 +1612,18 @@ def _bygg_send_fane() -> None:
                 with SkdSkattemeldingClient(tokens["maskinporten_token"], env=env_valg.value) as skd:
                     forhåndsutfylt = skd.hent_forhåndsutfylt(int(state.regnskapsaar), orgnr)
                     partsnummer = hent_partsnummer(forhåndsutfylt)
-                    xml = generer_skattemelding_upersonlig(
+                    skattemelding_xml = generer_skattemelding_upersonlig(
                         partsnummer=partsnummer,
                         inntektsaar=int(state.regnskapsaar),
                         fremfoert_underskudd=int(state.underskudd),
                     )
+                    naeringsspesifikasjon_xml = generer_naeringsspesifikasjon(regnskap, partsnummer)
                     return skd.send(
                         inntektsaar=int(state.regnskapsaar),
                         orgnr=orgnr,
-                        skattemelding_xml=xml,
+                        skattemelding_xml=skattemelding_xml,
                         altinn_token=tokens["altinn_token"],
+                        naeringsspesifikasjon_xml=naeringsspesifikasjon_xml,
                     )
 
             n.message = "Sender skattemelding via Altinn3..."
