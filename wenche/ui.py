@@ -47,6 +47,8 @@ from wenche.models import (
     SkattemeldingKonfig,
 )
 from wenche.skd_client import SkdAksjonaerClient
+from wenche.skd_skattemelding_client import SkdSkattemeldingClient
+from wenche.skattemelding_xml import generer_skattemelding_upersonlig, hent_partsnummer
 
 CONFIG_FIL = Path("config.yaml")
 _WENCHE_DIR = Path.home() / ".wenche"
@@ -1392,8 +1394,7 @@ def _bygg_dokumenter_fane() -> None:
         ui.button("Last ned aksjonærregister (XML)", on_click=last_ned_aksjonaerregister).props("color=primary outline").classes("w-full")
 
     with ui.column().classes("gap-0 mt-1"):
-        ui.label("Skattemeldingen sendes manuelt på skatteetaten.no —").classes("text-xs text-slate-500")
-        ui.link("Se fremgangsmåte →", "https://olefredrik.github.io/Wenche/bruk/#skattemelding-frist-31-mai", new_tab=True).classes("text-xs")
+        ui.label("Skattemeldingen sendes digitalt via «Send til Altinn»-fanen, eller manuelt på skatteetaten.no.").classes("text-xs text-slate-500")
 
     # Obligatoriske noter
     ui.separator().classes("my-6")
@@ -1599,11 +1600,52 @@ def _bygg_send_fane() -> None:
             n.timeout = 0
             n.close_button = "Lukk"
 
+    async def send_skattemelding():
+        orgnr = os.getenv("SKD_TEST_ORG_NUMMER", state.org_nummer) if env_valg.value == "test" else state.org_nummer
+        n = ui.notification("Henter tokens for skattemelding...", spinner=True, timeout=None)
+        try:
+            tokens = await run.io_bound(auth.get_skd_skattemelding_tokens)
+            n.message = "Henter forhåndsutfylt skattemelding..."
+
+            def _hent_og_send():
+                with SkdSkattemeldingClient(tokens["maskinporten_token"], env=env_valg.value) as skd:
+                    forhåndsutfylt = skd.hent_forhåndsutfylt(int(state.regnskapsaar), orgnr)
+                    partsnummer = hent_partsnummer(forhåndsutfylt)
+                    xml = generer_skattemelding_upersonlig(
+                        partsnummer=partsnummer,
+                        inntektsaar=int(state.regnskapsaar),
+                        fremfoert_underskudd=int(state.underskudd),
+                    )
+                    return skd.send(
+                        inntektsaar=int(state.regnskapsaar),
+                        orgnr=orgnr,
+                        skattemelding_xml=xml,
+                        altinn_token=tokens["altinn_token"],
+                    )
+
+            n.message = "Sender skattemelding via Altinn3..."
+            instans_id = await run.io_bound(_hent_og_send)
+            n.message = f"Skattemelding for {state.regnskapsaar} er sendt til Skatteetaten."
+            n.spinner = False
+            n.type = "positive"
+            n.timeout = 0
+            n.close_button = "Lukk"
+            ui.notify(f"Instans-ID: {instans_id}", type="info")
+        except Exception as e:
+            n.message = f"Innsending feilet: {e}"
+            n.spinner = False
+            n.type = "negative"
+            n.timeout = 0
+            n.close_button = "Lukk"
+
     ui.separator().classes("my-4")
-    with ui.grid(columns=2).classes("w-full gap-4"):
+    with ui.grid(columns=3).classes("w-full gap-4"):
         ui.button("Send årsregnskap til Altinn", on_click=send_aarsregnskap).props("color=primary").classes("w-full")
         ui.button(
             "Send aksjonærregister til Skatteetaten", on_click=send_aksjonaerregister
+        ).props("color=primary").classes("w-full")
+        ui.button(
+            "Send skattemelding til Skatteetaten", on_click=send_skattemelding
         ).props("color=primary").classes("w-full")
 
     aarsregnskap_resultat = ui.column().classes("mt-3")
