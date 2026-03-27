@@ -923,7 +923,7 @@ def _bygg_oppsett_fane() -> None:
             "Hvis systembrukeren allerede er godkjent og du har lagt til nye rettigheter, "
             "send en endringsforespørsel. Eksisterende rettigheter beholdes — kun nye legges til."
         ).classes("text-sm text-slate-500 mb-2")
-        endrings_url_label = ui.label("").classes("text-sm font-mono text-blue-700 break-all mt-1")
+        endrings_url_container = ui.element("div")
 
         async def oppdater_systembruker():
             n = ui.notification("Henter systembrukere...", spinner=True, timeout=None)
@@ -947,7 +947,9 @@ def _bygg_oppsett_fane() -> None:
                     [systembruker._SKATTEMELDING_RETT],
                 )
                 confirm_url = svar.get("confirmUrl") or svar.get("ConfirmUrl", "")
-                endrings_url_label.set_text(f"Godkjenn her: {confirm_url}")
+                endrings_url_container.clear()
+                with endrings_url_container:
+                    ui.link("Godkjenn i Altinn →", confirm_url, new_tab=True).classes("text-blue-600 font-medium text-sm")
                 n.message = f"Endringsforespørsel opprettet (status: {svar.get('status', '')})"
                 n.spinner = False
                 n.type = "positive"
@@ -962,7 +964,7 @@ def _bygg_oppsett_fane() -> None:
         ui.button("Oppdater systembruker-rettigheter", on_click=oppdater_systembruker).props("color=primary outline")
 
         seksjonstittel("Steg 2. Opprett systembrukerforespørsel")
-        godkjenn_url_label = ui.label("").classes("text-sm font-mono text-blue-700 break-all mt-1")
+        godkjenn_url_container = ui.element("div")
 
         async def opprett_forespørsel():
             n = ui.notification("Oppretter systembrukerforespørsel...", spinner=True, timeout=None)
@@ -974,7 +976,9 @@ def _bygg_oppsett_fane() -> None:
                 if request_id:
                     _lagre_request_id(request_id)
                 confirm_url = svar.get("confirmUrl", "")
-                godkjenn_url_label.set_text(f"Godkjenn her: {confirm_url}")
+                godkjenn_url_container.clear()
+                with godkjenn_url_container:
+                    ui.link("Godkjenn i Altinn →", confirm_url, new_tab=True).classes("text-blue-600 font-medium text-sm")
                 n.message = f"Forespørsel opprettet (status: {svar['status']})"
                 n.spinner = False
                 n.type = "positive"
