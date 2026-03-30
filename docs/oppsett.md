@@ -204,7 +204,16 @@ wenche registrer-system
 
 Registrerer Wenche i Altinns systemregister med riktige tilgangsrettigheter. Kan kjøres på nytt uten skade — oppdaterer automatisk hvis systemet allerede finnes.
 
-### 5b. Opprett systembrukerforespørsel
+### 5b. Oppdater rettigheter på eksisterende systembruker
+
+!!! note "Valgfritt — kun hvis du allerede har en godkjent systembruker"
+    Har du satt opp Wenche tidligere (f.eks. for årsregnskap) og nettopp lagt til et nytt scope (f.eks. skattemelding), skal du bruke dette steget — **ikke** steg 5c. Eksisterende rettigheter beholdes; kun de nye legges til.
+
+Send en endringsforespørsel via webgrensesnittet: start `wenche ui`, gå til **Oppsett → Systembruker-oppsett**, og klikk **Oppdater systembruker-rettigheter**. Du får en lenke — åpne den i nettleseren, logg inn med ID-porten, og godkjenn endringen.
+
+---
+
+### 5c. Opprett systembrukerforespørsel
 
 === "Produksjon"
 
@@ -272,6 +281,6 @@ Logg deretter ut igjen:
 wenche logout
 ```
 
-Får du feilen `invalid_altinn_customer_configuration` betyr det at systembrukeren ikke er godkjent ennå — fullfør steg 5b. Dobbeltsjekk ellers at klient-ID og KID i `.env` stemmer med det som vises i selvbetjeningsportalen.
+Får du feilen `invalid_altinn_customer_configuration` betyr det at systembrukeren ikke er godkjent ennå — fullfør steg 5c. Dobbeltsjekk ellers at klient-ID og KID i `.env` stemmer med det som vises i selvbetjeningsportalen.
 
 [Gå videre til bruk →](bruk.md){ .md-button .md-button--primary }
