@@ -51,6 +51,16 @@ def eksempel_oppgave(eksempel_selskap, eksempel_aksjonaer):
     )
 
 
+@pytest.fixture
+def oppgave_stiftelsesaar(eksempel_selskap, eksempel_aksjonaer):
+    """Oppgave der regnskapsåret er det samme som stiftelsesåret (2020)."""
+    return Aksjonaerregisteroppgave(
+        selskap=eksempel_selskap,
+        regnskapsaar=2020,
+        aksjonaerer=[eksempel_aksjonaer],
+    )
+
+
 def _parse(xml_bytes: bytes) -> ET.Element:
     return ET.fromstring(xml_bytes)
 
@@ -159,13 +169,40 @@ def test_underskjema_antall_aksjer(eksempel_oppgave):
     assert int(antall.text) == 100
 
 
-def test_underskjema_anskaffelsesverdi(eksempel_oppgave):
-    """Anskaffelsesverdi = innbetalt_kapital_per_aksje * antall_aksjer = 300 * 100 = 30000."""
-    aksjonaer = eksempel_oppgave.aksjonaerer[0]
-    root = _parse(generer_underskjema_xml(aksjonaer, eksempel_oppgave))
+def test_underskjema_anskaffelsesverdi(oppgave_stiftelsesaar):
+    """Anskaffelsesverdi = innbetalt_kapital_per_aksje * antall_aksjer = 300 * 100 = 30000.
+    Transaksjonsfelter skal kun være med i stiftelsesåret."""
+    aksjonaer = oppgave_stiftelsesaar.aksjonaerer[0]
+    root = _parse(generer_underskjema_xml(aksjonaer, oppgave_stiftelsesaar))
     verdi = root.find(".//{*}AksjeAnskaffelsesverdi-datadef-17636")
     assert verdi is not None
     assert int(verdi.text) == 30000
+
+
+def test_underskjema_ingen_transaksjon_etter_stiftelsesaar(eksempel_oppgave):
+    """For inntektsår etter stiftelsesåret skal ingen transaksjon rapporteres (MTRA_004)."""
+    aksjonaer = eksempel_oppgave.aksjonaerer[0]
+    root = _parse(generer_underskjema_xml(aksjonaer, eksempel_oppgave))
+    assert root.find(".//{*}AksjeAnskaffelsesverdi-datadef-17636") is None
+    assert root.find(".//{*}AksjerErvervsdato-datadef-17746") is None
+
+
+def test_underskjema_fjoraret_lik_antall_aksjer_etter_stiftelsesaar(eksempel_oppgave):
+    """For inntektsår etter stiftelsesåret skal AksjerAntallFjoraret == antall_aksjer."""
+    aksjonaer = eksempel_oppgave.aksjonaerer[0]
+    root = _parse(generer_underskjema_xml(aksjonaer, eksempel_oppgave))
+    fjoraret = root.find(".//{*}AksjerAntallFjoraret-datadef-29168")
+    assert fjoraret is not None
+    assert int(fjoraret.text) == aksjonaer.antall_aksjer
+
+
+def test_underskjema_fjoraret_null_i_stiftelsesaar(oppgave_stiftelsesaar):
+    """I stiftelsesåret skal AksjerAntallFjoraret være 0 (ingen beholdning foregående år)."""
+    aksjonaer = oppgave_stiftelsesaar.aksjonaerer[0]
+    root = _parse(generer_underskjema_xml(aksjonaer, oppgave_stiftelsesaar))
+    fjoraret = root.find(".//{*}AksjerAntallFjoraret-datadef-29168")
+    assert fjoraret is not None
+    assert int(fjoraret.text) == 0
 
 
 def test_underskjema_orgnummer(eksempel_oppgave):
@@ -216,6 +253,16 @@ def test_valider_mangler_epost(eksempel_aksjonaer):
     )
     feil = valider(oppgave)
     assert any("epost" in f.lower() or "e-post" in f.lower() for f in feil)
+
+
+def test_valider_stiftelsesaar_etter_regnskapsaar(eksempel_selskap, eksempel_aksjonaer):
+    oppgave = Aksjonaerregisteroppgave(
+        selskap=eksempel_selskap,
+        regnskapsaar=2019,
+        aksjonaerer=[eksempel_aksjonaer],
+    )
+    feil = valider(oppgave)
+    assert any("stiftelsesaar" in f.lower() for f in feil)
 
 
 def test_valider_ugyldig_fnr(eksempel_selskap):

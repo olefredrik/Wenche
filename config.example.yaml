@@ -11,11 +11,11 @@ selskap:
   daglig_leder: "Kari Nordmann"
   styreleder: "Kari Nordmann"       # Kan være samme person som daglig leder
   forretningsadresse: "Eksempelgata 1, 0001 Oslo"
-  stiftelsesaar: 2021
+  stiftelsesaar: 2022
   aksjekapital: 30000               # NOK — fra stiftelsesdokumentene
   kontakt_epost: "post@eksempel.no" # Påkrevd for aksjonærregisteroppgave (RF-1086)
 
-regnskapsaar: 2024                  # Året regnskapet gjelder for
+regnskapsaar: 2025                  # Året regnskapet gjelder for
 
 # --- Resultatregnskap ---
 # Alle beløp i hele kroner (NOK). Bruk 0 for poster som ikke er aktuelle.
