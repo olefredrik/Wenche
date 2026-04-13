@@ -75,6 +75,23 @@ def generer_hovedskjema_xml(
     paalydende = round(s.aksjekapital) // totalt_aksjer if totalt_aksjer > 0 else 0
     stiftelsesdato = f"{s.stiftelsesaar}-01-01T00:00:00"
 
+    # Fjorår-felter og stiftelsestransaksjon skal kun inkluderes i stiftelsesåret.
+    # For påfølgende år er beholdningen uendret fra foregående år, og SKDs MTRA_004-regel
+    # krever at transaksjonsdatoer er innenfor inntektsåret.
+    er_stiftelsesaar = s.stiftelsesaar == aar
+    fjoraret_aksjekapital = 0 if er_stiftelsesaar else round(s.aksjekapital)
+    fjoraret_aksjer = 0 if er_stiftelsesaar else totalt_aksjer
+    fjoraret_paalydende = 0 if er_stiftelsesaar else paalydende
+    if er_stiftelsesaar:
+        stiftelse_innhold = f"""
+            <AksjerNyutstedteStiftelseMvAntall-datadef-17668 orid="17668">{totalt_aksjer}</AksjerNyutstedteStiftelseMvAntall-datadef-17668>
+            <AksjerStiftelseMvAntall-datadef-17669 orid="17669">{totalt_aksjer}</AksjerStiftelseMvAntall-datadef-17669>
+            <AksjerNyutstedteStiftelseMvType-datadef-17670 orid="17670">N</AksjerNyutstedteStiftelseMvType-datadef-17670>
+            <AksjerNyutstedteStiftelseMvTidspunkt-datadef-17671 orid="17671">{stiftelsesdato}</AksjerNyutstedteStiftelseMvTidspunkt-datadef-17671>
+            <AksjerNyutstedteStiftelseMvPalydende-datadef-23947 orid="23947">{paalydende}</AksjerNyutstedteStiftelseMvPalydende-datadef-23947>"""
+    else:
+        stiftelse_innhold = ""
+
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Skjema skjemanummer="890" spesifikasjonsnummer="12144"
         blankettnummer="RF-1086" gruppeid="2586" etatid="974761076">
@@ -93,23 +110,23 @@ def generer_hovedskjema_xml(
     </GenerellInformasjon-grp-2587>
     <Selskapsopplysninger-grp-2589 gruppeid="2589">
         <AksjekapitalForHeleSelskapet-grp-3443 gruppeid="3443">
-            <AksjekapitalFjoraret-datadef-7129 orid="7129">0</AksjekapitalFjoraret-datadef-7129>
+            <AksjekapitalFjoraret-datadef-7129 orid="7129">{fjoraret_aksjekapital}</AksjekapitalFjoraret-datadef-7129>
             <Aksjekapital-datadef-87 orid="87">{round(s.aksjekapital)}</Aksjekapital-datadef-87>
         </AksjekapitalForHeleSelskapet-grp-3443>
         <AksjekapitalIDenneAksjeklassen-grp-3444 gruppeid="3444">
-            <AksjekapitalISINAksjetypeFjoraret-datadef-17663 orid="17663">0</AksjekapitalISINAksjetypeFjoraret-datadef-17663>
+            <AksjekapitalISINAksjetypeFjoraret-datadef-17663 orid="17663">{fjoraret_aksjekapital}</AksjekapitalISINAksjetypeFjoraret-datadef-17663>
             <AksjekapitalISINAksjetype-datadef-17664 orid="17664">{round(s.aksjekapital)}</AksjekapitalISINAksjetype-datadef-17664>
         </AksjekapitalIDenneAksjeklassen-grp-3444>
         <PalydendePerAksje-grp-3447 gruppeid="3447">
-            <AksjeMvPalydendeFjoraret-datadef-23944 orid="23944">0</AksjeMvPalydendeFjoraret-datadef-23944>
+            <AksjeMvPalydendeFjoraret-datadef-23944 orid="23944">{fjoraret_paalydende}</AksjeMvPalydendeFjoraret-datadef-23944>
             <AksjeMvPalydende-datadef-23945 orid="23945">{paalydende}</AksjeMvPalydende-datadef-23945>
         </PalydendePerAksje-grp-3447>
         <AntallAksjerIDenneAksjeklassen-grp-3445 gruppeid="3445">
-            <AksjerMvAntallFjoraret-datadef-29166 orid="29166">0</AksjerMvAntallFjoraret-datadef-29166>
+            <AksjerMvAntallFjoraret-datadef-29166 orid="29166">{fjoraret_aksjer}</AksjerMvAntallFjoraret-datadef-29166>
             <AksjerMvAntall-datadef-29167 orid="29167">{totalt_aksjer}</AksjerMvAntall-datadef-29167>
         </AntallAksjerIDenneAksjeklassen-grp-3445>
         <InnbetaltAksjekapitalIDenneAksjeklassen-grp-3446 gruppeid="3446">
-            <AksjekapitalInnbetaltFjoraret-datadef-8020 orid="8020">0</AksjekapitalInnbetaltFjoraret-datadef-8020>
+            <AksjekapitalInnbetaltFjoraret-datadef-8020 orid="8020">{fjoraret_aksjekapital}</AksjekapitalInnbetaltFjoraret-datadef-8020>
             <AksjekapitalInnbetalt-datadef-5867 orid="5867">{round(s.aksjekapital)}</AksjekapitalInnbetalt-datadef-5867>
         </InnbetaltAksjekapitalIDenneAksjeklassen-grp-3446>
         <InnbetaltOverkursIDenneAksjeklassen-grp-3448 gruppeid="3448">
@@ -121,12 +138,7 @@ def generer_hovedskjema_xml(
         <UtdeltSkatterettsligUtbytteILopetAvInntektsaret-grp-3451 gruppeid="3451"></UtdeltSkatterettsligUtbytteILopetAvInntektsaret-grp-3451>
     </Utbytte-grp-3449>
     <UtstedelseAvAksjerIfmStiftelseNyemisjonMv-grp-3452 gruppeid="3452">
-        <AntallNyutstedteAksjer-grp-3453 gruppeid="3453">
-            <AksjerNyutstedteStiftelseMvAntall-datadef-17668 orid="17668">{totalt_aksjer}</AksjerNyutstedteStiftelseMvAntall-datadef-17668>
-            <AksjerStiftelseMvAntall-datadef-17669 orid="17669">{totalt_aksjer}</AksjerStiftelseMvAntall-datadef-17669>
-            <AksjerNyutstedteStiftelseMvType-datadef-17670 orid="17670">N</AksjerNyutstedteStiftelseMvType-datadef-17670>
-            <AksjerNyutstedteStiftelseMvTidspunkt-datadef-17671 orid="17671">{stiftelsesdato}</AksjerNyutstedteStiftelseMvTidspunkt-datadef-17671>
-            <AksjerNyutstedteStiftelseMvPalydende-datadef-23947 orid="23947">{paalydende}</AksjerNyutstedteStiftelseMvPalydende-datadef-23947>
+        <AntallNyutstedteAksjer-grp-3453 gruppeid="3453">{stiftelse_innhold}
         </AntallNyutstedteAksjer-grp-3453>
     </UtstedelseAvAksjerIfmStiftelseNyemisjonMv-grp-3452>
     <UtstedelseAvAksjerIfmFondsemisjonSplittMv-grp-3454 gruppeid="3454">
@@ -166,6 +178,21 @@ def generer_underskjema_xml(
     anskaffelsesverdi = round(aksjonaer.innbetalt_kapital_per_aksje * aksjonaer.antall_aksjer)
     stiftelsesdato = f"{s.stiftelsesaar}-01-01T00:00:00"
 
+    # Transaksjoner skal kun inkluderes hvis stiftelsesåret er inntektsåret.
+    # For påfølgende år er det ingen transaksjon — aksjonæren hadde samme beholdning
+    # foregående år, og SKDs MTRA_004-regel krever at transaksjonsdatoer er innenfor
+    # inntektsåret.
+    er_stiftelsesaar = s.stiftelsesaar == aar
+    fjoraret_aksjer = 0 if er_stiftelsesaar else aksjonaer.antall_aksjer
+    if er_stiftelsesaar:
+        tilgang_innhold = f"""
+                <AksjerKjopAntall-datadef-12153 orid="12153">{aksjonaer.antall_aksjer}</AksjerKjopAntall-datadef-12153>
+                <AksjeErvervType-datadef-17745 orid="17745">N</AksjeErvervType-datadef-17745>
+                <AksjerErvervsdato-datadef-17746 orid="17746">{stiftelsesdato}</AksjerErvervsdato-datadef-17746>
+                <AksjeAnskaffelsesverdi-datadef-17636 orid="17636">{anskaffelsesverdi}</AksjeAnskaffelsesverdi-datadef-17636>"""
+    else:
+        tilgang_innhold = ""
+
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Skjema skjemanummer="923" spesifikasjonsnummer="12232"
         blankettnummer="RF-1086-U" tittel="Aksjonærregisteroppgaven - underskjema"
@@ -183,7 +210,7 @@ def generer_underskjema_xml(
     </SelskapsOgAksjonaropplysninger-grp-3987>
     <AntallAksjerUtbytteOgTilbakebetalingAvTidligereInnbetaltKapit-grp-3990 gruppeid="3990">
         <AntallAksjerPerAksjonar-grp-3989 gruppeid="3989">
-            <AksjerAntallFjoraret-datadef-29168 orid="29168">0</AksjerAntallFjoraret-datadef-29168>
+            <AksjerAntallFjoraret-datadef-29168 orid="29168">{fjoraret_aksjer}</AksjerAntallFjoraret-datadef-29168>
             <AksjonarAksjerAntall-datadef-17741 orid="17741">{aksjonaer.antall_aksjer}</AksjonarAksjerAntall-datadef-17741>
         </AntallAksjerPerAksjonar-grp-3989>
         <UtdeltUtbyttePerAksjonar-grp-3991 gruppeid="3991">
@@ -196,11 +223,7 @@ def generer_underskjema_xml(
     </AntallAksjerUtbytteOgTilbakebetalingAvTidligereInnbetaltKapit-grp-3990>
     <Transaksjoner-grp-3992 gruppeid="3992">
         <KjopArvGaveStiftelseNyemisjonMv-grp-3993 gruppeid="3993">
-            <AntallAksjerITilgang-grp-3998 gruppeid="3998">
-                <AksjerKjopAntall-datadef-12153 orid="12153">{aksjonaer.antall_aksjer}</AksjerKjopAntall-datadef-12153>
-                <AksjeErvervType-datadef-17745 orid="17745">N</AksjeErvervType-datadef-17745>
-                <AksjerErvervsdato-datadef-17746 orid="17746">{stiftelsesdato}</AksjerErvervsdato-datadef-17746>
-                <AksjeAnskaffelsesverdi-datadef-17636 orid="17636">{anskaffelsesverdi}</AksjeAnskaffelsesverdi-datadef-17636>
+            <AntallAksjerITilgang-grp-3998 gruppeid="3998">{tilgang_innhold}
             </AntallAksjerITilgang-grp-3998>
         </KjopArvGaveStiftelseNyemisjonMv-grp-3993>
     </Transaksjoner-grp-3992>
@@ -244,6 +267,12 @@ def valider(oppgave: Aksjonaerregisteroppgave) -> list[str]:
     total_aksjer = oppgave.totalt_antall_aksjer
     if total_aksjer <= 0:
         feil.append("Totalt antall aksjer må være større enn 0.")
+
+    if oppgave.selskap.stiftelsesaar > oppgave.regnskapsaar:
+        feil.append(
+            f"stiftelsesaar ({oppgave.selskap.stiftelsesaar}) kan ikke være etter "
+            f"regnskapsåret ({oppgave.regnskapsaar})."
+        )
 
     return feil
 
