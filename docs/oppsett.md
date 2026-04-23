@@ -206,7 +206,9 @@ cp config.example.yaml config.yaml
 
 ## Steg 5 — Registrer systembruker i Altinn
 
-Altinn 3 krever at Wenche er registrert som et leverandørsystem, og at organisasjonen din har godkjent en systembruker. Dette gjøres **én gang per miljø** (test/prod).
+Altinn 3 krever at datasystemer som handlar på vegne av virksomheter bruker **systemtilgang** — en mekanisme der systemet registreres i Altinns systemregister og virksomheten godkjenner tilgangen eksplisitt. Wenche er bygget rundt denne modellen fra starten av, og bruker ikke den eldre virksomhetsbruker-funksjonaliteten. Mottar du e-post fra Digitaliseringsdirektoratet om at systemer mot Altinn må tilpasses innen 31. mai 2026, trenger du ikke gjøre noe med Wenche — kravet er allerede oppfylt.
+
+Selve oppsettet gjøres **én gang per miljø** (test/prod):
 
 !!! note "Bruker du webgrensesnittet?"
     Disse stegene kan gjøres direkte i nettleseren: start `wenche ui` og gå til **Oppsett → Systembruker-oppsett**.
