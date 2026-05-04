@@ -182,7 +182,11 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
             f'</{tag}>'
         )
 
-    # Hjelpefunksjon: lager enkelt element uten beskrivelse (single-occurrence)
+    # Hjelpefunksjon for single-occurrence elementer.
+    # Utelater altinnRowId og <beskrivelse> med vilje: XSD-en for disse
+    # elementene (f.eks. rentekostnad, langsiktigKonserngjeld, overkursfond)
+    # definerer dem uten disse attributtene/barna, i motsetning til
+    # repeatable-elementer som bruker linje().
     def linje_enkel(tag: str, verdi: float,
                     orid_aarets: str, orid_fjor: str,
                     fjor_verdi: float = 0.0) -> str:

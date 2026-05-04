@@ -9,9 +9,7 @@ Innsendingsflyt:
   2. POST /{år}/{id}/1086U   — send Underskjema for hver aksjonær
   3. POST /{år}/{id}/bekreft — bekreft at alle underskjema er innsendt
 
-Merk: prod-URL er ikke publisert i åpen dokumentasjon. Verifiser mot SwaggerHub
-(https://app.swaggerhub.com/apis/skatteetaten/innrapportering-aksjonaerregister-api/)
-eller ta kontakt med Skatteetaten.
+Prod-URL (api.skatteetaten.no) er verifisert med vellykket innsending 2026-05-04.
 """
 
 import uuid
