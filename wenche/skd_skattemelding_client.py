@@ -57,7 +57,13 @@ class SkdSkattemeldingClient:
         Returnerer rå XML-bytes (skattemeldingUpersonlig v5).
         Inneholder partsnummer som trengs for innsending — bruk
         skattemelding_xml.hent_partsnummer() for å hente det ut.
+
+        API-et returnerer en wrapper-XML med base64-kodet innhold i <content>.
+        Denne metoden dekoder automatisk hvis wrapper-format oppdages.
         """
+        import base64
+        from xml.etree.ElementTree import fromstring
+
         url = f"{self._base}/api/skattemelding/v2/{inntektsaar}/{orgnr}"
         resp = self._http.get(url, headers={"Accept": "application/xml"})
         if not resp.is_success:
@@ -65,7 +71,21 @@ class SkdSkattemeldingClient:
                 f"Feil ved henting av forhåndsutfylt skattemelding: "
                 f"{resp.status_code}\n{resp.text}"
             )
-        return resp.content
+        raw = resp.content
+
+        # Sjekk om responsen er en wrapper med base64-kodet skattemelding
+        try:
+            root = fromstring(raw)
+            ns = "no:skatteetaten:fastsetting:formueinntekt:skattemeldingognaeringsspesifikasjon:forespoersel:response:v2"
+            content_el = root.find(f".//{{{ns}}}content")
+            if content_el is None:
+                content_el = root.find(".//{*}content")
+            if content_el is not None and content_el.text:
+                return base64.b64decode(content_el.text)
+        except Exception:
+            pass
+
+        return raw
 
     def valider(
         self,
