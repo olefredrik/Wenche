@@ -119,7 +119,7 @@ def generer_hovedskjema(regnskap: Aarsregnskap) -> bytes:
       <navn orid="1">{s.navn}</navn>
     </enhet>
     <opplysningerInnsending>
-      <noteMaskinellBehandling orid="37499">20</noteMaskinellBehandling>
+      <noteMaskinellBehandling orid="37499">10</noteMaskinellBehandling>
       <systemNavn orid="39007">Wenche</systemNavn>
     </opplysningerInnsending>
   </Innsender>
