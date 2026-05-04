@@ -20,7 +20,7 @@ import httpx
 
 _BASES = {
     "test": "https://api-test.sits.no/api/aksjonaerregister/v1",
-    "prod": "https://api.sits.no/api/aksjonaerregister/v1",  # TODO: verifiser prod-URL
+    "prod": "https://api.skatteetaten.no/api/aksjonaerregister/v1",
 }
 
 
