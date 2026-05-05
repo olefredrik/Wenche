@@ -119,7 +119,7 @@ def generer_hovedskjema(regnskap: Aarsregnskap) -> bytes:
       <navn orid="1">{s.navn}</navn>
     </enhet>
     <opplysningerInnsending>
-      <noteMaskinellBehandling orid="37499">Maskinell innsending</noteMaskinellBehandling>
+      <noteMaskinellBehandling orid="37499">10</noteMaskinellBehandling>
       <systemNavn orid="39007">Wenche</systemNavn>
     </opplysningerInnsending>
   </Innsender>
@@ -168,7 +168,7 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
     def _i(v: float) -> int:
         return round(v)
 
-    # Hjelpefunksjon: lager linjeelement med altinnRowId kun hvis verdi != 0
+    # Hjelpefunksjon: lager linjeelement med altinnRowId og beskrivelse (unbounded-elementer)
     def linje(tag: str, verdi: float, besk: str, orid_besk: str,
               orid_aarets: str, orid_fjor: str, fjor_verdi: float = 0.0) -> str:
         iv, ifv = _i(verdi), _i(fjor_verdi)
@@ -177,6 +177,24 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
         return (
             f'<{tag} altinnRowId="{_row_id()}">'
             f'<beskrivelse orid="{orid_besk}">{besk}</beskrivelse>'
+            f'<aarets orid="{orid_aarets}">{iv}</aarets>'
+            f'<fjoraarets orid="{orid_fjor}">{ifv}</fjoraarets>'
+            f'</{tag}>'
+        )
+
+    # Hjelpefunksjon for single-occurrence elementer.
+    # Utelater altinnRowId og <beskrivelse> med vilje: XSD-en for disse
+    # elementene (f.eks. rentekostnad, langsiktigKonserngjeld, overkursfond)
+    # definerer dem uten disse attributtene/barna, i motsetning til
+    # repeatable-elementer som bruker linje().
+    def linje_enkel(tag: str, verdi: float,
+                    orid_aarets: str, orid_fjor: str,
+                    fjor_verdi: float = 0.0) -> str:
+        iv, ifv = _i(verdi), _i(fjor_verdi)
+        if iv == 0 and ifv == 0:
+            return ""
+        return (
+            f'<{tag}>'
             f'<aarets orid="{orid_aarets}">{iv}</aarets>'
             f'<fjoraarets orid="{orid_fjor}">{ifv}</fjoraarets>'
             f'</{tag}>'
@@ -256,14 +274,14 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
       </nettoFinans>
       <finansinntekt>
         {linje("investeringDatterforetakTilknyttetSelskap", fp.utbytte_fra_datterselskap, "Utbytte fra datterselskap", "29004", "27934", "27935", ffp.utbytte_fra_datterselskap)}
-        {linje("annenRenteinntekt", fp.andre_finansinntekter, "Andre finansinntekter", "29006", "152", "7032", ffp.andre_finansinntekter)}
+        {linje_enkel("annenRenteinntekt", fp.andre_finansinntekter, "150", "7030", ffp.andre_finansinntekter)}
         <sumFinansinntekter>
           <aarets orid="153">{_i(fp.sum_inntekter)}</aarets>
           <fjoraarets orid="7993">{_i(ffp.sum_inntekter)}</fjoraarets>
         </sumFinansinntekter>
       </finansinntekt>
       <finanskostnad>
-        {linje("rentekostnad", fp.rentekostnader, "Rentekostnader", "29009", "7037", "7038", ffp.rentekostnader)}
+        {linje_enkel("rentekostnad", fp.rentekostnader, "7037", "7038", ffp.rentekostnader)}
         {linje("annenFinanskostnad", fp.andre_finanskostnader, "Andre finanskostnader", "29011", "156", "7041", ffp.andre_finanskostnader)}
         <sumFinanskostnader>
           <aarets orid="17130">{_i(fp.sum_kostnader)}</aarets>
@@ -285,8 +303,8 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
       </resultat>
       <overfoeringer>
         <sumOverfoeringerOgDisponeringer>
-          <aarets orid="7067">{_i(r.aarsresultat)}</aarets>
-          <fjoraarets orid="7068">{_i(fr.aarsresultat)}</fjoraarets>
+          <aarets orid="7071">{_i(r.aarsresultat)}</aarets>
+          <fjoraarets orid="7072">{_i(fr.aarsresultat)}</fjoraarets>
         </sumOverfoeringerOgDisponeringer>
       </overfoeringer>
     </resultatregnskapResultat>
@@ -306,8 +324,8 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
             <aarets orid="9686">{_i(am.aksjer_i_datterselskap)}</aarets>
             <fjoraarets orid="10289">{_i(fam.aksjer_i_datterselskap)}</fjoraarets>
           </investeringDatterselskap>
-          {linje("investeringAksjerAndeler", am.andre_aksjer, "Andre aksjer", "29018", "7727", "8012", fam.andre_aksjer)}
-          {linje("annenFordring", am.langsiktige_fordringer, "Langsiktige fordringer", "29019", "6500", "7093", fam.langsiktige_fordringer)}
+          {linje("investeringAksjerAndeler", am.andre_aksjer, "Andre aksjer", "29024", "7100", "7101", fam.andre_aksjer)}
+          {linje("annenFordring", am.langsiktige_fordringer, "Langsiktige fordringer", "29025", "203", "27585", fam.langsiktige_fordringer)}
           <sumFinansielleAnleggsmidler>
             <aarets orid="5267">{_i(am.sum)}</aarets>
             <fjoraarets orid="8014">{_i(fam.sum)}</fjoraarets>
@@ -348,7 +366,7 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
       <balanseEgenkapitalInnskuttOpptjentEgenkapital>
         <innskuttEgenkapital>
           {linje("selskapskapital", ek.aksjekapital, "Aksjekapital", "29032", "20488", "20489", fek.aksjekapital)}
-          {linje("overkursfond", ek.overkursfond, "Overkursfond", "29033", "2585", "7135", fek.overkursfond)}
+          {linje_enkel("overkursfond", ek.overkursfond, "2585", "7135", fek.overkursfond)}
           <sumInnskuttEgenkapital>
             <aarets orid="3730">{_i(sum_innskutt_ek)}</aarets>
             <fjoraarets orid="9984">{_i(fek.aksjekapital + fek.overkursfond)}</fjoraarets>
@@ -377,7 +395,7 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
             <fjoraarets orid="7156">{_i(flg.sum)}</fjoraarets>
           </sumLangsiktigGjeld>
           <annenLangsiktigGjeld>
-            {linje("langsiktigKonserngjeld", lg.laan_fra_aksjonaer, "Lån fra aksjonær", "29035", "2256", "7152", flg.laan_fra_aksjonaer)}
+            {linje_enkel("langsiktigKonserngjeld", lg.laan_fra_aksjonaer, "2256", "7152", flg.laan_fra_aksjonaer)}
             {linje("oevrigLangsiktigGjeld", lg.andre_langsiktige_laan, "Andre langsiktige lån", "29036", "242", "7155", flg.andre_langsiktige_laan)}
             <sumAnnenLangsiktigGjeld>
               <aarets orid="25019">{_i(lg.sum)}</aarets>
@@ -386,7 +404,7 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
           </annenLangsiktigGjeld>
         </balanseGjeldAvsetningerForpliktelserAnnenLangsiktigGjeld>
         <balanseKortsiktigGjeld>
-          {linje("leverandoergjeld", kg.leverandoergjeld, "Leverandørgjeld", "29037", "220", "7162", fkg.leverandoergjeld)}
+          {linje_enkel("leverandoergjeld", kg.leverandoergjeld, "220", "7162", fkg.leverandoergjeld)}
           {linje("skyldigeOffentligeAvgifter", kg.skyldige_offentlige_avgifter, "Skyldige offentlige avgifter", "29039", "225", "7170", fkg.skyldige_offentlige_avgifter)}
           {linje("annenKortsiktigGjeld", kg.annen_kortsiktig_gjeld, "Annen kortsiktig gjeld", "29040", "236", "7182", fkg.annen_kortsiktig_gjeld)}
           <sumKortsiktigGjeld>
