@@ -697,14 +697,54 @@ def _frist_info(maaned: int, dag: int) -> tuple[str, str, str]:
         return dato_tekst, f"{dager} dager igjen", "green-600"
 
 
-def _fristkort(tittel: str, undertittel: str, maaned: int, dag: int, beskrivelse: str) -> None:
-    dato_tekst, status_tekst, farge = _frist_info(maaned, dag)
-    with ui.card().classes("w-full p-5 border border-slate-200 shadow-none rounded-xl"):
-        with ui.column().classes("gap-0 w-full"):
+def _fristkort(tittel: str, undertittel: str) -> tuple:
+    """Oppretter fristkort med loading-tilstand. Returnerer (card, content)."""
+    card = ui.card().classes("w-full p-5 border border-slate-200 shadow-none rounded-xl")
+    with card:
+        content = ui.column().classes("w-full gap-0")
+        with content:
             ui.label(tittel).classes("font-semibold text-slate-800 text-base")
-            ui.label(undertittel).classes("text-xs text-slate-500 mb-2")
-            ui.label(dato_tekst).classes(f"text-sm font-medium text-{farge}")
-            ui.label(status_tekst).classes(f"text-xs text-{farge}")
+            ui.label(undertittel).classes("text-xs text-slate-500 mb-3")
+            with ui.row().classes("items-center gap-2"):
+                ui.spinner(size="sm").classes("text-slate-400")
+                ui.label("Sjekker status...").classes("text-xs text-slate-400 italic")
+    return card, content
+
+
+def _fristkort_innfridd(card, content, tittel: str, undertittel: str, result) -> None:
+    """Vis fristkort som fullført — grønt, ingen frist, tydelig bekreftelse."""
+    card.classes(remove="border-slate-200", add="border-green-200 bg-green-50/50")
+    content.clear()
+    with content:
+        ui.label(tittel).classes("font-semibold text-slate-800 text-base")
+        ui.label(undertittel).classes("text-xs text-slate-500 mb-3")
+        with ui.row().classes("items-center gap-2"):
+            ui.icon("check_circle").classes("text-green-600 text-2xl")
+            ui.label("Levert").classes("text-lg font-bold text-green-700")
+        ui.label(result.brukertekst).classes("text-sm text-slate-600 mt-2")
+        if result.tidspunkt:
+            ui.label(f"Mottatt {result.tidspunkt}").classes("text-xs text-slate-400 mt-1")
+        if result.lenke:
+            ui.separator().classes("my-3")
+            ui.link(
+                "Åpne kvittering i Altinn →", result.lenke, new_tab=True
+            ).classes("text-sm text-green-700 font-medium")
+
+
+def _fristkort_ventende(card, content, tittel: str, undertittel: str, maaned: int, dag: int,
+                         beskrivelse: str, result=None) -> None:
+    """Vis fristkort med nedtelling til frist."""
+    dato_tekst, countdown, farge = _frist_info(maaned, dag)
+    content.clear()
+    with content:
+        ui.label(tittel).classes("font-semibold text-slate-800 text-base")
+        ui.label(undertittel).classes("text-xs text-slate-500 mb-2")
+        if result and result.beskrivelse:
+            with ui.row().classes("items-center gap-1 mb-1"):
+                ui.icon("schedule").classes("text-slate-400 text-base")
+                ui.label(result.beskrivelse).classes("text-sm text-slate-500")
+        ui.label(dato_tekst).classes(f"text-sm font-medium text-{farge}")
+        ui.label(countdown).classes(f"text-xs text-{farge}")
         ui.separator().classes("my-3")
         ui.label(beskrivelse).classes("text-sm text-slate-600")
 
@@ -720,28 +760,62 @@ def _bygg_hjem_fane() -> None:
         ui.link("dokumentasjonen", "https://olefredrik.github.io/Wenche/", new_tab=True).classes("text-sm")
         ui.label(", der finner du hjelp til å sette opp alt riktig.").classes("text-sm text-slate-500")
 
-    ui.label("Frister").classes("text-lg font-semibold mb-3")
+    with ui.row().classes("items-center gap-3 mb-3"):
+        ui.label("Frister").classes("text-lg font-semibold")
+        ui.button(
+            "Oppdater status",
+            on_click=lambda: sjekk_alle_frister(),
+        ).props("outline color=primary size=sm flat icon=refresh")
+
+    frister = [
+        {"key": "skattemelding", "tittel": "Skattemelding", "undertittel": "RF-1167 + RF-1028",
+         "maaned": 5, "dag": 31,
+         "beskrivelse": "Wenche beregner skatten og sender skattemeldingen digitalt via Altinn i steg 6."},
+        {"key": "aarsregnskap", "tittel": "Årsregnskap", "undertittel": "Brønnøysundregistrene",
+         "maaned": 7, "dag": 31,
+         "beskrivelse": "Sendes digitalt via Altinn i steg 6. "
+                        "Krever signering med BankID av daglig leder eller styreleder."},
+        {"key": "aksjonaerregister", "tittel": "Aksjonærregisteroppgave",
+         "undertittel": "RF-1086, Skatteetaten", "maaned": 1, "dag": 31,
+         "beskrivelse": "Sendes maskinelt til Skatteetatens API via steg 6. "
+                        "Ingen manuell signering nødvendig."},
+    ]
+
+    kort: dict[str, tuple] = {}
     with ui.grid(columns=3).classes("w-full gap-4"):
-        _fristkort(
-            "Skattemelding",
-            "RF-1167 + RF-1028",
-            5, 31,
-            "Wenche beregner skatten og sender skattemeldingen digitalt via Altinn i steg 6.",
-        )
-        _fristkort(
-            "Årsregnskap",
-            "Brønnøysundregistrene",
-            7, 31,
-            "Sendes digitalt via Altinn i steg 6. "
-            "Krever signering med BankID av daglig leder eller styreleder.",
-        )
-        _fristkort(
-            "Aksjonærregisteroppgave",
-            "RF-1086, Skatteetaten",
-            1, 31,
-            "Sendes maskinelt til Skatteetatens API via steg 6. "
-            "Ingen manuell signering nødvendig.",
-        )
+        for f in frister:
+            card, content = _fristkort(f["tittel"], f["undertittel"])
+            kort[f["key"]] = (card, content, f)
+
+    async def sjekk_alle_frister():
+        from wenche.fristsjekk import sjekk_skattemelding, sjekk_aarsregnskap, sjekk_aksjonaerregister
+
+        orgnr = state.org_nummer
+        aar = int(state.regnskapsaar)
+        check_fns = {
+            "skattemelding": sjekk_skattemelding,
+            "aarsregnskap": sjekk_aarsregnskap,
+            "aksjonaerregister": sjekk_aksjonaerregister,
+        }
+
+        for key, (card, content, info) in kort.items():
+            try:
+                result = await run.io_bound(check_fns[key], orgnr, aar)
+                if result.innfridd:
+                    _fristkort_innfridd(card, content, info["tittel"], info["undertittel"], result)
+                else:
+                    _fristkort_ventende(
+                        card, content, info["tittel"], info["undertittel"],
+                        info["maaned"], info["dag"], info["beskrivelse"], result,
+                    )
+            except Exception:
+                _fristkort_ventende(
+                    card, content, info["tittel"], info["undertittel"],
+                    info["maaned"], info["dag"], info["beskrivelse"],
+                )
+
+    # Sjekk automatisk ved sidelasting
+    ui.timer(1.0, sjekk_alle_frister, once=True)
 
     ui.separator().classes("my-6")
     ui.label("Ansvarsfraskrivelse").classes("text-sm font-semibold text-slate-700 mb-1")
