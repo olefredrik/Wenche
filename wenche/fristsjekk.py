@@ -5,6 +5,15 @@ Brukes av Wenche UI for å vise om frister er innfridd:
   - Skattemelding: Skatteetatens API (krever Maskinporten-token)
   - Årsregnskap:   Brønnøysundregistrenes åpne Regnskapsregister-API
   - Aksjonærregisteroppgave: Ingen offentlig status-API tilgjengelig
+
+Skattemelding-sjekken bruker endepunktet GET /api/skattemelding/v2/{aar}/{orgnr}
+som returnerer en XML-wrapper med <type>-element. Verdiene er definert i
+Skatteetatens offisielle XSD-skjema (Dokumenttype):
+  - skattemeldingUpersonligUtkast    → forhåndsutfylt, ikke innsendt
+  - skattemeldingUpersonligFastsatt  → innsendt og fastsatt
+
+Kilde: https://github.com/Skatteetaten/skattemeldingen/blob/master/src/resources/
+       xsd/skattemeldingognaeringsspesifikasjonforespoerselresponse_v2_kompakt.xsd
 """
 
 from __future__ import annotations
@@ -25,8 +34,8 @@ _SKD_BASES = {
 }
 
 # Brønnøysundregistrenes Regnskapsregister-API.
-# Åpent API uten autentisering. Dokumentasjon:
-# https://data.brreg.no/regnskapsregisteret/openapi/index.html
+# Åpent API uten autentisering.
+# Dokumentasjon: https://data.brreg.no/regnskapsregisteret/openapi/index.html
 _BRG_REGNSKAP_URL = "https://data.brreg.no/regnskapsregisteret/regnskap"
 
 
@@ -42,10 +51,10 @@ class FristStatus:
 def sjekk_skattemelding(orgnr: str, aar: int) -> FristStatus:
     """Sjekk om skattemelding er fastsatt via Skatteetatens API."""
     try:
-        from wenche.auth import get_skd_skattemelding_tokens
+        from wenche.auth import get_skd_skattemelding_maskinporten_token
 
-        tokens = get_skd_skattemelding_tokens()
-    except Exception:
+        token = get_skd_skattemelding_maskinporten_token()
+    except RuntimeError:
         return FristStatus(beskrivelse="Maskinporten ikke konfigurert")
 
     env = os.getenv("WENCHE_ENV", "prod")
@@ -55,7 +64,7 @@ def sjekk_skattemelding(orgnr: str, aar: int) -> FristStatus:
         resp = httpx.get(
             f"{base}/api/skattemelding/v2/{aar}/{orgnr}",
             headers={
-                "Authorization": f"Bearer {tokens['maskinporten_token']}",
+                "Authorization": f"Bearer {token}",
                 "Accept": "application/xml",
             },
             timeout=30,
@@ -71,6 +80,9 @@ def sjekk_skattemelding(orgnr: str, aar: int) -> FristStatus:
     except ET.ParseError:
         return FristStatus(beskrivelse="Ugyldig svar fra Skatteetaten")
 
+    # <type>-elementet i wrapper-XML-en angir dokumentstatus.
+    # "Fastsatt" i verdien betyr at skattemeldingen er innsendt og godkjent.
+    # Ref: Dokumenttype-enum i XSD (se modul-docstring).
     for elem in root.iter():
         tag = elem.tag.split("}")[-1] if "}" in elem.tag else elem.tag
         if tag == "type" and elem.text and "Fastsatt" in elem.text:
@@ -102,7 +114,7 @@ def sjekk_aarsregnskap(orgnr: str, aar: int) -> FristStatus:
 
     try:
         data = resp.json()
-    except Exception:
+    except ValueError:
         return FristStatus(beskrivelse="Uventet svar fra Regnskapsregisteret")
 
     if not isinstance(data, list):

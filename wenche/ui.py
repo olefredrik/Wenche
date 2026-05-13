@@ -784,35 +784,59 @@ def _bygg_hjem_fane() -> None:
     kort: dict[str, tuple] = {}
     with ui.grid(columns=3).classes("w-full gap-4"):
         for f in frister:
-            card, content = _fristkort(f["tittel"], f["undertittel"])
+            if f["key"] == "aksjonaerregister":
+                # Ingen automatisk sjekk — vis sluttilstand direkte uten spinner.
+                from wenche.fristsjekk import FristStatus
+                card, content = _fristkort(f["tittel"], f["undertittel"])
+                _fristkort_ventende(
+                    card, content, f["tittel"], f["undertittel"],
+                    f["maaned"], f["dag"], f["beskrivelse"],
+                    FristStatus(beskrivelse="Ingen automatisk sjekk tilgjengelig"),
+                )
+            else:
+                card, content = _fristkort(f["tittel"], f["undertittel"])
             kort[f["key"]] = (card, content, f)
 
+    async def _sjekk_en_frist(key, check_fn, orgnr, aar):
+        """Kjør én fristsjekk og oppdater kortet."""
+        card, content, info = kort[key]
+        try:
+            result = await run.io_bound(check_fn, orgnr, aar)
+            if result.innfridd:
+                _fristkort_innfridd(card, content, info["tittel"], info["undertittel"], result)
+            else:
+                _fristkort_ventende(
+                    card, content, info["tittel"], info["undertittel"],
+                    info["maaned"], info["dag"], info["beskrivelse"], result,
+                )
+        except Exception:
+            _fristkort_ventende(
+                card, content, info["tittel"], info["undertittel"],
+                info["maaned"], info["dag"], info["beskrivelse"],
+            )
+
     async def sjekk_alle_frister():
-        from wenche.fristsjekk import sjekk_skattemelding, sjekk_aarsregnskap, sjekk_aksjonaerregister
+        import asyncio
+        from wenche.fristsjekk import sjekk_skattemelding, sjekk_aarsregnskap
 
         orgnr = state.org_nummer
         aar = int(state.regnskapsaar)
-        check_fns = {
-            "skattemelding": sjekk_skattemelding,
-            "aarsregnskap": sjekk_aarsregnskap,
-            "aksjonaerregister": sjekk_aksjonaerregister,
-        }
 
-        for key, (card, content, info) in kort.items():
-            try:
-                result = await run.io_bound(check_fns[key], orgnr, aar)
-                if result.innfridd:
-                    _fristkort_innfridd(card, content, info["tittel"], info["undertittel"], result)
-                else:
+        # Ikke send API-kall med placeholder eller tomt org.nr.
+        if not orgnr or orgnr == "123456789":
+            for key, (card, content, info) in kort.items():
+                if key != "aksjonaerregister":
                     _fristkort_ventende(
                         card, content, info["tittel"], info["undertittel"],
-                        info["maaned"], info["dag"], info["beskrivelse"], result,
+                        info["maaned"], info["dag"], info["beskrivelse"],
                     )
-            except Exception:
-                _fristkort_ventende(
-                    card, content, info["tittel"], info["undertittel"],
-                    info["maaned"], info["dag"], info["beskrivelse"],
-                )
+            return
+
+        # Kjør skattemelding- og årsregnskap-sjekk parallelt.
+        await asyncio.gather(
+            _sjekk_en_frist("skattemelding", sjekk_skattemelding, orgnr, aar),
+            _sjekk_en_frist("aarsregnskap", sjekk_aarsregnskap, orgnr, aar),
+        )
 
     # Sjekk automatisk ved sidelasting
     ui.timer(1.0, sjekk_alle_frister, once=True)

@@ -55,6 +55,9 @@ SKD_SKATTEMELDING_SCOPE = (
     "skatteetaten:formueinntekt/skattemelding "
     "altinn:instances.read altinn:instances.write"
 )
+
+# Scope for lesestatus fra SKDs skattemelding-API (ingen Altinn-instanser)
+SKD_SKATTEMELDING_LESE_SCOPE = "skatteetaten:formueinntekt/skattemelding"
 TOKEN_FILE = Path.home() / ".wenche" / "token.json"
 
 
@@ -242,6 +245,37 @@ def get_skd_aksjonaer_token() -> str:
 
     return _hent_maskinporten_token(
         client_id, private_key_pem, kid, scopes=SKD_AKSJONAER_SCOPE, org_nummer=org_nummer
+    )
+
+
+def get_skd_skattemelding_maskinporten_token() -> str:
+    """
+    Henter et Maskinporten-token med skattemelding-scope (kun lesestatus).
+
+    Brukes for read-only sjekk av fastsettingsstatus mot SKDs API.
+    Ingen Altinn-veksling — krever ikke at brukeren har Altinn-rettigheter.
+    """
+    client_id = _les_påkrevd_env(
+        "MASKINPORTEN_CLIENT_ID",
+        "Kopier .env.example til .env og fyll inn din klient-ID fra Digdirs selvbetjeningsportal.",
+    )
+    kid = _les_påkrevd_env(
+        "MASKINPORTEN_KID",
+        "Finn nøkkel-ID (UUID) i Digdirs selvbetjeningsportal under klientens nøkler og legg den i .env.",
+    )
+    vendor_orgnr = _les_påkrevd_env(
+        "ORG_NUMMER",
+        "Legg til ORG_NUMMER=<ditt organisasjonsnummer> i .env.",
+    )
+    env = os.getenv("WENCHE_ENV", "prod")
+    org_nummer = os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr) if env == "test" else vendor_orgnr
+    nokkel_sti = os.getenv("MASKINPORTEN_PRIVAT_NOKKEL", "maskinporten_privat.pem")
+    private_key_pem = _les_nokkel(nokkel_sti)
+
+    return _hent_maskinporten_token(
+        client_id, private_key_pem, kid,
+        scopes=SKD_SKATTEMELDING_LESE_SCOPE,
+        org_nummer=org_nummer,
     )
 
 
