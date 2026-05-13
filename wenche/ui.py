@@ -682,7 +682,7 @@ def _frist_info(maaned: int, dag: int) -> tuple[str, str, str]:
     if frist < today:
         frist = date(today.year + 1, maaned, dag)
     dager = (frist - today).days
-    dato_tekst = frist.strftime("%-d. %B %Y").replace(
+    dato_tekst = f"{frist.day}. {frist.strftime('%B %Y')}".replace(
         "January", "januar").replace("February", "februar").replace(
         "March", "mars").replace("April", "april").replace(
         "May", "mai").replace("June", "juni").replace(
