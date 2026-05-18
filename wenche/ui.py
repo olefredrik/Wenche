@@ -748,7 +748,7 @@ def _fristkort_ventende(card, content, tittel: str, undertittel: str, maaned: in
         ui.label(beskrivelse).classes("text-sm text-slate-600")
 
 
-def _bygg_hjem_fane() -> None:
+def _bygg_hjem_fane(tabs=None, t_oppsett=None) -> None:
     ui.label("Tid for å sende inn papirene igjen?").classes("text-2xl font-semibold mt-2 mb-1")
     ui.label(
         "Wenche ordner årsregnskap, skattemelding og aksjonærregisteroppgave "
@@ -759,12 +759,37 @@ def _bygg_hjem_fane() -> None:
         ui.link("dokumentasjonen", "https://olefredrik.github.io/Wenche/", new_tab=True).classes("text-sm")
         ui.label(", der finner du hjelp til å sette opp alt riktig.").classes("text-sm text-slate-500")
 
+    orgnr_konfigurert = bool(state.org_nummer) and state.org_nummer != "123456789"
+
+    if not orgnr_konfigurert:
+        with ui.card().classes(
+            "w-full p-4 mb-4 bg-amber-50 border border-amber-200 shadow-none rounded-xl"
+        ):
+            with ui.row().classes("items-center gap-3 w-full"):
+                ui.icon("info").classes("text-amber-600 text-2xl")
+                with ui.column().classes("gap-1 flex-grow"):
+                    ui.label("Organisasjonsnummer mangler").classes(
+                        "font-semibold text-amber-900"
+                    )
+                    ui.label(
+                        "Fyll inn organisasjonsnummer i Oppsett-fanen for å aktivere "
+                        "automatisk statussjekk."
+                    ).classes("text-sm text-amber-900")
+                if tabs is not None and t_oppsett is not None:
+                    ui.button(
+                        "Åpne Oppsett",
+                        on_click=lambda: tabs.set_value(t_oppsett),
+                    ).props("color=amber-7 size=sm flat icon=arrow_forward")
+
     with ui.row().classes("items-center gap-3 mb-3"):
         ui.label("Frister").classes("text-lg font-semibold")
-        ui.button(
+        oppdater_knapp = ui.button(
             "Oppdater status",
             on_click=lambda: sjekk_alle_frister(),
         ).props("outline color=primary size=sm flat icon=refresh")
+        if not orgnr_konfigurert:
+            oppdater_knapp.disable()
+            oppdater_knapp.tooltip("Fyll inn organisasjonsnummer i Oppsett-fanen først")
 
     frister = [
         {"key": "skattemelding", "tittel": "Skattemelding", "undertittel": "RF-1167 + RF-1028",
@@ -780,17 +805,25 @@ def _bygg_hjem_fane() -> None:
                         "Ingen manuell signering nødvendig."},
     ]
 
+    from wenche.fristsjekk import FristStatus
+
     kort: dict[str, tuple] = {}
     with ui.grid(columns=3).classes("w-full gap-4"):
         for f in frister:
             if f["key"] == "aksjonaerregister":
                 # Ingen automatisk sjekk — vis sluttilstand direkte uten spinner.
-                from wenche.fristsjekk import FristStatus
                 card, content = _fristkort(f["tittel"], f["undertittel"])
                 _fristkort_ventende(
                     card, content, f["tittel"], f["undertittel"],
                     f["maaned"], f["dag"], f["beskrivelse"],
                     FristStatus(beskrivelse="Ingen automatisk sjekk tilgjengelig"),
+                )
+            elif not orgnr_konfigurert:
+                # Ingen API-sjekk uten orgnr — hopp over spinner og vis ventende direkte.
+                card, content = _fristkort(f["tittel"], f["undertittel"])
+                _fristkort_ventende(
+                    card, content, f["tittel"], f["undertittel"],
+                    f["maaned"], f["dag"], f["beskrivelse"],
                 )
             else:
                 card, content = _fristkort(f["tittel"], f["undertittel"])
@@ -825,13 +858,8 @@ def _bygg_hjem_fane() -> None:
         orgnr = state.org_nummer
 
         # Ikke send API-kall med placeholder eller tomt org.nr.
+        # Kortene er allerede bygget i ventende-tilstand når dette er tilfelle.
         if not orgnr or orgnr == "123456789":
-            for key, (card, content, info) in kort.items():
-                if key != "aksjonaerregister":
-                    _fristkort_ventende(
-                        card, content, info["tittel"], info["undertittel"],
-                        info["maaned"], info["dag"], info["beskrivelse"],
-                    )
             return
 
         # Hvert kort sjekkes for sitt eget regnskapsår, utledet fra fristen.
@@ -848,8 +876,9 @@ def _bygg_hjem_fane() -> None:
             _sjekk_en_frist("aarsregnskap", sjekk_aarsregnskap, orgnr, aarsregnskap_aar),
         )
 
-    # Sjekk automatisk ved sidelasting
-    ui.timer(1.0, sjekk_alle_frister, once=True)
+    # Sjekk automatisk ved sidelasting kun hvis orgnr er konfigurert.
+    if orgnr_konfigurert:
+        ui.timer(1.0, sjekk_alle_frister, once=True)
 
     ui.separator().classes("my-6")
     ui.label("Ansvarsfraskrivelse").classes("text-sm font-semibold text-slate-700 mb-1")
@@ -1869,7 +1898,7 @@ def main() -> None:
 
     with ui.tab_panels(tabs, value=t_hjem).classes("w-full max-w-5xl mx-auto px-4 py-6"):
         with ui.tab_panel(t_hjem):
-            _bygg_hjem_fane()
+            _bygg_hjem_fane(tabs, t_oppsett)
         with ui.tab_panel(t_oppsett):
             _bygg_oppsett_fane()
         with ui.tab_panel(t_selskap):
