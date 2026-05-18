@@ -4,6 +4,28 @@ Wenche brukes primært via **webgrensesnittet** (`wenche ui`) — et grafisk gre
 
 ---
 
+## Hjem-fanen
+
+Når du åpner `wenche ui` lander du på **Hjem**-fanen. Den viser tre fristkort — ett for hver årlige innsending:
+
+- **Skattemelding** (frist 31. mai)
+- **Årsregnskap** (frist 31. juli)
+- **Aksjonærregisteroppgave** (frist 31. januar)
+
+Hvert kort viser hvor mange dager det er igjen til neste frist, og kjører en automatisk statussjekk mot offentlige API-er for å se om innsendingen allerede er gjort:
+
+| Kort | Statuskilde |
+|---|---|
+| Skattemelding | Skatteetatens skattemelding-API (krever Maskinporten-konfig) |
+| Årsregnskap | Brønnøysundregistrenes åpne Regnskapsregister |
+| Aksjonærregisteroppgave | Ingen offentlig status-API — sjekk manuelt hos Skatteetaten |
+
+Når statussjekken bekrefter at innsendingen er gjort, vises kortet grønt med «Levert» og en lenke til Altinn-kvitteringen. Knappen **Oppdater status** kjører sjekkene på nytt.
+
+Statussjekkene gjøres mot regnskapsåret som tilhører neste frist (f.eks. 31. juli 2026 → regnskapsår 2025), ikke det arbeidsåret du har valgt i fanen **Oppsett**.
+
+---
+
 ## Autentisering
 
 Innsending av årsregnskap og aksjonærregisteroppgave krever innlogging mot Maskinporten:
