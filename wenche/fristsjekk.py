@@ -18,7 +18,6 @@ Kilde: https://github.com/Skatteetaten/skattemeldingen/blob/master/src/resources
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from datetime import date
 from xml.etree import ElementTree as ET
@@ -47,11 +46,9 @@ def regnskapsaar_for_frist(maaned: int, dag: int) -> int:
     """
     return neste_frist(maaned, dag).year - 1
 
-# Basis-URL-er for Skatteetatens API — samme som i skd_skattemelding_client.py.
-_SKD_BASES = {
-    "test": "https://api-test.sits.no",
-    "prod": "https://api.skatteetaten.no",
-}
+# Hjem-fanens statussjekk slår alltid opp mot prod, uavhengig av WENCHE_ENV.
+# Brukeren skal se reell innsendingsstatus i prod, ikke status mot et test-orgnr.
+_SKD_PROD_BASE = "https://api.skatteetaten.no"
 
 # Brønnøysundregistrenes Regnskapsregister-API.
 # Åpent API uten autentisering.
@@ -69,20 +66,22 @@ class FristStatus:
 
 
 def sjekk_skattemelding(orgnr: str, aar: int) -> FristStatus:
-    """Sjekk om skattemelding er fastsatt via Skatteetatens API."""
+    """
+    Sjekk om skattemelding er fastsatt via Skatteetatens API.
+
+    Slår alltid opp mot prod-Skatteetaten og prod-Maskinporten,
+    uavhengig av WENCHE_ENV. Hjem-fanen viser reell innsendingsstatus.
+    """
     try:
         from wenche.auth import get_skd_skattemelding_maskinporten_token
 
-        token = get_skd_skattemelding_maskinporten_token()
+        token = get_skd_skattemelding_maskinporten_token(env_override="prod")
     except RuntimeError:
-        return FristStatus(beskrivelse="Maskinporten ikke konfigurert")
-
-    env = os.getenv("WENCHE_ENV", "prod")
-    base = _SKD_BASES.get(env, _SKD_BASES["prod"])
+        return FristStatus(beskrivelse="Maskinporten ikke konfigurert for prod")
 
     try:
         resp = httpx.get(
-            f"{base}/api/skattemelding/v2/{aar}/{orgnr}",
+            f"{_SKD_PROD_BASE}/api/skattemelding/v2/{aar}/{orgnr}",
             headers={
                 "Authorization": f"Bearer {token}",
                 "Accept": "application/xml",
@@ -91,6 +90,13 @@ def sjekk_skattemelding(orgnr: str, aar: int) -> FristStatus:
         )
     except httpx.HTTPError:
         return FristStatus(beskrivelse="Kunne ikke kontakte Skatteetaten")
+
+    if resp.status_code == 404:
+        # 404 betyr ingen skattemelding for året — typisk før forhåndsutfylt åpner.
+        return FristStatus(
+            beskrivelse="Ingen skattemelding klargjort ennå",
+            brukertekst=f"Skattemeldingen for {aar} er ikke klargjort av Skatteetaten ennå.",
+        )
 
     if not resp.is_success:
         return FristStatus(beskrivelse=f"Skatteetaten svarte med HTTP {resp.status_code}")

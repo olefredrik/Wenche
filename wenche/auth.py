@@ -24,18 +24,36 @@ load_dotenv()
 
 _ENV = os.getenv("WENCHE_ENV", "prod")
 
+_MASKINPORTEN_ENDPOINTS = {
+    "test": {
+        "token_url": "https://test.maskinporten.no/token",
+        "audience": "https://test.maskinporten.no/",
+    },
+    "prod": {
+        "token_url": "https://maskinporten.no/token",
+        "audience": "https://maskinporten.no/",
+    },
+}
+
 if _ENV == "test":
-    MASKINPORTEN_TOKEN_URL = "https://test.maskinporten.no/token"
-    MASKINPORTEN_AUD = "https://test.maskinporten.no/"
+    MASKINPORTEN_TOKEN_URL = _MASKINPORTEN_ENDPOINTS["test"]["token_url"]
+    MASKINPORTEN_AUD = _MASKINPORTEN_ENDPOINTS["test"]["audience"]
     ALTINN_EXCHANGE_URL = (
         "https://platform.tt02.altinn.no/authentication/api/v1/exchange/maskinporten"
     )
 else:
-    MASKINPORTEN_TOKEN_URL = "https://maskinporten.no/token"
-    MASKINPORTEN_AUD = "https://maskinporten.no/"
+    MASKINPORTEN_TOKEN_URL = _MASKINPORTEN_ENDPOINTS["prod"]["token_url"]
+    MASKINPORTEN_AUD = _MASKINPORTEN_ENDPOINTS["prod"]["audience"]
     ALTINN_EXCHANGE_URL = (
         "https://platform.altinn.no/authentication/api/v1/exchange/maskinporten"
     )
+
+
+def _maskinporten_endpoints(env_override: str | None = None) -> tuple[str, str]:
+    """Returner (token_url, audience) for ønsket Maskinporten-miljø."""
+    env = env_override or _ENV
+    cfg = _MASKINPORTEN_ENDPOINTS.get(env, _MASKINPORTEN_ENDPOINTS["prod"])
+    return cfg["token_url"], cfg["audience"]
 
 # Scopes for innsending av instanser via Altinn
 SCOPES = "altinn:instances.read altinn:instances.write"
@@ -67,18 +85,21 @@ def _lag_jwt(
     kid: str,
     scopes: str = SCOPES,
     org_nummer: str | None = None,
+    env_override: str | None = None,
 ) -> str:
     """
     Lager et signert JWT for Maskinporten JWT grant-flyten.
 
     Hvis org_nummer er oppgitt, legges authorization_details til i JWT-et
-    for å hente et systembruker-token.
+    for å hente et systembruker-token. env_override='prod' eller 'test'
+    overstyrer WENCHE_ENV for audience.
     """
+    _, aud = _maskinporten_endpoints(env_override)
     now = int(time.time())
     claims = {
         "iss": client_id,
         "sub": client_id,
-        "aud": MASKINPORTEN_AUD,
+        "aud": aud,
         "scope": scopes,
         "iat": now,
         "exp": now + 119,  # Maskinporten tillater maks 120 sekunder
@@ -105,11 +126,16 @@ def _hent_maskinporten_token(
     kid: str,
     scopes: str = SCOPES,
     org_nummer: str | None = None,
+    env_override: str | None = None,
 ) -> str:
-    """Henter et Maskinporten access token."""
-    assertion = _lag_jwt(client_id, private_key_pem, kid, scopes=scopes, org_nummer=org_nummer)
+    """Henter et Maskinporten access token. env_override overstyrer WENCHE_ENV."""
+    assertion = _lag_jwt(
+        client_id, private_key_pem, kid,
+        scopes=scopes, org_nummer=org_nummer, env_override=env_override,
+    )
+    token_url, _ = _maskinporten_endpoints(env_override)
     resp = httpx.post(
-        MASKINPORTEN_TOKEN_URL,
+        token_url,
         data={
             "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
             "assertion": assertion,
@@ -248,12 +274,16 @@ def get_skd_aksjonaer_token() -> str:
     )
 
 
-def get_skd_skattemelding_maskinporten_token() -> str:
+def get_skd_skattemelding_maskinporten_token(env_override: str | None = None) -> str:
     """
     Henter et Maskinporten-token med skattemelding-scope (kun lesestatus).
 
     Brukes for read-only sjekk av fastsettingsstatus mot SKDs API.
     Ingen Altinn-veksling — krever ikke at brukeren har Altinn-rettigheter.
+
+    env_override='prod' eller 'test' overstyrer WENCHE_ENV. Brukes f.eks. av
+    Hjem-fanens statussjekk som alltid skal slå opp mot prod for å vise
+    reell innsendingsstatus, uavhengig av aktivt arbeidsmiljø.
     """
     client_id = _les_påkrevd_env(
         "MASKINPORTEN_CLIENT_ID",
@@ -267,7 +297,7 @@ def get_skd_skattemelding_maskinporten_token() -> str:
         "ORG_NUMMER",
         "Legg til ORG_NUMMER=<ditt organisasjonsnummer> i .env.",
     )
-    env = os.getenv("WENCHE_ENV", "prod")
+    env = env_override or os.getenv("WENCHE_ENV", "prod")
     org_nummer = os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr) if env == "test" else vendor_orgnr
     nokkel_sti = os.getenv("MASKINPORTEN_PRIVAT_NOKKEL", "maskinporten_privat.pem")
     private_key_pem = _les_nokkel(nokkel_sti)
@@ -276,6 +306,7 @@ def get_skd_skattemelding_maskinporten_token() -> str:
         client_id, private_key_pem, kid,
         scopes=SKD_SKATTEMELDING_LESE_SCOPE,
         org_nummer=org_nummer,
+        env_override=env_override,
     )
 
 

@@ -137,6 +137,32 @@ class TestSjekkSkattemelding:
         assert result.innfridd is False
         assert "kontakte Skatteetaten" in result.beskrivelse
 
+    @patch("wenche.fristsjekk.httpx.get")
+    def test_bruker_alltid_prod_url_og_forcer_prod_token(self, mock_get):
+        """API-kallet skal alltid gå mot prod-Skatteetaten og prod-Maskinporten."""
+        mock_auth = MagicMock(return_value="t")
+        with patch("wenche.auth.get_skd_skattemelding_maskinporten_token", mock_auth):
+            mock_get.return_value = _mock_response(text=_wrapper_xml("skattemeldingUpersonligUtkast"))
+            sjekk_skattemelding("931808869", 2025)
+
+        # API-URL skal være prod uavhengig av WENCHE_ENV
+        call_url = mock_get.call_args[0][0]
+        assert call_url.startswith("https://api.skatteetaten.no/")
+
+        # Auth-funksjonen skal kalles med env_override="prod"
+        assert mock_auth.call_args.kwargs.get("env_override") == "prod"
+
+    @patch("wenche.fristsjekk.httpx.get")
+    def test_404_gir_ikke_klargjort_melding(self, mock_get):
+        """HTTP 404 (skattemelding ikke klargjort av SKD) → pen melding, ikke feilmelding."""
+        with patch("wenche.auth.get_skd_skattemelding_maskinporten_token", return_value="t"):
+            mock_get.return_value = _mock_response(status_code=404)
+            result = sjekk_skattemelding("931808869", 2026)
+
+        assert result.innfridd is False
+        assert "ikke klargjort" in result.brukertekst.lower()
+        assert "HTTP" not in result.beskrivelse
+
 
 # ---------------------------------------------------------------------------
 # Årsregnskap
