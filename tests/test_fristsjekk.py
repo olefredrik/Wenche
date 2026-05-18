@@ -5,6 +5,7 @@ Verifiserer statussjekk mot Skatteetatens og Brønnøysundregistrenes API-er.
 Alle HTTP-kall er mocket — testene gjør ingen ekte nettverkskall.
 """
 
+from datetime import date
 from unittest.mock import patch, MagicMock
 from xml.etree import ElementTree as ET
 
@@ -13,10 +14,19 @@ import pytest
 
 from wenche.fristsjekk import (
     FristStatus,
+    neste_frist,
+    regnskapsaar_for_frist,
     sjekk_skattemelding,
     sjekk_aarsregnskap,
     sjekk_aksjonaerregister,
 )
+
+
+def _freeze_today(d: date):
+    """`date`-subklasse med today() frosset til gitt dato."""
+    klass = type("FrozenDate", (date,), {})
+    klass.today = classmethod(lambda cls: d)
+    return klass
 
 
 # ---------------------------------------------------------------------------
@@ -146,7 +156,8 @@ class TestSjekkAarsregnskap:
         result = sjekk_aarsregnskap("931808869", 2025)
 
         assert result.innfridd is True
-        assert "levert" in result.brukertekst.lower()
+        assert "mottatt" in result.brukertekst.lower()
+        assert "2025" in result.brukertekst
         assert result.tidspunkt == "2026-04-15"
 
     @patch("wenche.fristsjekk.httpx.get")
@@ -160,7 +171,7 @@ class TestSjekkAarsregnskap:
         result = sjekk_aarsregnskap("931808869", 2025)
 
         assert result.innfridd is False
-        assert "ikke levert" in result.brukertekst.lower()
+        assert "ikke mottatt" in result.brukertekst.lower()
 
     @patch("wenche.fristsjekk.httpx.get")
     def test_tom_liste_gir_ikke_innfridd(self, mock_get):
@@ -237,3 +248,46 @@ class TestFristStatus:
         )
         assert status.innfridd is True
         assert status.lenke == "https://example.com"
+
+
+# ---------------------------------------------------------------------------
+# Frist-dato og regnskapsår-utregning
+# ---------------------------------------------------------------------------
+
+class TestRegnskapsaarForFrist:
+
+    def test_skattemelding_frist_31_mai_etter_idag(self):
+        """18. mai 2026: neste 31. mai er 2026 → regnskapsår 2025."""
+        with patch("wenche.fristsjekk.date", _freeze_today(date(2026, 5, 18))):
+            assert regnskapsaar_for_frist(5, 31) == 2025
+
+    def test_aarsregnskap_frist_31_juli(self):
+        """18. mai 2026: neste 31. juli er 2026 → regnskapsår 2025."""
+        with patch("wenche.fristsjekk.date", _freeze_today(date(2026, 5, 18))):
+            assert regnskapsaar_for_frist(7, 31) == 2025
+
+    def test_aksjonaerregister_frist_31_januar_etter_passert(self):
+        """18. mai 2026: 31. jan 2026 er passert, neste er 2027 → regnskapsår 2026."""
+        with patch("wenche.fristsjekk.date", _freeze_today(date(2026, 5, 18))):
+            assert regnskapsaar_for_frist(1, 31) == 2026
+
+    def test_frist_idag_telles_som_aktiv(self):
+        """Dagens dato er fristen → frist.year - 1 = forrige år."""
+        with patch("wenche.fristsjekk.date", _freeze_today(date(2026, 5, 31))):
+            assert regnskapsaar_for_frist(5, 31) == 2025
+
+    def test_dagen_etter_frist_ruller_til_neste_aar(self):
+        """1. juni 2026: 31. mai er passert, neste er 2027 → regnskapsår 2026."""
+        with patch("wenche.fristsjekk.date", _freeze_today(date(2026, 6, 1))):
+            assert regnskapsaar_for_frist(5, 31) == 2026
+
+
+class TestNesteFrist:
+
+    def test_frist_i_fremtiden_samme_aar(self):
+        with patch("wenche.fristsjekk.date", _freeze_today(date(2026, 5, 18))):
+            assert neste_frist(7, 31) == date(2026, 7, 31)
+
+    def test_frist_passert_ruller_til_neste_aar(self):
+        with patch("wenche.fristsjekk.date", _freeze_today(date(2026, 5, 18))):
+            assert neste_frist(1, 31) == date(2027, 1, 31)
