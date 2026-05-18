@@ -675,29 +675,11 @@ def txt(label: str, attr: str, obj=None, placeholder: str = "", tooltip: str = "
 # Fane 0: Hjem
 # ---------------------------------------------------------------------------
 
-def _neste_frist(maaned: int, dag: int) -> date:
-    """Returner neste forekomst av (maaned, dag) fra og med i dag."""
-    today = date.today()
-    frist = date(today.year, maaned, dag)
-    if frist < today:
-        frist = date(today.year + 1, maaned, dag)
-    return frist
-
-
-def _regnskapsaar_for_frist(maaned: int, dag: int) -> int:
-    """
-    Regnskapsåret som neste frist gjelder for.
-
-    Frister leveres i året etter regnskapsårets slutt, så regnskapsår = frist.year - 1.
-    F.eks. frist 31. juli 2026 → regnskapsår 2025.
-    """
-    return _neste_frist(maaned, dag).year - 1
-
-
 def _frist_info(maaned: int, dag: int) -> tuple[str, str, str]:
     """Returner (dato_tekst, status_tekst, farge) basert på dager til neste frist."""
+    from wenche.fristsjekk import neste_frist
     today = date.today()
-    frist = _neste_frist(maaned, dag)
+    frist = neste_frist(maaned, dag)
     dager = (frist - today).days
     dato_tekst = f"{frist.day}. {frist.strftime('%B %Y')}".replace(
         "January", "januar").replace("February", "februar").replace(
@@ -834,7 +816,11 @@ def _bygg_hjem_fane() -> None:
 
     async def sjekk_alle_frister():
         import asyncio
-        from wenche.fristsjekk import sjekk_skattemelding, sjekk_aarsregnskap
+        from wenche.fristsjekk import (
+            regnskapsaar_for_frist,
+            sjekk_aarsregnskap,
+            sjekk_skattemelding,
+        )
 
         orgnr = state.org_nummer
 
@@ -850,10 +836,10 @@ def _bygg_hjem_fane() -> None:
 
         # Hvert kort sjekkes for sitt eget regnskapsår, utledet fra fristen.
         # Slik blir API-statusen konsistent med nedtellingen i samme kort.
-        skattemelding_aar = _regnskapsaar_for_frist(
+        skattemelding_aar = regnskapsaar_for_frist(
             kort["skattemelding"][2]["maaned"], kort["skattemelding"][2]["dag"]
         )
-        aarsregnskap_aar = _regnskapsaar_for_frist(
+        aarsregnskap_aar = regnskapsaar_for_frist(
             kort["aarsregnskap"][2]["maaned"], kort["aarsregnskap"][2]["dag"]
         )
 

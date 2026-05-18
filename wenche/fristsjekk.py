@@ -20,12 +20,32 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from datetime import date
 from xml.etree import ElementTree as ET
 
 import httpx
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+def neste_frist(maaned: int, dag: int) -> date:
+    """Neste forekomst av (maaned, dag) fra og med i dag."""
+    today = date.today()
+    frist = date(today.year, maaned, dag)
+    if frist < today:
+        frist = date(today.year + 1, maaned, dag)
+    return frist
+
+
+def regnskapsaar_for_frist(maaned: int, dag: int) -> int:
+    """
+    Regnskapsåret som neste frist gjelder for.
+
+    Frister leveres i året etter regnskapsårets slutt, så regnskapsår = frist.year - 1.
+    F.eks. frist 31. juli 2026 → regnskapsår 2025.
+    """
+    return neste_frist(maaned, dag).year - 1
 
 # Basis-URL-er for Skatteetatens API — samme som i skd_skattemelding_client.py.
 _SKD_BASES = {
