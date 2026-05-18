@@ -14,10 +14,7 @@ Alle AS plikter å levere tre ting hvert år:
 |---|---|---|---|
 | **Årsregnskap** | Brønnøysundregistrene | 31. juli | Automatisk innsending |
 | **Aksjonærregisteroppgave** (RF-1086) | Skatteetaten via Altinn | 31. januar | Automatisk innsending |
-| **Skattemelding for AS** (RF-1028 + RF-1167) | Skatteetaten | 31. mai | Genereres lokalt — sendes inn manuelt |
-
-!!! info "Om skattemeldingen"
-    Automatisk innsending av skattemelding krever registrering som systemleverandør hos Skatteetaten. Wenche genererer i stedet et ferdig utfylt sammendrag som du kopierer inn på skatteetaten.no.
+| **Skattemelding for AS** (RF-1028 + RF-1167) | Skatteetaten | 31. mai | Automatisk innsending |
 
 ## Hva er de ulike skjemaene?
 

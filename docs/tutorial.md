@@ -29,7 +29,9 @@ Denne veiledningen tar deg gjennom en komplett innsending fra start til slutt. V
     wenche ui
     ```
 
-    Wenche åpner `http://localhost:8080` i nettleseren. Du ser fem faner øverst: **Selskap**, **Regnskap**, **Aksjonærer**, **Dokumenter** og **Send til Altinn**.
+    Wenche åpner `http://localhost:8080` i nettleseren. Du ser sju faner øverst: **Hjem**, **1. Oppsett**, **2. Selskap**, **3. Regnskap**, **4. Aksjonærer**, **5. Dokumenter** og **6. Send til Altinn**.
+
+    **Hjem**-fanen viser fristkort for de tre årlige innsendingene med live statussjekk — se [Bruk → Hjem-fanen](bruk.md#hjem-fanen) for detaljer. Resten av denne tutorialen går gjennom steg 1–6.
 
 === "Kommandolinje"
 
