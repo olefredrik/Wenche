@@ -146,7 +146,8 @@ class TestSjekkAarsregnskap:
         result = sjekk_aarsregnskap("931808869", 2025)
 
         assert result.innfridd is True
-        assert "levert" in result.brukertekst.lower()
+        assert "mottatt" in result.brukertekst.lower()
+        assert "2025" in result.brukertekst
         assert result.tidspunkt == "2026-04-15"
 
     @patch("wenche.fristsjekk.httpx.get")
@@ -160,7 +161,7 @@ class TestSjekkAarsregnskap:
         result = sjekk_aarsregnskap("931808869", 2025)
 
         assert result.innfridd is False
-        assert "ikke levert" in result.brukertekst.lower()
+        assert "ikke mottatt" in result.brukertekst.lower()
 
     @patch("wenche.fristsjekk.httpx.get")
     def test_tom_liste_gir_ikke_innfridd(self, mock_get):

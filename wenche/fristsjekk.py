@@ -128,12 +128,12 @@ def sjekk_aarsregnskap(orgnr: str, aar: int) -> FristStatus:
             return FristStatus(
                 innfridd=True,
                 tidspunkt=mottatt,
-                brukertekst=f"Årsregnskapet for {aar} er levert til Brønnøysundregistrene.",
+                brukertekst=f"Brønnøysundregistrene har mottatt årsregnskapet for {aar}.",
             )
 
     return FristStatus(
         beskrivelse="Ikke levert",
-        brukertekst=f"Årsregnskapet for {aar} er ikke levert ennå.",
+        brukertekst=f"Brønnøysundregistrene har ikke mottatt årsregnskapet for {aar} ennå.",
     )
 
 

@@ -675,12 +675,29 @@ def txt(label: str, attr: str, obj=None, placeholder: str = "", tooltip: str = "
 # Fane 0: Hjem
 # ---------------------------------------------------------------------------
 
-def _frist_info(maaned: int, dag: int) -> tuple[str, str, str]:
-    """Returner (dato_tekst, status_tekst, farge) basert på dager til neste frist."""
+def _neste_frist(maaned: int, dag: int) -> date:
+    """Returner neste forekomst av (maaned, dag) fra og med i dag."""
     today = date.today()
     frist = date(today.year, maaned, dag)
     if frist < today:
         frist = date(today.year + 1, maaned, dag)
+    return frist
+
+
+def _regnskapsaar_for_frist(maaned: int, dag: int) -> int:
+    """
+    Regnskapsåret som neste frist gjelder for.
+
+    Frister leveres i året etter regnskapsårets slutt, så regnskapsår = frist.year - 1.
+    F.eks. frist 31. juli 2026 → regnskapsår 2025.
+    """
+    return _neste_frist(maaned, dag).year - 1
+
+
+def _frist_info(maaned: int, dag: int) -> tuple[str, str, str]:
+    """Returner (dato_tekst, status_tekst, farge) basert på dager til neste frist."""
+    today = date.today()
+    frist = _neste_frist(maaned, dag)
     dager = (frist - today).days
     dato_tekst = f"{frist.day}. {frist.strftime('%B %Y')}".replace(
         "January", "januar").replace("February", "februar").replace(
@@ -820,7 +837,6 @@ def _bygg_hjem_fane() -> None:
         from wenche.fristsjekk import sjekk_skattemelding, sjekk_aarsregnskap
 
         orgnr = state.org_nummer
-        aar = int(state.regnskapsaar)
 
         # Ikke send API-kall med placeholder eller tomt org.nr.
         if not orgnr or orgnr == "123456789":
@@ -832,10 +848,18 @@ def _bygg_hjem_fane() -> None:
                     )
             return
 
-        # Kjør skattemelding- og årsregnskap-sjekk parallelt.
+        # Hvert kort sjekkes for sitt eget regnskapsår, utledet fra fristen.
+        # Slik blir API-statusen konsistent med nedtellingen i samme kort.
+        skattemelding_aar = _regnskapsaar_for_frist(
+            kort["skattemelding"][2]["maaned"], kort["skattemelding"][2]["dag"]
+        )
+        aarsregnskap_aar = _regnskapsaar_for_frist(
+            kort["aarsregnskap"][2]["maaned"], kort["aarsregnskap"][2]["dag"]
+        )
+
         await asyncio.gather(
-            _sjekk_en_frist("skattemelding", sjekk_skattemelding, orgnr, aar),
-            _sjekk_en_frist("aarsregnskap", sjekk_aarsregnskap, orgnr, aar),
+            _sjekk_en_frist("skattemelding", sjekk_skattemelding, orgnr, skattemelding_aar),
+            _sjekk_en_frist("aarsregnskap", sjekk_aarsregnskap, orgnr, aarsregnskap_aar),
         )
 
     # Sjekk automatisk ved sidelasting
