@@ -7,7 +7,12 @@ from unittest.mock import patch
 
 import pytest
 
-from wenche.auth import _les_miljo_env
+from wenche.auth import (
+    _altinn_exchange_url,
+    _les_miljo_env,
+    _maskinporten_aud,
+    _maskinporten_token_url,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -84,3 +89,36 @@ class TestLesMiljoEnv:
         os.environ["MASKINPORTEN_CLIENT_ID_PROD"] = "prod-uuid"
         assert _les_miljo_env("MASKINPORTEN_CLIENT_ID", "prod") == "prod-uuid"
         assert _les_miljo_env("MASKINPORTEN_CLIENT_ID", "PROD") == "prod-uuid"
+
+
+class TestRuntimeEnvUrls:
+    """URL-ene må reflektere gjeldende WENCHE_ENV, ikke cachet verdi ved import."""
+
+    def test_token_url_bytter_med_env(self):
+        with patch.dict(os.environ, {"WENCHE_ENV": "test"}):
+            assert _maskinporten_token_url() == "https://test.maskinporten.no/token"
+        with patch.dict(os.environ, {"WENCHE_ENV": "prod"}):
+            assert _maskinporten_token_url() == "https://maskinporten.no/token"
+
+    def test_audience_bytter_med_env(self):
+        with patch.dict(os.environ, {"WENCHE_ENV": "test"}):
+            assert _maskinporten_aud() == "https://test.maskinporten.no/"
+        with patch.dict(os.environ, {"WENCHE_ENV": "prod"}):
+            assert _maskinporten_aud() == "https://maskinporten.no/"
+
+    def test_altinn_exchange_url_bytter_med_env(self):
+        with patch.dict(os.environ, {"WENCHE_ENV": "test"}):
+            assert "tt02" in _altinn_exchange_url()
+        with patch.dict(os.environ, {"WENCHE_ENV": "prod"}):
+            assert "tt02" not in _altinn_exchange_url()
+            assert "platform.altinn.no" in _altinn_exchange_url()
+
+    def test_default_er_prod_naar_env_ikke_satt(self):
+        # Fjern WENCHE_ENV midlertidig
+        opprinnelig = os.environ.pop("WENCHE_ENV", None)
+        try:
+            assert _maskinporten_token_url() == "https://maskinporten.no/token"
+            assert _maskinporten_aud() == "https://maskinporten.no/"
+        finally:
+            if opprinnelig is not None:
+                os.environ["WENCHE_ENV"] = opprinnelig

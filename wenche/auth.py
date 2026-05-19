@@ -22,20 +22,43 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-_ENV = os.getenv("WENCHE_ENV", "prod")
+# Miljø-spesifikke URL-er evalueres ved hvert kall (ikke ved modulinnlastning),
+# slik at brukeren kan bytte miljø i UI-et og få umiddelbar effekt uten å
+# starte Wenche på nytt.
 
-if _ENV == "test":
-    MASKINPORTEN_TOKEN_URL = "https://test.maskinporten.no/token"
-    MASKINPORTEN_AUD = "https://test.maskinporten.no/"
-    ALTINN_EXCHANGE_URL = (
+def _gjeldende_env() -> str:
+    return os.getenv("WENCHE_ENV", "prod")
+
+
+def _maskinporten_token_url() -> str:
+    return (
+        "https://test.maskinporten.no/token"
+        if _gjeldende_env() == "test"
+        else "https://maskinporten.no/token"
+    )
+
+
+def _maskinporten_aud() -> str:
+    return (
+        "https://test.maskinporten.no/"
+        if _gjeldende_env() == "test"
+        else "https://maskinporten.no/"
+    )
+
+
+def _altinn_exchange_url() -> str:
+    return (
         "https://platform.tt02.altinn.no/authentication/api/v1/exchange/maskinporten"
+        if _gjeldende_env() == "test"
+        else "https://platform.altinn.no/authentication/api/v1/exchange/maskinporten"
     )
-else:
-    MASKINPORTEN_TOKEN_URL = "https://maskinporten.no/token"
-    MASKINPORTEN_AUD = "https://maskinporten.no/"
-    ALTINN_EXCHANGE_URL = (
-        "https://platform.altinn.no/authentication/api/v1/exchange/maskinporten"
-    )
+
+
+# Bakoverkompatibel modul-tilgang for ekstern kode (bruk funksjonene over for
+# kall som skal respektere endring av WENCHE_ENV ved kjøretid).
+MASKINPORTEN_TOKEN_URL = _maskinporten_token_url()
+MASKINPORTEN_AUD = _maskinporten_aud()
+ALTINN_EXCHANGE_URL = _altinn_exchange_url()
 
 # Scopes for innsending av instanser via Altinn
 SCOPES = "altinn:instances.read altinn:instances.write"
@@ -78,7 +101,7 @@ def _lag_jwt(
     claims = {
         "iss": client_id,
         "sub": client_id,
-        "aud": MASKINPORTEN_AUD,
+        "aud": _maskinporten_aud(),
         "scope": scopes,
         "iat": now,
         "exp": now + 119,  # Maskinporten tillater maks 120 sekunder
@@ -109,7 +132,7 @@ def _hent_maskinporten_token(
     """Henter et Maskinporten access token."""
     assertion = _lag_jwt(client_id, private_key_pem, kid, scopes=scopes, org_nummer=org_nummer)
     resp = httpx.post(
-        MASKINPORTEN_TOKEN_URL,
+        _maskinporten_token_url(),
         data={
             "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
             "assertion": assertion,
@@ -200,7 +223,7 @@ def login() -> dict:
 
     print("Maskinporten-token mottatt. Henter Altinn-token...")
     altinn_resp = httpx.get(
-        ALTINN_EXCHANGE_URL,
+        _altinn_exchange_url(),
         headers={"Authorization": f"Bearer {maskinporten_token}"},
         timeout=15,
     )
@@ -353,7 +376,7 @@ def get_skd_skattemelding_tokens() -> dict:
     )
 
     altinn_resp = httpx.get(
-        ALTINN_EXCHANGE_URL,
+        _altinn_exchange_url(),
         headers={"Authorization": f"Bearer {maskinporten_token}"},
         timeout=15,
     )

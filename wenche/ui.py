@@ -921,36 +921,74 @@ def _bygg_oppsett_fane() -> None:
         "Fyll inn Maskinporten-konfigurasjonen og test tilkoblingen mot Altinn."
     ).classes("text-slate-500 text-sm mb-4")
 
-    # --- Konfig-skjema ---
-    seksjonstittel("Konfigurasjon")
+    # --- Aktivt miljø ---
+    seksjonstittel("Aktivt miljø")
     ui.label(
-        "Klient-ID og Nøkkel-ID finner du i Digdirs selvbetjeningsportal under din Maskinporten-klient."
+        "Avgjør hvilket sett credentials Wenche bruker. Du kan konfigurere "
+        "begge miljø samtidig under, og bytte aktivt miljø her uten å redigere noe annet."
     ).classes("text-sm text-slate-500 mb-3")
 
     dot_env_fil = Path(".env")
     aktivt_env = os.getenv("WENCHE_ENV", "prod")
 
+    inp_env = ui.radio(
+        {"prod": "Produksjon", "test": "Testmiljø (tt02)"},
+        value=aktivt_env,
+    ).props("inline color=primary")
+
+    # --- Credentials per miljø ---
+    ui.separator().classes("my-4")
+    seksjonstittel("Maskinporten-credentials")
+    ui.label(
+        "Klient-ID og Nøkkel-ID finner du i Digdirs selvbetjeningsportal. "
+        "Test- og prod-Maskinporten er separate registre — fyll inn credentials "
+        "for hvert miljø du har registrert klient i."
+    ).classes("text-sm text-slate-500 mb-3")
+
+    test_card_inputs: dict[str, ui.input] = {}
+    prod_card_inputs: dict[str, ui.input] = {}
+
     with ui.grid(columns=2).classes("w-full gap-4"):
-        inp_client_id = ui.input(
-            "Klient-ID",
-            value=_les_konfig_for_milj("MASKINPORTEN_CLIENT_ID", aktivt_env),
-            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-        ).classes("w-full").tooltip("UUID-en til Maskinporten-klienten din i valgt miljø. Test og prod har separate UUID-er.")
+        # Test-card
+        with ui.card().classes("w-full p-4 border border-slate-200 shadow-none rounded-xl"):
+            with ui.row().classes("items-center gap-2 mb-2"):
+                ui.icon("science").classes("text-slate-500")
+                ui.label("Testmiljø (tt02)").classes("font-semibold text-slate-800")
+            test_card_inputs["client_id"] = ui.input(
+                "Klient-ID (test)",
+                value=_les_konfig_for_milj("MASKINPORTEN_CLIENT_ID", "test"),
+                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+            ).classes("w-full")
+            test_card_inputs["kid"] = ui.input(
+                "Nøkkel-ID (test)",
+                value=_les_konfig_for_milj("MASKINPORTEN_KID", "test"),
+                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+            ).classes("w-full")
 
-        inp_env = ui.select(
-            {"prod": "Produksjon", "test": "Testmiljø (tt02)"},
-            label="Miljø",
-            value=aktivt_env,
-        ).classes("w-full")
+        # Prod-card
+        with ui.card().classes("w-full p-4 border border-slate-200 shadow-none rounded-xl"):
+            with ui.row().classes("items-center gap-2 mb-2"):
+                ui.icon("business").classes("text-slate-700")
+                ui.label("Produksjon").classes("font-semibold text-slate-800")
+            prod_card_inputs["client_id"] = ui.input(
+                "Klient-ID (prod)",
+                value=_les_konfig_for_milj("MASKINPORTEN_CLIENT_ID", "prod"),
+                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+            ).classes("w-full")
+            prod_card_inputs["kid"] = ui.input(
+                "Nøkkel-ID (prod)",
+                value=_les_konfig_for_milj("MASKINPORTEN_KID", "prod"),
+                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+            ).classes("w-full")
 
-        inp_kid = ui.input(
-            "Nøkkel-ID",
-            value=_les_konfig_for_milj("MASKINPORTEN_KID", aktivt_env),
-            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-        ).classes("w-full").tooltip("UUID-en portalen tildelte nøkkelen din i valgt miljø.")
+    # --- Felles for begge miljø ---
+    ui.separator().classes("my-4")
+    seksjonstittel("Felles innstillinger")
+    ui.label(
+        "Disse gjelder uansett aktivt miljø."
+    ).classes("text-sm text-slate-500 mb-3")
 
-        ui.label("").classes("w-full")  # placeholder for grid-justering
-
+    with ui.grid(columns=2).classes("w-full gap-4"):
         inp_orgnr = ui.input(
             "Organisasjonsnummer",
             value=os.getenv("ORG_NUMMER", ""),
@@ -961,16 +999,6 @@ def _bygg_oppsett_fane() -> None:
             label="Last opp privat nøkkel (.pem)",
             auto_upload=True,
         ).props("flat bordered").classes("w-full").tooltip("Din maskinporten_privat.pem-fil. Lagres lokalt og sendes aldri til noen server.")
-
-    # Når brukeren bytter miljø skal Klient-ID og Nøkkel-ID-feltene reflektere
-    # det andre miljøets verdier, slik at brukeren kan ha to klienter i .env
-    # samtidig og veksle mellom dem uten manuell redigering.
-    def _last_inn_credentials_for_milj():
-        env = inp_env.value
-        inp_client_id.value = _les_konfig_for_milj("MASKINPORTEN_CLIENT_ID", env)
-        inp_kid.value = _les_konfig_for_milj("MASKINPORTEN_KID", env)
-
-    inp_env.on_value_change(lambda _: _last_inn_credentials_for_milj())
 
     pem_bytes_holder: list[bytes] = []
 
@@ -985,18 +1013,19 @@ def _bygg_oppsett_fane() -> None:
         from dotenv import set_key
         dot_env_fil.touch(exist_ok=True)
         valgt_env = inp_env.value
-        suffix = valgt_env.upper()
 
-        # Klient-ID og nøkkel-ID lagres miljø-spesifikt slik at test og prod
-        # kan ha separate verdier i samme .env-fil.
-        if inp_client_id.value:
-            navn = f"MASKINPORTEN_CLIENT_ID_{suffix}"
-            set_key(str(dot_env_fil), navn, inp_client_id.value)
-            os.environ[navn] = inp_client_id.value
-        if inp_kid.value:
-            navn = f"MASKINPORTEN_KID_{suffix}"
-            set_key(str(dot_env_fil), navn, inp_kid.value)
-            os.environ[navn] = inp_kid.value
+        # Lagre credentials per miljø — begge sett skrives uavhengig av aktivt miljø.
+        for kort_env, inputs in [("test", test_card_inputs), ("prod", prod_card_inputs)]:
+            suffix = kort_env.upper()
+            if inputs["client_id"].value:
+                navn = f"MASKINPORTEN_CLIENT_ID_{suffix}"
+                set_key(str(dot_env_fil), navn, inputs["client_id"].value)
+                os.environ[navn] = inputs["client_id"].value
+            if inputs["kid"].value:
+                navn = f"MASKINPORTEN_KID_{suffix}"
+                set_key(str(dot_env_fil), navn, inputs["kid"].value)
+                os.environ[navn] = inputs["kid"].value
+
         if inp_orgnr.value:
             set_key(str(dot_env_fil), "ORG_NUMMER", inp_orgnr.value)
             os.environ["ORG_NUMMER"] = inp_orgnr.value
@@ -1009,7 +1038,8 @@ def _bygg_oppsett_fane() -> None:
             set_key(str(dot_env_fil), "MASKINPORTEN_PRIVAT_NOKKEL", str(nokkel_sti))
             os.environ["MASKINPORTEN_PRIVAT_NOKKEL"] = str(nokkel_sti)
         konfig_status.refresh()
-        ui.notify(f"Konfigurasjon lagret for {('testmiljø' if valgt_env == 'test' else 'produksjon')}.", type="positive")
+        miljo_navn = "testmiljø" if valgt_env == "test" else "produksjon"
+        ui.notify(f"Konfigurasjon lagret. Aktivt miljø: {miljo_navn}.", type="positive")
 
     ui.button("Lagre konfigurasjon", on_click=lagre_konfig).props("color=primary").classes("mt-2")
 
