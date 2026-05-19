@@ -192,11 +192,15 @@ def _les_miljo_env(
     return default
 
 
-def login() -> dict:
+def login(lagre_token: bool = True) -> dict:
     """
     Autentiserer mot Maskinporten med systembruker-token og veksler mot Altinn-token.
 
     Krever ORG_NUMMER i .env. Returnerer {'maskinporten_token': str, 'altinn_token': str}.
+
+    Hvis lagre_token=False, skrives ikke tokenet til disk. Brukes ved
+    tilkoblingstest der vi ikke vil overskrive et eksisterende aktivt token
+    eller forstyrre annen miljø-konfigurasjon.
     """
     env = os.getenv("WENCHE_ENV", "prod")
     client_id = _les_miljo_env(
@@ -234,6 +238,10 @@ def login() -> dict:
         "maskinporten_token": maskinporten_token,
         "altinn_token": altinn_token,
     }
+
+    if not lagre_token:
+        print("Autentisering vellykket (token ikke lagret).\n")
+        return tokens
 
     TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
     TOKEN_FILE.write_text(json.dumps(tokens))

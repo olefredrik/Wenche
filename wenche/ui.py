@@ -1076,31 +1076,66 @@ def _bygg_oppsett_fane() -> None:
     ui.separator().classes("my-4")
     seksjonstittel("Tilkoblingstest")
     ui.label(
-        "Henter et midlertidig token fra Maskinporten og veksler det mot et Altinn-token. Ingen data sendes inn."
+        "Tester Maskinporten og Altinn-veksling for hvert miljø som har credentials konfigurert. "
+        "Ingen data sendes inn og tokens lagres ikke."
     ).classes("text-sm text-slate-500 mb-2")
 
-    async def test_tilkobling():
-        alle_ok = all(ok for ok, _, _ in _sjekk_konfig())
-        if not alle_ok:
-            ui.notify("Fiks konfigurasjonsfeilene og lagre før du tester tilkoblingen.", type="warning")
-            return
-        n = ui.notification("Kobler til Maskinporten og Altinn...", spinner=True, timeout=None)
+    test_resultat_container = ui.column().classes("w-full gap-1 mt-3")
+
+    def _milj_har_credentials(env: str) -> bool:
+        return bool(
+            _les_konfig_for_milj("MASKINPORTEN_CLIENT_ID", env)
+            and _les_konfig_for_milj("MASKINPORTEN_KID", env)
+        )
+
+    def _test_for_milj(env: str) -> tuple[bool, str]:
+        """Test tilkobling for ett spesifikt miljø. Returnerer (ok, melding)."""
+        opprinnelig_env = os.environ.get("WENCHE_ENV")
+        os.environ["WENCHE_ENV"] = env
         try:
-            await run.io_bound(auth.login)
-            n.message = "Tilkobling OK. Maskinporten og Altinn svarte som forventet."
-            n.spinner = False
-            n.type = "positive"
-            n.timeout = 6
+            auth.login(lagre_token=False)
+            return True, "Tilkobling OK"
         except RuntimeError as e:
-            n.message = str(e)
-            n.spinner = False
-            n.type = "negative"
-            n.timeout = 0
+            return False, str(e).split("\n")[0]  # første linje for visning
         except Exception as e:
-            n.message = f"Uventet feil: {e}"
-            n.spinner = False
-            n.type = "negative"
-            n.timeout = 0
+            return False, f"Uventet feil: {type(e).__name__}: {e}"
+        finally:
+            if opprinnelig_env is None:
+                os.environ.pop("WENCHE_ENV", None)
+            else:
+                os.environ["WENCHE_ENV"] = opprinnelig_env
+
+    async def test_tilkobling():
+        test_resultat_container.clear()
+        n = ui.notification("Tester tilkobling for begge miljø...", spinner=True, timeout=None)
+
+        resultater = []
+        for env in ["test", "prod"]:
+            if not _milj_har_credentials(env):
+                resultater.append((env, None, "Ingen credentials konfigurert"))
+                continue
+            ok, melding = await run.io_bound(_test_for_milj, env)
+            resultater.append((env, ok, melding))
+
+        n.dismiss()
+
+        with test_resultat_container:
+            for env, ok, melding in resultater:
+                miljo_navn = "Testmiljø (tt02)" if env == "test" else "Produksjon"
+                if ok is None:
+                    ikon, farge = "remove_circle_outline", "text-slate-400"
+                    statustekst = melding
+                elif ok:
+                    ikon, farge = "check_circle", "text-green-600"
+                    statustekst = melding
+                else:
+                    ikon, farge = "error", "text-red-600"
+                    statustekst = melding
+                with ui.row().classes("items-start gap-2"):
+                    ui.icon(ikon).classes(f"{farge} text-base mt-0.5")
+                    with ui.column().classes("gap-0"):
+                        ui.label(miljo_navn).classes("text-sm font-medium text-slate-800")
+                        ui.label(statustekst).classes(f"text-xs {farge}")
 
     ui.button("Test tilkobling mot Altinn", on_click=test_tilkobling).props("color=primary outline")
 
