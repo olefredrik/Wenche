@@ -1398,17 +1398,30 @@ def _bygg_oppsett_fane() -> None:
                 _vis_status(env_var, None)
 
                 # Auto-sjekk status ved sidelasting hvis vi har credentials og
-                # en eksisterende forespørsel. Stille modus betyr at evt. feil
-                # kun synes i status-raden, ikke som popup-notifikasjoner.
+                # en eksisterende forespørsel. Vi gjør to forsøk med god buffer
+                # mellom for å unngå transient race conditions ved oppstart
+                # (NiceGUI/event-loop trenger noen sekunder før alt fungerer
+                # pålitelig). Begge er stille — ingen popup ved feil. Statusen
+                # forblir på initial-tilstanden hvis begge feiler, og brukeren
+                # kan alltid klikke manuelt.
                 if (
                     _milj_har_credentials(env_var)
                     and _les_request_id(env_var)
                 ):
-                    ui.timer(
-                        1.0,
-                        lambda env=env_var: sjekk_status_handler(env=env, silent=True),
-                        once=True,
-                    )
+                    async def _auto_sjekk_med_retry(env=env_var):
+                        if _siste_status.get(env) in ("New", None):
+                            await sjekk_status_handler(env=env, silent=True)
+                            # Hvis fortsatt i venter-tilstand, prøv én gang til
+                            # om 5 sek. Da gir vi event-loopen god tid og
+                            # spammer ikke Altinn med flere kall.
+                            if _siste_status.get(env) in ("New", None):
+                                ui.timer(
+                                    5.0,
+                                    lambda e=env: sjekk_status_handler(env=e, silent=True),
+                                    once=True,
+                                )
+
+                    ui.timer(3.0, _auto_sjekk_med_retry, once=True)
 
     # --- Felles for begge miljø ---
     ui.separator().classes("my-4")
