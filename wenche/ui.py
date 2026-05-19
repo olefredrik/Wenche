@@ -841,7 +841,11 @@ def _bygg_hjem_fane(tabs=None, t_oppsett=None) -> None:
         ui.link("dokumentasjonen", "https://olefredrik.github.io/Wenche/", new_tab=True).classes("text-sm")
         ui.label(", der finner du hjelp til å sette opp alt riktig.").classes("text-sm text-slate-500")
 
-    orgnr_konfigurert = bool(state.org_nummer) and state.org_nummer != "123456789"
+    # Hjem-fanen sjekker status mot offentlige myndigheter for din egen virksomhet,
+    # så vi bruker prod-orgnr (ORG_NUMMER fra .env), ikke config.yaml-orgnr som ofte
+    # er Tenor-testdata. Skattemelding-sjekken tvinger uansett prod-env internt.
+    prod_orgnr = os.getenv("ORG_NUMMER", "").strip()
+    orgnr_konfigurert = bool(prod_orgnr) and prod_orgnr != "123456789"
 
     if not orgnr_konfigurert:
         with ui.card().classes(
@@ -854,8 +858,9 @@ def _bygg_hjem_fane(tabs=None, t_oppsett=None) -> None:
                         "font-semibold text-amber-900"
                     )
                     ui.label(
-                        "Fyll inn organisasjonsnummer i Oppsett-fanen for å aktivere "
-                        "automatisk statussjekk."
+                        "Fyll inn organisasjonsnummer for din virksomhet "
+                        "(prod-kortet i Oppsett-fanen) for å aktivere automatisk "
+                        "statussjekk."
                     ).classes("text-sm text-amber-900")
                 if tabs is not None and t_oppsett is not None:
                     ui.button(
@@ -937,7 +942,9 @@ def _bygg_hjem_fane(tabs=None, t_oppsett=None) -> None:
             sjekk_skattemelding,
         )
 
-        orgnr = state.org_nummer
+        # Bruk alltid prod-orgnr (ORG_NUMMER fra .env) for offentlig statussjekk.
+        # config.yaml kan inneholde Tenor-testdata, som vil gi 4xx mot prod-API-er.
+        orgnr = os.getenv("ORG_NUMMER", "").strip()
 
         # Ikke send API-kall med placeholder eller tomt org.nr.
         # Kortene er allerede bygget i ventende-tilstand når dette er tilfelle.
