@@ -187,6 +187,18 @@ WENCHE_ENV=prod
 | `ORG_NUMMER` | Ditt organisasjonsnummer (9 siffer) |
 | `WENCHE_ENV` | `prod` for produksjon, `test` for Altinn tt02-testmiljø |
 
+!!! tip "Bruker du både test og prod?"
+    Maskinporten test og prod er separate registre, så samme klient-UUID fungerer ikke i begge miljø. Hvis du veksler mellom miljøene, kan du legge inn begge sett credentials i `.env` samtidig med `_TEST`- og `_PROD`-suffix:
+
+    ```
+    MASKINPORTEN_CLIENT_ID_TEST=test-uuid-her
+    MASKINPORTEN_KID_TEST=test-kid-her
+    MASKINPORTEN_CLIENT_ID_PROD=prod-uuid-her
+    MASKINPORTEN_KID_PROD=prod-kid-her
+    ```
+
+    Da bytter Wenche automatisk credentials basert på `WENCHE_ENV` (eller miljø-toggle i Oppsett-fanen i UI-et). Generiske variabler uten suffix fungerer fortsatt som fallback for brukere som kun har ett miljø.
+
 ---
 
 ## Steg 4 — Fyll ut config.yaml

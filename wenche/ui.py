@@ -582,19 +582,39 @@ def kr(v: float) -> str:
     return f"{v:,.0f}".replace(",", "\u00a0") + " kr"
 
 
+def _les_konfig_for_milj(navn: str, env: str, default: str = "") -> str:
+    """
+    Les credential-verdi for gitt miljø.
+
+    Prøver først miljø-spesifikk variant ({navn}_{TEST|PROD}), faller tilbake
+    til generisk variabelnavn for brukere som kun har ett sett credentials.
+    """
+    return os.getenv(f"{navn}_{env.upper()}") or os.getenv(navn) or default
+
+
 def _sjekk_konfig() -> list[tuple[bool, str, str]]:
     resultater = []
-    client_id = os.getenv("MASKINPORTEN_CLIENT_ID")
-    resultater.append((bool(client_id), "MASKINPORTEN_CLIENT_ID", "Satt" if client_id else "Mangler. Legg til i .env-filen"))
-    kid = os.getenv("MASKINPORTEN_KID")
-    resultater.append((bool(kid), "MASKINPORTEN_KID", "Satt" if kid else "Mangler. Legg til i .env-filen"))
+    env = os.getenv("WENCHE_ENV", "prod")
+    suffix = env.upper()
+
+    client_id = _les_konfig_for_milj("MASKINPORTEN_CLIENT_ID", env)
+    resultater.append((
+        bool(client_id),
+        f"MASKINPORTEN_CLIENT_ID for {suffix}",
+        "Satt" if client_id else f"Mangler. Sett MASKINPORTEN_CLIENT_ID_{suffix} (eller MASKINPORTEN_CLIENT_ID som fallback) i .env",
+    ))
+    kid = _les_konfig_for_milj("MASKINPORTEN_KID", env)
+    resultater.append((
+        bool(kid),
+        f"MASKINPORTEN_KID for {suffix}",
+        "Satt" if kid else f"Mangler. Sett MASKINPORTEN_KID_{suffix} (eller MASKINPORTEN_KID som fallback) i .env",
+    ))
     orgnr = os.getenv("ORG_NUMMER")
     resultater.append((bool(orgnr), "ORG_NUMMER", "Satt" if orgnr else "Mangler. Legg til i .env-filen"))
-    nokkel_sti = os.getenv("MASKINPORTEN_PRIVAT_NOKKEL", "maskinporten_privat.pem")
+    nokkel_sti = _les_konfig_for_milj("MASKINPORTEN_PRIVAT_NOKKEL", env, "maskinporten_privat.pem")
     nokkel_ok = Path(nokkel_sti).exists()
     resultater.append((nokkel_ok, "Privat nøkkel", f"Funnet: {nokkel_sti}" if nokkel_ok else f"Finner ikke: {nokkel_sti}"))
-    env = os.getenv("WENCHE_ENV", "prod")
-    resultater.append((True, "Miljø", f"{'Testmiljø (tt02)' if env == 'test' else 'Produksjon'}, endre med WENCHE_ENV=test i .env"))
+    resultater.append((True, "Miljø", f"{'Testmiljø (tt02)' if env == 'test' else 'Produksjon'}, bytt i Oppsett-fanen"))
     return resultater
 
 
@@ -908,25 +928,26 @@ def _bygg_oppsett_fane() -> None:
     ).classes("text-sm text-slate-500 mb-3")
 
     dot_env_fil = Path(".env")
+    aktivt_env = os.getenv("WENCHE_ENV", "prod")
 
     with ui.grid(columns=2).classes("w-full gap-4"):
         inp_client_id = ui.input(
             "Klient-ID",
-            value=os.getenv("MASKINPORTEN_CLIENT_ID", ""),
+            value=_les_konfig_for_milj("MASKINPORTEN_CLIENT_ID", aktivt_env),
             placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-        ).classes("w-full").tooltip("UUID-en til Maskinporten-klienten din fra Digdirs selvbetjeningsportal.")
+        ).classes("w-full").tooltip("UUID-en til Maskinporten-klienten din i valgt miljø. Test og prod har separate UUID-er.")
 
         inp_env = ui.select(
             {"prod": "Produksjon", "test": "Testmiljø (tt02)"},
             label="Miljø",
-            value=os.getenv("WENCHE_ENV", "prod"),
+            value=aktivt_env,
         ).classes("w-full")
 
         inp_kid = ui.input(
             "Nøkkel-ID",
-            value=os.getenv("MASKINPORTEN_KID", ""),
+            value=_les_konfig_for_milj("MASKINPORTEN_KID", aktivt_env),
             placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-        ).classes("w-full").tooltip("UUID-en portalen tildelte nøkkelen din, synlig i nøkkellisten under klienten.")
+        ).classes("w-full").tooltip("UUID-en portalen tildelte nøkkelen din i valgt miljø.")
 
         ui.label("").classes("w-full")  # placeholder for grid-justering
 
@@ -941,6 +962,16 @@ def _bygg_oppsett_fane() -> None:
             auto_upload=True,
         ).props("flat bordered").classes("w-full").tooltip("Din maskinporten_privat.pem-fil. Lagres lokalt og sendes aldri til noen server.")
 
+    # Når brukeren bytter miljø skal Klient-ID og Nøkkel-ID-feltene reflektere
+    # det andre miljøets verdier, slik at brukeren kan ha to klienter i .env
+    # samtidig og veksle mellom dem uten manuell redigering.
+    def _last_inn_credentials_for_milj():
+        env = inp_env.value
+        inp_client_id.value = _les_konfig_for_milj("MASKINPORTEN_CLIENT_ID", env)
+        inp_kid.value = _les_konfig_for_milj("MASKINPORTEN_KID", env)
+
+    inp_env.on_value_change(lambda _: _last_inn_credentials_for_milj())
+
     pem_bytes_holder: list[bytes] = []
 
     def pem_mottatt(e):
@@ -953,17 +984,24 @@ def _bygg_oppsett_fane() -> None:
     async def lagre_konfig():
         from dotenv import set_key
         dot_env_fil.touch(exist_ok=True)
+        valgt_env = inp_env.value
+        suffix = valgt_env.upper()
+
+        # Klient-ID og nøkkel-ID lagres miljø-spesifikt slik at test og prod
+        # kan ha separate verdier i samme .env-fil.
         if inp_client_id.value:
-            set_key(str(dot_env_fil), "MASKINPORTEN_CLIENT_ID", inp_client_id.value)
-            os.environ["MASKINPORTEN_CLIENT_ID"] = inp_client_id.value
+            navn = f"MASKINPORTEN_CLIENT_ID_{suffix}"
+            set_key(str(dot_env_fil), navn, inp_client_id.value)
+            os.environ[navn] = inp_client_id.value
         if inp_kid.value:
-            set_key(str(dot_env_fil), "MASKINPORTEN_KID", inp_kid.value)
-            os.environ["MASKINPORTEN_KID"] = inp_kid.value
+            navn = f"MASKINPORTEN_KID_{suffix}"
+            set_key(str(dot_env_fil), navn, inp_kid.value)
+            os.environ[navn] = inp_kid.value
         if inp_orgnr.value:
             set_key(str(dot_env_fil), "ORG_NUMMER", inp_orgnr.value)
             os.environ["ORG_NUMMER"] = inp_orgnr.value
-        set_key(str(dot_env_fil), "WENCHE_ENV", inp_env.value)
-        os.environ["WENCHE_ENV"] = inp_env.value
+        set_key(str(dot_env_fil), "WENCHE_ENV", valgt_env)
+        os.environ["WENCHE_ENV"] = valgt_env
         if pem_bytes_holder:
             nokkel_sti = Path("maskinporten_privat.pem")
             nokkel_sti.write_bytes(pem_bytes_holder[0])
@@ -971,7 +1009,7 @@ def _bygg_oppsett_fane() -> None:
             set_key(str(dot_env_fil), "MASKINPORTEN_PRIVAT_NOKKEL", str(nokkel_sti))
             os.environ["MASKINPORTEN_PRIVAT_NOKKEL"] = str(nokkel_sti)
         konfig_status.refresh()
-        ui.notify("Konfigurasjon lagret.", type="positive")
+        ui.notify(f"Konfigurasjon lagret for {('testmiljø' if valgt_env == 'test' else 'produksjon')}.", type="positive")
 
     ui.button("Lagre konfigurasjon", on_click=lagre_konfig).props("color=primary").classes("mt-2")
 

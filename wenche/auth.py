@@ -141,25 +141,56 @@ def _les_påkrevd_env(navn: str, hjelpetekst: str) -> str:
     return verdi
 
 
+def _les_miljo_env(
+    navn: str,
+    env: str,
+    hjelpetekst: str | None = None,
+    paakrevd: bool = True,
+    default: str | None = None,
+) -> str | None:
+    """
+    Les en credential-variabel som potensielt er miljø-spesifikk.
+
+    Sjekker først `{navn}_{ENV}` (f.eks. MASKINPORTEN_CLIENT_ID_TEST),
+    deretter `{navn}` som fallback. Brukere som bare har én klient kan
+    fortsette å bruke det generiske navnet. Brukere som har separate
+    test- og prod-klienter kan ha begge sett samtidig i .env og la
+    WENCHE_ENV velge riktig sett.
+    """
+    suffix = env.upper()
+    verdi = os.getenv(f"{navn}_{suffix}") or os.getenv(navn)
+    if verdi:
+        return verdi
+    if paakrevd:
+        raise RuntimeError(
+            f"{navn}_{suffix} (eller {navn} som fallback) mangler.\n"
+            f"{hjelpetekst or ''}"
+        )
+    return default
+
+
 def login() -> dict:
     """
     Autentiserer mot Maskinporten med systembruker-token og veksler mot Altinn-token.
 
     Krever ORG_NUMMER i .env. Returnerer {'maskinporten_token': str, 'altinn_token': str}.
     """
-    client_id = _les_påkrevd_env(
-        "MASKINPORTEN_CLIENT_ID",
+    env = os.getenv("WENCHE_ENV", "prod")
+    client_id = _les_miljo_env(
+        "MASKINPORTEN_CLIENT_ID", env,
         "Kopier .env.example til .env og fyll inn din klient-ID fra Digdirs selvbetjeningsportal.",
     )
-    kid = _les_påkrevd_env(
-        "MASKINPORTEN_KID",
+    kid = _les_miljo_env(
+        "MASKINPORTEN_KID", env,
         "Finn nøkkel-ID (UUID) i Digdirs selvbetjeningsportal under klientens nøkler og legg den i .env.",
     )
     org_nummer = _les_påkrevd_env(
         "ORG_NUMMER",
         "Legg til ORG_NUMMER=<ditt organisasjonsnummer> i .env.",
     )
-    nokkel_sti = os.getenv("MASKINPORTEN_PRIVAT_NOKKEL", "maskinporten_privat.pem")
+    nokkel_sti = _les_miljo_env(
+        "MASKINPORTEN_PRIVAT_NOKKEL", env, paakrevd=False, default="maskinporten_privat.pem",
+    )
     private_key_pem = _les_nokkel(nokkel_sti)
 
     print("Autentiserer mot Maskinporten (systembruker)...")
@@ -195,15 +226,18 @@ def login_admin() -> str:
 
     Returnerer rått Maskinporten access token (ikke vekslet mot Altinn).
     """
-    client_id = _les_påkrevd_env(
-        "MASKINPORTEN_CLIENT_ID",
+    env = os.getenv("WENCHE_ENV", "prod")
+    client_id = _les_miljo_env(
+        "MASKINPORTEN_CLIENT_ID", env,
         "Kopier .env.example til .env og fyll inn din klient-ID fra Digdirs selvbetjeningsportal.",
     )
-    kid = _les_påkrevd_env(
-        "MASKINPORTEN_KID",
+    kid = _les_miljo_env(
+        "MASKINPORTEN_KID", env,
         "Finn nøkkel-ID (UUID) i Digdirs selvbetjeningsportal under klientens nøkler og legg den i .env.",
     )
-    nokkel_sti = os.getenv("MASKINPORTEN_PRIVAT_NOKKEL", "maskinporten_privat.pem")
+    nokkel_sti = _les_miljo_env(
+        "MASKINPORTEN_PRIVAT_NOKKEL", env, paakrevd=False, default="maskinporten_privat.pem",
+    )
     private_key_pem = _les_nokkel(nokkel_sti)
 
     return _hent_maskinporten_token(client_id, private_key_pem, kid, scopes=ADMIN_SCOPES)
@@ -225,12 +259,13 @@ def get_skd_aksjonaer_token() -> str:
     Krever at scope 'skatteetaten:innrapporteringaksjonaerregisteroppgave'
     er innvilget av Skatteetaten for klienten.
     """
-    client_id = _les_påkrevd_env(
-        "MASKINPORTEN_CLIENT_ID",
+    env = os.getenv("WENCHE_ENV", "prod")
+    client_id = _les_miljo_env(
+        "MASKINPORTEN_CLIENT_ID", env,
         "Kopier .env.example til .env og fyll inn din klient-ID fra Digdirs selvbetjeningsportal.",
     )
-    kid = _les_påkrevd_env(
-        "MASKINPORTEN_KID",
+    kid = _les_miljo_env(
+        "MASKINPORTEN_KID", env,
         "Finn nøkkel-ID (UUID) i Digdirs selvbetjeningsportal under klientens nøkler og legg den i .env.",
     )
     vendor_orgnr = _les_påkrevd_env(
@@ -238,9 +273,10 @@ def get_skd_aksjonaer_token() -> str:
         "Legg til ORG_NUMMER=<ditt organisasjonsnummer> i .env.",
     )
     # I SKDs testmiljø må systembrukeren tilhøre et syntetisk Tenor-org, ikke produksjonsorg.
-    env = os.getenv("WENCHE_ENV", "prod")
     org_nummer = os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr) if env == "test" else vendor_orgnr
-    nokkel_sti = os.getenv("MASKINPORTEN_PRIVAT_NOKKEL", "maskinporten_privat.pem")
+    nokkel_sti = _les_miljo_env(
+        "MASKINPORTEN_PRIVAT_NOKKEL", env, paakrevd=False, default="maskinporten_privat.pem",
+    )
     private_key_pem = _les_nokkel(nokkel_sti)
 
     return _hent_maskinporten_token(
@@ -255,21 +291,23 @@ def get_skd_skattemelding_maskinporten_token() -> str:
     Brukes for read-only sjekk av fastsettingsstatus mot SKDs API.
     Ingen Altinn-veksling — krever ikke at brukeren har Altinn-rettigheter.
     """
-    client_id = _les_påkrevd_env(
-        "MASKINPORTEN_CLIENT_ID",
+    env = os.getenv("WENCHE_ENV", "prod")
+    client_id = _les_miljo_env(
+        "MASKINPORTEN_CLIENT_ID", env,
         "Kopier .env.example til .env og fyll inn din klient-ID fra Digdirs selvbetjeningsportal.",
     )
-    kid = _les_påkrevd_env(
-        "MASKINPORTEN_KID",
+    kid = _les_miljo_env(
+        "MASKINPORTEN_KID", env,
         "Finn nøkkel-ID (UUID) i Digdirs selvbetjeningsportal under klientens nøkler og legg den i .env.",
     )
     vendor_orgnr = _les_påkrevd_env(
         "ORG_NUMMER",
         "Legg til ORG_NUMMER=<ditt organisasjonsnummer> i .env.",
     )
-    env = os.getenv("WENCHE_ENV", "prod")
     org_nummer = os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr) if env == "test" else vendor_orgnr
-    nokkel_sti = os.getenv("MASKINPORTEN_PRIVAT_NOKKEL", "maskinporten_privat.pem")
+    nokkel_sti = _les_miljo_env(
+        "MASKINPORTEN_PRIVAT_NOKKEL", env, paakrevd=False, default="maskinporten_privat.pem",
+    )
     private_key_pem = _les_nokkel(nokkel_sti)
 
     return _hent_maskinporten_token(
@@ -289,21 +327,23 @@ def get_skd_skattemelding_tokens() -> dict:
 
     I testmiljø brukes SKD_TEST_ORG_NUMMER som systembruker-org.
     """
-    client_id = _les_påkrevd_env(
-        "MASKINPORTEN_CLIENT_ID",
+    env = os.getenv("WENCHE_ENV", "prod")
+    client_id = _les_miljo_env(
+        "MASKINPORTEN_CLIENT_ID", env,
         "Kopier .env.example til .env og fyll inn din klient-ID fra Digdirs selvbetjeningsportal.",
     )
-    kid = _les_påkrevd_env(
-        "MASKINPORTEN_KID",
+    kid = _les_miljo_env(
+        "MASKINPORTEN_KID", env,
         "Finn nøkkel-ID (UUID) i Digdirs selvbetjeningsportal under klientens nøkler og legg den i .env.",
     )
     vendor_orgnr = _les_påkrevd_env(
         "ORG_NUMMER",
         "Legg til ORG_NUMMER=<ditt organisasjonsnummer> i .env.",
     )
-    env = os.getenv("WENCHE_ENV", "prod")
     org_nummer = os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr) if env == "test" else vendor_orgnr
-    nokkel_sti = os.getenv("MASKINPORTEN_PRIVAT_NOKKEL", "maskinporten_privat.pem")
+    nokkel_sti = _les_miljo_env(
+        "MASKINPORTEN_PRIVAT_NOKKEL", env, paakrevd=False, default="maskinporten_privat.pem",
+    )
     private_key_pem = _les_nokkel(nokkel_sti)
 
     maskinporten_token = _hent_maskinporten_token(
