@@ -2015,11 +2015,11 @@ def _bygg_aksjonaer_fane() -> None:
                 value=(i == 0),
             ).classes("w-full mb-2"):
                 with ui.grid(columns=2).classes("w-full gap-4"):
-                    # NB: ingen refresh-callback på navn-feltet — det ville
-                    # rebygd hele lista på hvert tastetrykk og ødelagt fokus.
-                    # Header-teksten oppdateres ved neste refresh (f.eks. når
-                    # man legger til/fjerner en aksjonær eller lagrer).
-                    txt("Navn", "navn", obj=a)
+                    # Refresh kun på blur (når feltet mister fokus), ikke på
+                    # hver tastetrykk. Det gir oss synkronisert header uten å
+                    # ødelegge fokus mens brukeren skriver.
+                    navn_inp = txt("Navn", "navn", obj=a)
+                    navn_inp.on("blur", lambda _: aksjonaer_liste.refresh())
                     num("Antall aksjer", "antall_aksjer", obj=a, step=1, min_val=1)
                     txt("Fødselsnummer (11 siffer)", "fodselsnummer", obj=a)
                     num("Utbytte utbetalt (NOK)", "utbytte_utbetalt", obj=a, min_val=0)
