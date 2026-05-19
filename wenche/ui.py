@@ -62,6 +62,11 @@ def _request_id_fil_for_milj(env: str) -> Path:
     return _WENCHE_DIR / f"systembruker_request_id_{env}.txt"
 
 
+def _confirm_url_fil_for_milj(env: str) -> Path:
+    """Sti til miljø-spesifikk fil for sist mottatte godkjenningslenke."""
+    return _WENCHE_DIR / f"systembruker_confirm_url_{env}.txt"
+
+
 # ---------------------------------------------------------------------------
 # Tilstandsklasser
 # ---------------------------------------------------------------------------
@@ -644,6 +649,20 @@ def _les_request_id(env: str | None = None) -> str:
     return ""
 
 
+def _lagre_confirm_url(url: str, env: str) -> None:
+    if not url:
+        return
+    _WENCHE_DIR.mkdir(exist_ok=True)
+    _confirm_url_fil_for_milj(env).write_text(url, encoding="utf-8")
+
+
+def _les_confirm_url(env: str) -> str:
+    fil = _confirm_url_fil_for_milj(env)
+    if fil.exists():
+        return fil.read_text(encoding="utf-8").strip()
+    return ""
+
+
 # ---------------------------------------------------------------------------
 # Gjenbrukbare UI-komponenter
 # ---------------------------------------------------------------------------
@@ -992,24 +1011,96 @@ def _bygg_oppsett_fane() -> None:
     status_kontainer: dict[str, "ui.column"] = {}
     godkjenn_url_kontainer: dict[str, "ui.element"] = {}
 
+    def _vis_godkjenn_lenke(env: str, url: str, etikett: str = "Godkjenn i Altinn →"):
+        godkjenn_url_kontainer[env].clear()
+        if not url:
+            return
+        with godkjenn_url_kontainer[env]:
+            ui.link(etikett, url, new_tab=True).classes(
+                "text-blue-600 font-medium text-sm"
+            )
+
     def _vis_status(env: str, status: str | None, melding: str | None = None):
         kontainer = status_kontainer[env]
         kontainer.clear()
+        miljo_navn = "testmiljø (tt02)" if env == "test" else "produksjon"
+
         if status == "Accepted":
-            ikon, farge, tekst = "check_circle", "text-green-600", "Systembruker godkjent"
+            ikon, farge = "check_circle", "text-green-600"
+            overskrift = "Systembruker godkjent"
+            forklaring = (
+                f"Virksomheten har godkjent Wenche som leverandørsystem i {miljo_navn}. "
+                f"Wenche kan nå sende inn dokumenter på vegne av virksomheten."
+            )
+            _vis_godkjenn_lenke(env, "")  # ikke vis lenken når godkjent
         elif status == "New":
-            ikon, farge, tekst = "schedule", "text-amber-600", "Forespørsel venter på godkjenning"
+            ikon, farge = "schedule", "text-amber-600"
+            overskrift = "Forespørsel venter på godkjenning"
+            forklaring = (
+                f"Du har bedt om at Wenche skal kunne handle på vegne av virksomheten i "
+                f"{miljo_navn}. Daglig leder eller styreleder må logge inn på Altinn med "
+                f"BankID og godkjenne forespørselen. Inntil det er gjort kan ikke Wenche "
+                f"sende inn dokumenter i dette miljøet."
+            )
+            # Vis lagret godkjenningslenke hvis den finnes (etter restart osv.)
+            lagret_url = _les_confirm_url(env)
+            if lagret_url:
+                _vis_godkjenn_lenke(env, lagret_url)
         elif status == "Rejected":
-            ikon, farge, tekst = "error", "text-red-600", "Forespørsel avvist — opprett ny"
+            ikon, farge = "error", "text-red-600"
+            overskrift = "Forespørsel avvist"
+            forklaring = (
+                "Forrige systembruker-forespørsel ble avvist. Klikk «Opprett systembruker» "
+                "for å lage en ny forespørsel."
+            )
+            _vis_godkjenn_lenke(env, "")
+        elif status == "ikke_opprettet":
+            ikon, farge = "info", "text-slate-500"
+            overskrift = "Ingen systembruker satt opp"
+            forklaring = (
+                "Wenche må ha en godkjent systembruker for å sende inn dokumenter på "
+                f"vegne av virksomheten i {miljo_navn}. Klikk «Opprett systembruker» for "
+                "å starte. Du får en lenke som daglig leder eller styreleder må følge "
+                "for å godkjenne i Altinn med BankID."
+            )
+            _vis_godkjenn_lenke(env, "")
         elif status:
-            ikon, farge, tekst = "info", "text-slate-500", f"Status: {status}"
+            ikon, farge = "info", "text-slate-500"
+            overskrift = f"Status: {status}"
+            forklaring = melding or ""
         else:
-            ikon, farge = "help_outline", "text-slate-400"
-            tekst = melding or "Status ikke sjekket ennå"
+            # Ingen status sjekket ennå. Se om vi har en lagret forespørsel
+            # for å gi mer presis kontekst.
+            har_forespørsel = bool(_les_request_id(env))
+            if har_forespørsel:
+                ikon, farge = "schedule", "text-amber-600"
+                overskrift = "Forespørsel sendt — status ikke sjekket"
+                forklaring = (
+                    "Du har bedt om at Wenche skal kunne handle på vegne av "
+                    f"virksomheten i {miljo_navn}. Klikk «Sjekk status» for å se om "
+                    "den er godkjent. Hvis ikke, må daglig leder eller styreleder "
+                    "godkjenne den i Altinn med BankID."
+                )
+                lagret_url = _les_confirm_url(env)
+                if lagret_url:
+                    _vis_godkjenn_lenke(env, lagret_url)
+            else:
+                ikon, farge = "info", "text-slate-500"
+                overskrift = "Ingen systembruker satt opp ennå"
+                forklaring = (
+                    "Wenche må ha en godkjent systembruker for å sende inn dokumenter "
+                    f"på vegne av virksomheten i {miljo_navn}. Klikk «Opprett "
+                    "systembruker» for å starte. Du får en lenke som daglig leder "
+                    "eller styreleder må følge for å godkjenne i Altinn med BankID."
+                )
+
         with kontainer:
-            with ui.element("div").classes("grid grid-cols-[auto_1fr] gap-2 items-center"):
-                ui.icon(ikon).classes(f"{farge} text-base")
-                ui.label(tekst).classes(f"text-sm {farge}")
+            with ui.element("div").classes("grid grid-cols-[auto_1fr] gap-2 items-start"):
+                ui.icon(ikon).classes(f"{farge} text-base mt-0.5")
+                with ui.column().classes("gap-0 min-w-0"):
+                    ui.label(overskrift).classes(f"text-sm font-medium {farge}")
+                    if forklaring:
+                        ui.label(forklaring).classes("text-xs text-slate-500 mt-0.5")
 
     with ui.grid(columns=2).classes("w-full gap-4"):
         for env_var, miljo_navn, ikon_navn, ikon_farge, card_inputs in [
@@ -1042,14 +1133,20 @@ def _bygg_oppsett_fane() -> None:
                 ui.label("Systembruker i Altinn").classes(
                     "text-xs text-slate-500 uppercase tracking-wide font-medium"
                 )
-                status_kontainer[env_var] = ui.column().classes("gap-0 mb-2 mt-1")
+                ui.label(
+                    "Altinn krever at virksomheten godkjenner Wenche som "
+                    "leverandørsystem før vi kan sende inn dokumenter for "
+                    "den. Det gjøres med BankID av daglig leder eller "
+                    "styreleder."
+                ).classes("text-xs text-slate-500 mt-1 mb-2")
+                status_kontainer[env_var] = ui.column().classes("gap-0 mb-2")
                 _vis_status(env_var, None)
                 godkjenn_url_kontainer[env_var] = ui.element("div").classes("mb-2")
 
                 async def sjekk_status_handler(env=env_var):
                     request_id = _les_request_id(env)
                     if not request_id:
-                        _vis_status(env, None, "Ingen forespørsel opprettet ennå")
+                        _vis_status(env, "ikke_opprettet")
                         return
                     n = ui.notification(
                         f"Sjekker status i {('testmiljø' if env == 'test' else 'produksjon')}...",
@@ -1119,12 +1216,16 @@ def _bygg_oppsett_fane() -> None:
                         if request_id:
                             _lagre_request_id(request_id, env)
                         confirm_url = svar.get("confirmUrl", "")
-                        godkjenn_url_kontainer[env].clear()
-                        with godkjenn_url_kontainer[env]:
-                            ui.link("Godkjenn i Altinn →", confirm_url, new_tab=True).classes(
-                                "text-blue-600 font-medium text-sm"
-                            )
-                        n.message = f"Forespørsel opprettet (status: {svar.get('status', '')})"
+                        if confirm_url:
+                            _lagre_confirm_url(confirm_url, env)
+                        # Oppdater status-visningen samtidig så brukeren ser
+                        # at vi nå venter på godkjenning, ikke bare en flat
+                        # notification.
+                        _vis_status(env, "New")
+                        n.message = (
+                            "Forespørsel opprettet. Klikk lenken i kortet for å "
+                            "godkjenne i Altinn."
+                        )
                         n.spinner = False
                         n.type = "positive"
                         n.timeout = 5
