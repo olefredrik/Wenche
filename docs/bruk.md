@@ -16,13 +16,29 @@ Hvert kort viser hvor mange dager det er igjen til neste frist, og kjører en au
 
 | Kort | Statuskilde |
 |---|---|
-| Skattemelding | Skatteetatens skattemelding-API (krever Maskinporten-konfig) |
+| Skattemelding | Skatteetatens skattemelding-API (krever prod-Maskinporten-konfig) |
 | Årsregnskap | Brønnøysundregistrenes åpne Regnskapsregister |
 | Aksjonærregisteroppgave | Ingen offentlig status-API — sjekk manuelt hos Skatteetaten |
 
 Når statussjekken bekrefter at innsendingen er gjort, vises kortet grønt med «Levert» og en lenke til Altinn-kvitteringen. Knappen **Oppdater status** kjører sjekkene på nytt.
 
-Statussjekkene gjøres mot regnskapsåret som tilhører neste frist (f.eks. 31. juli 2026 → regnskapsår 2025), ikke det arbeidsåret du har valgt i fanen **Oppsett**.
+Statussjekkene refererer alltid til **produksjonsmiljøet**, uavhengig av om du har konfigurert test- eller prod-credentials i Oppsett. Frister og innsendinger er reelle hendelser for din virksomhet, og test-API-ene ville bare avvist din ekte org.nr. uansett. Hvis du ikke har prod-credentials konfigurert ennå, viser skattemelding-kortet en pen feilmelding i status-raden — det stopper deg ikke fra å bruke testmiljø-flyten i resten av appen.
+
+Statussjekkene gjøres mot regnskapsåret som tilhører neste frist (f.eks. 31. juli 2026 → regnskapsår 2025).
+
+---
+
+## Oppsett-fanen
+
+Under **1. Oppsett** finner du «Per miljø-oppsett» med to kort side om side — Testmiljø (tt02) og Produksjon. Hvert kort er et selvstendig oppsett for sitt miljø:
+
+- **Maskinporten-credentials:** Klient-ID og Nøkkel-ID. Test og prod er separate Maskinporten-registre, så hver har sin UUID.
+- **Organisasjonsnummer:** Test krever et syntetisk Tenor-orgnr fra [skatteetaten.no/testdata](https://www.skatteetaten.no/testdata/); prod bruker din egen org.
+- **Systembruker i Altinn:** Status oppdateres automatisk ved sidelasting. Statuskortet viser hva som mangler eller hva som er klart, og **Avansert**-ekspansjonen har knapper for å registrere system, opprette eller fornye systembruker, og oppdatere rettigheter.
+
+Under kortene ligger felles innstillinger (privat nøkkel), en **Lagre konfigurasjon**-knapp, og en **Tilkoblingstest** som sjekker alle tre forutsetninger per miljø (Maskinporten, Altinn-veksling og systembruker) og oppsummerer «klar for innsending» eller hva som mangler.
+
+Når du senere sender inn, velger du test eller prod direkte i Send-fanen — Oppsett-fanen har ikke noen aktivt-miljø-bryter, fordi du kan ha begge miljø konfigurert samtidig.
 
 ---
 
@@ -149,12 +165,12 @@ Teknisk dokumentasjon: [github.com/Skatteetaten/skattemeldingen](https://github.
 Wenche sender RF-1086 direkte til Skatteetatens eget REST-API — ikke via Altinn-instansflyt. Innsendingen er maskinell og krever ikke manuell signering.
 
 !!! note "Forutsetninger"
-    - Maskinporten-klienten din må ha fått scopet `skatteetaten:innrapporteringaksjonaerregisteroppgave` innvilget. Se [steg 2d i oppsett](oppsett.md#2d-sok-om-tilgang-til-skds-api-for-aksjonaerregisteroppgave).
+    - Maskinporten-klienten din må ha fått scopet `skatteetaten:innrapporteringaksjonaerregisteroppgave` innvilget. Se [steg 2e i oppsett](oppsett.md#2e-sk-om-tilgang-til-skds-api-for-aksjonrregisteroppgave).
     - Systembrukeren for din organisasjon må inkludere SKD-rettigheten. Denne settes opp automatisk av `wenche opprett-systembruker` — se [steg 5 i oppsett](oppsett.md#steg-5-registrer-systembruker-i-altinn).
     - `kontakt_epost` må være utfylt under `selskap` i `config.yaml` (eller i Wenche UI under **Selskap**).
 
 !!! warning "Testmiljø krever syntetiske testdata"
-    Bruker du `WENCHE_ENV=test` må systembrukeren tilhøre en syntetisk testorganisasjon fra Tenor, og `SKD_TEST_ORG_NUMMER` må være satt i `.env`. Se [steg 5b i oppsett](oppsett.md#5b-opprett-systembrukerforespørsel) for fullstendig veiledning.
+    Bruker du `WENCHE_ENV=test` må systembrukeren tilhøre en syntetisk testorganisasjon fra Tenor, og `SKD_TEST_ORG_NUMMER` må være satt i `.env`. Se [steg 5 i oppsett](oppsett.md#steg-5-registrer-systembruker-i-altinn) for fullstendig veiledning.
 
 === "Webgrensesnitt"
 

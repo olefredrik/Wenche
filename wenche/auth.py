@@ -22,20 +22,43 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-_ENV = os.getenv("WENCHE_ENV", "prod")
+# Miljø-spesifikke URL-er evalueres ved hvert kall (ikke ved modulinnlastning),
+# slik at brukeren kan bytte miljø i UI-et og få umiddelbar effekt uten å
+# starte Wenche på nytt.
 
-if _ENV == "test":
-    MASKINPORTEN_TOKEN_URL = "https://test.maskinporten.no/token"
-    MASKINPORTEN_AUD = "https://test.maskinporten.no/"
-    ALTINN_EXCHANGE_URL = (
+def _gjeldende_env() -> str:
+    return os.getenv("WENCHE_ENV", "prod")
+
+
+def _maskinporten_token_url() -> str:
+    return (
+        "https://test.maskinporten.no/token"
+        if _gjeldende_env() == "test"
+        else "https://maskinporten.no/token"
+    )
+
+
+def _maskinporten_aud() -> str:
+    return (
+        "https://test.maskinporten.no/"
+        if _gjeldende_env() == "test"
+        else "https://maskinporten.no/"
+    )
+
+
+def _altinn_exchange_url() -> str:
+    return (
         "https://platform.tt02.altinn.no/authentication/api/v1/exchange/maskinporten"
+        if _gjeldende_env() == "test"
+        else "https://platform.altinn.no/authentication/api/v1/exchange/maskinporten"
     )
-else:
-    MASKINPORTEN_TOKEN_URL = "https://maskinporten.no/token"
-    MASKINPORTEN_AUD = "https://maskinporten.no/"
-    ALTINN_EXCHANGE_URL = (
-        "https://platform.altinn.no/authentication/api/v1/exchange/maskinporten"
-    )
+
+
+# Bakoverkompatibel modul-tilgang for ekstern kode (bruk funksjonene over for
+# kall som skal respektere endring av WENCHE_ENV ved kjøretid).
+MASKINPORTEN_TOKEN_URL = _maskinporten_token_url()
+MASKINPORTEN_AUD = _maskinporten_aud()
+ALTINN_EXCHANGE_URL = _altinn_exchange_url()
 
 # Scopes for innsending av instanser via Altinn
 SCOPES = "altinn:instances.read altinn:instances.write"
@@ -78,7 +101,7 @@ def _lag_jwt(
     claims = {
         "iss": client_id,
         "sub": client_id,
-        "aud": MASKINPORTEN_AUD,
+        "aud": _maskinporten_aud(),
         "scope": scopes,
         "iat": now,
         "exp": now + 119,  # Maskinporten tillater maks 120 sekunder
@@ -109,7 +132,7 @@ def _hent_maskinporten_token(
     """Henter et Maskinporten access token."""
     assertion = _lag_jwt(client_id, private_key_pem, kid, scopes=scopes, org_nummer=org_nummer)
     resp = httpx.post(
-        MASKINPORTEN_TOKEN_URL,
+        _maskinporten_token_url(),
         data={
             "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
             "assertion": assertion,
@@ -141,25 +164,67 @@ def _les_påkrevd_env(navn: str, hjelpetekst: str) -> str:
     return verdi
 
 
-def login() -> dict:
+def _les_miljo_env(
+    navn: str,
+    env: str,
+    hjelpetekst: str | None = None,
+    paakrevd: bool = True,
+    default: str | None = None,
+) -> str | None:
+    """
+    Les en credential-variabel som potensielt er miljø-spesifikk.
+
+    Sjekker først `{navn}_{ENV}` (f.eks. MASKINPORTEN_CLIENT_ID_TEST),
+    deretter `{navn}` som fallback. Brukere som bare har én klient kan
+    fortsette å bruke det generiske navnet. Brukere som har separate
+    test- og prod-klienter kan ha begge sett samtidig i .env og la
+    WENCHE_ENV velge riktig sett.
+    """
+    suffix = env.upper()
+    verdi = os.getenv(f"{navn}_{suffix}") or os.getenv(navn)
+    if verdi:
+        return verdi
+    if paakrevd:
+        raise RuntimeError(
+            f"{navn}_{suffix} (eller {navn} som fallback) mangler.\n"
+            f"{hjelpetekst or ''}"
+        )
+    return default
+
+
+def login(lagre_token: bool = True) -> dict:
     """
     Autentiserer mot Maskinporten med systembruker-token og veksler mot Altinn-token.
 
     Krever ORG_NUMMER i .env. Returnerer {'maskinporten_token': str, 'altinn_token': str}.
+
+    Hvis lagre_token=False, skrives ikke tokenet til disk. Brukes ved
+    tilkoblingstest der vi ikke vil overskrive et eksisterende aktivt token
+    eller forstyrre annen miljø-konfigurasjon.
     """
-    client_id = _les_påkrevd_env(
-        "MASKINPORTEN_CLIENT_ID",
+    env = os.getenv("WENCHE_ENV", "prod")
+    client_id = _les_miljo_env(
+        "MASKINPORTEN_CLIENT_ID", env,
         "Kopier .env.example til .env og fyll inn din klient-ID fra Digdirs selvbetjeningsportal.",
     )
-    kid = _les_påkrevd_env(
-        "MASKINPORTEN_KID",
+    kid = _les_miljo_env(
+        "MASKINPORTEN_KID", env,
         "Finn nøkkel-ID (UUID) i Digdirs selvbetjeningsportal under klientens nøkler og legg den i .env.",
     )
-    org_nummer = _les_påkrevd_env(
+    vendor_orgnr = _les_påkrevd_env(
         "ORG_NUMMER",
         "Legg til ORG_NUMMER=<ditt organisasjonsnummer> i .env.",
     )
-    nokkel_sti = os.getenv("MASKINPORTEN_PRIVAT_NOKKEL", "maskinporten_privat.pem")
+    # I testmiljø skal Maskinporten-JWT-en hevde at vi handler på vegne av
+    # den syntetiske Tenor-orgen (kunden i test), ikke vår egen leverandør-org.
+    # Systembrukeren i tt02-Altinn er knyttet til Tenor-orgen, så uten denne
+    # mappingen får vi 403 på instance-opprettelse selv om credentials er ok.
+    org_nummer = (
+        os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr) if env == "test" else vendor_orgnr
+    )
+    nokkel_sti = _les_miljo_env(
+        "MASKINPORTEN_PRIVAT_NOKKEL", env, paakrevd=False, default="maskinporten_privat.pem",
+    )
     private_key_pem = _les_nokkel(nokkel_sti)
 
     print("Autentiserer mot Maskinporten (systembruker)...")
@@ -169,7 +234,7 @@ def login() -> dict:
 
     print("Maskinporten-token mottatt. Henter Altinn-token...")
     altinn_resp = httpx.get(
-        ALTINN_EXCHANGE_URL,
+        _altinn_exchange_url(),
         headers={"Authorization": f"Bearer {maskinporten_token}"},
         timeout=15,
     )
@@ -180,6 +245,10 @@ def login() -> dict:
         "maskinporten_token": maskinporten_token,
         "altinn_token": altinn_token,
     }
+
+    if not lagre_token:
+        print("Autentisering vellykket (token ikke lagret).\n")
+        return tokens
 
     TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
     TOKEN_FILE.write_text(json.dumps(tokens))
@@ -195,15 +264,18 @@ def login_admin() -> str:
 
     Returnerer rått Maskinporten access token (ikke vekslet mot Altinn).
     """
-    client_id = _les_påkrevd_env(
-        "MASKINPORTEN_CLIENT_ID",
+    env = os.getenv("WENCHE_ENV", "prod")
+    client_id = _les_miljo_env(
+        "MASKINPORTEN_CLIENT_ID", env,
         "Kopier .env.example til .env og fyll inn din klient-ID fra Digdirs selvbetjeningsportal.",
     )
-    kid = _les_påkrevd_env(
-        "MASKINPORTEN_KID",
+    kid = _les_miljo_env(
+        "MASKINPORTEN_KID", env,
         "Finn nøkkel-ID (UUID) i Digdirs selvbetjeningsportal under klientens nøkler og legg den i .env.",
     )
-    nokkel_sti = os.getenv("MASKINPORTEN_PRIVAT_NOKKEL", "maskinporten_privat.pem")
+    nokkel_sti = _les_miljo_env(
+        "MASKINPORTEN_PRIVAT_NOKKEL", env, paakrevd=False, default="maskinporten_privat.pem",
+    )
     private_key_pem = _les_nokkel(nokkel_sti)
 
     return _hent_maskinporten_token(client_id, private_key_pem, kid, scopes=ADMIN_SCOPES)
@@ -225,12 +297,13 @@ def get_skd_aksjonaer_token() -> str:
     Krever at scope 'skatteetaten:innrapporteringaksjonaerregisteroppgave'
     er innvilget av Skatteetaten for klienten.
     """
-    client_id = _les_påkrevd_env(
-        "MASKINPORTEN_CLIENT_ID",
+    env = os.getenv("WENCHE_ENV", "prod")
+    client_id = _les_miljo_env(
+        "MASKINPORTEN_CLIENT_ID", env,
         "Kopier .env.example til .env og fyll inn din klient-ID fra Digdirs selvbetjeningsportal.",
     )
-    kid = _les_påkrevd_env(
-        "MASKINPORTEN_KID",
+    kid = _les_miljo_env(
+        "MASKINPORTEN_KID", env,
         "Finn nøkkel-ID (UUID) i Digdirs selvbetjeningsportal under klientens nøkler og legg den i .env.",
     )
     vendor_orgnr = _les_påkrevd_env(
@@ -238,9 +311,10 @@ def get_skd_aksjonaer_token() -> str:
         "Legg til ORG_NUMMER=<ditt organisasjonsnummer> i .env.",
     )
     # I SKDs testmiljø må systembrukeren tilhøre et syntetisk Tenor-org, ikke produksjonsorg.
-    env = os.getenv("WENCHE_ENV", "prod")
     org_nummer = os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr) if env == "test" else vendor_orgnr
-    nokkel_sti = os.getenv("MASKINPORTEN_PRIVAT_NOKKEL", "maskinporten_privat.pem")
+    nokkel_sti = _les_miljo_env(
+        "MASKINPORTEN_PRIVAT_NOKKEL", env, paakrevd=False, default="maskinporten_privat.pem",
+    )
     private_key_pem = _les_nokkel(nokkel_sti)
 
     return _hent_maskinporten_token(
@@ -255,21 +329,23 @@ def get_skd_skattemelding_maskinporten_token() -> str:
     Brukes for read-only sjekk av fastsettingsstatus mot SKDs API.
     Ingen Altinn-veksling — krever ikke at brukeren har Altinn-rettigheter.
     """
-    client_id = _les_påkrevd_env(
-        "MASKINPORTEN_CLIENT_ID",
+    env = os.getenv("WENCHE_ENV", "prod")
+    client_id = _les_miljo_env(
+        "MASKINPORTEN_CLIENT_ID", env,
         "Kopier .env.example til .env og fyll inn din klient-ID fra Digdirs selvbetjeningsportal.",
     )
-    kid = _les_påkrevd_env(
-        "MASKINPORTEN_KID",
+    kid = _les_miljo_env(
+        "MASKINPORTEN_KID", env,
         "Finn nøkkel-ID (UUID) i Digdirs selvbetjeningsportal under klientens nøkler og legg den i .env.",
     )
     vendor_orgnr = _les_påkrevd_env(
         "ORG_NUMMER",
         "Legg til ORG_NUMMER=<ditt organisasjonsnummer> i .env.",
     )
-    env = os.getenv("WENCHE_ENV", "prod")
     org_nummer = os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr) if env == "test" else vendor_orgnr
-    nokkel_sti = os.getenv("MASKINPORTEN_PRIVAT_NOKKEL", "maskinporten_privat.pem")
+    nokkel_sti = _les_miljo_env(
+        "MASKINPORTEN_PRIVAT_NOKKEL", env, paakrevd=False, default="maskinporten_privat.pem",
+    )
     private_key_pem = _les_nokkel(nokkel_sti)
 
     return _hent_maskinporten_token(
@@ -289,21 +365,23 @@ def get_skd_skattemelding_tokens() -> dict:
 
     I testmiljø brukes SKD_TEST_ORG_NUMMER som systembruker-org.
     """
-    client_id = _les_påkrevd_env(
-        "MASKINPORTEN_CLIENT_ID",
+    env = os.getenv("WENCHE_ENV", "prod")
+    client_id = _les_miljo_env(
+        "MASKINPORTEN_CLIENT_ID", env,
         "Kopier .env.example til .env og fyll inn din klient-ID fra Digdirs selvbetjeningsportal.",
     )
-    kid = _les_påkrevd_env(
-        "MASKINPORTEN_KID",
+    kid = _les_miljo_env(
+        "MASKINPORTEN_KID", env,
         "Finn nøkkel-ID (UUID) i Digdirs selvbetjeningsportal under klientens nøkler og legg den i .env.",
     )
     vendor_orgnr = _les_påkrevd_env(
         "ORG_NUMMER",
         "Legg til ORG_NUMMER=<ditt organisasjonsnummer> i .env.",
     )
-    env = os.getenv("WENCHE_ENV", "prod")
     org_nummer = os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr) if env == "test" else vendor_orgnr
-    nokkel_sti = os.getenv("MASKINPORTEN_PRIVAT_NOKKEL", "maskinporten_privat.pem")
+    nokkel_sti = _les_miljo_env(
+        "MASKINPORTEN_PRIVAT_NOKKEL", env, paakrevd=False, default="maskinporten_privat.pem",
+    )
     private_key_pem = _les_nokkel(nokkel_sti)
 
     maskinporten_token = _hent_maskinporten_token(
@@ -313,7 +391,7 @@ def get_skd_skattemelding_tokens() -> dict:
     )
 
     altinn_resp = httpx.get(
-        ALTINN_EXCHANGE_URL,
+        _altinn_exchange_url(),
         headers={"Authorization": f"Bearer {maskinporten_token}"},
         timeout=15,
     )

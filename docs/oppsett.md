@@ -160,32 +160,50 @@ Når SKD bekrefter at tilgangen er innvilget, logg inn i Digdirs selvbetjeningsp
 
 ## Steg 3 — Konfigurer miljøvariabler
 
+!!! tip "Webgrensesnittet håndterer dette for deg"
+    Starter du `wenche ui` og går til **Oppsett**-fanen, kan du fylle inn alle credentials direkte i nettleseren. Hvert miljø (Test og Produksjon) har sitt eget kort der du angir klient-ID, nøkkel-ID og organisasjonsnummer. Lagre-knappen skriver til `.env` for deg. Manuell redigering under er for de som foretrekker terminal.
+
 Kopier eksempelfilen:
 
 ```bash
 cp .env.example .env
 ```
 
-Åpne `.env` og fyll inn verdiene fra portalen:
+Åpne `.env` og fyll inn verdiene fra portalen. Variabelnavnene har miljø-suffix (`_TEST` / `_PROD`) slik at samme `.env`-fil kan inneholde begge oppsett:
 
 ```
-MASKINPORTEN_CLIENT_ID=din-klient-id-her
-MASKINPORTEN_KID=uuid-fra-portalen-her
+# Test (Altinn tt02)
+MASKINPORTEN_CLIENT_ID_TEST=test-klient-uuid-her
+MASKINPORTEN_KID_TEST=test-nokkel-uuid-her
+SKD_TEST_ORG_NUMMER=syntetisk-tenor-orgnr-her
+
+# Produksjon
+MASKINPORTEN_CLIENT_ID_PROD=prod-klient-uuid-her
+MASKINPORTEN_KID_PROD=prod-nokkel-uuid-her
+ORG_NUMMER=ditt-eget-organisasjonsnummer
+
+# Felles for begge miljø
 MASKINPORTEN_PRIVAT_NOKKEL=maskinporten_privat.pem
-ORG_NUMMER=ditt-organisasjonsnummer
 WENCHE_ENV=prod
 ```
 
 !!! warning "Ikke bruk anførselstegn"
-    Verdiene skal skrives direkte uten hermetegn, slik som vist ovenfor.
+    Verdiene skal skrives direkte uten hermetegn.
 
 | Variabel | Hva det er |
 |---|---|
-| `MASKINPORTEN_CLIENT_ID` | Klient-ID fra selvbetjeningsportalen |
-| `MASKINPORTEN_KID` | UUID som portalen tildelte nøkkelen din |
-| `MASKINPORTEN_PRIVAT_NOKKEL` | Sti til din private nøkkelfil (standard: `maskinporten_privat.pem`) |
-| `ORG_NUMMER` | Ditt organisasjonsnummer (9 siffer) |
-| `WENCHE_ENV` | `prod` for produksjon, `test` for Altinn tt02-testmiljø |
+| `MASKINPORTEN_CLIENT_ID_TEST` / `_PROD` | Klient-ID fra Digdirs selvbetjeningsportal — egen UUID per miljø |
+| `MASKINPORTEN_KID_TEST` / `_PROD` | UUID som portalen tildelte den offentlige nøkkelen for klienten |
+| `ORG_NUMMER` | Ditt eget organisasjonsnummer (9 siffer). Brukes som systembruker_org i prod |
+| `SKD_TEST_ORG_NUMMER` | Syntetisk Tenor-orgnr som brukes som systembruker_org i testmiljø. Påkrevd hvis du faktisk skal sende inn i test |
+| `MASKINPORTEN_PRIVAT_NOKKEL` | Sti til din private nøkkelfil (samme nøkkel kan brukes i begge miljø) |
+| `WENCHE_ENV` | `prod` (standard) eller `test`. Påvirker CLI-kommandoer; Send-fanen i UI-et har egen test/prod-velger som overstyrer per innsending |
+
+!!! info "Hvorfor separate test/prod-credentials?"
+    Maskinporten test og prod er adskilte registre. En klient registrert i test-portalen finnes ikke i prod-portalen og motsatt, så samme UUID fungerer ikke i begge. På samme måte krever Altinn tt02 og SKD test syntetiske Tenor-orgnumre — din ekte org.nr. er ikke kjent der.
+
+!!! tip "Bare ett miljø?"
+    Hvis du kun skal bruke prod, kan du droppe `_TEST`-variablene og `SKD_TEST_ORG_NUMMER`. Hvis du kun skal teste, dropp `_PROD`-variablene. Generiske navn uten suffix (`MASKINPORTEN_CLIENT_ID`, `MASKINPORTEN_KID`) fungerer fortsatt som fallback for bakoverkompatibilitet, men vi anbefaler suffix-formen.
 
 ---
 
@@ -206,98 +224,57 @@ cp config.example.yaml config.yaml
 
 ## Steg 5 — Registrer systembruker i Altinn
 
-Altinn 3 krever at datasystemer som handlar på vegne av virksomheter bruker **systemtilgang** — en mekanisme der systemet registreres i Altinns systemregister og virksomheten godkjenner tilgangen eksplisitt. Wenche er bygget rundt denne modellen fra starten av, og bruker ikke den eldre virksomhetsbruker-funksjonaliteten. Mottar du e-post fra Digitaliseringsdirektoratet om at systemer mot Altinn må tilpasses innen 31. mai 2026, trenger du ikke gjøre noe med Wenche — kravet er allerede oppfylt.
+Altinn 3 krever at datasystemer som handler på vegne av virksomheter bruker **systemtilgang** — en mekanisme der systemet registreres i Altinns systemregister og virksomheten godkjenner tilgangen eksplisitt. Wenche er bygget rundt denne modellen fra starten av, og bruker ikke den eldre virksomhetsbruker-funksjonaliteten. Mottar du e-post fra Digitaliseringsdirektoratet om at systemer mot Altinn må tilpasses innen 31. mai 2026, trenger du ikke gjøre noe med Wenche — kravet er allerede oppfylt.
 
-Selve oppsettet gjøres **én gang per miljø** (test/prod):
+Hvert miljø (test og prod) trenger sin egen systembruker. Settes opp uavhengig.
 
-!!! note "Bruker du webgrensesnittet?"
-    Disse stegene kan gjøres direkte i nettleseren: start `wenche ui` og gå til **Oppsett → Systembruker-oppsett**.
+### Anbefalt: bruk webgrensesnittet
 
-### 5a. Registrer system
+Start `wenche ui` og gå til **1. Oppsett**-fanen. Under «Per miljø-oppsett» finner du to kort — Testmiljø (tt02) og Produksjon. Hvert kort viser status for systembrukeren i det miljøet, og har knapper for å sette den opp.
 
-```bash
-wenche registrer-system
-```
+**For å opprette en ny systembruker:**
 
-Registrerer Wenche i Altinns systemregister med riktige tilgangsrettigheter. Kan kjøres på nytt uten skade — oppdaterer automatisk hvis systemet allerede finnes.
+1. Sørg for at Maskinporten-credentials og organisasjonsnummer er fylt inn i kortet (og lagret).
+2. Åpne **Avansert**-ekspansjonen i kortet og klikk **Registrer system**. Dette registrerer Wenche i Altinns systemregister med de nødvendige tilgangsrettighetene. Idempotent — kan kjøres flere ganger uten skade.
+3. Klikk **Opprett systembruker** i samme kort. Wenche oppretter en forespørsel og viser en «Godkjenn i Altinn →»-lenke.
+4. Åpne lenken og godkjenn:
+    - **Produksjon:** Logg inn med BankID som daglig leder eller styreleder.
+    - **Testmiljø:** Logg inn med TestID. Bruk fødselsnummeret til daglig leder for Tenor-orgen din (finnes under **Kildedata → rollegrupper → DAGL** i [Tenor testdatasøk](https://www.skatteetaten.no/testdata/)).
+5. Tilbake i Wenche: klikk **Jeg har godkjent — sjekk status** ved siden av lenken. Status oppdateres til **Systembruker godkjent**.
 
-### 5b. Oppdater rettigheter på eksisterende systembruker
+**Hvis status fortsatt sier «venter»:** Vent 10-20 sekunder og klikk knappen igjen — Altinn trenger noen sekunder på å registrere godkjenningen.
 
-!!! note "Valgfritt — kun hvis du allerede har en godkjent systembruker"
-    Har du satt opp Wenche tidligere (f.eks. for årsregnskap) og nettopp lagt til et nytt scope (f.eks. skattemelding), skal du bruke dette steget — **ikke** steg 5c. Eksisterende rettigheter beholdes; kun de nye legges til.
+### Når trenger jeg å gjøre dette på nytt?
 
-Send en endringsforespørsel via webgrensesnittet: start `wenche ui`, gå til **Oppsett → Systembruker-oppsett**, og klikk **Oppdater systembruker-rettigheter**. Du får en lenke — åpne den i nettleseren, logg inn med ID-porten, og godkjenn endringen.
+| Situasjon | Handling |
+|---|---|
+| Setter opp Wenche for første gang | Steg 5 (registrer + opprett systembruker) |
+| Vil bruke et annet miljø også (test ↔ prod) | Steg 5 for det andre miljøet — uavhengig |
+| Har lagt til nye scopes (f.eks. skattemelding etter at årsregnskap allerede er satt opp) | Bruk **Oppdater rettigheter** i Avansert-ekspansjonen — sender en endringsforespørsel som beholder eksisterende rettigheter og bare legger til nye |
+| Systembrukeren er Avvist eller har utløpt | Klikk **Opprett (ny) systembruker** i Avansert — lager en fersk forespørsel |
 
----
+### Verifiser oppsett
 
-### 5c. Opprett systembrukerforespørsel
+I Oppsett-fanen → **Tilkoblingstest** → klikk **Test tilkobling mot Altinn**. Resultatet viser tre sjekker per miljø:
 
-=== "Produksjon"
+1. ✓ Maskinporten og Altinn-veksling (credentials gyldige)
+2. ✓ Systembruker (godkjent og aktiv)
+3. ✓ Klar for innsending
 
-    ```bash
-    wenche opprett-systembruker
-    ```
+Hvis alt er grønt, er du klar til å sende inn.
 
-    Oppretter en forespørsel på ditt eget organisasjonsnummer (`ORG_NUMMER` fra `.env`) og skriver ut en `confirmUrl`. Åpne lenken i nettleseren, logg inn med ID-porten, og godkjenn tilgangen.
-
-=== "Testmiljø (tt02)"
-
-    Altinns testmiljø bruker syntetiske testdata. Din egen organisasjon finnes ikke i testregisteret, og du må bruke en **syntetisk testorganisasjon fra Tenor**.
-
-    **1. Finn en syntetisk test-AS i Tenor**
-
-    Gå til [Tenor testdatasøk](https://www.skatteetaten.no/testdata/) og søk frem et aksjeselskap (AS). Noter deg:
-
-    - Organisasjonsnummeret til selskapet
-    - Fødselsnummeret til daglig leder (finnes under **Kildedata → rollegrupper → DAGL**)
-
-    **2. Opprett systembrukerforespørsel for Tenor-org**
-
-    ```bash
-    wenche opprett-systembruker --org <tenor-orgnr>
-    ```
-
-    Erstatt `<tenor-orgnr>` med organisasjonsnummeret du fant i Tenor.
-
-    **3. Godkjenn forespørselen**
-
-    Kommandoen skriver ut en `confirmUrl`. Åpne lenken i nettleseren og logg inn med **TestID** (syntetisk BankID) ved å bruke fødselsnummeret til daglig leder fra steg 1.
-
-    **4. Konfigurer testmiljøet i `.env`**
-
-    Legg til følgende linje i `.env`:
-
-    ```
-    SKD_TEST_ORG_NUMMER=<tenor-orgnr>
-    ```
-
-    Wenche bruker da automatisk Tenor-org-et i XML-en og i Maskinporten-tokenet når `WENCHE_ENV=test`.
-
-    !!! info "Hvorfor syntetiske data i test?"
-        Skatteetaten og Altinns testmiljø er populert med data fra Tenor. Din reelle organisasjon eksisterer ikke i testregisteret, og innsending vil feile på bekreftelsessteget. Bruk av syntetisk org i test er ikke en begrensning i Wenche — det er et krav fra SKD og Altinn.
-
-### 5c. Verifiser oppsett
-
-Når forespørselen er godkjent, test at innlogging fungerer:
+### Alternativ: kommandolinje
 
 ```bash
-wenche login
+wenche registrer-system            # Registrer system (samme som UI-knappen)
+wenche opprett-systembruker        # Opprett systembruker for ORG_NUMMER (prod)
+wenche opprett-systembruker --org <tenor-orgnr>  # For test, oppgi Tenor-orgnr eksplisitt
+wenche login                       # Test tilkobling (henter token mot aktivt miljø)
 ```
 
-Vellykket utskrift:
+`WENCHE_ENV` i `.env` styrer hvilket miljø CLI-kommandoene gjelder. UI-et håndterer test/prod uavhengig av denne variabelen.
 
-```
-Autentiserer mot Maskinporten (systembruker)...
-Maskinporten-token mottatt. Henter Altinn-token...
-Autentisering vellykket.
-```
-
-Logg deretter ut igjen:
-
-```bash
-wenche logout
-```
-
-Får du feilen `invalid_altinn_customer_configuration` betyr det at systembrukeren ikke er godkjent ennå — fullfør steg 5c. Dobbeltsjekk ellers at klient-ID og KID i `.env` stemmer med det som vises i selvbetjeningsportalen.
+!!! warning "Test krever syntetiske Tenor-orgnumre"
+    Altinn tt02 og SKDs testmiljø er populert med data fra Tenor. Din egen organisasjon finnes ikke i testregisteret, og innsending vil feile (typisk med en uventet 500-feil) hvis du forsøker å bruke ekte org.nr. i test. Bruk alltid et test-AS fra [skatteetaten.no/testdata](https://www.skatteetaten.no/testdata/) når du tester.
 
 [Gå videre til bruk →](bruk.md){ .md-button .md-button--primary }
