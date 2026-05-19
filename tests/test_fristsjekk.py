@@ -5,6 +5,7 @@ Verifiserer statussjekk mot Skatteetatens og Brønnøysundregistrenes API-er.
 Alle HTTP-kall er mocket — testene gjør ingen ekte nettverkskall.
 """
 
+import os
 from datetime import date
 from unittest.mock import patch, MagicMock
 from xml.etree import ElementTree as ET
@@ -64,11 +65,18 @@ def _mock_response(status_code: int = 200, text: str = "", json_data=None) -> Ma
 # Skattemelding
 # ---------------------------------------------------------------------------
 
+@pytest.fixture
+def prod_env():
+    """Kjør test med WENCHE_ENV=prod slik at sjekk_skattemelding går full flyt."""
+    with patch.dict(os.environ, {"WENCHE_ENV": "prod"}):
+        yield
+
+
 class TestSjekkSkattemelding:
 
     @patch("wenche.fristsjekk.httpx.get")
     @patch("wenche.fristsjekk.get_skd_skattemelding_maskinporten_token", create=True)
-    def test_fastsatt_gir_innfridd(self, mock_token, mock_get):
+    def test_fastsatt_gir_innfridd(self, mock_token, mock_get, prod_env):
         """Respons med skattemeldingUpersonligFastsatt → innfridd=True."""
         # Importer igjen etter patching
         import wenche.fristsjekk as mod
@@ -85,7 +93,7 @@ class TestSjekkSkattemelding:
         assert "931808869" in result.lenke
 
     @patch("wenche.fristsjekk.httpx.get")
-    def test_utkast_gir_ikke_innfridd(self, mock_get):
+    def test_utkast_gir_ikke_innfridd(self, mock_get, prod_env):
         """Respons med skattemeldingUpersonligUtkast → innfridd=False."""
         with patch("wenche.auth.get_skd_skattemelding_maskinporten_token", return_value="t"):
             mock_get.return_value = _mock_response(
@@ -97,7 +105,7 @@ class TestSjekkSkattemelding:
         assert "ikke innsendt" in result.brukertekst
 
     @patch("wenche.fristsjekk.httpx.get")
-    def test_http_feil_gir_beskrivelse(self, mock_get):
+    def test_http_feil_gir_beskrivelse(self, mock_get, prod_env):
         """HTTP 500 fra Skatteetaten → innfridd=False med feilmelding."""
         with patch("wenche.auth.get_skd_skattemelding_maskinporten_token", return_value="t"):
             mock_get.return_value = _mock_response(status_code=500)
@@ -107,7 +115,7 @@ class TestSjekkSkattemelding:
         assert "HTTP 500" in result.beskrivelse
 
     @patch("wenche.fristsjekk.httpx.get")
-    def test_ugyldig_xml_gir_beskrivelse(self, mock_get):
+    def test_ugyldig_xml_gir_beskrivelse(self, mock_get, prod_env):
         """Ugyldig XML fra Skatteetaten → innfridd=False med feilmelding."""
         with patch("wenche.auth.get_skd_skattemelding_maskinporten_token", return_value="t"):
             mock_get.return_value = _mock_response(text="dette er ikke xml")
@@ -116,7 +124,7 @@ class TestSjekkSkattemelding:
         assert result.innfridd is False
         assert "Ugyldig svar" in result.beskrivelse
 
-    def test_manglende_maskinporten_gir_beskrivelse(self):
+    def test_manglende_maskinporten_gir_beskrivelse(self, prod_env):
         """RuntimeError fra auth → innfridd=False med 'ikke konfigurert'."""
         with patch(
             "wenche.auth.get_skd_skattemelding_maskinporten_token",
@@ -128,7 +136,7 @@ class TestSjekkSkattemelding:
         assert "Maskinporten" in result.beskrivelse
 
     @patch("wenche.fristsjekk.httpx.get")
-    def test_nettverksfeil_gir_beskrivelse(self, mock_get):
+    def test_nettverksfeil_gir_beskrivelse(self, mock_get, prod_env):
         """Timeout/nettverksfeil → innfridd=False med feilmelding."""
         with patch("wenche.auth.get_skd_skattemelding_maskinporten_token", return_value="t"):
             mock_get.side_effect = httpx.ConnectError("Connection refused")
@@ -136,6 +144,15 @@ class TestSjekkSkattemelding:
 
         assert result.innfridd is False
         assert "kontakte Skatteetaten" in result.beskrivelse
+
+    def test_testmiljo_hopper_over_sjekken(self):
+        """I testmiljø skal vi vise informativ melding, ikke ringe API-et."""
+        with patch.dict(os.environ, {"WENCHE_ENV": "test"}):
+            result = sjekk_skattemelding("922020523", 2025)
+
+        assert result.innfridd is False
+        assert "test" in result.beskrivelse.lower() or "test" in result.brukertekst.lower()
+        assert "prod" in result.brukertekst.lower()
 
 
 # ---------------------------------------------------------------------------

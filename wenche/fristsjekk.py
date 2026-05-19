@@ -70,6 +70,22 @@ class FristStatus:
 
 def sjekk_skattemelding(orgnr: str, aar: int) -> FristStatus:
     """Sjekk om skattemelding er fastsatt via Skatteetatens API."""
+    env = os.getenv("WENCHE_ENV", "prod")
+
+    # Skatteetatens testmiljø kjenner kun syntetiske Tenor-orgnumre.
+    # En statussjekk fra Hjem-fanen mot test-API-et med ekte org.nr.
+    # ville bare gitt "Ugyldig identifikator". Vi viser i stedet en
+    # informativ melding så brukeren forstår hva som mangler.
+    if env == "test":
+        return FristStatus(
+            beskrivelse="Statussjekk kun tilgjengelig i prod-miljø",
+            brukertekst=(
+                "Du er i testmiljø. Statussjekk mot Skatteetaten gjøres kun "
+                "mot prod-API-et med ekte org.nr. Bytt aktivt miljø til "
+                "Produksjon i Oppsett-fanen når du er klar."
+            ),
+        )
+
     try:
         from wenche.auth import get_skd_skattemelding_maskinporten_token
 
@@ -77,8 +93,7 @@ def sjekk_skattemelding(orgnr: str, aar: int) -> FristStatus:
     except RuntimeError:
         return FristStatus(beskrivelse="Maskinporten ikke konfigurert")
 
-    env = os.getenv("WENCHE_ENV", "prod")
-    base = _SKD_BASES.get(env, _SKD_BASES["prod"])
+    base = _SKD_BASES["prod"]
 
     try:
         resp = httpx.get(
