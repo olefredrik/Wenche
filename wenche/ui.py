@@ -630,22 +630,31 @@ def _les_konfig_for_milj(navn: str, env: str, default: str = "") -> str:
 def _sjekk_konfig() -> list[tuple[bool, str, str]]:
     resultater = []
 
-    # Credentials per miljø — viser status for begge slik at brukeren ser hva
-    # som er på plass uten å måtte tenke på «aktivt miljø».
-    for env, miljo_navn in [("test", "Testmiljø"), ("prod", "Produksjon")]:
+    # Per miljø: credentials + orgnr. Viser status for begge slik at brukeren
+    # ser hva som er på plass uten å måtte tenke på «aktivt miljø».
+    for env, miljo_navn, orgnr_var in [
+        ("test", "Testmiljø", "SKD_TEST_ORG_NUMMER"),
+        ("prod", "Produksjon", "ORG_NUMMER"),
+    ]:
         client_id = _les_konfig_for_milj("MASKINPORTEN_CLIENT_ID", env)
         kid = _les_konfig_for_milj("MASKINPORTEN_KID", env)
-        komplett = bool(client_id and kid)
-        if komplett:
-            detalj = "Klient-ID og Nøkkel-ID satt"
-        elif client_id or kid:
-            detalj = "Delvis konfigurert (mangler Klient-ID eller Nøkkel-ID)"
-        else:
+        orgnr = os.getenv(orgnr_var, "")
+        mangler = [
+            navn for navn, verdi in
+            [("Klient-ID", client_id), ("Nøkkel-ID", kid), ("Orgnr", orgnr)]
+            if not verdi
+        ]
+        if not mangler:
+            detalj = "Klient-ID, Nøkkel-ID og Orgnr er satt"
+            ok = True
+        elif len(mangler) == 3:
             detalj = "Ikke konfigurert"
-        resultater.append((komplett, f"{miljo_navn}-credentials", detalj))
+            ok = False
+        else:
+            detalj = f"Mangler: {', '.join(mangler)}"
+            ok = False
+        resultater.append((ok, f"{miljo_navn}", detalj))
 
-    orgnr = os.getenv("ORG_NUMMER")
-    resultater.append((bool(orgnr), "ORG_NUMMER", "Satt" if orgnr else "Mangler. Legg til i .env-filen"))
     nokkel_sti = os.getenv("MASKINPORTEN_PRIVAT_NOKKEL", "maskinporten_privat.pem")
     nokkel_ok = Path(nokkel_sti).exists()
     resultater.append((nokkel_ok, "Privat nøkkel", f"Funnet: {nokkel_sti}" if nokkel_ok else f"Finner ikke: {nokkel_sti}"))
@@ -1184,6 +1193,24 @@ def _bygg_oppsett_fane() -> None:
                     value=_les_konfig_for_milj("MASKINPORTEN_KID", env_var),
                     placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
                 ).classes("w-full")
+                if env_var == "test":
+                    card_inputs["orgnr"] = ui.input(
+                        "Organisasjonsnummer (test)",
+                        value=os.getenv("SKD_TEST_ORG_NUMMER", ""),
+                        placeholder="syntetisk org fra Tenor",
+                    ).classes("w-full").tooltip(
+                        "Altinns testmiljø kjenner kun syntetiske orgnr fra "
+                        "Tenor (skatteetaten.no/testdata). Bruk et test-AS "
+                        "her, ikke ditt eget org.nr."
+                    )
+                else:
+                    card_inputs["orgnr"] = ui.input(
+                        "Organisasjonsnummer (prod)",
+                        value=os.getenv("ORG_NUMMER", ""),
+                        placeholder="123456789",
+                    ).classes("w-full").tooltip(
+                        "Ditt eget organisasjonsnummer (9 siffer)."
+                    )
 
                 # --- Systembruker-seksjon ---
                 ui.separator().classes("my-4")
@@ -1376,22 +1403,19 @@ def _bygg_oppsett_fane() -> None:
 
     # --- Felles for begge miljø ---
     ui.separator().classes("my-4")
-    seksjonstittel("Felles innstillinger")
+    seksjonstittel("Felles for begge miljø")
     ui.label(
-        "Disse gjelder uansett aktivt miljø."
+        "Samme private nøkkel kan brukes i begge miljø — vanligvis genererer "
+        "du ett nøkkelpar og laster opp den offentlige nøkkelen til både "
+        "test- og prod-klienten i Digdir."
     ).classes("text-sm text-slate-500 mb-3")
 
-    with ui.grid(columns=2).classes("w-full gap-4"):
-        inp_orgnr = ui.input(
-            "Organisasjonsnummer",
-            value=os.getenv("ORG_NUMMER", ""),
-            placeholder="123456789",
-        ).classes("w-full").tooltip("Organisasjonsnummeret til selskapet du sender inn på vegne av.")
-
-        pem_opplasting = ui.upload(
-            label="Last opp privat nøkkel (.pem)",
-            auto_upload=True,
-        ).props("flat bordered").classes("w-full").tooltip("Din maskinporten_privat.pem-fil. Lagres lokalt og sendes aldri til noen server.")
+    pem_opplasting = ui.upload(
+        label="Last opp privat nøkkel (.pem)",
+        auto_upload=True,
+    ).props("flat bordered").classes("w-full").tooltip(
+        "Din maskinporten_privat.pem-fil. Lagres lokalt og sendes aldri til noen server."
+    )
 
     pem_bytes_holder: list[bytes] = []
 
@@ -1420,9 +1444,22 @@ def _bygg_oppsett_fane() -> None:
                 set_key(str(dot_env_fil), env_navn, verdi)
                 os.environ[env_navn] = verdi
 
-        if inp_orgnr.value:
-            set_key(str(dot_env_fil), "ORG_NUMMER", inp_orgnr.value)
-            os.environ["ORG_NUMMER"] = inp_orgnr.value
+        # Orgnr per miljø: test-kort → SKD_TEST_ORG_NUMMER (Tenor-syntetisk),
+        # prod-kort → ORG_NUMMER (din egen virksomhet).
+        test_orgnr = test_card_inputs["orgnr"].value or ""
+        set_key(str(dot_env_fil), "SKD_TEST_ORG_NUMMER", test_orgnr)
+        if test_orgnr:
+            os.environ["SKD_TEST_ORG_NUMMER"] = test_orgnr
+        else:
+            os.environ.pop("SKD_TEST_ORG_NUMMER", None)
+
+        prod_orgnr = prod_card_inputs["orgnr"].value or ""
+        set_key(str(dot_env_fil), "ORG_NUMMER", prod_orgnr)
+        if prod_orgnr:
+            os.environ["ORG_NUMMER"] = prod_orgnr
+        else:
+            os.environ.pop("ORG_NUMMER", None)
+
         if pem_bytes_holder:
             nokkel_sti = Path("maskinporten_privat.pem")
             nokkel_sti.write_bytes(pem_bytes_holder[0])
