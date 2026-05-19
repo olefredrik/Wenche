@@ -996,6 +996,12 @@ def _bygg_oppsett_fane() -> None:
     test_card_inputs: dict[str, ui.input] = {}
     prod_card_inputs: dict[str, ui.input] = {}
 
+    def _milj_har_credentials(env: str) -> bool:
+        return bool(
+            _les_konfig_for_milj("MASKINPORTEN_CLIENT_ID", env)
+            and _les_konfig_for_milj("MASKINPORTEN_KID", env)
+        )
+
     # Helper: kjør en operasjon med en bestemt WENCHE_ENV, restorer etterpå.
     def _med_env(env: str, fn, *args, **kwargs):
         opprinnelig = os.environ.get("WENCHE_ENV")
@@ -1010,6 +1016,9 @@ def _bygg_oppsett_fane() -> None:
 
     status_kontainer: dict[str, "ui.column"] = {}
     godkjenn_url_kontainer: dict[str, "ui.element"] = {}
+    knapper_kontainer: dict[str, "ui.column"] = {}
+    handlere: dict[str, dict] = {}
+    _siste_status: dict[str, str | None] = {}
 
     def _vis_godkjenn_lenke(env: str, url: str, etikett: str = "Godkjenn i Altinn →"):
         godkjenn_url_kontainer[env].clear()
@@ -1019,6 +1028,50 @@ def _bygg_oppsett_fane() -> None:
             ui.link(etikett, url, new_tab=True).classes(
                 "text-blue-600 font-medium text-sm"
             )
+
+    def _render_handlinger(env: str):
+        """Render knappene for et miljø basert på siste kjente status.
+
+        Bare det som er relevant vises primært; resten gjemmes i Avansert.
+        """
+        if env not in knapper_kontainer or env not in handlere:
+            return
+        knapper_kontainer[env].clear()
+        status = _siste_status.get(env)
+        h = handlere[env]
+
+        with knapper_kontainer[env]:
+            if status == "ikke_opprettet":
+                ui.button("Opprett systembruker", on_click=h["opprett"]).props(
+                    "color=primary"
+                ).classes("w-full")
+            elif status == "Rejected":
+                ui.button("Opprett ny systembruker", on_click=h["opprett"]).props(
+                    "color=primary"
+                ).classes("w-full")
+            elif status in ("New", "Accepted"):
+                # Status-raden viser allerede det viktigste. Brukeren trenger
+                # ikke en stor primær-knapp — kun en lav-profil refresh.
+                pass
+
+            with ui.expansion("Avansert").classes("w-full"):
+                ui.label(
+                    "Disse trengs sjelden. Bruk dem hvis du må re-registrere "
+                    "systemet, opprette ny forespørsel, eller legge til nye "
+                    "scopes på en allerede godkjent systembruker."
+                ).classes("text-xs text-slate-500 mb-2")
+                ui.button("Sjekk status på nytt", on_click=h["sjekk_status"]).props(
+                    "outline color=primary"
+                ).classes("w-full")
+                ui.button("Oppdater rettigheter", on_click=h["oppdater"]).props(
+                    "outline color=primary"
+                ).classes("w-full")
+                ui.button("Registrer system", on_click=h["registrer"]).props(
+                    "outline color=primary"
+                ).classes("w-full")
+                ui.button("Opprett (ny) systembruker", on_click=h["opprett"]).props(
+                    "outline color=primary"
+                ).classes("w-full")
 
     def _vis_status(env: str, status: str | None, melding: str | None = None):
         kontainer = status_kontainer[env]
@@ -1102,6 +1155,10 @@ def _bygg_oppsett_fane() -> None:
                     if forklaring:
                         ui.label(forklaring).classes("text-xs text-slate-500 mt-0.5")
 
+        # Husker hvilken status vi er i, og rerender knappene kontekstuelt.
+        _siste_status[env] = "ikke_opprettet" if status == "ikke_opprettet" else status
+        _render_handlinger(env)
+
     with ui.grid(columns=2).classes("w-full gap-4"):
         for env_var, miljo_navn, ikon_navn, ikon_farge, card_inputs in [
             ("test", "Testmiljø (tt02)", "science", "text-slate-500", test_card_inputs),
@@ -1133,15 +1190,9 @@ def _bygg_oppsett_fane() -> None:
                 ui.label("Systembruker i Altinn").classes(
                     "text-xs text-slate-500 uppercase tracking-wide font-medium"
                 )
-                ui.label(
-                    "Altinn krever at virksomheten godkjenner Wenche som "
-                    "leverandørsystem før vi kan sende inn dokumenter for "
-                    "den. Det gjøres med BankID av daglig leder eller "
-                    "styreleder."
-                ).classes("text-xs text-slate-500 mt-1 mb-2")
-                status_kontainer[env_var] = ui.column().classes("gap-0 mb-2")
-                _vis_status(env_var, None)
+                status_kontainer[env_var] = ui.column().classes("gap-0 mb-2 mt-1")
                 godkjenn_url_kontainer[env_var] = ui.element("div").classes("mb-2")
+                knapper_kontainer[env_var] = ui.column().classes("w-full gap-2 mt-2")
 
                 async def sjekk_status_handler(env=env_var):
                     request_id = _les_request_id(env)
@@ -1288,25 +1339,24 @@ def _bygg_oppsett_fane() -> None:
                         n.timeout = 0
                         n.close_button = "Lukk"
 
-                with ui.column().classes("w-full gap-2 mt-2"):
-                    ui.button("Sjekk status", on_click=sjekk_status_handler).props(
-                        "color=primary"
-                    ).classes("w-full")
-                    ui.button("Registrer system", on_click=registrer_handler).props(
-                        "outline color=primary"
-                    ).classes("w-full")
-                    ui.button("Opprett systembruker", on_click=opprett_handler).props(
-                        "outline color=primary"
-                    ).classes("w-full")
-                    with ui.expansion("Avansert").classes("w-full"):
-                        ui.label(
-                            "Oppdater rettigheter sender en endringsforespørsel "
-                            "hvis du har lagt til nye scopes på en allerede godkjent "
-                            "systembruker. Eksisterende rettigheter beholdes."
-                        ).classes("text-sm text-slate-500 mb-2")
-                        ui.button(
-                            "Oppdater rettigheter", on_click=oppdater_handler,
-                        ).props("outline color=primary").classes("w-full")
+                # Registrer alle handlere så _render_handlinger kan bruke dem.
+                handlere[env_var] = {
+                    "sjekk_status": sjekk_status_handler,
+                    "registrer": registrer_handler,
+                    "opprett": opprett_handler,
+                    "oppdater": oppdater_handler,
+                }
+
+                # Initial render: viser «Status ikke sjekket»-tilstand + relevante knapper.
+                _vis_status(env_var, None)
+
+                # Auto-sjekk status ved sidelasting hvis vi har credentials og
+                # en eksisterende forespørsel. Brukeren slipper å klikke.
+                if (
+                    _milj_har_credentials(env_var)
+                    and _les_request_id(env_var)
+                ):
+                    ui.timer(1.0, sjekk_status_handler, once=True)
 
     # --- Felles for begge miljø ---
     ui.separator().classes("my-4")
@@ -1396,12 +1446,6 @@ def _bygg_oppsett_fane() -> None:
     ).classes("text-sm text-slate-500 mb-2")
 
     test_resultat_container = ui.column().classes("w-full gap-1 mt-3")
-
-    def _milj_har_credentials(env: str) -> bool:
-        return bool(
-            _les_konfig_for_milj("MASKINPORTEN_CLIENT_ID", env)
-            and _les_konfig_for_milj("MASKINPORTEN_KID", env)
-        )
 
     def _tolk_feilmelding(env: str, raw: str) -> str:
         """Oversett rå auth-feilmelding til brukervennlig norsk."""
