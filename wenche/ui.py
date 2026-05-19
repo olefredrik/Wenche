@@ -841,7 +841,11 @@ def _bygg_hjem_fane(tabs=None, t_oppsett=None) -> None:
         ui.link("dokumentasjonen", "https://olefredrik.github.io/Wenche/", new_tab=True).classes("text-sm")
         ui.label(", der finner du hjelp til å sette opp alt riktig.").classes("text-sm text-slate-500")
 
-    orgnr_konfigurert = bool(state.org_nummer) and state.org_nummer != "123456789"
+    # Hjem-fanen sjekker status mot offentlige myndigheter for din egen virksomhet,
+    # så vi bruker prod-orgnr (ORG_NUMMER fra .env), ikke config.yaml-orgnr som ofte
+    # er Tenor-testdata. Skattemelding-sjekken tvinger uansett prod-env internt.
+    prod_orgnr = os.getenv("ORG_NUMMER", "").strip()
+    orgnr_konfigurert = bool(prod_orgnr) and prod_orgnr != "123456789"
 
     if not orgnr_konfigurert:
         with ui.card().classes(
@@ -854,8 +858,9 @@ def _bygg_hjem_fane(tabs=None, t_oppsett=None) -> None:
                         "font-semibold text-amber-900"
                     )
                     ui.label(
-                        "Fyll inn organisasjonsnummer i Oppsett-fanen for å aktivere "
-                        "automatisk statussjekk."
+                        "Fyll inn organisasjonsnummer for din virksomhet "
+                        "(prod-kortet i Oppsett-fanen) for å aktivere automatisk "
+                        "statussjekk."
                     ).classes("text-sm text-amber-900")
                 if tabs is not None and t_oppsett is not None:
                     ui.button(
@@ -937,7 +942,9 @@ def _bygg_hjem_fane(tabs=None, t_oppsett=None) -> None:
             sjekk_skattemelding,
         )
 
-        orgnr = state.org_nummer
+        # Bruk alltid prod-orgnr (ORG_NUMMER fra .env) for offentlig statussjekk.
+        # config.yaml kan inneholde Tenor-testdata, som vil gi 4xx mot prod-API-er.
+        orgnr = os.getenv("ORG_NUMMER", "").strip()
 
         # Ikke send API-kall med placeholder eller tomt org.nr.
         # Kortene er allerede bygget i ventende-tilstand når dette er tilfelle.
@@ -1069,7 +1076,7 @@ def _bygg_oppsett_fane() -> None:
                 ui.button("Registrer system", on_click=h["registrer"]).props(
                     "outline color=primary"
                 ).classes("w-full")
-                ui.button("Opprett (ny) systembruker", on_click=h["opprett"]).props(
+                ui.button("Opprett ny forespørsel", on_click=h["opprett"]).props(
                     "outline color=primary"
                 ).classes("w-full")
 
@@ -1280,10 +1287,23 @@ def _bygg_oppsett_fane() -> None:
                                 env, systembruker.registrer_system, token, orgnr, client_id,
                             )
                         )
-                        n.message = "System oppdatert." if svar.get("oppdatert") else "System registrert."
+                        # Altinn returnerer noen ganger bare system-ID-en som
+                        # streng på POST i stedet for et dict. Håndter begge.
+                        oppdatert = isinstance(svar, dict) and svar.get("oppdatert", False)
+                        hva = "System oppdatert." if oppdatert else "System registrert."
+                        # Hvis systembruker ikke er satt opp ennå, dyttene
+                        # brukeren videre til neste logiske handling.
+                        if _siste_status.get(env) in ("ikke_opprettet", None):
+                            n.message = (
+                                f"{hva} Neste steg: klikk «Opprett systembruker» "
+                                "for å lage forespørselen som skal godkjennes."
+                            )
+                            n.timeout = 10
+                        else:
+                            n.message = hva
+                            n.timeout = 5
                         n.spinner = False
                         n.type = "positive"
-                        n.timeout = 5
                     except Exception as e:
                         n.message = f"Feil: {e}"
                         n.spinner = False
@@ -1409,17 +1429,18 @@ def _bygg_oppsett_fane() -> None:
                     and _les_request_id(env_var)
                 ):
                     async def _auto_sjekk_med_retry(env=env_var):
+                        import asyncio
+                        if _siste_status.get(env) not in ("New", None):
+                            return
+                        await sjekk_status_handler(env=env, silent=True)
+                        # Hvis fortsatt i venter-tilstand, prøv én gang til
+                        # om 5 sek. asyncio.sleep brukes i stedet for å
+                        # opprette en ny ui.timer (den ville feilet hvis
+                        # parent-slotten er borte, f.eks. ved sidebytte).
                         if _siste_status.get(env) in ("New", None):
-                            await sjekk_status_handler(env=env, silent=True)
-                            # Hvis fortsatt i venter-tilstand, prøv én gang til
-                            # om 5 sek. Da gir vi event-loopen god tid og
-                            # spammer ikke Altinn med flere kall.
+                            await asyncio.sleep(5)
                             if _siste_status.get(env) in ("New", None):
-                                ui.timer(
-                                    5.0,
-                                    lambda e=env: sjekk_status_handler(env=e, silent=True),
-                                    once=True,
-                                )
+                                await sjekk_status_handler(env=env, silent=True)
 
                     ui.timer(3.0, _auto_sjekk_med_retry, once=True)
 

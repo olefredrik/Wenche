@@ -110,6 +110,17 @@ def _utfør_skattemelding_sjekk(token: str, orgnr: str, aar: int) -> FristStatus
     except httpx.HTTPError:
         return FristStatus(beskrivelse="Kunne ikke kontakte Skatteetaten")
 
+    # 404 fra Skatteetaten betyr at ingen skattemelding er klargjort for orgnr/år
+    # ennå — det er normal status før forhåndsutfylt utkast publiseres.
+    if resp.status_code == 404:
+        return FristStatus(
+            beskrivelse="Ikke klargjort ennå",
+            brukertekst=(
+                f"Skatteetaten har ikke klargjort skattemelding for {aar} ennå. "
+                "Forhåndsutfylt utkast kommer normalt i mars/april."
+            ),
+        )
+
     if not resp.is_success:
         return FristStatus(beskrivelse=f"Skatteetaten svarte med HTTP {resp.status_code}")
 
@@ -147,8 +158,18 @@ def sjekk_aarsregnskap(orgnr: str, aar: int) -> FristStatus:
     except httpx.HTTPError:
         return FristStatus(beskrivelse="Kunne ikke kontakte Regnskapsregisteret")
 
+    # 404 betyr at orgnr ikke har innleverte regnskap i registeret — det er
+    # samme tilstand som "ikke levert ennå" for inneværende regnskapsår.
+    if resp.status_code == 404:
+        return FristStatus(
+            beskrivelse="Ikke levert",
+            brukertekst=f"Brønnøysundregistrene har ikke mottatt årsregnskapet for {aar} ennå.",
+        )
+
     if not resp.is_success:
-        return FristStatus(beskrivelse="Kunne ikke kontakte Regnskapsregisteret")
+        return FristStatus(
+            beskrivelse=f"Regnskapsregisteret svarte med HTTP {resp.status_code}"
+        )
 
     try:
         data = resp.json()

@@ -105,6 +105,16 @@ class TestSjekkSkattemelding:
         assert "ikke innsendt" in result.brukertekst
 
     @patch("wenche.fristsjekk.httpx.get")
+    def test_404_gir_ikke_klargjort(self, mock_get, prod_env):
+        """404 fra Skatteetaten → ingen skattemelding klargjort ennå."""
+        with patch("wenche.auth.get_skd_skattemelding_maskinporten_token", return_value="t"):
+            mock_get.return_value = _mock_response(status_code=404)
+            result = sjekk_skattemelding("931808869", 2025)
+
+        assert result.innfridd is False
+        assert "klargjort" in result.beskrivelse.lower()
+
+    @patch("wenche.fristsjekk.httpx.get")
     def test_http_feil_gir_beskrivelse(self, mock_get, prod_env):
         """HTTP 500 fra Skatteetaten → innfridd=False med feilmelding."""
         with patch("wenche.auth.get_skd_skattemelding_maskinporten_token", return_value="t"):
@@ -206,13 +216,23 @@ class TestSjekkAarsregnskap:
         assert result.innfridd is False
 
     @patch("wenche.fristsjekk.httpx.get")
-    def test_http_feil_gir_beskrivelse(self, mock_get):
-        """HTTP-feil fra BRG → innfridd=False med feilmelding."""
+    def test_404_gir_ikke_levert(self, mock_get):
+        """404 fra BRG → orgnr har ingen innleverte regnskap → 'Ikke levert'."""
         mock_get.return_value = _mock_response(status_code=404)
         result = sjekk_aarsregnskap("931808869", 2025)
 
         assert result.innfridd is False
-        assert "kontakte" in result.beskrivelse.lower()
+        assert result.beskrivelse == "Ikke levert"
+        assert "ikke mottatt" in result.brukertekst.lower()
+
+    @patch("wenche.fristsjekk.httpx.get")
+    def test_http_feil_gir_beskrivelse(self, mock_get):
+        """5xx fra BRG → innfridd=False med HTTP-kode i beskrivelse."""
+        mock_get.return_value = _mock_response(status_code=503)
+        result = sjekk_aarsregnskap("931808869", 2025)
+
+        assert result.innfridd is False
+        assert "HTTP 503" in result.beskrivelse
 
     @patch("wenche.fristsjekk.httpx.get")
     def test_nettverksfeil_gir_beskrivelse(self, mock_get):
