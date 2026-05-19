@@ -1069,7 +1069,7 @@ def _bygg_oppsett_fane() -> None:
                 ui.button("Registrer system", on_click=h["registrer"]).props(
                     "outline color=primary"
                 ).classes("w-full")
-                ui.button("Opprett (ny) systembruker", on_click=h["opprett"]).props(
+                ui.button("Opprett ny forespørsel", on_click=h["opprett"]).props(
                     "outline color=primary"
                 ).classes("w-full")
 
@@ -1283,10 +1283,20 @@ def _bygg_oppsett_fane() -> None:
                         # Altinn returnerer noen ganger bare system-ID-en som
                         # streng på POST i stedet for et dict. Håndter begge.
                         oppdatert = isinstance(svar, dict) and svar.get("oppdatert", False)
-                        n.message = "System oppdatert." if oppdatert else "System registrert."
+                        hva = "System oppdatert." if oppdatert else "System registrert."
+                        # Hvis systembruker ikke er satt opp ennå, dyttene
+                        # brukeren videre til neste logiske handling.
+                        if _siste_status.get(env) in ("ikke_opprettet", None):
+                            n.message = (
+                                f"{hva} Neste steg: klikk «Opprett systembruker» "
+                                "for å lage forespørselen som skal godkjennes."
+                            )
+                            n.timeout = 10
+                        else:
+                            n.message = hva
+                            n.timeout = 5
                         n.spinner = False
                         n.type = "positive"
-                        n.timeout = 5
                     except Exception as e:
                         n.message = f"Feil: {e}"
                         n.spinner = False
