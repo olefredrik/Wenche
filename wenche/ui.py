@@ -1009,49 +1009,25 @@ def _bygg_oppsett_fane() -> None:
     knapper_kontainer: dict[str, "ui.column"] = {}
     handlere: dict[str, dict] = {}
     _siste_status: dict[str, str | None] = {}
-    polling_timer: dict[str, "ui.timer"] = {}
-    polling_teller: dict[str, int] = {}
-    _POLLING_INTERVALL_SEK = 8.0
-    _POLLING_MAX_FORSOK = 38  # ~5 min med 8 sek intervall
-
-    def _start_polling(env: str):
-        """Start auto-polling av systembruker-status hvis ikke allerede aktiv."""
-        if polling_timer.get(env) is not None:
-            return  # allerede polling
-        polling_teller[env] = 0
-
-        async def _poll(env=env):
-            polling_teller[env] = polling_teller.get(env, 0) + 1
-            handlers = handlere.get(env, {})
-            sjekk = handlers.get("sjekk_status")
-            if sjekk is not None:
-                await sjekk(silent=True)
-            # _vis_status kalles av sjekk og oppdaterer _siste_status. Hvis status
-            # ikke lenger er "New", eller vi har prøvd for mange ganger, slutt.
-            if (
-                _siste_status.get(env) != "New"
-                or polling_teller[env] >= _POLLING_MAX_FORSOK
-            ):
-                _stopp_polling(env)
-
-        polling_timer[env] = ui.timer(_POLLING_INTERVALL_SEK, _poll, active=True)
-
-    def _stopp_polling(env: str):
-        t = polling_timer.pop(env, None)
-        if t is not None:
-            try:
-                t.deactivate()
-            except Exception:
-                pass
 
     def _vis_godkjenn_lenke(env: str, url: str, etikett: str = "Godkjenn i Altinn →"):
         godkjenn_url_kontainer[env].clear()
         if not url:
             return
         with godkjenn_url_kontainer[env]:
-            ui.link(etikett, url, new_tab=True).classes(
-                "text-blue-600 font-medium text-sm"
-            )
+            with ui.row().classes("items-center gap-3 flex-wrap"):
+                ui.link(etikett, url, new_tab=True).classes(
+                    "text-blue-600 font-medium text-sm"
+                )
+                # Tilbyr brukeren en rask «jeg har godkjent»-handling så de
+                # ikke trenger å åpne Avansert for å oppdatere status.
+                handlers = handlere.get(env, {})
+                sjekk = handlers.get("sjekk_status")
+                if sjekk is not None:
+                    ui.button(
+                        "Jeg har godkjent — sjekk status",
+                        on_click=sjekk,
+                    ).props("outline color=primary size=sm")
 
     def _render_handlinger(env: str):
         """Render knappene for et miljø basert på siste kjente status.
@@ -1190,16 +1166,8 @@ def _bygg_oppsett_fane() -> None:
                         ui.label(forklaring).classes("text-xs text-slate-500 mt-0.5")
 
         # Husker hvilken status vi er i, og rerender knappene kontekstuelt.
-        effektiv_status = "ikke_opprettet" if status == "ikke_opprettet" else status
-        _siste_status[env] = effektiv_status
+        _siste_status[env] = "ikke_opprettet" if status == "ikke_opprettet" else status
         _render_handlinger(env)
-
-        # Auto-poll mens vi venter på godkjenning, slik at UI-et fanger opp
-        # godkjenningen så snart den skjer i Altinn. Stopp i alle andre states.
-        if effektiv_status == "New":
-            _start_polling(env)
-        else:
-            _stopp_polling(env)
 
     with ui.grid(columns=2).classes("w-full gap-4"):
         for env_var, miljo_navn, ikon_navn, ikon_farge, card_inputs in [
