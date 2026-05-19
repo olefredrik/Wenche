@@ -131,15 +131,28 @@ Liste over alle aksjonærer per 31.12 i regnskapsåret.
 
 ## Miljøvariabler (.env)
 
+Maskinporten test og prod er separate registre med ulike klient-UUID-er. Wenche støtter to konvensjoner: miljø-spesifikke variabler (anbefalt) eller generiske variabler. Hvis begge er satt, vinner miljø-spesifikk variant.
+
+### Miljø-spesifikke variabler (anbefalt)
+
+| Variabel | Brukes når | Beskrivelse |
+|---|---|---|
+| `MASKINPORTEN_CLIENT_ID_TEST` | testmiljø | Klient-ID for test-Maskinporten fra Digdir |
+| `MASKINPORTEN_KID_TEST` | testmiljø | UUID for offentlig nøkkel registrert på test-klienten |
+| `MASKINPORTEN_CLIENT_ID_PROD` | prod | Klient-ID for prod-Maskinporten fra Digdir |
+| `MASKINPORTEN_KID_PROD` | prod | UUID for offentlig nøkkel registrert på prod-klienten |
+
+### Felles og generiske
+
 | Variabel | Påkrevd | Beskrivelse |
 |---|---|---|
-| `MASKINPORTEN_CLIENT_ID` | ja | Klient-ID fra Digdir selvbetjeningsportal |
-| `MASKINPORTEN_KID` | ja | UUID som portalen tildelte den offentlige nøkkelen |
-| `MASKINPORTEN_PRIVAT_NOKKEL` | ja | Sti til privat nøkkelfil. Standard: `maskinporten_privat.pem` |
-| `ORG_NUMMER` | ja | Organisasjonsnummeret til leverandøren (deg/selskapet som bruker Wenche), 9 siffer |
-| `WENCHE_ENV` | nei | `prod` for produksjon, `test` for Altinn tt02-testmiljø. Standard: `prod` |
-| `SKD_TEST_ORG_NUMMER` | nei | Organisasjonsnummeret til en syntetisk testorganisasjon fra Tenor. Brukes i testmiljø (`WENCHE_ENV=test`) som mottaker for systembrukerforespørsel og i XML-innsending til SKD |
-| `SKD_TEST_PARTSNUMMER` | nei | Partsnummer fra Tenor for testorganisasjonen. Setter man denne hopper Wenche over kallet til SKDs forhåndsutfylt-API (som ikke alltid har data for syntetiske org i test) og bruker partsnummeret direkte |
+| `MASKINPORTEN_PRIVAT_NOKKEL` | ja | Sti til privat nøkkelfil. Samme nøkkel kan brukes i begge miljø. Standard: `maskinporten_privat.pem` |
+| `ORG_NUMMER` | ja (for prod) | Ditt eget organisasjonsnummer (9 siffer). Brukes som systembruker_org og party i prod |
+| `SKD_TEST_ORG_NUMMER` | ja (for test) | Syntetisk Tenor-orgnr som brukes som systembruker_org og party i testmiljø |
+| `WENCHE_ENV` | nei | `prod` (standard) eller `test`. Påvirker CLI-kommandoer. Send-fanen i UI-et har egen velger som overstyrer per innsending |
+| `SKD_TEST_PARTSNUMMER` | nei | Partsnummer fra Tenor for skattemelding-test. Setter man denne hopper Wenche over kallet til SKDs forhåndsutfylt-API og bruker partsnummeret direkte |
+| `MASKINPORTEN_CLIENT_ID` | nei | Generisk fallback. Brukes hvis ingen miljø-spesifikk variant er satt |
+| `MASKINPORTEN_KID` | nei | Generisk fallback. Brukes hvis ingen miljø-spesifikk variant er satt |
 
 ---
 
@@ -225,7 +238,7 @@ wenche send-skattemelding [--config FILSTI] [--dry-run]
 | `--config` | Sti til konfigurasjonsfil. Standard: `config.yaml` |
 | `--dry-run` | Henter forhåndsutfylt og genererer XML lokalt (`skattemelding.xml` og `naeringsspesifikasjon.xml`) uten å sende |
 
-Krever at Maskinporten-klienten har fått scopet `skatteetaten:formueinntekt/skattemelding` innvilget. Se [steg 2e i oppsett](oppsett.md#2e-sok-om-tilgang-til-skds-api-for-skattemelding).
+Krever at Maskinporten-klienten har fått scopet `skatteetaten:formueinntekt/skattemelding` innvilget. Se [steg 2f i oppsett](oppsett.md#2f-sk-om-tilgang-til-skds-api-for-skattemelding).
 
 ---
 
