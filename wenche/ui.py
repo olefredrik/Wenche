@@ -1288,8 +1288,10 @@ def _bygg_oppsett_fane() -> None:
     ui.separator().classes("my-4")
     seksjonstittel("Tilkoblingstest")
     ui.label(
-        "Tester Maskinporten og Altinn-veksling for hvert miljø som har credentials konfigurert. "
-        "Ingen data sendes inn og tokens lagres ikke."
+        "Sjekker tre ting per miljø: at Maskinporten godtar credentials, at "
+        "Altinn aksepterer instance-scopene, og at systembrukeren er godkjent. "
+        "Alle tre må være OK for at innsending skal fungere. Ingen data sendes "
+        "inn og tokens lagres ikke."
     ).classes("text-sm text-slate-500 mb-2")
 
     test_resultat_container = ui.column().classes("w-full gap-1 mt-3")
@@ -1353,29 +1355,24 @@ def _bygg_oppsett_fane() -> None:
         # Vis bare første linje for å holde meldingen kort.
         return raw.split("\n")[0]
 
-    def _test_for_milj(env: str) -> tuple[bool, str]:
-        """Test tilkobling for ett spesifikt miljø. Returnerer (ok, melding)."""
+    def _test_auth_for_milj(env: str) -> tuple[bool, str]:
+        """Test Maskinporten + Altinn-veksling. Returnerer (ok, melding)."""
         opprinnelig_env = os.environ.get("WENCHE_ENV")
         os.environ["WENCHE_ENV"] = env
         try:
             auth.login(lagre_token=False)
-            return True, "Tilkobling OK"
+            return True, "Maskinporten og Altinn godtok credentials"
         except RuntimeError as e:
             return False, _tolk_feilmelding(env, str(e))
         except httpx.HTTPStatusError as e:
             kode = e.response.status_code
             if kode == 401:
                 return False, (
-                    f"Altinn avviste tokenet (HTTP 401). Maskinporten-tokenet "
-                    f"ble hentet, men Altinn aksepterer det ikke. Vanligste "
-                    f"årsak: scopene altinn:instances.* er ikke aktivert på "
-                    f"klienten din i dette miljøet."
+                    "Altinn avviste tokenet (HTTP 401). Vanligste årsak: "
+                    "altinn:instances.* er ikke aktivert på klienten."
                 )
             if kode == 403:
-                return False, (
-                    f"Altinn avslo tilgangen (HTTP 403). Sjekk at systembruker "
-                    f"er opprettet og godkjent for org.nr. {os.getenv('ORG_NUMMER', '')}."
-                )
+                return False, "Altinn avslo tilgangen (HTTP 403)."
             return False, f"Altinn svarte med HTTP {kode}."
         except Exception as e:
             return False, f"Uventet feil ({type(e).__name__}): {e}"
@@ -1385,39 +1382,146 @@ def _bygg_oppsett_fane() -> None:
             else:
                 os.environ["WENCHE_ENV"] = opprinnelig_env
 
+    def _test_systembruker_for_milj(env: str) -> tuple[str, str]:
+        """Sjekk systembruker-status. Returnerer (status, melding).
+
+        status: 'godkjent' / 'venter' / 'avvist' / 'ikke_opprettet' / 'feil' / 'ukjent'
+        """
+        request_id = _les_request_id(env)
+        if not request_id:
+            return "ikke_opprettet", "Ingen forespørsel opprettet ennå"
+        opprinnelig_env = os.environ.get("WENCHE_ENV")
+        os.environ["WENCHE_ENV"] = env
+        try:
+            token = auth.login_admin()
+            svar = systembruker.hent_forespørsel_status(token, request_id)
+            altinn_status = svar.get("status", "ukjent")
+            if altinn_status == "Accepted":
+                return "godkjent", "Systembruker godkjent"
+            if altinn_status == "New":
+                return "venter", "Forespørsel venter på godkjenning"
+            if altinn_status == "Rejected":
+                return "avvist", "Forespørsel avvist — opprett ny"
+            return "ukjent", f"Status: {altinn_status}"
+        except Exception as e:
+            return "feil", f"Kunne ikke hente status: {type(e).__name__}"
+        finally:
+            if opprinnelig_env is None:
+                os.environ.pop("WENCHE_ENV", None)
+            else:
+                os.environ["WENCHE_ENV"] = opprinnelig_env
+
+    def _test_for_milj(env: str) -> dict:
+        """Kjør alle sjekker for ett miljø og returner samlet resultat."""
+        auth_ok, auth_melding = _test_auth_for_milj(env)
+        if not auth_ok:
+            # Hvis auth feiler, gir ikke systembruker-sjekken ekstra info
+            return {
+                "env": env,
+                "auth": (False, auth_melding),
+                "systembruker": None,
+            }
+        sys_status, sys_melding = _test_systembruker_for_milj(env)
+        return {
+            "env": env,
+            "auth": (True, auth_melding),
+            "systembruker": (sys_status, sys_melding),
+        }
+
     async def test_tilkobling():
         test_resultat_container.clear()
-        n = ui.notification("Tester tilkobling for begge miljø...", spinner=True, timeout=None)
+        n = ui.notification("Tester begge miljø...", spinner=True, timeout=None)
 
         resultater = []
         for env in ["test", "prod"]:
             if not _milj_har_credentials(env):
-                resultater.append((env, None, "Ingen credentials konfigurert"))
+                resultater.append({"env": env, "auth": None, "systembruker": None})
                 continue
-            ok, melding = await run.io_bound(_test_for_milj, env)
-            resultater.append((env, ok, melding))
+            res = await run.io_bound(_test_for_milj, env)
+            resultater.append(res)
 
         n.dismiss()
 
+        def _ikon_for_status(sys_status: str) -> tuple[str, str]:
+            return {
+                "godkjent": ("check_circle", "text-green-600"),
+                "venter": ("schedule", "text-amber-600"),
+                "avvist": ("error", "text-red-600"),
+                "ikke_opprettet": ("info", "text-slate-500"),
+                "feil": ("error_outline", "text-red-600"),
+                "ukjent": ("help_outline", "text-slate-400"),
+            }.get(sys_status, ("help_outline", "text-slate-400"))
+
         with test_resultat_container:
-            for env, ok, melding in resultater:
+            for res in resultater:
+                env = res["env"]
                 miljo_navn = "Testmiljø (tt02)" if env == "test" else "Produksjon"
-                if ok is None:
-                    ikon, farge = "remove_circle_outline", "text-slate-400"
-                elif ok:
-                    ikon, farge = "check_circle", "text-green-600"
-                else:
-                    ikon, farge = "error", "text-red-600"
-                # Grid med fast ikon-kolonne og fleksibel tekst-kolonne så lange
-                # meldinger wrapper i tekstkolonnen i stedet for å skyve ikonet
-                # ned på egen linje.
-                with ui.element("div").classes(
-                    "grid grid-cols-[auto_1fr] gap-2 items-start w-full"
+                with ui.card().classes(
+                    "w-full p-3 border border-slate-200 shadow-none rounded-lg mb-2"
                 ):
-                    ui.icon(ikon).classes(f"{farge} text-base mt-0.5")
-                    with ui.column().classes("gap-0 min-w-0"):
-                        ui.label(miljo_navn).classes("text-sm font-medium text-slate-800")
-                        ui.label(melding).classes(f"text-xs {farge}")
+                    ui.label(miljo_navn).classes("text-sm font-semibold text-slate-800 mb-1")
+
+                    if res["auth"] is None:
+                        # Ingen credentials konfigurert
+                        with ui.element("div").classes("grid grid-cols-[auto_1fr] gap-2 items-start"):
+                            ui.icon("remove_circle_outline").classes("text-slate-400 text-base mt-0.5")
+                            ui.label("Ingen credentials konfigurert for dette miljøet").classes(
+                                "text-sm text-slate-500"
+                            )
+                        continue
+
+                    auth_ok, auth_melding = res["auth"]
+                    auth_ikon = "check_circle" if auth_ok else "error"
+                    auth_farge = "text-green-600" if auth_ok else "text-red-600"
+                    with ui.element("div").classes("grid grid-cols-[auto_1fr] gap-2 items-start"):
+                        ui.icon(auth_ikon).classes(f"{auth_farge} text-base mt-0.5")
+                        with ui.column().classes("gap-0 min-w-0"):
+                            ui.label("Maskinporten og Altinn-veksling").classes(
+                                "text-sm font-medium text-slate-700"
+                            )
+                            ui.label(auth_melding).classes(f"text-xs {auth_farge}")
+
+                    if res["systembruker"] is None:
+                        with ui.element("div").classes(
+                            "grid grid-cols-[auto_1fr] gap-2 items-start mt-1"
+                        ):
+                            ui.icon("help_outline").classes("text-slate-400 text-base mt-0.5")
+                            with ui.column().classes("gap-0 min-w-0"):
+                                ui.label("Systembruker").classes(
+                                    "text-sm font-medium text-slate-700"
+                                )
+                                ui.label("Ikke sjekket (auth må fungere først)").classes(
+                                    "text-xs text-slate-400"
+                                )
+                    else:
+                        sys_status, sys_melding = res["systembruker"]
+                        sys_ikon, sys_farge = _ikon_for_status(sys_status)
+                        with ui.element("div").classes(
+                            "grid grid-cols-[auto_1fr] gap-2 items-start mt-1"
+                        ):
+                            ui.icon(sys_ikon).classes(f"{sys_farge} text-base mt-0.5")
+                            with ui.column().classes("gap-0 min-w-0"):
+                                ui.label("Systembruker").classes(
+                                    "text-sm font-medium text-slate-700"
+                                )
+                                ui.label(sys_melding).classes(f"text-xs {sys_farge}")
+
+                    # Sammendrag-rad
+                    klart = auth_ok and res["systembruker"] and res["systembruker"][0] == "godkjent"
+                    sammendrag_ikon = "check_circle" if klart else "info"
+                    sammendrag_farge = "text-green-700" if klart else "text-slate-500"
+                    sammendrag_tekst = (
+                        "Klar for innsending"
+                        if klart
+                        else "Ikke klar for innsending — fiks det som er rødt eller gult"
+                    )
+                    with ui.element("div").classes(
+                        "grid grid-cols-[auto_1fr] gap-2 items-center mt-2 pt-2 border-t border-slate-200"
+                    ):
+                        ui.icon(sammendrag_ikon).classes(f"{sammendrag_farge} text-base")
+                        ui.label(sammendrag_tekst).classes(
+                            f"text-sm font-medium {sammendrag_farge}"
+                        )
 
     ui.button("Test tilkobling mot Altinn", on_click=test_tilkobling).props("color=primary outline")
 
