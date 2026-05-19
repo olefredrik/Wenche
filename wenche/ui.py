@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
+import httpx
 import yaml
 from nicegui import app, run, ui
 
@@ -1088,6 +1089,59 @@ def _bygg_oppsett_fane() -> None:
             and _les_konfig_for_milj("MASKINPORTEN_KID", env)
         )
 
+    def _tolk_feilmelding(env: str, raw: str) -> str:
+        """Oversett rå auth-feilmelding til brukervennlig norsk."""
+        import json
+        import re
+
+        miljo = "testmiljøet (tt02)" if env == "test" else "produksjonsmiljøet"
+        portal = (
+            "sjolvbetjening.test.samarbeid.digdir.no"
+            if env == "test"
+            else "sjolvbetjening.samarbeid.digdir.no"
+        )
+
+        # Maskinporten-feil: "Maskinporten svarte 400:\n{...json...}"
+        if "Maskinporten svarte" in raw:
+            m = re.search(r"\{.*\}", raw, re.DOTALL)
+            if m:
+                try:
+                    p = json.loads(m.group(0))
+                    kode = p.get("error", "")
+                    beskr = p.get("error_description", "")
+
+                    if kode == "invalid_grant" and "Client authentication" in beskr:
+                        return (
+                            f"Klient-ID-en din er ikke registrert i {miljo} "
+                            f"hos Maskinporten. Sjekk at klienten er opprettet "
+                            f"i riktig portal ({portal}) og at klient-ID + "
+                            f"nøkkel-ID i {('test' if env == 'test' else 'prod')}-kortet "
+                            f"matcher det som ligger der."
+                        )
+                    if kode == "invalid_grant":
+                        return f"Maskinporten avviste innloggingen: {beskr or kode}."
+                    if kode == "invalid_client":
+                        return f"Maskinporten kjenner ikke klient-ID-en i {miljo}."
+                    if kode == "invalid_scope":
+                        return (
+                            "Klienten mangler ett eller flere scopes du har "
+                            f"prøvd å hente. Legg dem til på klienten i {portal}."
+                        )
+                    return f"Maskinporten-feil ({kode}): {beskr or 'ingen detaljer'}."
+                except (json.JSONDecodeError, AttributeError):
+                    pass
+
+            m = re.search(r"svarte (\d+)", raw)
+            if m:
+                return (
+                    f"Maskinporten svarte med HTTP {m.group(1)} for {miljo}. "
+                    "Sjekk credentials og at klienten er registrert i riktig miljø."
+                )
+
+        # Andre RuntimeError-meldinger (manglende env, manglende nøkkelfil osv.)
+        # Vis bare første linje for å holde meldingen kort.
+        return raw.split("\n")[0]
+
     def _test_for_milj(env: str) -> tuple[bool, str]:
         """Test tilkobling for ett spesifikt miljø. Returnerer (ok, melding)."""
         opprinnelig_env = os.environ.get("WENCHE_ENV")
@@ -1096,9 +1150,24 @@ def _bygg_oppsett_fane() -> None:
             auth.login(lagre_token=False)
             return True, "Tilkobling OK"
         except RuntimeError as e:
-            return False, str(e).split("\n")[0]  # første linje for visning
+            return False, _tolk_feilmelding(env, str(e))
+        except httpx.HTTPStatusError as e:
+            kode = e.response.status_code
+            if kode == 401:
+                return False, (
+                    f"Altinn avviste tokenet (HTTP 401). Maskinporten-tokenet "
+                    f"ble hentet, men Altinn aksepterer det ikke. Vanligste "
+                    f"årsak: scopene altinn:instances.* er ikke aktivert på "
+                    f"klienten din i dette miljøet."
+                )
+            if kode == 403:
+                return False, (
+                    f"Altinn avslo tilgangen (HTTP 403). Sjekk at systembruker "
+                    f"er opprettet og godkjent for org.nr. {os.getenv('ORG_NUMMER', '')}."
+                )
+            return False, f"Altinn svarte med HTTP {kode}."
         except Exception as e:
-            return False, f"Uventet feil: {type(e).__name__}: {e}"
+            return False, f"Uventet feil ({type(e).__name__}): {e}"
         finally:
             if opprinnelig_env is None:
                 os.environ.pop("WENCHE_ENV", None)
