@@ -1250,6 +1250,14 @@ def _bygg_oppsett_fane() -> None:
                         if n is not None:
                             n.dismiss()
                     except Exception as e:
+                        if silent:
+                            # Stille auto-sjekk skal aldri forstyrre brukeren med
+                            # rød feiltekst på en transient feil ved oppstart.
+                            # Status forblir på initial-tilstanden («Forespørsel
+                            # sendt — status ikke sjekket» eller tilsvarende),
+                            # og brukeren kan klikke «Sjekk status på nytt» for
+                            # å se full feilmelding hvis problemet vedvarer.
+                            return
                         _vis_status(env, "feil", f"Kunne ikke sjekke status ({type(e).__name__})")
                         if n is not None:
                             n.message = f"Feil ved statussjekk: {e}"
