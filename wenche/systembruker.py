@@ -98,7 +98,7 @@ def registrer_system(maskinporten_token: str, vendor_orgnr: str, client_id: str)
         timeout=15,
     )
     if resp.is_success:
-        return resp.json()
+        return _normaliser_svar(resp, sid, oppdatert=False)
 
     # Systemet finnes allerede — oppdater med PUT
     if resp.status_code == 400 and "already exists" in resp.text:
@@ -110,9 +110,26 @@ def registrer_system(maskinporten_token: str, vendor_orgnr: str, client_id: str)
         )
         if not resp.is_success:
             raise RuntimeError(f"{resp.status_code} {resp.reason_phrase}:\n{resp.text}")
-        return resp.json() if resp.text.strip() else {"id": sid, "oppdatert": True}
+        return _normaliser_svar(resp, sid, oppdatert=True)
 
     raise RuntimeError(f"{resp.status_code} {resp.reason_phrase}:\n{resp.text}")
+
+
+def _normaliser_svar(resp, sid: str, oppdatert: bool) -> dict:
+    """Altinn returnerer noen ganger system-ID-en som rå streng i stedet for dict.
+    Normaliser til alltid-dict for konsistent oppstrøms-bruk."""
+    if not resp.text.strip():
+        return {"id": sid, "oppdatert": oppdatert}
+    try:
+        data = resp.json()
+    except Exception:
+        return {"id": sid, "oppdatert": oppdatert}
+    if isinstance(data, dict):
+        data.setdefault("id", sid)
+        data.setdefault("oppdatert", oppdatert)
+        return data
+    # Strengt svar (typisk bare system-ID-en)
+    return {"id": data if isinstance(data, str) else sid, "oppdatert": oppdatert}
 
 
 def opprett_forespørsel(
