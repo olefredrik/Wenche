@@ -1280,7 +1280,10 @@ def _bygg_oppsett_fane() -> None:
                                 env, systembruker.registrer_system, token, orgnr, client_id,
                             )
                         )
-                        n.message = "System oppdatert." if svar.get("oppdatert") else "System registrert."
+                        # Altinn returnerer noen ganger bare system-ID-en som
+                        # streng på POST i stedet for et dict. Håndter begge.
+                        oppdatert = isinstance(svar, dict) and svar.get("oppdatert", False)
+                        n.message = "System oppdatert." if oppdatert else "System registrert."
                         n.spinner = False
                         n.type = "positive"
                         n.timeout = 5
