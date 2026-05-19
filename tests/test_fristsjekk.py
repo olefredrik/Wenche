@@ -145,14 +145,21 @@ class TestSjekkSkattemelding:
         assert result.innfridd is False
         assert "kontakte Skatteetaten" in result.beskrivelse
 
-    def test_testmiljo_hopper_over_sjekken(self):
-        """I testmiljø skal vi vise informativ melding, ikke ringe API-et."""
+    @patch("wenche.fristsjekk.httpx.get")
+    def test_tvinger_prod_uavhengig_av_wenche_env(self, mock_get):
+        """Sjekken skal alltid gå mot prod, selv om WENCHE_ENV=test."""
         with patch.dict(os.environ, {"WENCHE_ENV": "test"}):
-            result = sjekk_skattemelding("922020523", 2025)
+            with patch("wenche.auth.get_skd_skattemelding_maskinporten_token", return_value="t"):
+                mock_get.return_value = _mock_response(
+                    text=_wrapper_xml("skattemeldingUpersonligUtkast"),
+                )
+                result = sjekk_skattemelding("922020523", 2025)
 
+        # Skal ha ringt prod-URL, ikke test-URL
+        called_url = mock_get.call_args[0][0]
+        assert "api.skatteetaten.no" in called_url
+        assert "api-test.sits.no" not in called_url
         assert result.innfridd is False
-        assert "test" in result.beskrivelse.lower() or "test" in result.brukertekst.lower()
-        assert "prod" in result.brukertekst.lower()
 
 
 # ---------------------------------------------------------------------------

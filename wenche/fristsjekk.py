@@ -69,30 +69,33 @@ class FristStatus:
 
 
 def sjekk_skattemelding(orgnr: str, aar: int) -> FristStatus:
-    """Sjekk om skattemelding er fastsatt via Skatteetatens API."""
-    env = os.getenv("WENCHE_ENV", "prod")
+    """
+    Sjekk om skattemelding er fastsatt via Skatteetatens API.
 
-    # Skatteetatens testmiljø kjenner kun syntetiske Tenor-orgnumre.
-    # En statussjekk fra Hjem-fanen mot test-API-et med ekte org.nr.
-    # ville bare gitt "Ugyldig identifikator". Vi viser i stedet en
-    # informativ melding så brukeren forstår hva som mangler.
-    if env == "test":
-        return FristStatus(
-            beskrivelse="Statussjekk kun tilgjengelig i prod-miljø",
-            brukertekst=(
-                "Du er i testmiljø. Statussjekk mot Skatteetaten gjøres kun "
-                "mot prod-API-et med ekte org.nr. Bytt aktivt miljø til "
-                "Produksjon i Oppsett-fanen når du er klar."
-            ),
-        )
-
+    Hjem-fanen viser alltid reell innsendingsstatus mot prod, uavhengig av
+    WENCHE_ENV. Test-API-et kjenner uansett kun syntetiske Tenor-orgnumre.
+    Vi setter WENCHE_ENV midlertidig til 'prod' rundt auth-flyten slik at
+    prod-Maskinporten og prod-credentials brukes selv om global WENCHE_ENV
+    er noe annet.
+    """
+    opprinnelig_env = os.environ.get("WENCHE_ENV")
+    os.environ["WENCHE_ENV"] = "prod"
     try:
-        from wenche.auth import get_skd_skattemelding_maskinporten_token
+        try:
+            from wenche.auth import get_skd_skattemelding_maskinporten_token
 
-        token = get_skd_skattemelding_maskinporten_token()
-    except RuntimeError:
-        return FristStatus(beskrivelse="Maskinporten ikke konfigurert")
+            token = get_skd_skattemelding_maskinporten_token()
+        except RuntimeError:
+            return FristStatus(beskrivelse="Maskinporten ikke konfigurert for prod")
+        return _utfør_skattemelding_sjekk(token, orgnr, aar)
+    finally:
+        if opprinnelig_env is None:
+            os.environ.pop("WENCHE_ENV", None)
+        else:
+            os.environ["WENCHE_ENV"] = opprinnelig_env
 
+
+def _utfør_skattemelding_sjekk(token: str, orgnr: str, aar: int) -> FristStatus:
     base = _SKD_BASES["prod"]
 
     try:

@@ -57,6 +57,24 @@ _WENCHE_DIR = Path.home() / ".wenche"
 _REQUEST_ID_FIL = _WENCHE_DIR / "systembruker_request_id.txt"  # legacy (alle miljø)
 
 
+def _med_env(env: str, fn, *args, **kwargs):
+    """
+    Kjør fn med WENCHE_ENV midlertidig satt til env, restorer etterpå.
+
+    Brukes av flere faner (Oppsett, Send, Hjem) for å midlertidig peke auth-
+    flyten mot et bestemt miljø uavhengig av globalt aktivt miljø.
+    """
+    opprinnelig = os.environ.get("WENCHE_ENV")
+    os.environ["WENCHE_ENV"] = env
+    try:
+        return fn(*args, **kwargs)
+    finally:
+        if opprinnelig is None:
+            os.environ.pop("WENCHE_ENV", None)
+        else:
+            os.environ["WENCHE_ENV"] = opprinnelig
+
+
 def _request_id_fil_for_milj(env: str) -> Path:
     """Sti til miljø-spesifikk request-id-fil. Faller tilbake til legacy-fil."""
     return _WENCHE_DIR / f"systembruker_request_id_{env}.txt"
@@ -597,35 +615,40 @@ def _les_konfig_for_milj(navn: str, env: str, default: str = "") -> str:
     """
     Les credential-verdi for gitt miljø.
 
-    Prøver først miljø-spesifikk variant ({navn}_{TEST|PROD}), faller tilbake
-    til generisk variabelnavn for brukere som kun har ett sett credentials.
+    Prøver først miljø-spesifikk variant ({navn}_{TEST|PROD}). Hvis den er
+    eksplisitt satt (selv som tom streng) er den autoritativ, slik at brukere
+    som har tømt feltet ikke får tilbake en gammel generisk fallback-verdi.
+    Faller tilbake til generisk variabelnavn kun når miljø-spesifikk
+    variabel ikke er definert i det hele tatt.
     """
-    return os.getenv(f"{navn}_{env.upper()}") or os.getenv(navn) or default
+    env_key = f"{navn}_{env.upper()}"
+    if env_key in os.environ:
+        return os.environ[env_key] or default
+    return os.getenv(navn) or default
 
 
 def _sjekk_konfig() -> list[tuple[bool, str, str]]:
     resultater = []
-    env = os.getenv("WENCHE_ENV", "prod")
-    suffix = env.upper()
 
-    client_id = _les_konfig_for_milj("MASKINPORTEN_CLIENT_ID", env)
-    resultater.append((
-        bool(client_id),
-        f"MASKINPORTEN_CLIENT_ID for {suffix}",
-        "Satt" if client_id else f"Mangler. Sett MASKINPORTEN_CLIENT_ID_{suffix} (eller MASKINPORTEN_CLIENT_ID som fallback) i .env",
-    ))
-    kid = _les_konfig_for_milj("MASKINPORTEN_KID", env)
-    resultater.append((
-        bool(kid),
-        f"MASKINPORTEN_KID for {suffix}",
-        "Satt" if kid else f"Mangler. Sett MASKINPORTEN_KID_{suffix} (eller MASKINPORTEN_KID som fallback) i .env",
-    ))
+    # Credentials per miljø — viser status for begge slik at brukeren ser hva
+    # som er på plass uten å måtte tenke på «aktivt miljø».
+    for env, miljo_navn in [("test", "Testmiljø"), ("prod", "Produksjon")]:
+        client_id = _les_konfig_for_milj("MASKINPORTEN_CLIENT_ID", env)
+        kid = _les_konfig_for_milj("MASKINPORTEN_KID", env)
+        komplett = bool(client_id and kid)
+        if komplett:
+            detalj = "Klient-ID og Nøkkel-ID satt"
+        elif client_id or kid:
+            detalj = "Delvis konfigurert (mangler Klient-ID eller Nøkkel-ID)"
+        else:
+            detalj = "Ikke konfigurert"
+        resultater.append((komplett, f"{miljo_navn}-credentials", detalj))
+
     orgnr = os.getenv("ORG_NUMMER")
     resultater.append((bool(orgnr), "ORG_NUMMER", "Satt" if orgnr else "Mangler. Legg til i .env-filen"))
-    nokkel_sti = _les_konfig_for_milj("MASKINPORTEN_PRIVAT_NOKKEL", env, "maskinporten_privat.pem")
+    nokkel_sti = os.getenv("MASKINPORTEN_PRIVAT_NOKKEL", "maskinporten_privat.pem")
     nokkel_ok = Path(nokkel_sti).exists()
     resultater.append((nokkel_ok, "Privat nøkkel", f"Funnet: {nokkel_sti}" if nokkel_ok else f"Finner ikke: {nokkel_sti}"))
-    resultater.append((True, "Miljø", f"{'Testmiljø (tt02)' if env == 'test' else 'Produksjon'}, bytt i Oppsett-fanen"))
     return resultater
 
 
@@ -956,33 +979,7 @@ def _bygg_oppsett_fane() -> None:
     ).classes("text-slate-500 text-sm mb-4")
 
     # --- Aktivt miljø ---
-    seksjonstittel("Aktivt miljø")
-    ui.label(
-        "Avgjør hvilket sett credentials Wenche bruker. Du kan konfigurere "
-        "begge miljø samtidig under, og bytte aktivt miljø her uten å redigere noe annet."
-    ).classes("text-sm text-slate-500 mb-3")
-
     dot_env_fil = Path(".env")
-    aktivt_env = os.getenv("WENCHE_ENV", "prod")
-
-    inp_env = ui.radio(
-        {"test": "Testmiljø (tt02)", "prod": "Produksjon"},
-        value=aktivt_env,
-    ).props("inline color=primary")
-
-    # Når brukeren bytter radio-knappen, oppdater os.environ umiddelbart slik
-    # at andre faner (særlig Hjem-fanens statussjekk) reflekterer det nye
-    # miljøet uten å vente på Lagre-klikk. Lagre-knappen persisterer fortsatt
-    # endringen til .env-filen.
-    def _radio_endret():
-        os.environ["WENCHE_ENV"] = inp_env.value
-        miljo_navn = "testmiljø" if inp_env.value == "test" else "produksjon"
-        ui.notify(
-            f"Aktivt miljø satt til {miljo_navn}. Klikk Lagre for å persistere.",
-            type="info",
-        )
-
-    inp_env.on_value_change(lambda _: _radio_endret())
 
     # --- Miljø-oppsett (credentials + systembruker per miljø) ---
     ui.separator().classes("my-4")
@@ -1001,18 +998,6 @@ def _bygg_oppsett_fane() -> None:
             _les_konfig_for_milj("MASKINPORTEN_CLIENT_ID", env)
             and _les_konfig_for_milj("MASKINPORTEN_KID", env)
         )
-
-    # Helper: kjør en operasjon med en bestemt WENCHE_ENV, restorer etterpå.
-    def _med_env(env: str, fn, *args, **kwargs):
-        opprinnelig = os.environ.get("WENCHE_ENV")
-        os.environ["WENCHE_ENV"] = env
-        try:
-            return fn(*args, **kwargs)
-        finally:
-            if opprinnelig is None:
-                os.environ.pop("WENCHE_ENV", None)
-            else:
-                os.environ["WENCHE_ENV"] = opprinnelig
 
     status_kontainer: dict[str, "ui.column"] = {}
     godkjenn_url_kontainer: dict[str, "ui.element"] = {}
@@ -1107,6 +1092,16 @@ def _bygg_oppsett_fane() -> None:
                 "for å lage en ny forespørsel."
             )
             _vis_godkjenn_lenke(env, "")
+        elif status == "feil":
+            ikon, farge = "error_outline", "text-red-600"
+            overskrift = melding or "Kunne ikke sjekke status"
+            forklaring = (
+                "Vanligste årsaker: ugyldige credentials for dette miljøet, "
+                "klient ikke registrert hos Maskinporten, eller manglende "
+                "scopes. Klikk «Sjekk status på nytt» i Avansert for å se "
+                "den fulle feilmeldingen."
+            )
+            _vis_godkjenn_lenke(env, "")
         elif status == "ikke_opprettet":
             ikon, farge = "info", "text-slate-500"
             overskrift = "Ingen systembruker satt opp"
@@ -1194,15 +1189,23 @@ def _bygg_oppsett_fane() -> None:
                 godkjenn_url_kontainer[env_var] = ui.element("div").classes("mb-2")
                 knapper_kontainer[env_var] = ui.column().classes("w-full gap-2 mt-2")
 
-                async def sjekk_status_handler(env=env_var):
+                async def sjekk_status_handler(env=env_var, silent: bool = False):
+                    """Sjekk systembruker-status for et miljø.
+
+                    silent=True brukes ved auto-sjekk ved sidelasting — feil
+                    blir kun synlige som rødt i status-raden, ikke som
+                    forstyrrende popup-meldinger.
+                    """
                     request_id = _les_request_id(env)
                     if not request_id:
                         _vis_status(env, "ikke_opprettet")
                         return
-                    n = ui.notification(
-                        f"Sjekker status i {('testmiljø' if env == 'test' else 'produksjon')}...",
-                        spinner=True, timeout=None,
-                    )
+                    n = None
+                    if not silent:
+                        n = ui.notification(
+                            f"Sjekker status i {('testmiljø' if env == 'test' else 'produksjon')}...",
+                            spinner=True, timeout=None,
+                        )
                     try:
                         token = await run.io_bound(lambda: _med_env(env, auth.login_admin))
                         svar = await run.io_bound(
@@ -1211,13 +1214,16 @@ def _bygg_oppsett_fane() -> None:
                             )
                         )
                         _vis_status(env, svar.get("status", "ukjent"))
-                        n.dismiss()
+                        if n is not None:
+                            n.dismiss()
                     except Exception as e:
-                        n.message = f"Feil ved statussjekk: {e}"
-                        n.spinner = False
-                        n.type = "negative"
-                        n.timeout = 0
-                        n.close_button = "Lukk"
+                        _vis_status(env, "feil", f"Kunne ikke sjekke status ({type(e).__name__})")
+                        if n is not None:
+                            n.message = f"Feil ved statussjekk: {e}"
+                            n.spinner = False
+                            n.type = "negative"
+                            n.timeout = 0
+                            n.close_button = "Lukk"
 
                 async def registrer_handler(env=env_var):
                     n = ui.notification(
@@ -1351,12 +1357,17 @@ def _bygg_oppsett_fane() -> None:
                 _vis_status(env_var, None)
 
                 # Auto-sjekk status ved sidelasting hvis vi har credentials og
-                # en eksisterende forespørsel. Brukeren slipper å klikke.
+                # en eksisterende forespørsel. Stille modus betyr at evt. feil
+                # kun synes i status-raden, ikke som popup-notifikasjoner.
                 if (
                     _milj_har_credentials(env_var)
                     and _les_request_id(env_var)
                 ):
-                    ui.timer(1.0, sjekk_status_handler, once=True)
+                    ui.timer(
+                        1.0,
+                        lambda env=env_var: sjekk_status_handler(env=env, silent=True),
+                        once=True,
+                    )
 
     # --- Felles for begge miljø ---
     ui.separator().classes("my-4")
@@ -1389,25 +1400,24 @@ def _bygg_oppsett_fane() -> None:
     async def lagre_konfig():
         from dotenv import set_key
         dot_env_fil.touch(exist_ok=True)
-        valgt_env = inp_env.value
 
-        # Lagre credentials per miljø — begge sett skrives uavhengig av aktivt miljø.
+        # Lagre credentials per miljø — begge sett skrives uavhengig av hverandre.
+        # Skriver alltid eksplisitt (selv om tomt) slik at tomming fra UI faktisk
+        # persisteres. _les_konfig_for_milj behandler eksplisitt tom som
+        # autoritativ (ikke fallback til generisk legacy-verdi).
         for kort_env, inputs in [("test", test_card_inputs), ("prod", prod_card_inputs)]:
             suffix = kort_env.upper()
-            if inputs["client_id"].value:
-                navn = f"MASKINPORTEN_CLIENT_ID_{suffix}"
-                set_key(str(dot_env_fil), navn, inputs["client_id"].value)
-                os.environ[navn] = inputs["client_id"].value
-            if inputs["kid"].value:
-                navn = f"MASKINPORTEN_KID_{suffix}"
-                set_key(str(dot_env_fil), navn, inputs["kid"].value)
-                os.environ[navn] = inputs["kid"].value
+            for felt_navn, env_navn in [
+                ("client_id", f"MASKINPORTEN_CLIENT_ID_{suffix}"),
+                ("kid", f"MASKINPORTEN_KID_{suffix}"),
+            ]:
+                verdi = inputs[felt_navn].value or ""
+                set_key(str(dot_env_fil), env_navn, verdi)
+                os.environ[env_navn] = verdi
 
         if inp_orgnr.value:
             set_key(str(dot_env_fil), "ORG_NUMMER", inp_orgnr.value)
             os.environ["ORG_NUMMER"] = inp_orgnr.value
-        set_key(str(dot_env_fil), "WENCHE_ENV", valgt_env)
-        os.environ["WENCHE_ENV"] = valgt_env
         if pem_bytes_holder:
             nokkel_sti = Path("maskinporten_privat.pem")
             nokkel_sti.write_bytes(pem_bytes_holder[0])
@@ -1415,8 +1425,7 @@ def _bygg_oppsett_fane() -> None:
             set_key(str(dot_env_fil), "MASKINPORTEN_PRIVAT_NOKKEL", str(nokkel_sti))
             os.environ["MASKINPORTEN_PRIVAT_NOKKEL"] = str(nokkel_sti)
         konfig_status.refresh()
-        miljo_navn = "testmiljø" if valgt_env == "test" else "produksjon"
-        ui.notify(f"Konfigurasjon lagret. Aktivt miljø: {miljo_navn}.", type="positive")
+        ui.notify("Konfigurasjon lagret.", type="positive")
 
     ui.button("Lagre konfigurasjon", on_click=lagre_konfig).props("color=primary").classes("mt-2")
 
@@ -2210,7 +2219,7 @@ def _bygg_send_fane() -> None:
 
     async def hent_altinn_token() -> str | None:
         try:
-            return await run.io_bound(auth.get_altinn_token)
+            return await run.io_bound(lambda: _med_env(env_valg.value, auth.get_altinn_token))
         except RuntimeError as e:
             feilmelding = str(e)
             if "invalid_altinn_customer_configuration" in feilmelding:
@@ -2266,7 +2275,7 @@ def _bygg_send_fane() -> None:
             return
         n = ui.notification("Henter Maskinporten-token med SKD-scope...", spinner=True, timeout=None)
         try:
-            skd_token = await run.io_bound(auth.get_skd_aksjonaer_token)
+            skd_token = await run.io_bound(lambda: _med_env(env_valg.value, auth.get_skd_aksjonaer_token))
             n.message = "Sender aksjonærregisteroppgave til Skatteetaten..."
 
             def _send():
@@ -2293,7 +2302,7 @@ def _bygg_send_fane() -> None:
         orgnr = os.getenv("SKD_TEST_ORG_NUMMER", state.org_nummer) if env_valg.value == "test" else state.org_nummer
         n = ui.notification("Henter tokens for skattemelding...", spinner=True, timeout=None)
         try:
-            tokens = await run.io_bound(auth.get_skd_skattemelding_tokens)
+            tokens = await run.io_bound(lambda: _med_env(env_valg.value, auth.get_skd_skattemelding_tokens))
             n.message = "Henter forhåndsutfylt skattemelding..."
 
             def _hent_og_send():
