@@ -211,9 +211,16 @@ def login(lagre_token: bool = True) -> dict:
         "MASKINPORTEN_KID", env,
         "Finn nøkkel-ID (UUID) i Digdirs selvbetjeningsportal under klientens nøkler og legg den i .env.",
     )
-    org_nummer = _les_påkrevd_env(
+    vendor_orgnr = _les_påkrevd_env(
         "ORG_NUMMER",
         "Legg til ORG_NUMMER=<ditt organisasjonsnummer> i .env.",
+    )
+    # I testmiljø skal Maskinporten-JWT-en hevde at vi handler på vegne av
+    # den syntetiske Tenor-orgen (kunden i test), ikke vår egen leverandør-org.
+    # Systembrukeren i tt02-Altinn er knyttet til Tenor-orgen, så uten denne
+    # mappingen får vi 403 på instance-opprettelse selv om credentials er ok.
+    org_nummer = (
+        os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr) if env == "test" else vendor_orgnr
     )
     nokkel_sti = _les_miljo_env(
         "MASKINPORTEN_PRIVAT_NOKKEL", env, paakrevd=False, default="maskinporten_privat.pem",
