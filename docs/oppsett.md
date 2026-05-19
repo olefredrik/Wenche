@@ -57,9 +57,25 @@ Gå til [sjolvbetjening.samarbeid.digdir.no](https://sjolvbetjening.samarbeid.di
 3. Klikk **Gå til Altinn for å fullføre** og godkjenn forespørselen i Altinn
 
 !!! info "Behandlingstid"
-    Tilgang gis vanligvis samme dag, men kan ta noe lenger tid. Steg 2c og 2d gjøres etter at du har fått tilgang.
+    Tilgang gis vanligvis samme dag, men kan ta noe lenger tid.
 
-### 2c. Opprett integrasjon
+### 2c. Registrer Wenche som sluttbrukersystem hos Digdir
+
+!!! info "Gjelder deg?"
+    Dette steget gjelder **kun virksomheter som ikke tidligere har integrert et eget sluttbrukersystem mot Altinn 3**. Har virksomheten din allerede gjort dette (du ser de fem Altinn-scopene under steg 2d som søkbare), kan du hoppe rett til steg 2d.
+
+De fem Altinn 3-scopene som Wenche bruker (`altinn:instances.read`, `altinn:instances.write`, `altinn:authentication/systemregister.write`, `altinn:authentication/systemuser.request.read`, `altinn:authentication/systemuser.request.write`) er ikke åpent tilgjengelige. Virksomheten din må registreres som sluttbrukersystem-leverandør hos Digdir før scopene blir søkbare i selvbetjeningsportalen.
+
+Følg veiledningen [Kom i gang med integrasjon mot Altinn 3](https://samarbeid.digdir.no/altinn/kom-i-gang/2868) på Samarbeidsportalen. Hovedstegene er:
+
+1. **Godkjenn bruksvilkår for sluttbrukersystemleverandør** (punkt 0.3 i Digdirs veiledning). Selv om Wenche er ditt eget verktøy for din egen virksomhet, regnes du som både leverandør og kunde av sluttbrukersystemet.
+2. **Fyll ut registreringsskjemaet for sluttbrukersystem** (punkt 1.1). Oppgi at du trenger de fem scopene listet over, og om du ønsker tilgang i produksjon, testmiljø (tt02), eller begge.
+3. **Vent på e-post fra Digdir** med bekreftelse på at scopene er tildelt (punkt 1.3). Dette tar typisk noen virkedager.
+
+!!! tip "Hvis scopene ikke blir tilgjengelige etter forventet behandlingstid"
+    Ta kontakt med [servicedesk@altinn.no](mailto:servicedesk@altinn.no). Oppgi organisasjonsnummeret ditt og hvilke scopes du venter på. De kan sjekke status manuelt og innvilge tilgang om noe har stoppet opp.
+
+### 2d. Opprett integrasjon
 
 !!! info "Produksjon eller test?"
     De fleste trenger kun å sette opp **Produksjon**. Testmiljøet (Altinn tt02) er for utviklere som vil teste innsending uten å sende ekte data til myndighetene. De to miljøene har hver sin portal:
@@ -67,7 +83,7 @@ Gå til [sjolvbetjening.samarbeid.digdir.no](https://sjolvbetjening.samarbeid.di
     - **Produksjon:** [sjolvbetjening.samarbeid.digdir.no](https://sjolvbetjening.samarbeid.digdir.no)
     - **Test:** [sjolvbetjening.test.samarbeid.digdir.no](https://sjolvbetjening.test.samarbeid.digdir.no)
 
-    Setter du opp begge miljøene, gjenta steg 2c og 2d i begge portaler.
+    Setter du opp begge miljøene, gjenta steg 2d og 2e i begge portaler.
 
 Logg inn på riktig portal. Du vil bli bedt om å velge innloggingsmetode — velg **Med organisasjonsnummer** (ikke «Med syntetisk organisasjon»). Det forutsetter at du har fått tildelt rettigheter til selvbetjening av APIer og integrasjoner i Altinn, noe som skjer automatisk når du søker om tilgang som Maskinporten-konsument i steg 2b.
 
@@ -95,18 +111,18 @@ Følg stegene under:
 
         | Scope | Formål |
         |---|---|
-        | `skatteetaten:innrapporteringaksjonaerregisteroppgave` | Aksjonærregisteroppgave (RF-1086) — se steg 2e |
-        | `skatteetaten:formueinntekt/skattemelding` | Skattemelding for AS — se steg 2f |
+        | `skatteetaten:innrapporteringaksjonaerregisteroppgave` | Aksjonærregisteroppgave (RF-1086) — se steg 2f |
+        | `skatteetaten:formueinntekt/skattemelding` | Skattemelding for AS — se steg 2g |
 
 4. Kopier **klient-ID** — du trenger den i steg 3
 
-### 2d. Last opp offentlig nøkkel
+### 2e. Last opp offentlig nøkkel
 
 Under klienten, klikk **Legg til nøkkel** og lim inn innholdet i `maskinporten_offentlig.pem`. Lagre klienten.
 
 Nøkkelen vil vises i listen med en UUID (f.eks. `9bc5078c-...`). Kopier denne UUID-en — dette er din **KID**, som du trenger i steg 3.
 
-### 2e. Søk om tilgang til SKDs API for aksjonærregisteroppgave
+### 2f. Søk om tilgang til SKDs API for aksjonærregisteroppgave
 
 !!! note "Valgfritt"
     Dette steget er kun nødvendig dersom du skal sende inn aksjonærregisteroppgave (RF-1086). Hopp over om du bare bruker Wenche til årsregnskap og skattemelding.
@@ -126,12 +142,12 @@ SKD behandler vanligvis slike forespørsler innen noen virkedager.
 
 **Del 2 — Legg til scope i Digdirs selvbetjeningsportal**
 
-Når SKD bekrefter at tilgangen er innvilget, logg inn i Digdirs selvbetjeningsportal (se steg 2c) og legg til scopet `skatteetaten:innrapporteringaksjonaerregisteroppgave` på Maskinporten-klienten din. Scopet vil nå være søkbart i portalen.
+Når SKD bekrefter at tilgangen er innvilget, logg inn i Digdirs selvbetjeningsportal (se steg 2d) og legg til scopet `skatteetaten:innrapporteringaksjonaerregisteroppgave` på Maskinporten-klienten din. Scopet vil nå være søkbart i portalen.
 
 !!! warning "Begge steg er nødvendige"
     Tilgangen fra SKD aktiveres ikke automatisk på klienten. Du må eksplisitt legge til scopet i Digdirs portal etter at SKD har innvilget det.
 
-### 2f. Søk om tilgang til SKDs API for skattemelding
+### 2g. Søk om tilgang til SKDs API for skattemelding
 
 !!! note "Valgfritt"
     Dette steget er kun nødvendig dersom du skal sende inn skattemelding for AS. Hopp over om du bare bruker Wenche til årsregnskap og aksjonærregisteroppgave.
@@ -151,7 +167,7 @@ SKD behandler vanligvis slike forespørsler innen noen virkedager.
 
 **Del 2 — Legg til scope i Digdirs selvbetjeningsportal**
 
-Når SKD bekrefter at tilgangen er innvilget, logg inn i Digdirs selvbetjeningsportal (se steg 2c) og legg til scopet `skatteetaten:formueinntekt/skattemelding` på Maskinporten-klienten din. Scopet vil nå være søkbart i portalen.
+Når SKD bekrefter at tilgangen er innvilget, logg inn i Digdirs selvbetjeningsportal (se steg 2d) og legg til scopet `skatteetaten:formueinntekt/skattemelding` på Maskinporten-klienten din. Scopet vil nå være søkbart i portalen.
 
 !!! warning "Begge steg er nødvendige"
     Tilgangen fra SKD aktiveres ikke automatisk på klienten. Du må eksplisitt legge til scopet i Digdirs portal etter at SKD har innvilget det.
