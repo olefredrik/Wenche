@@ -1422,17 +1422,18 @@ def _bygg_oppsett_fane() -> None:
                     and _les_request_id(env_var)
                 ):
                     async def _auto_sjekk_med_retry(env=env_var):
+                        import asyncio
+                        if _siste_status.get(env) not in ("New", None):
+                            return
+                        await sjekk_status_handler(env=env, silent=True)
+                        # Hvis fortsatt i venter-tilstand, prøv én gang til
+                        # om 5 sek. asyncio.sleep brukes i stedet for å
+                        # opprette en ny ui.timer (den ville feilet hvis
+                        # parent-slotten er borte, f.eks. ved sidebytte).
                         if _siste_status.get(env) in ("New", None):
-                            await sjekk_status_handler(env=env, silent=True)
-                            # Hvis fortsatt i venter-tilstand, prøv én gang til
-                            # om 5 sek. Da gir vi event-loopen god tid og
-                            # spammer ikke Altinn med flere kall.
+                            await asyncio.sleep(5)
                             if _siste_status.get(env) in ("New", None):
-                                ui.timer(
-                                    5.0,
-                                    lambda e=env: sjekk_status_handler(env=e, silent=True),
-                                    once=True,
-                                )
+                                await sjekk_status_handler(env=env, silent=True)
 
                     ui.timer(3.0, _auto_sjekk_med_retry, once=True)
 
