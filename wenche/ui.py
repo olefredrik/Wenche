@@ -1193,18 +1193,20 @@ def _bygg_oppsett_fane() -> None:
                 miljo_navn = "Testmiljø (tt02)" if env == "test" else "Produksjon"
                 if ok is None:
                     ikon, farge = "remove_circle_outline", "text-slate-400"
-                    statustekst = melding
                 elif ok:
                     ikon, farge = "check_circle", "text-green-600"
-                    statustekst = melding
                 else:
                     ikon, farge = "error", "text-red-600"
-                    statustekst = melding
-                with ui.row().classes("items-start gap-2"):
+                # Grid med fast ikon-kolonne og fleksibel tekst-kolonne så lange
+                # meldinger wrapper i tekstkolonnen i stedet for å skyve ikonet
+                # ned på egen linje.
+                with ui.element("div").classes(
+                    "grid grid-cols-[auto_1fr] gap-2 items-start w-full"
+                ):
                     ui.icon(ikon).classes(f"{farge} text-base mt-0.5")
-                    with ui.column().classes("gap-0"):
+                    with ui.column().classes("gap-0 min-w-0"):
                         ui.label(miljo_navn).classes("text-sm font-medium text-slate-800")
-                        ui.label(statustekst).classes(f"text-xs {farge}")
+                        ui.label(melding).classes(f"text-xs {farge}")
 
     ui.button("Test tilkobling mot Altinn", on_click=test_tilkobling).props("color=primary outline")
 
