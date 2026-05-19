@@ -54,7 +54,12 @@ from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
 
 CONFIG_FIL = Path("config.yaml")
 _WENCHE_DIR = Path.home() / ".wenche"
-_REQUEST_ID_FIL = _WENCHE_DIR / "systembruker_request_id.txt"
+_REQUEST_ID_FIL = _WENCHE_DIR / "systembruker_request_id.txt"  # legacy (alle miljø)
+
+
+def _request_id_fil_for_milj(env: str) -> Path:
+    """Sti til miljø-spesifikk request-id-fil. Faller tilbake til legacy-fil."""
+    return _WENCHE_DIR / f"systembruker_request_id_{env}.txt"
 
 
 # ---------------------------------------------------------------------------
@@ -619,12 +624,21 @@ def _sjekk_konfig() -> list[tuple[bool, str, str]]:
     return resultater
 
 
-def _lagre_request_id(request_id: str) -> None:
+def _lagre_request_id(request_id: str, env: str | None = None) -> None:
     _WENCHE_DIR.mkdir(exist_ok=True)
+    if env is None:
+        env = os.getenv("WENCHE_ENV", "prod")
+    _request_id_fil_for_milj(env).write_text(request_id, encoding="utf-8")
+    # Behold også i legacy-fil for bakoverkompatibilitet
     _REQUEST_ID_FIL.write_text(request_id, encoding="utf-8")
 
 
-def _les_request_id() -> str:
+def _les_request_id(env: str | None = None) -> str:
+    if env is None:
+        env = os.getenv("WENCHE_ENV", "prod")
+    milj_fil = _request_id_fil_for_milj(env)
+    if milj_fil.exists():
+        return milj_fil.read_text(encoding="utf-8").strip()
     if _REQUEST_ID_FIL.exists():
         return _REQUEST_ID_FIL.read_text(encoding="utf-8").strip()
     return ""
@@ -1212,156 +1226,221 @@ def _bygg_oppsett_fane() -> None:
 
     # --- Systembruker-oppsett ---
     ui.separator().classes("my-4")
-    with ui.expansion("Systembruker-oppsett (gjøres én gang per miljø)").classes("w-full"):
-        ui.label(
-            "Altinn 3 krever at Wenche er registrert som leverandørsystem og at organisasjonen din "
-            "har godkjent en systembruker. Dette gjøres én gang, og på nytt hvis du bytter miljø."
-        ).classes("text-sm text-slate-500 mb-3")
+    seksjonstittel("Systembruker-oppsett")
+    ui.label(
+        "Wenche må være registrert som leverandørsystem i Altinn, og "
+        "virksomheten må ha godkjent en systembruker. Hvert miljø har sin egen "
+        "systembruker — settes opp uavhengig og forblir gyldig så lenge "
+        "rettighetene ikke endres."
+    ).classes("text-sm text-slate-500 mb-3")
 
-        seksjonstittel("Steg 1. Registrer Wenche i systemregisteret")
-        ui.label(
-            "Registrerer Wenche i Altinns systemregister. Kan kjøres på nytt uten skade."
-        ).classes("text-sm text-slate-500 mb-2")
+    # Helper: kjør en operasjon i et bestemt miljø, restorer WENCHE_ENV etterpå.
+    def _med_env(env: str, fn, *args, **kwargs):
+        opprinnelig = os.environ.get("WENCHE_ENV")
+        os.environ["WENCHE_ENV"] = env
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            if opprinnelig is None:
+                os.environ.pop("WENCHE_ENV", None)
+            else:
+                os.environ["WENCHE_ENV"] = opprinnelig
 
-        async def registrer_system():
-            n = ui.notification("Registrerer system i Altinn...", spinner=True, timeout=None)
-            try:
-                token = await run.io_bound(auth.login_admin)
-                orgnr = os.getenv("ORG_NUMMER")
-                client_id = os.getenv("MASKINPORTEN_CLIENT_ID")
-                svar = await run.io_bound(systembruker.registrer_system, token, orgnr, client_id)
-                n.message = "System oppdatert." if svar.get("oppdatert") else "System registrert."
-                n.spinner = False
-                n.type = "positive"
-                n.timeout = 5
-            except Exception as e:
-                n.message = f"Feil: {e}"
-                n.spinner = False
-                n.type = "negative"
-                n.timeout = 0
-                n.close_button = "Lukk"
+    status_kontainer: dict[str, "ui.column"] = {}
+    godkjenn_url_kontainer: dict[str, "ui.element"] = {}
 
-        ui.button("Registrer Wenche i systemregisteret", on_click=registrer_system).props("color=primary outline")
+    def _vis_status(env: str, status: str | None, melding: str | None = None):
+        kontainer = status_kontainer[env]
+        kontainer.clear()
+        if status == "Accepted":
+            ikon, farge, tekst = "check_circle", "text-green-600", "Systembruker godkjent"
+        elif status == "New":
+            ikon, farge, tekst = "schedule", "text-amber-600", "Forespørsel venter på godkjenning"
+        elif status == "Rejected":
+            ikon, farge, tekst = "error", "text-red-600", "Forespørsel avvist — opprett ny"
+        elif status:
+            ikon, farge, tekst = "info", "text-slate-500", f"Status: {status}"
+        else:
+            ikon, farge = "help_outline", "text-slate-400"
+            tekst = melding or "Status ikke sjekket ennå"
+        with kontainer:
+            with ui.element("div").classes("grid grid-cols-[auto_1fr] gap-2 items-center"):
+                ui.icon(ikon).classes(f"{farge} text-base")
+                ui.label(tekst).classes(f"text-sm {farge}")
 
-        seksjonstittel("Steg 1b. Oppdater rettigheter på eksisterende systembruker")
-        ui.label(
-            "Hvis systembrukeren allerede er godkjent og du har lagt til nye rettigheter, "
-            "send en endringsforespørsel. Eksisterende rettigheter beholdes — kun nye legges til."
-        ).classes("text-sm text-slate-500 mb-2")
-        endrings_url_container = ui.element("div")
+    with ui.grid(columns=2).classes("w-full gap-4"):
+        for env_var, miljo_navn, ikon_navn, ikon_farge in [
+            ("test", "Testmiljø (tt02)", "science", "text-slate-500"),
+            ("prod", "Produksjon", "business", "text-slate-700"),
+        ]:
+            with ui.card().classes("w-full p-4 border border-slate-200 shadow-none rounded-xl"):
+                with ui.row().classes("items-center gap-2 mb-2"):
+                    ui.icon(ikon_navn).classes(ikon_farge)
+                    ui.label(miljo_navn).classes("font-semibold text-slate-800")
 
-        async def oppdater_systembruker():
-            n = ui.notification("Henter systembrukere...", spinner=True, timeout=None)
-            try:
-                token = await run.io_bound(auth.login_admin)
-                vendor_orgnr = os.getenv("ORG_NUMMER")
-                env = os.getenv("WENCHE_ENV", "prod")
-                orgnr = os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr) if env == "test" else vendor_orgnr
-                brukere = await run.io_bound(systembruker.hent_systembrukere, token, vendor_orgnr)
-                if not brukere:
-                    n.message = "Ingen aktive systembrukere funnet. Bruk steg 2 for å opprette ny."
-                    n.spinner = False
-                    n.type = "info"
-                    n.timeout = 6
-                    return
-                # Finn systembrukeren for riktig party-org (i test: SKD_TEST_ORG_NUMMER)
-                treff = next(
-                    (b for b in brukere if b.get("reporteeOrgNo") == orgnr),
-                    brukere[0],
-                )
-                bruker_id = treff["id"]
-                # Send kun den nye skattemelding-rettigheten.
-                # Altinn-API-et krever at uendrede rettigheter utelates fra changerequest.
-                svar = await run.io_bound(
-                    systembruker.opprett_endringsforespørsel,
-                    token,
-                    bruker_id,
-                    [systembruker._SKATTEMELDING_RETT],
-                )
-                confirm_url = svar.get("confirmUrl") or svar.get("ConfirmUrl", "")
-                endrings_url_container.clear()
-                with endrings_url_container:
-                    ui.link("Godkjenn i Altinn →", confirm_url, new_tab=True).classes("text-blue-600 font-medium text-sm")
-                n.message = f"Endringsforespørsel opprettet (status: {svar.get('status', '')})"
-                n.spinner = False
-                n.type = "positive"
-                n.timeout = 5
-            except Exception as e:
-                n.message = f"Feil: {e}"
-                n.spinner = False
-                n.type = "negative"
-                n.timeout = 0
-                n.close_button = "Lukk"
+                status_kontainer[env_var] = ui.column().classes("gap-0 mb-2")
+                _vis_status(env_var, None)
 
-        ui.button("Oppdater systembruker-rettigheter", on_click=oppdater_systembruker).props("color=primary outline")
+                godkjenn_url_kontainer[env_var] = ui.element("div").classes("mb-2 min-h-0")
 
-        seksjonstittel("Steg 2. Opprett systembrukerforespørsel")
-        godkjenn_url_container = ui.element("div")
+                # Handlere — bruker env=env_var som default-arg for korrekt closure-capture.
+                async def sjekk_status_handler(env=env_var):
+                    request_id = _les_request_id(env)
+                    if not request_id:
+                        _vis_status(env, None, "Ingen forespørsel opprettet ennå")
+                        return
+                    n = ui.notification(
+                        f"Sjekker status i {('testmiljø' if env == 'test' else 'produksjon')}...",
+                        spinner=True, timeout=None,
+                    )
+                    try:
+                        token = await run.io_bound(lambda: _med_env(env, auth.login_admin))
+                        svar = await run.io_bound(
+                            lambda: _med_env(
+                                env, systembruker.hent_forespørsel_status, token, request_id,
+                            )
+                        )
+                        _vis_status(env, svar.get("status", "ukjent"))
+                        n.dismiss()
+                    except Exception as e:
+                        n.message = f"Feil ved statussjekk: {e}"
+                        n.spinner = False
+                        n.type = "negative"
+                        n.timeout = 0
+                        n.close_button = "Lukk"
 
-        async def opprett_forespørsel():
-            n = ui.notification("Oppretter systembrukerforespørsel...", spinner=True, timeout=None)
-            try:
-                token = await run.io_bound(auth.login_admin)
-                vendor_orgnr = os.getenv("ORG_NUMMER")
-                env = os.getenv("WENCHE_ENV", "prod")
-                party_orgnr = os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr) if env == "test" else vendor_orgnr
-                svar = await run.io_bound(systembruker.opprett_forespørsel, token, vendor_orgnr, party_orgnr)
-                request_id = svar.get("id", "")
-                if request_id:
-                    _lagre_request_id(request_id)
-                confirm_url = svar.get("confirmUrl", "")
-                godkjenn_url_container.clear()
-                with godkjenn_url_container:
-                    ui.link("Godkjenn i Altinn →", confirm_url, new_tab=True).classes("text-blue-600 font-medium text-sm")
-                n.message = f"Forespørsel opprettet (status: {svar['status']})"
-                n.spinner = False
-                n.type = "positive"
-                n.timeout = 5
-            except Exception as e:
-                n.message = f"Feil: {e}"
-                n.spinner = False
-                n.type = "negative"
-                n.timeout = 0
-                n.close_button = "Lukk"
+                async def registrer_handler(env=env_var):
+                    n = ui.notification(
+                        f"Registrerer system i {('testmiljø' if env == 'test' else 'produksjon')}...",
+                        spinner=True, timeout=None,
+                    )
+                    try:
+                        token = await run.io_bound(lambda: _med_env(env, auth.login_admin))
+                        orgnr = os.getenv("ORG_NUMMER")
+                        client_id = _les_konfig_for_milj("MASKINPORTEN_CLIENT_ID", env)
+                        svar = await run.io_bound(
+                            lambda: _med_env(
+                                env, systembruker.registrer_system, token, orgnr, client_id,
+                            )
+                        )
+                        n.message = "System oppdatert." if svar.get("oppdatert") else "System registrert."
+                        n.spinner = False
+                        n.type = "positive"
+                        n.timeout = 5
+                    except Exception as e:
+                        n.message = f"Feil: {e}"
+                        n.spinner = False
+                        n.type = "negative"
+                        n.timeout = 0
+                        n.close_button = "Lukk"
 
-        ui.button("Opprett systembrukerforespørsel", on_click=opprett_forespørsel).props("color=primary outline")
+                async def opprett_handler(env=env_var):
+                    n = ui.notification(
+                        f"Oppretter systembruker-forespørsel i {('testmiljø' if env == 'test' else 'produksjon')}...",
+                        spinner=True, timeout=None,
+                    )
+                    try:
+                        token = await run.io_bound(lambda: _med_env(env, auth.login_admin))
+                        vendor_orgnr = os.getenv("ORG_NUMMER")
+                        party_orgnr = (
+                            os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr)
+                            if env == "test" else vendor_orgnr
+                        )
+                        svar = await run.io_bound(
+                            lambda: _med_env(
+                                env, systembruker.opprett_forespørsel,
+                                token, vendor_orgnr, party_orgnr,
+                            )
+                        )
+                        request_id = svar.get("id", "")
+                        if request_id:
+                            _lagre_request_id(request_id, env)
+                        confirm_url = svar.get("confirmUrl", "")
+                        godkjenn_url_kontainer[env].clear()
+                        with godkjenn_url_kontainer[env]:
+                            ui.link("Godkjenn i Altinn →", confirm_url, new_tab=True).classes(
+                                "text-blue-600 font-medium text-sm"
+                            )
+                        n.message = f"Forespørsel opprettet (status: {svar.get('status', '')})"
+                        n.spinner = False
+                        n.type = "positive"
+                        n.timeout = 5
+                    except Exception as e:
+                        n.message = f"Feil: {e}"
+                        n.spinner = False
+                        n.type = "negative"
+                        n.timeout = 0
+                        n.close_button = "Lukk"
 
-        seksjonstittel("Sjekk godkjenningsstatus")
+                async def oppdater_handler(env=env_var):
+                    n = ui.notification(
+                        f"Henter systembrukere i {('testmiljø' if env == 'test' else 'produksjon')}...",
+                        spinner=True, timeout=None,
+                    )
+                    try:
+                        token = await run.io_bound(lambda: _med_env(env, auth.login_admin))
+                        vendor_orgnr = os.getenv("ORG_NUMMER")
+                        party_orgnr = (
+                            os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr)
+                            if env == "test" else vendor_orgnr
+                        )
+                        brukere = await run.io_bound(
+                            lambda: _med_env(
+                                env, systembruker.hent_systembrukere, token, vendor_orgnr,
+                            )
+                        )
+                        if not brukere:
+                            n.message = "Ingen aktive systembrukere funnet. Opprett ny forespørsel først."
+                            n.spinner = False
+                            n.type = "info"
+                            n.timeout = 6
+                            return
+                        treff = next(
+                            (b for b in brukere if b.get("reporteeOrgNo") == party_orgnr),
+                            brukere[0],
+                        )
+                        bruker_id = treff["id"]
+                        svar = await run.io_bound(
+                            lambda: _med_env(
+                                env, systembruker.opprett_endringsforespørsel,
+                                token, bruker_id, [systembruker._SKATTEMELDING_RETT],
+                            )
+                        )
+                        confirm_url = svar.get("confirmUrl") or svar.get("ConfirmUrl", "")
+                        godkjenn_url_kontainer[env].clear()
+                        with godkjenn_url_kontainer[env]:
+                            ui.link("Godkjenn endring i Altinn →", confirm_url, new_tab=True).classes(
+                                "text-blue-600 font-medium text-sm"
+                            )
+                        n.message = f"Endringsforespørsel opprettet (status: {svar.get('status', '')})"
+                        n.spinner = False
+                        n.type = "positive"
+                        n.timeout = 5
+                    except Exception as e:
+                        n.message = f"Feil: {e}"
+                        n.spinner = False
+                        n.type = "negative"
+                        n.timeout = 0
+                        n.close_button = "Lukk"
 
-        async def sjekk_status():
-            request_id = _les_request_id()
-            if not request_id:
-                ui.notify("Ingen lagret forespørsels-ID. Opprett en forespørsel først.", type="warning")
-                return
-            n = ui.notification("Henter status...", spinner=True, timeout=None)
-            try:
-                token = await run.io_bound(auth.login_admin)
-                svar = await run.io_bound(systembruker.hent_forespørsel_status, token, request_id)
-                status = svar.get("status", "ukjent")
-                n.spinner = False
-                n.timeout = 6
-                if status == "Accepted":
-                    n.message = "Systembruker er godkjent. Du kan nå sende inn dokumenter."
-                    n.type = "positive"
-                elif status == "New":
-                    n.message = "Forespørselen venter på godkjenning."
-                    n.type = "info"
-                elif status == "Rejected":
-                    n.message = "Forespørselen ble avvist. Opprett en ny forespørsel."
-                    n.type = "negative"
-                    n.timeout = 0
-                    n.close_button = "Lukk"
-                else:
-                    n.message = f"Status: {status}"
-                    n.type = "info"
-            except Exception as e:
-                n.message = f"Feil: {e}"
-                n.spinner = False
-                n.type = "negative"
-                n.timeout = 0
-                n.close_button = "Lukk"
-
-        ui.button("Sjekk status", on_click=sjekk_status).props("color=primary outline")
+                with ui.column().classes("w-full gap-1 mt-2"):
+                    ui.button("Sjekk status", on_click=sjekk_status_handler).props(
+                        "color=primary size=sm"
+                    ).classes("w-full")
+                    ui.button("Registrer system", on_click=registrer_handler).props(
+                        "outline color=primary size=sm"
+                    ).classes("w-full")
+                    ui.button("Opprett systembruker", on_click=opprett_handler).props(
+                        "outline color=primary size=sm"
+                    ).classes("w-full")
+                    with ui.expansion("Avansert").classes("w-full text-xs"):
+                        ui.button(
+                            "Oppdater rettigheter", on_click=oppdater_handler,
+                        ).props("outline color=primary size=sm").classes("w-full")
+                        ui.label(
+                            "Send endringsforespørsel hvis du har lagt til nye scopes "
+                            "på en allerede godkjent systembruker."
+                        ).classes("text-xs text-slate-500 mt-1")
 
 
 # ---------------------------------------------------------------------------
