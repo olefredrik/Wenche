@@ -667,7 +667,12 @@ def _les_request_id(env: str | None = None) -> str:
     milj_fil = _request_id_fil_for_milj(env)
     if milj_fil.exists():
         return milj_fil.read_text(encoding="utf-8").strip()
-    if _REQUEST_ID_FIL.exists():
+    # Legacy-fallback brukes kun hvis INGEN env-spesifikke filer finnes —
+    # ellers ville et test-spesifikt request_id smitte over til prod-kortet
+    # (eller motsatt) som om det var en gyldig forespørsel.
+    test_fil = _request_id_fil_for_milj("test")
+    prod_fil = _request_id_fil_for_milj("prod")
+    if not test_fil.exists() and not prod_fil.exists() and _REQUEST_ID_FIL.exists():
         return _REQUEST_ID_FIL.read_text(encoding="utf-8").strip()
     return ""
 
