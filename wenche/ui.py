@@ -54,7 +54,6 @@ from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
 
 CONFIG_FIL = Path("config.yaml")
 _WENCHE_DIR = Path.home() / ".wenche"
-_REQUEST_ID_FIL = _WENCHE_DIR / "systembruker_request_id.txt"  # legacy (alle miljø)
 
 
 def _med_env(env: str, fn, *args, **kwargs):
@@ -666,23 +665,15 @@ def _lagre_request_id(request_id: str, env: str | None = None) -> None:
     if env is None:
         env = os.getenv("WENCHE_ENV", "prod")
     _request_id_fil_for_milj(env).write_text(request_id, encoding="utf-8")
-    # Behold også i legacy-fil for bakoverkompatibilitet
-    _REQUEST_ID_FIL.write_text(request_id, encoding="utf-8")
 
 
 def _les_request_id(env: str | None = None) -> str:
+    """Les request_id for et bestemt miljø. Ingen fallback til andre miljø."""
     if env is None:
         env = os.getenv("WENCHE_ENV", "prod")
     milj_fil = _request_id_fil_for_milj(env)
     if milj_fil.exists():
         return milj_fil.read_text(encoding="utf-8").strip()
-    # Legacy-fallback brukes kun hvis INGEN env-spesifikke filer finnes —
-    # ellers ville et test-spesifikt request_id smitte over til prod-kortet
-    # (eller motsatt) som om det var en gyldig forespørsel.
-    test_fil = _request_id_fil_for_milj("test")
-    prod_fil = _request_id_fil_for_milj("prod")
-    if not test_fil.exists() and not prod_fil.exists() and _REQUEST_ID_FIL.exists():
-        return _REQUEST_ID_FIL.read_text(encoding="utf-8").strip()
     return ""
 
 
