@@ -932,9 +932,23 @@ def _bygg_oppsett_fane() -> None:
     aktivt_env = os.getenv("WENCHE_ENV", "prod")
 
     inp_env = ui.radio(
-        {"prod": "Produksjon", "test": "Testmiljø (tt02)"},
+        {"test": "Testmiljø (tt02)", "prod": "Produksjon"},
         value=aktivt_env,
     ).props("inline color=primary")
+
+    # Når brukeren bytter radio-knappen, oppdater os.environ umiddelbart slik
+    # at andre faner (særlig Hjem-fanens statussjekk) reflekterer det nye
+    # miljøet uten å vente på Lagre-klikk. Lagre-knappen persisterer fortsatt
+    # endringen til .env-filen.
+    def _radio_endret():
+        os.environ["WENCHE_ENV"] = inp_env.value
+        miljo_navn = "testmiljø" if inp_env.value == "test" else "produksjon"
+        ui.notify(
+            f"Aktivt miljø satt til {miljo_navn}. Klikk Lagre for å persistere.",
+            type="info",
+        )
+
+    inp_env.on_value_change(lambda _: _radio_endret())
 
     # --- Credentials per miljø ---
     ui.separator().classes("my-4")
