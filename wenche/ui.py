@@ -598,6 +598,11 @@ class AppState:
 
 # Globalt tilstandsobjekt — initialisert fra config.yaml ved oppstart
 state = AppState()
+
+# Refresh-callback for aksjonær-konsistens-indikatoren. Settes når Aksjonær-
+# fanen bygges, og kalles fra Selskap-fanen når aksjekapital eller stiftelses-
+# år endres, så indikatoren reflekterer ny verdi når brukeren bytter tilbake.
+_aksjonaer_liste_refresh: callable | None = None
 state.les_config()
 
 
@@ -1840,19 +1845,26 @@ def _bygg_selskap_fane() -> None:
     ui.separator().classes("my-2")
 
     with ui.grid(columns=2).classes("w-full gap-4"):
+        # Endringer på disse feltene må også refreshe Aksjonær-fanens
+        # konsistens-indikator, slik at den reflekterer ny verdi når brukeren
+        # bytter tilbake.
+        def oppdater_aksjonaer_indikator():
+            if _aksjonaer_liste_refresh is not None:
+                _aksjonaer_liste_refresh()
+
         txt("Selskapsnavn", "navn")
         txt("Forretningsadresse", "forretningsadresse")
         txt("Organisasjonsnummer (9 siffer)", "org_nummer", placeholder="123456789")
-        num("Stiftelsesår", "stiftelsesaar", step=1, min_val=1900)
+        num("Stiftelsesår", "stiftelsesaar", step=1, min_val=1900, on_change=oppdater_aksjonaer_indikator)
         txt("Daglig leder", "daglig_leder")
-        num("Aksjekapital (NOK)", "aksjekapital", step=1000)
+        num("Aksjekapital (NOK)", "aksjekapital", step=1000, on_change=oppdater_aksjonaer_indikator)
         txt("Styreleder", "styreleder")
         txt(
             "Kontakt-e-post",
             "kontakt_epost",
             tooltip="Påkrevd for aksjonærregisteroppgave (RF-1086).",
         )
-        num("Regnskapsår", "regnskapsaar", step=1, min_val=2000)
+        num("Regnskapsår", "regnskapsaar", step=1, min_val=2000, on_change=oppdater_aksjonaer_indikator)
 
     ui.separator().classes("my-4")
 
@@ -2030,6 +2042,42 @@ def _bygg_aksjonaer_fane() -> None:
 
     @ui.refreshable
     def aksjonaer_liste() -> None:
+        # Konsistens-indikator: ved stiftelse i inntektsåret må sum av
+        # (antall_aksjer * innbetalt_kapital_per_aksje) matche selskapets
+        # aksjekapital, ellers avvises oppgaven av SKD (avvikskode MAKH_053).
+        if state.stiftelsesaar == state.regnskapsaar:
+            sum_innbetalt = sum(
+                a.innbetalt_kapital_per_aksje * a.antall_aksjer for a in state.aksjonaerer
+            )
+            stemmer = round(sum_innbetalt) == round(state.aksjekapital)
+            if stemmer:
+                with ui.row().classes(
+                    "items-center gap-2 p-3 mb-3 bg-emerald-50 "
+                    "border border-emerald-200 rounded-lg"
+                ):
+                    ui.icon("check_circle").classes("text-emerald-600")
+                    ui.label(
+                        f"Sum innbetalt kapital ({round(sum_innbetalt):,} kr) matcher "
+                        f"selskapets aksjekapital."
+                    ).classes("text-sm text-emerald-900")
+            else:
+                diff = round(state.aksjekapital) - round(sum_innbetalt)
+                with ui.row().classes(
+                    "items-start gap-2 p-3 mb-3 bg-amber-50 "
+                    "border border-amber-200 rounded-lg"
+                ):
+                    ui.icon("warning").classes("text-amber-600 mt-0.5")
+                    with ui.column().classes("gap-1"):
+                        ui.label("Sum innbetalt kapital matcher ikke aksjekapital").classes(
+                            "text-sm font-medium text-amber-900"
+                        )
+                        ui.label(
+                            f"Selskapets aksjekapital er {round(state.aksjekapital):,} kr, "
+                            f"men sum innbetalt fra aksjonærer er {round(sum_innbetalt):,} kr "
+                            f"(diff: {diff:+,} kr). SKD avviser oppgaven ved stiftelse "
+                            "hvis tallene ikke matcher."
+                        ).classes("text-xs text-amber-800")
+
         for i, a in enumerate(state.aksjonaerer):
             with ui.expansion(
                 f"Aksjonær {i + 1}" + (f", {a.navn}" if a.navn else ""),
@@ -2041,11 +2089,12 @@ def _bygg_aksjonaer_fane() -> None:
                     # ødelegge fokus mens brukeren skriver.
                     navn_inp = txt("Navn", "navn", obj=a)
                     navn_inp.on("blur", lambda _: aksjonaer_liste.refresh())
-                    num("Antall aksjer", "antall_aksjer", obj=a, step=1, min_val=1)
+                    antall_inp = num("Antall aksjer", "antall_aksjer", obj=a, step=1, min_val=1)
+                    antall_inp.on("blur", lambda _: aksjonaer_liste.refresh())
                     txt("Fødselsnummer (11 siffer)", "fodselsnummer", obj=a)
                     num("Utbytte utbetalt (NOK)", "utbytte_utbetalt", obj=a, min_val=0)
                     txt("Aksjeklasse", "aksjeklasse", obj=a)
-                    num(
+                    innbetalt_inp = num(
                         "Innbetalt kapital per aksje (NOK)",
                         "innbetalt_kapital_per_aksje",
                         obj=a,
@@ -2053,6 +2102,7 @@ def _bygg_aksjonaer_fane() -> None:
                         min_val=0,
                         tooltip="Aksjekapital delt på antall aksjer. Eks: 30 000 kr / 100 aksjer = 300 kr per aksje.",
                     )
+                    innbetalt_inp.on("blur", lambda _: aksjonaer_liste.refresh())
 
                 if len(state.aksjonaerer) > 1:
                     def fjern(idx=i):
@@ -2061,6 +2111,9 @@ def _bygg_aksjonaer_fane() -> None:
                     ui.button("Fjern aksjonær", on_click=fjern).props("flat color=negative size=sm").classes("mt-2")
 
     aksjonaer_liste()
+
+    global _aksjonaer_liste_refresh
+    _aksjonaer_liste_refresh = aksjonaer_liste.refresh
 
     def legg_til():
         state.aksjonaerer.append(AksjonaerState())
@@ -2362,6 +2415,15 @@ def _bygg_send_fane() -> None:
             for f in feil:
                 ui.notify(f, type="negative")
             return
+
+        # BRG-stiftelsesårssjekk kun mot prod — Tenor-orger finnes ikke i BRG.
+        if env_valg.value == "prod":
+            brg_advarsler = await run.io_bound(akr_modul.valider_mot_brg, oppgave)
+            if brg_advarsler:
+                for advarsel in brg_advarsler:
+                    ui.notify(advarsel, type="negative", timeout=0, close_button="Lukk")
+                return
+
         n = ui.notification("Henter Maskinporten-token med SKD-scope...", spinner=True, timeout=None)
         try:
             skd_token = await run.io_bound(lambda: _med_env(env_valg.value, auth.get_skd_aksjonaer_token))
@@ -2377,8 +2439,25 @@ def _bygg_send_fane() -> None:
             n.type = "positive"
             n.timeout = 0
             n.close_button = "Lukk"
-            if svar:
-                ui.notify(f"Forsendelse-ID: {svar.get('forsendelseId')}", type="info")
+            aksjonaer_resultat.clear()
+            with aksjonaer_resultat:
+                if svar and svar.get("forsendelseId"):
+                    ui.label(f"Forsendelse-ID: {svar['forsendelseId']}").classes(
+                        "text-xs text-slate-500"
+                    )
+                ui.label(
+                    "Skatteetaten kontrollerer oppgaven og sender en tilbakemelding i "
+                    "Altinn meldingsboks i løpet av minutter. Hvis oppgaven blir avvist, "
+                    "vil tilbakemeldingen forklare hva som må rettes."
+                ).classes("text-sm text-slate-600 mt-1")
+                altinn_base = "https://tt02.altinn.no" if env_valg.value == "test" else "https://af.altinn.no"
+                meldingsboks_url = (
+                    f"{altinn_base}/?party=urn%3Aaltinn%3Aorganization%3Aidentifier-no%3A"
+                    f"{oppgave.selskap.org_nummer}"
+                )
+                ui.link("Åpne Altinn meldingsboks →", meldingsboks_url, new_tab=True).classes(
+                    "text-blue-600 font-medium"
+                )
         except Exception as e:
             n.message = f"Innsending feilet: {e}"
             n.spinner = False
@@ -2442,6 +2521,7 @@ def _bygg_send_fane() -> None:
         ).props("color=primary").classes("w-full")
 
     aarsregnskap_resultat = ui.column().classes("mt-3")
+    aksjonaer_resultat = ui.column().classes("mt-3")
 
 
 # ---------------------------------------------------------------------------

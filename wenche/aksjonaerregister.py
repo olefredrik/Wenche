@@ -14,10 +14,15 @@ Innsendingsflyt (SKDs eget REST-API, ikke Altinn-instansflyt):
 import os
 from xml.sax.saxutils import escape
 
+import httpx
 import yaml
 
 from wenche.models import Aksjonaer, Aksjonaerregisteroppgave, Selskap
 from wenche.skd_client import SkdAksjonaerClient
+
+# Brønnøysundregistrenes åpne Enhetsregister-API.
+# Brukes for å verifisere stiftelsesår mot SKDs forventning (MAKS_025-klassen).
+_BRG_ENHET_URL = "https://data.brreg.no/enhetsregisteret/api/enheter"
 
 
 def les_config(config_fil: str) -> Aksjonaerregisteroppgave:
@@ -247,6 +252,20 @@ def generer_underskjema_xml(
     return xml.encode("UTF-8")
 
 
+def _fnr_modulus11_ok(fnr: str) -> bool:
+    """Sjekker modulus-11-kontrollsifrene i et 11-sifret norsk fødselsnummer.
+
+    Returnerer False hvis kontrollsifrene ikke stemmer. Forutsetter at fnr
+    allerede er 11 siffer (kallsiden sjekker det først).
+    """
+    vekter1 = [3, 7, 6, 1, 8, 9, 4, 5, 2]
+    vekter2 = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2]
+    siffer = [int(c) for c in fnr]
+    k1 = (11 - sum(v * d for v, d in zip(vekter1, siffer[:9])) % 11) % 11
+    k2 = (11 - sum(v * d for v, d in zip(vekter2, siffer[:10])) % 11) % 11
+    return k1 < 10 and k2 < 10 and k1 == siffer[9] and k2 == siffer[10]
+
+
 def valider(oppgave: Aksjonaerregisteroppgave) -> list[str]:
     feil = []
 
@@ -263,6 +282,11 @@ def valider(oppgave: Aksjonaerregisteroppgave) -> list[str]:
         fnr = a.fodselsnummer.replace(" ", "")
         if len(fnr) != 11 or not fnr.isdigit():
             feil.append(f"Ugyldig fødselsnummer for {a.navn}: må være 11 siffer.")
+        elif not _fnr_modulus11_ok(fnr):
+            feil.append(
+                f"Fødselsnummeret for {a.navn} har ugyldige kontrollsifre. "
+                "Dobbeltsjekk at sifrene er korrekt skrevet inn."
+            )
 
     total_aksjer = oppgave.totalt_antall_aksjer
     if total_aksjer <= 0:
@@ -274,7 +298,85 @@ def valider(oppgave: Aksjonaerregisteroppgave) -> list[str]:
             f"regnskapsåret ({oppgave.regnskapsaar})."
         )
 
+    # Ved stiftelse i inntektsåret må innbetalt_kapital_per_aksje være > 0,
+    # ellers blir AnskaffelsesverdiSamlet i stiftelsestransaksjonen 0 og SKD avviser.
+    if oppgave.selskap.stiftelsesaar == oppgave.regnskapsaar:
+        for a in oppgave.aksjonaerer:
+            if a.innbetalt_kapital_per_aksje <= 0:
+                feil.append(
+                    f"innbetalt_kapital_per_aksje må være > 0 for {a.navn} "
+                    f"når selskapet er stiftet i inntektsåret ({oppgave.regnskapsaar})."
+                )
+
+        # Sum av aksjonærenes innbetalte kapital må matche selskapets aksjekapital
+        # ved nyemisjon. SKDs MAKH_053-regel: post 9 (selskap) = post 23 (aksjonærer).
+        sum_innbetalt = sum(
+            a.innbetalt_kapital_per_aksje * a.antall_aksjer for a in oppgave.aksjonaerer
+        )
+        if round(sum_innbetalt) != round(oppgave.selskap.aksjekapital):
+            feil.append(
+                f"Sum innbetalt kapital fra aksjonærer ({round(sum_innbetalt):,} kr) "
+                f"må matche selskapets aksjekapital ({round(oppgave.selskap.aksjekapital):,} kr) "
+                "ved nyemisjon. Juster antall_aksjer eller innbetalt_kapital_per_aksje per "
+                "aksjonær slik at summen blir lik aksjekapital."
+            )
+
     return feil
+
+
+def valider_mot_brg(
+    oppgave: Aksjonaerregisteroppgave, *, timeout: float = 5.0
+) -> list[str]:
+    """
+    Sjekker stiftelsesår mot Brønnøysundregistrene som ekstra forhåndsvalidering.
+
+    Returnerer liste med advarsler hvis stiftelsesåret i config ikke stemmer
+    med BRGs registrering. Tom liste hvis alt stemmer eller hvis BRG ikke
+    kan kontaktes (transient feil skal ikke blokkere innsending).
+
+    Brukes kun mot reelle org.nr. — syntetiske Tenor-orger finnes ikke i BRG.
+    """
+    orgnr = oppgave.selskap.org_nummer
+    try:
+        resp = httpx.get(
+            f"{_BRG_ENHET_URL}/{orgnr}",
+            headers={"Accept": "application/json"},
+            timeout=timeout,
+        )
+    except httpx.HTTPError:
+        return []
+
+    if resp.status_code == 404:
+        return [
+            f"Org.nr. {orgnr} ble ikke funnet i Brønnøysundregistrene. "
+            "Sjekk at org.nr. er korrekt."
+        ]
+    if not resp.is_success:
+        return []
+
+    try:
+        data = resp.json()
+    except ValueError:
+        return []
+
+    stiftelsesdato = data.get("stiftelsesdato")
+    if not stiftelsesdato or len(stiftelsesdato) < 4:
+        return []
+
+    try:
+        brg_stiftelsesaar = int(stiftelsesdato[:4])
+    except ValueError:
+        return []
+
+    if brg_stiftelsesaar != oppgave.selskap.stiftelsesaar:
+        return [
+            f"stiftelsesaar i config ({oppgave.selskap.stiftelsesaar}) stemmer "
+            f"ikke med Brønnøysundregistrenes registrering ({brg_stiftelsesaar}). "
+            "Dette er en vanlig årsak til avvikskode MAKS_025 fra Skatteetaten. "
+            "Oppdater stiftelsesaar i config.yaml før innsending."
+        ]
+
+    return []
 
 
 def send_inn(

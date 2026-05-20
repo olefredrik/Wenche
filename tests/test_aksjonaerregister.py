@@ -5,13 +5,16 @@ Bruker SKDs RF-1086 / RF-1086-U format med grp-/datadef-elementnavn.
 """
 
 import xml.etree.ElementTree as ET
+from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 
 from wenche.aksjonaerregister import (
     generer_hovedskjema_xml,
     generer_underskjema_xml,
     valider,
+    valider_mot_brg,
 )
 from wenche.models import Aksjonaer, Aksjonaerregisteroppgave, Selskap
 
@@ -34,7 +37,7 @@ def eksempel_selskap():
 def eksempel_aksjonaer():
     return Aksjonaer(
         navn="Ola Nordmann",
-        fodselsnummer="01010112345",
+        fodselsnummer="20916997389",
         antall_aksjer=100,
         aksjeklasse="A",
         utbytte_utbetalt=0,
@@ -158,7 +161,7 @@ def test_underskjema_fodselsnummer(eksempel_oppgave):
     root = _parse(generer_underskjema_xml(aksjonaer, eksempel_oppgave))
     fnr = root.find(".//{*}AksjonarFodselsnummer-datadef-1156")
     assert fnr is not None
-    assert fnr.text == "01010112345"
+    assert fnr.text == "20916997389"
 
 
 def test_underskjema_antall_aksjer(eksempel_oppgave):
@@ -281,3 +284,176 @@ def test_valider_ugyldig_fnr(eksempel_selskap):
     )
     feil = valider(oppgave)
     assert any("fødselsnummer" in f.lower() for f in feil)
+
+
+def test_valider_fnr_riktig_lengde_men_feil_kontrollsifre(eksempel_selskap):
+    # 11 siffer, men kontrollsifrene stemmer ikke (modulus-11).
+    aksjonaer = Aksjonaer(
+        navn="Typo Person",
+        fodselsnummer="20916997380",  # siste siffer endret fra 9 til 0
+        antall_aksjer=10,
+        aksjeklasse="A",
+        utbytte_utbetalt=0,
+        innbetalt_kapital_per_aksje=300,
+    )
+    oppgave = Aksjonaerregisteroppgave(
+        selskap=eksempel_selskap,
+        regnskapsaar=2024,
+        aksjonaerer=[aksjonaer],
+    )
+    feil = valider(oppgave)
+    assert any("kontrollsifre" in f.lower() for f in feil)
+
+
+def test_valider_stiftelse_i_inntektsaar_krever_innbetalt_kapital(eksempel_selskap):
+    # Selskapet er stiftet i inntektsåret men aksjonær har 0 i innbetalt kapital.
+    aksjonaer = Aksjonaer(
+        navn="Stifter Nordmann",
+        fodselsnummer="20916997389",
+        antall_aksjer=100,
+        aksjeklasse="A",
+        utbytte_utbetalt=0,
+        innbetalt_kapital_per_aksje=0,
+    )
+    oppgave = Aksjonaerregisteroppgave(
+        selskap=eksempel_selskap,  # stiftelsesaar=2020
+        regnskapsaar=2020,
+        aksjonaerer=[aksjonaer],
+    )
+    feil = valider(oppgave)
+    assert any("innbetalt_kapital_per_aksje" in f for f in feil)
+
+
+def test_valider_sum_innbetalt_matcher_aksjekapital_ved_nyemisjon(eksempel_selskap):
+    # Selskap stiftet i regnskapsåret med aksjekapital 30000, men aksjonæren bidrar
+    # bare 30 * 100 = 3000. Det skal trigge MAKH_053-sjekken.
+    aksjonaer = Aksjonaer(
+        navn="Underdekkende Nordmann",
+        fodselsnummer="20916997389",
+        antall_aksjer=100,
+        aksjeklasse="A",
+        utbytte_utbetalt=0,
+        innbetalt_kapital_per_aksje=30,
+    )
+    oppgave = Aksjonaerregisteroppgave(
+        selskap=eksempel_selskap,  # aksjekapital=30000, stiftelsesaar=2020
+        regnskapsaar=2020,
+        aksjonaerer=[aksjonaer],
+    )
+    feil = valider(oppgave)
+    assert any("Sum innbetalt kapital" in f for f in feil)
+
+
+def test_valider_sum_innbetalt_lik_aksjekapital_ok(eksempel_selskap):
+    # 100 aksjer * 300 = 30000, matcher selskapets aksjekapital.
+    aksjonaer = Aksjonaer(
+        navn="Korrekt Nordmann",
+        fodselsnummer="20916997389",
+        antall_aksjer=100,
+        aksjeklasse="A",
+        utbytte_utbetalt=0,
+        innbetalt_kapital_per_aksje=300,
+    )
+    oppgave = Aksjonaerregisteroppgave(
+        selskap=eksempel_selskap,
+        regnskapsaar=2020,
+        aksjonaerer=[aksjonaer],
+    )
+    feil = valider(oppgave)
+    assert not any("Sum innbetalt kapital" in f for f in feil)
+
+
+def test_valider_sum_innbetalt_ikke_sjekket_etter_stiftelsesaar(eksempel_selskap):
+    # Mismatch er OK når selskapet ikke ble stiftet i inntektsåret —
+    # da brukes ikke feltet i stiftelsestransaksjonen.
+    aksjonaer = Aksjonaer(
+        navn="Etablert Nordmann",
+        fodselsnummer="20916997389",
+        antall_aksjer=100,
+        aksjeklasse="A",
+        utbytte_utbetalt=0,
+        innbetalt_kapital_per_aksje=30,  # Mismatch, men ikke stiftelsesår
+    )
+    oppgave = Aksjonaerregisteroppgave(
+        selskap=eksempel_selskap,  # stiftelsesaar=2020
+        regnskapsaar=2024,
+        aksjonaerer=[aksjonaer],
+    )
+    feil = valider(oppgave)
+    assert not any("Sum innbetalt kapital" in f for f in feil)
+
+
+def test_valider_innbetalt_kapital_null_ok_etter_stiftelsesaar(eksempel_selskap):
+    # Innbetalt kapital = 0 er OK når selskapet ikke ble stiftet i inntektsåret.
+    aksjonaer = Aksjonaer(
+        navn="Etablert Nordmann",
+        fodselsnummer="20916997389",
+        antall_aksjer=100,
+        aksjeklasse="A",
+        utbytte_utbetalt=0,
+        innbetalt_kapital_per_aksje=0,
+    )
+    oppgave = Aksjonaerregisteroppgave(
+        selskap=eksempel_selskap,  # stiftelsesaar=2020
+        regnskapsaar=2024,
+        aksjonaerer=[aksjonaer],
+    )
+    feil = valider(oppgave)
+    assert not any("innbetalt_kapital_per_aksje" in f for f in feil)
+
+
+# ---------------------------------------------------------------------------
+# valider_mot_brg
+# ---------------------------------------------------------------------------
+
+def _brg_mock(status_code: int = 200, json_data: dict | None = None):
+    resp = MagicMock(spec=httpx.Response)
+    resp.status_code = status_code
+    resp.is_success = 200 <= status_code < 300
+    resp.json.return_value = json_data or {}
+    return resp
+
+
+@patch("wenche.aksjonaerregister.httpx.get")
+def test_valider_mot_brg_samsvar_gir_ingen_advarsel(mock_get, eksempel_oppgave):
+    mock_get.return_value = _brg_mock(json_data={"stiftelsesdato": "2020-06-15"})
+    assert valider_mot_brg(eksempel_oppgave) == []
+
+
+@patch("wenche.aksjonaerregister.httpx.get")
+def test_valider_mot_brg_mismatch_gir_advarsel(mock_get, eksempel_oppgave):
+    # BRG har 2018, config har 2020 → mismatch.
+    mock_get.return_value = _brg_mock(json_data={"stiftelsesdato": "2018-12-11"})
+    advarsler = valider_mot_brg(eksempel_oppgave)
+    assert len(advarsler) == 1
+    assert "MAKS_025" in advarsler[0]
+    assert "2018" in advarsler[0]
+    assert "2020" in advarsler[0]
+
+
+@patch("wenche.aksjonaerregister.httpx.get")
+def test_valider_mot_brg_404_gir_advarsel_om_ukjent_orgnr(mock_get, eksempel_oppgave):
+    mock_get.return_value = _brg_mock(status_code=404)
+    advarsler = valider_mot_brg(eksempel_oppgave)
+    assert len(advarsler) == 1
+    assert "ikke funnet" in advarsler[0].lower()
+
+
+@patch("wenche.aksjonaerregister.httpx.get")
+def test_valider_mot_brg_nettverksfeil_returnerer_tom_liste(mock_get, eksempel_oppgave):
+    # Transient feil skal ikke blokkere innsending.
+    mock_get.side_effect = httpx.ConnectError("Connection refused")
+    assert valider_mot_brg(eksempel_oppgave) == []
+
+
+@patch("wenche.aksjonaerregister.httpx.get")
+def test_valider_mot_brg_5xx_returnerer_tom_liste(mock_get, eksempel_oppgave):
+    mock_get.return_value = _brg_mock(status_code=503)
+    assert valider_mot_brg(eksempel_oppgave) == []
+
+
+@patch("wenche.aksjonaerregister.httpx.get")
+def test_valider_mot_brg_uten_stiftelsesdato_i_svar(mock_get, eksempel_oppgave):
+    # BRG-svar uten stiftelsesdato (uvanlig, men håndteres trygt).
+    mock_get.return_value = _brg_mock(json_data={"navn": "TEST AS"})
+    assert valider_mot_brg(eksempel_oppgave) == []
