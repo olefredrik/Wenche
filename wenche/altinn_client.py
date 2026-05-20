@@ -239,6 +239,28 @@ class AltinnClient:
         resp.raise_for_status()
         return resp.json()
 
+    def hent_data_element_bytes(
+        self, app_key: str, instans: dict, data_type: str
+    ) -> bytes | None:
+        """
+        Henter rå bytes for et data-element av gitt dataType.
+
+        Returnerer None hvis dataType ikke finnes i instansen. Nyttig for å
+        plukke ut Skatteetatens tilbakemelding etter at instansen har
+        avansert gjennom prosesstegene.
+        """
+        instance_id = instans["id"]
+        for element in instans.get("data", []):
+            if element.get("dataType") == data_type:
+                url = (
+                    f"{self._app_base(app_key)}/instances/{instance_id}"
+                    f"/data/{element['id']}"
+                )
+                resp = self._http.get(url)
+                resp.raise_for_status()
+                return resp.content
+        return None
+
     def close(self):
         self._http.close()
 

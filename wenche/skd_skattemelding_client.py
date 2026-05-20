@@ -168,6 +168,14 @@ class SkdSkattemeldingClient:
             print("Tilbakemelding...")
             altinn.neste_prosesssteg("skattemelding", instans)
 
+            # Skatteetaten legger valideringsresultat i data-elementet «tilbakemelding»
+            # etter at instansen har avansert gjennom prosesstegene. Hent og verifiser
+            # at innsendingen faktisk ble akseptert. Hvis Skatteetaten avviser
+            # innsendingen settes prosessen fortsatt som «fullført» i Altinn, men
+            # tilbakemeldingen inneholder en valideringsfeil.
+            oppdatert = altinn.hent_status("skattemelding", instans)
+            _verifiser_tilbakemelding(altinn, oppdatert)
+
         return instans["id"]
 
     def close(self):
@@ -178,6 +186,69 @@ class SkdSkattemeldingClient:
 
     def __exit__(self, *args):
         self.close()
+
+
+_RESPONSE_NS = (
+    "no:skatteetaten:fastsetting:formueinntekt:"
+    "skattemeldingognaeringsspesifikasjon:response:v2"
+)
+
+
+def _verifiser_tilbakemelding(altinn: AltinnClient, instans: dict) -> None:
+    """
+    Henter Skatteetatens tilbakemelding fra instansen og raiser RuntimeError
+    hvis innsendingen ble avvist.
+
+    Skatteetatens prosess ender alltid med en tilbakemelding-XML, selv ved
+    avvisning. Tilbakemeldingen ligger som data-element 'tilbakemelding'.
+    """
+    raw = altinn.hent_data_element_bytes("skattemelding", instans, "tilbakemelding")
+    if raw is None:
+        print(
+            "Advarsel: kunne ikke finne tilbakemelding-data-element. "
+            "Sjekk Altinn meldingsboks for å bekrefte at innsendingen ble akseptert."
+        )
+        return
+
+    try:
+        root = fromstring(raw)
+    except ParseError as e:
+        raise RuntimeError(
+            f"Kunne ikke parse tilbakemelding fra Skatteetaten: {e}"
+        ) from e
+
+    resultat_el = root.find(f"{{{_RESPONSE_NS}}}resultatAvValidering")
+    if resultat_el is None or resultat_el.text is None:
+        # Eldre eller annerledes respons. Klassifiser som ukjent og gi videre.
+        print("Advarsel: tilbakemelding mangler resultatAvValidering-felt.")
+        return
+
+    resultat = resultat_el.text.strip()
+    if resultat == "validertUtenFeil":
+        print(f"Skatteetaten har godkjent skattemeldingen ({resultat}).")
+        return
+
+    aarsak_el = root.find(f"{{{_RESPONSE_NS}}}aarsakTilValidertMedFeil")
+    aarsak = aarsak_el.text.strip() if aarsak_el is not None and aarsak_el.text else ""
+
+    avvik_tekster = []
+    for avvik in root.iter(f"{{{_RESPONSE_NS}}}avvik"):
+        kode_el = avvik.find(f"{{{_RESPONSE_NS}}}avvikstype")
+        besk_el = avvik.find(f"{{{_RESPONSE_NS}}}beskrivelse")
+        kode = kode_el.text if kode_el is not None and kode_el.text else "(uten kode)"
+        besk = besk_el.text if besk_el is not None and besk_el.text else ""
+        avvik_tekster.append(f"  - {kode}: {besk}".rstrip(": "))
+
+    detaljer = ""
+    if aarsak:
+        detaljer += f"\n  Årsak: {aarsak}"
+    if avvik_tekster:
+        detaljer += "\n  Avvik:\n" + "\n".join(avvik_tekster)
+
+    raise RuntimeError(
+        f"Skatteetaten avviste skattemeldingen (resultatAvValidering={resultat}).{detaljer}\n"
+        "Sjekk tilbakemelding-XML i Altinn meldingsboks for full kontekst."
+    )
 
 
 def bygg_og_valider_konvolutt(
