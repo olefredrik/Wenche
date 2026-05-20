@@ -2052,6 +2052,7 @@ def _bygg_regnskap_fane() -> None:
                         yaml.dump(eks, f, allow_unicode=True, sort_keys=False)
 
                     state.les_config()
+                    foregaaende_aar_felter.refresh()
 
                     r = data["resultatregnskap"]
                     rentekost = r["finansposter"]["rentekostnader"]
@@ -2059,8 +2060,7 @@ def _bygg_regnskap_fane() -> None:
                     ui.notify(
                         f"Sammenligningstall importert fra SAF-T {saft_aar}: "
                         f"andre driftskostnader {andre_drift:.0f} kr, "
-                        f"rentekostnader {rentekost:.0f} kr. "
-                        "Naviger bort og tilbake for å se de oppdaterte feltene under.",
+                        f"rentekostnader {rentekost:.0f} kr.",
                         type="positive",
                         timeout=0,
                         close_button="Lukk",
@@ -2077,36 +2077,42 @@ def _bygg_regnskap_fane() -> None:
                 "color=primary outline"
             ).classes("mt-2")
 
-        ui.label("Resultatregnskap").classes("text-base font-semibold mt-2 mb-2")
-        with ui.grid(columns=2).classes("w-full gap-4"):
-            num("Salgsinntekter", "f_salgsinntekter")
-            num("Utbytte fra datterselskap", "f_utbytte_fra_datterselskap")
-            num("Andre driftsinntekter", "f_andre_driftsinntekter")
-            num("Andre finansinntekter", "f_andre_finansinntekter")
-            num("Lønnskostnader", "f_loennskostnader")
-            num("Rentekostnader", "f_rentekostnader")
-            num("Avskrivninger", "f_avskrivninger")
-            num("Andre finanskostnader", "f_andre_finanskostnader")
-            num("Andre driftskostnader", "f_andre_driftskostnader")
+        # Inntastingsfeltene pakkes i en refreshable så de kan re-rendres
+        # med oppdaterte verdier etter SAF-T-import for foregående år.
+        @ui.refreshable
+        def foregaaende_aar_felter() -> None:
+            ui.label("Resultatregnskap").classes("text-base font-semibold mt-2 mb-2")
+            with ui.grid(columns=2).classes("w-full gap-4"):
+                num("Salgsinntekter", "f_salgsinntekter")
+                num("Utbytte fra datterselskap", "f_utbytte_fra_datterselskap")
+                num("Andre driftsinntekter", "f_andre_driftsinntekter")
+                num("Andre finansinntekter", "f_andre_finansinntekter")
+                num("Lønnskostnader", "f_loennskostnader")
+                num("Rentekostnader", "f_rentekostnader")
+                num("Avskrivninger", "f_avskrivninger")
+                num("Andre finanskostnader", "f_andre_finanskostnader")
+                num("Andre driftskostnader", "f_andre_driftskostnader")
 
-        ui.label("Balanse").classes("text-base font-semibold mt-4 mb-2")
-        with ui.grid(columns=2).classes("w-full gap-4"):
-            num("Aksjer i datterselskap", "f_aksjer_i_datterselskap")
-            num("Aksjekapital", "f_ek_aksjekapital")
-            num("Andre aksjer", "f_andre_aksjer")
-            num("Overkursfond", "f_overkursfond", min_val=None)
-            num("Langsiktige fordringer", "f_langsiktige_fordringer")
-            num("Annen egenkapital", "f_annen_egenkapital", min_val=None)
-            num("Kortsiktige fordringer", "f_kortsiktige_fordringer")
-            num("Lån fra aksjonær", "f_laan_fra_aksjonaer")
-            num("Bankinnskudd", "f_bankinnskudd", step=100)
-            num("Andre langsiktige lån", "f_andre_langsiktige_laan")
-            ui.label("").classes("w-full")
-            num("Leverandørgjeld", "f_leverandoergjeld")
-            ui.label("").classes("w-full")
-            num("Skyldige offentlige avgifter", "f_skyldige_offentlige_avgifter")
-            ui.label("").classes("w-full")
-            num("Annen kortsiktig gjeld", "f_annen_kortsiktig_gjeld")
+            ui.label("Balanse").classes("text-base font-semibold mt-4 mb-2")
+            with ui.grid(columns=2).classes("w-full gap-4"):
+                num("Aksjer i datterselskap", "f_aksjer_i_datterselskap")
+                num("Aksjekapital", "f_ek_aksjekapital")
+                num("Andre aksjer", "f_andre_aksjer")
+                num("Overkursfond", "f_overkursfond", min_val=None)
+                num("Langsiktige fordringer", "f_langsiktige_fordringer")
+                num("Annen egenkapital", "f_annen_egenkapital", min_val=None)
+                num("Kortsiktige fordringer", "f_kortsiktige_fordringer")
+                num("Lån fra aksjonær", "f_laan_fra_aksjonaer")
+                num("Bankinnskudd", "f_bankinnskudd", step=100)
+                num("Andre langsiktige lån", "f_andre_langsiktige_laan")
+                ui.label("").classes("w-full")
+                num("Leverandørgjeld", "f_leverandoergjeld")
+                ui.label("").classes("w-full")
+                num("Skyldige offentlige avgifter", "f_skyldige_offentlige_avgifter")
+                ui.label("").classes("w-full")
+                num("Annen kortsiktig gjeld", "f_annen_kortsiktig_gjeld")
+
+        foregaaende_aar_felter()
 
     ui.separator().classes("my-4")
 
