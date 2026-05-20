@@ -170,7 +170,6 @@ class TestLinjeEnkel:
         "rentekostnad",
         "annenRenteinntekt",
         "overkursfond",
-        "langsiktigKonserngjeld",
         "leverandoergjeld",
     ]
 
@@ -223,11 +222,24 @@ class TestLinjeEnkel:
         assert el is not None
         assert int(el.text) == 39000
 
-    def test_langsiktig_konserngjeld_value(self, regnskap_med_alle_poster):
+    def test_laan_fra_aksjonaer_klassifisert_som_annen_langsiktig_gjeld(
+        self, regnskap_med_alle_poster
+    ):
+        """Lån fra aksjonær skal ikke klassifiseres som konserngjeld i BRG-XML
+        for et selskap som ikke er morselskap. Skal i stedet være en
+        oevrigLangsiktigGjeld-linje med beskrivelse 'Lån fra aksjonær'."""
         root = _parse(generer_underskjema(regnskap_med_alle_poster))
-        el = root.find(f".//{{{NS}}}langsiktigKonserngjeld/{{{NS}}}aarets")
-        assert el is not None
-        assert int(el.text) == 300000
+        # langsiktigKonserngjeld skal ikke lenger forekomme
+        assert root.find(f".//{{{NS}}}langsiktigKonserngjeld") is None
+        # Lån fra aksjonær skal være en oevrigLangsiktigGjeld med riktig beskrivelse
+        for el in root.findall(f".//{{{NS}}}oevrigLangsiktigGjeld"):
+            besk = el.find(f"{{{NS}}}beskrivelse")
+            if besk is not None and besk.text == "Lån fra aksjonær":
+                aarets = el.find(f"{{{NS}}}aarets")
+                assert aarets is not None
+                assert int(aarets.text) == 300000
+                return
+        assert False, "Fant ikke oevrigLangsiktigGjeld med 'Lån fra aksjonær'-beskrivelse"
 
     def test_zero_values_omitted(self, eksempel_regnskap):
         """linje_enkel with 0 for both years should produce no element."""
