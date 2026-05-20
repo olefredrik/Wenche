@@ -2362,6 +2362,15 @@ def _bygg_send_fane() -> None:
             for f in feil:
                 ui.notify(f, type="negative")
             return
+
+        # BRG-stiftelsesårssjekk kun mot prod — Tenor-orger finnes ikke i BRG.
+        if env_valg.value == "prod":
+            brg_advarsler = await run.io_bound(akr_modul.valider_mot_brg, oppgave)
+            if brg_advarsler:
+                for advarsel in brg_advarsler:
+                    ui.notify(advarsel, type="negative", timeout=0, close_button="Lukk")
+                return
+
         n = ui.notification("Henter Maskinporten-token med SKD-scope...", spinner=True, timeout=None)
         try:
             skd_token = await run.io_bound(lambda: _med_env(env_valg.value, auth.get_skd_aksjonaer_token))
@@ -2377,8 +2386,25 @@ def _bygg_send_fane() -> None:
             n.type = "positive"
             n.timeout = 0
             n.close_button = "Lukk"
-            if svar:
-                ui.notify(f"Forsendelse-ID: {svar.get('forsendelseId')}", type="info")
+            aksjonaer_resultat.clear()
+            with aksjonaer_resultat:
+                if svar and svar.get("forsendelseId"):
+                    ui.label(f"Forsendelse-ID: {svar['forsendelseId']}").classes(
+                        "text-xs text-slate-500"
+                    )
+                ui.label(
+                    "Skatteetaten kontrollerer oppgaven og sender en tilbakemelding i "
+                    "Altinn meldingsboks i løpet av minutter. Hvis oppgaven blir avvist, "
+                    "vil tilbakemeldingen forklare hva som må rettes."
+                ).classes("text-sm text-slate-600 mt-1")
+                altinn_base = "https://tt02.altinn.no" if env_valg.value == "test" else "https://af.altinn.no"
+                meldingsboks_url = (
+                    f"{altinn_base}/?party=urn%3Aaltinn%3Aorganization%3Aidentifier-no%3A"
+                    f"{oppgave.selskap.org_nummer}"
+                )
+                ui.link("Åpne Altinn meldingsboks →", meldingsboks_url, new_tab=True).classes(
+                    "text-blue-600 font-medium"
+                )
         except Exception as e:
             n.message = f"Innsending feilet: {e}"
             n.spinner = False
@@ -2442,6 +2468,7 @@ def _bygg_send_fane() -> None:
         ).props("color=primary").classes("w-full")
 
     aarsregnskap_resultat = ui.column().classes("mt-3")
+    aksjonaer_resultat = ui.column().classes("mt-3")
 
 
 # ---------------------------------------------------------------------------
