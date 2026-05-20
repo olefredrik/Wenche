@@ -1989,6 +1989,94 @@ def _bygg_regnskap_fane() -> None:
             "Disse brukes som sammenligningstall i årsregnskapet til Brønnøysundregistrene."
         ).classes("text-sm text-slate-500 mb-3")
 
+        # SAF-T-import for foregående år
+        with ui.card().classes("w-full p-3 mb-4 bg-slate-50 shadow-none border border-slate-200 rounded-lg"):
+            ui.label("Importer fra SAF-T (foregående år)").classes(
+                "text-sm font-semibold text-slate-700 mb-1"
+            )
+            ui.label(
+                "Last opp en SAF-T Financial-fil for fjoråret for å fylle inn "
+                "resultatregnskap og balanse automatisk."
+            ).classes("text-xs text-slate-500 mb-2")
+
+            fjor_saft_holder: list[bytes] = []
+
+            async def fjor_saft_mottatt(e):
+                fjor_saft_holder.clear()
+                fjor_saft_holder.append(await e.file.read())
+                ui.notify(f"Fil lastet opp: {e.file.name}", type="info")
+
+            ui.upload(
+                label="Last opp SAF-T-fil for foregående år",
+                auto_upload=True,
+                on_upload=fjor_saft_mottatt,
+            ).props("flat bordered").classes("w-full")
+
+            async def importer_fjor_saft():
+                if not fjor_saft_holder:
+                    ui.notify("Last opp en SAF-T-fil først.", type="warning")
+                    return
+                from wenche.saft import importer as importer_saft_fil
+                try:
+                    with tempfile.NamedTemporaryFile(suffix=".xml", delete=False) as tmp:
+                        tmp.write(fjor_saft_holder[0])
+                        tmp_sti = tmp.name
+
+                    data = await run.io_bound(importer_saft_fil, tmp_sti)
+                    Path(tmp_sti).unlink(missing_ok=True)
+
+                    saft_aar = int(data.get("regnskapsaar", 0))
+                    forventet_aar = int(state.regnskapsaar) - 1
+                    if saft_aar != forventet_aar:
+                        ui.notify(
+                            f"Advarsel: SAF-T er for år {saft_aar}, forventet {forventet_aar}. "
+                            "Verdier ble likevel importert som foregående år.",
+                            type="warning",
+                            timeout=0,
+                            close_button="Lukk",
+                        )
+
+                    eks = {}
+                    if CONFIG_FIL.exists():
+                        with open(CONFIG_FIL, encoding="utf-8") as f_eks:
+                            eks = yaml.safe_load(f_eks) or {}
+
+                    # SAF-T-en for fjoråret har fjorårets resultat og fjorårets closing balanse.
+                    # Disse er nettopp det vi trenger som sammenligningstall i inneværende år.
+                    eks["foregaaende_aar"] = {
+                        "resultatregnskap": data["resultatregnskap"],
+                        "balanse": data["balanse"],
+                    }
+
+                    with open(CONFIG_FIL, "w", encoding="utf-8") as f:
+                        yaml.dump(eks, f, allow_unicode=True, sort_keys=False)
+
+                    state.les_config()
+
+                    r = data["resultatregnskap"]
+                    rentekost = r["finansposter"]["rentekostnader"]
+                    andre_drift = r["driftskostnader"]["andre_driftskostnader"]
+                    ui.notify(
+                        f"Sammenligningstall importert fra SAF-T {saft_aar}: "
+                        f"andre driftskostnader {andre_drift:.0f} kr, "
+                        f"rentekostnader {rentekost:.0f} kr. "
+                        "Naviger bort og tilbake for å se de oppdaterte feltene under.",
+                        type="positive",
+                        timeout=0,
+                        close_button="Lukk",
+                    )
+                except Exception as e:
+                    ui.notify(
+                        f"Feil ved import: {e}",
+                        type="negative",
+                        timeout=0,
+                        close_button="Lukk",
+                    )
+
+            ui.button("Importer SAF-T for foregående år", on_click=importer_fjor_saft).props(
+                "color=primary outline"
+            ).classes("mt-2")
+
         ui.label("Resultatregnskap").classes("text-base font-semibold mt-2 mb-2")
         with ui.grid(columns=2).classes("w-full gap-4"):
             num("Salgsinntekter", "f_salgsinntekter")
