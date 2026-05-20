@@ -324,6 +324,65 @@ def test_valider_stiftelse_i_inntektsaar_krever_innbetalt_kapital(eksempel_selsk
     assert any("innbetalt_kapital_per_aksje" in f for f in feil)
 
 
+def test_valider_sum_innbetalt_matcher_aksjekapital_ved_nyemisjon(eksempel_selskap):
+    # Selskap stiftet i regnskapsåret med aksjekapital 30000, men aksjonæren bidrar
+    # bare 30 * 100 = 3000. Det skal trigge MAKH_053-sjekken.
+    aksjonaer = Aksjonaer(
+        navn="Underdekkende Nordmann",
+        fodselsnummer="20916997389",
+        antall_aksjer=100,
+        aksjeklasse="A",
+        utbytte_utbetalt=0,
+        innbetalt_kapital_per_aksje=30,
+    )
+    oppgave = Aksjonaerregisteroppgave(
+        selskap=eksempel_selskap,  # aksjekapital=30000, stiftelsesaar=2020
+        regnskapsaar=2020,
+        aksjonaerer=[aksjonaer],
+    )
+    feil = valider(oppgave)
+    assert any("Sum innbetalt kapital" in f for f in feil)
+
+
+def test_valider_sum_innbetalt_lik_aksjekapital_ok(eksempel_selskap):
+    # 100 aksjer * 300 = 30000, matcher selskapets aksjekapital.
+    aksjonaer = Aksjonaer(
+        navn="Korrekt Nordmann",
+        fodselsnummer="20916997389",
+        antall_aksjer=100,
+        aksjeklasse="A",
+        utbytte_utbetalt=0,
+        innbetalt_kapital_per_aksje=300,
+    )
+    oppgave = Aksjonaerregisteroppgave(
+        selskap=eksempel_selskap,
+        regnskapsaar=2020,
+        aksjonaerer=[aksjonaer],
+    )
+    feil = valider(oppgave)
+    assert not any("Sum innbetalt kapital" in f for f in feil)
+
+
+def test_valider_sum_innbetalt_ikke_sjekket_etter_stiftelsesaar(eksempel_selskap):
+    # Mismatch er OK når selskapet ikke ble stiftet i inntektsåret —
+    # da brukes ikke feltet i stiftelsestransaksjonen.
+    aksjonaer = Aksjonaer(
+        navn="Etablert Nordmann",
+        fodselsnummer="20916997389",
+        antall_aksjer=100,
+        aksjeklasse="A",
+        utbytte_utbetalt=0,
+        innbetalt_kapital_per_aksje=30,  # Mismatch, men ikke stiftelsesår
+    )
+    oppgave = Aksjonaerregisteroppgave(
+        selskap=eksempel_selskap,  # stiftelsesaar=2020
+        regnskapsaar=2024,
+        aksjonaerer=[aksjonaer],
+    )
+    feil = valider(oppgave)
+    assert not any("Sum innbetalt kapital" in f for f in feil)
+
+
 def test_valider_innbetalt_kapital_null_ok_etter_stiftelsesaar(eksempel_selskap):
     # Innbetalt kapital = 0 er OK når selskapet ikke ble stiftet i inntektsåret.
     aksjonaer = Aksjonaer(

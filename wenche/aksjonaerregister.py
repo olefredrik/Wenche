@@ -308,6 +308,19 @@ def valider(oppgave: Aksjonaerregisteroppgave) -> list[str]:
                     f"når selskapet er stiftet i inntektsåret ({oppgave.regnskapsaar})."
                 )
 
+        # Sum av aksjonærenes innbetalte kapital må matche selskapets aksjekapital
+        # ved nyemisjon. SKDs MAKH_053-regel: post 9 (selskap) = post 23 (aksjonærer).
+        sum_innbetalt = sum(
+            a.innbetalt_kapital_per_aksje * a.antall_aksjer for a in oppgave.aksjonaerer
+        )
+        if round(sum_innbetalt) != round(oppgave.selskap.aksjekapital):
+            feil.append(
+                f"Sum innbetalt kapital fra aksjonærer ({round(sum_innbetalt):,} kr) "
+                f"må matche selskapets aksjekapital ({round(oppgave.selskap.aksjekapital):,} kr) "
+                "ved nyemisjon. Juster antall_aksjer eller innbetalt_kapital_per_aksje per "
+                "aksjonær slik at summen blir lik aksjekapital."
+            )
+
     return feil
 
 
