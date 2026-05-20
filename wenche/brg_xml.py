@@ -395,7 +395,7 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
             <fjoraarets orid="7156">{_i(flg.sum)}</fjoraarets>
           </sumLangsiktigGjeld>
           <annenLangsiktigGjeld>
-            {linje_enkel("langsiktigKonserngjeld", lg.laan_fra_aksjonaer, "2256", "7152", flg.laan_fra_aksjonaer)}
+            {linje("oevrigLangsiktigGjeld", lg.laan_fra_aksjonaer, "Lån fra aksjonær", "29036", "242", "7155", flg.laan_fra_aksjonaer)}
             {linje("oevrigLangsiktigGjeld", lg.andre_langsiktige_laan, "Andre langsiktige lån", "29036", "242", "7155", flg.andre_langsiktige_laan)}
             <sumAnnenLangsiktigGjeld>
               <aarets orid="25019">{_i(lg.sum)}</aarets>
