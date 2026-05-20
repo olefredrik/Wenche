@@ -2171,6 +2171,14 @@ def _bygg_dokumenter_fane() -> None:
                 min_val=0,
             )
 
+    def lagre_dokumenter():
+        state.lagre_config()
+        ui.notify(f"Lagret til {CONFIG_FIL.resolve()}", type="positive")
+
+    ui.button("Lagre innstillinger og noter", on_click=lagre_dokumenter).props(
+        "color=primary"
+    ).classes("mb-4")
+
     ui.separator().classes("my-4")
 
     # Nedlastinger
