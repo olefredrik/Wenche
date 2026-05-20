@@ -1458,21 +1458,20 @@ def _bygg_oppsett_fane() -> None:
         "test- og prod-klienten i Digdir."
     ).classes("text-sm text-slate-500 mb-3")
 
+    pem_bytes_holder: list[bytes] = []
+
+    async def pem_mottatt(e):
+        pem_bytes_holder.clear()
+        pem_bytes_holder.append(await e.file.read())
+        ui.notify("Nøkkelfil lastet opp. Klikk 'Lagre konfigurasjon' for å lagre.", type="info")
+
     pem_opplasting = ui.upload(
         label="Last opp privat nøkkel (.pem)",
         auto_upload=True,
+        on_upload=pem_mottatt,
     ).props("flat bordered").classes("w-full").tooltip(
         "Din maskinporten_privat.pem-fil. Lagres lokalt og sendes aldri til noen server."
     )
-
-    pem_bytes_holder: list[bytes] = []
-
-    def pem_mottatt(e):
-        pem_bytes_holder.clear()
-        pem_bytes_holder.append(e.content.read())
-        ui.notify("Nøkkelfil lastet opp. Klikk 'Lagre konfigurasjon' for å lagre.", type="info")
-
-    pem_opplasting.on_upload(pem_mottatt)
 
     async def lagre_konfig():
         from dotenv import set_key
@@ -1795,17 +1794,16 @@ def _bygg_selskap_fane() -> None:
 
         saft_bytes_holder: list[bytes] = []
 
+        async def saft_mottatt(e):
+            saft_bytes_holder.clear()
+            saft_bytes_holder.append(await e.file.read())
+            ui.notify(f"Fil lastet opp: {e.file.name}", type="info")
+
         saft_opplasting = ui.upload(
             label="Last opp SAF-T Financial XML-fil",
             auto_upload=True,
+            on_upload=saft_mottatt,
         ).props("flat bordered").classes("w-full")
-
-        def saft_mottatt(e):
-            saft_bytes_holder.clear()
-            saft_bytes_holder.append(e.content.read())
-            ui.notify(f"Fil lastet opp: {e.name}", type="info")
-
-        saft_opplasting.on_upload(saft_mottatt)
 
         async def importer_saft():
             if not saft_bytes_holder:
