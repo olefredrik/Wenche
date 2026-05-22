@@ -6,9 +6,12 @@ Innsendingsflyt for AS via Maskinporten:
   2. POST /api/skattemelding/v2/valider/{år}/{orgnr}  — valider konvolutten (valgfritt)
   3. POST Altinn3: opprett instans
   4. POST Altinn3: last opp konvolutt (text/xml, ingen anførselstegn i Content-Disposition)
-  5. PUT  Altinn3: /process/next  (→ Bekreftelse)
-  6. PUT  Altinn3: /process/next  (→ Tilbakemelding)
-  7. Returner instans-ID
+  5. Returner Altinn-inbox-URL der brukeren bekrefter med BankID
+
+Selve bekreftelsessteget kan ikke kjøres av systembrukeren. Skatteetaten
+krever personlig pålogging via ID-porten for å bekrefte innsendingen,
+bekreftet i SSV-5129 (2026-05-20). Brukeren logger inn i Altinn etter
+opplasting og klikker «Send inn» for å fullføre.
 
 Autentisering: Maskinporten-token veksles mot Altinn-token for Altinn3-kallene.
 Scope: skatteetaten:formueinntekt/skattemelding, altinn:instances.read/write
@@ -121,15 +124,18 @@ class SkdSkattemeldingClient:
         naeringsspesifikasjon_xml: bytes | None = None,
     ) -> str:
         """
-        Sender skattemeldingen til Skatteetaten via Altinn3.
+        Klargjør skattemelding for innsending via Altinn3.
 
         Flyt:
           1. Generer konvolutt
           2. Opprett Altinn3-instans
-          3. Last opp konvolutt
-          4. Bekreftelse (process/next)
-          5. Tilbakemelding (process/next)
-          6. Returner instans-ID
+          3. Sett inntektsaar i Skattemeldingsapp_v2
+          4. Last opp konvolutt
+          5. Returner Altinn-inbox-URL
+
+        Brukeren må deretter logge inn i Altinn med BankID og klikke
+        «Send inn» for å fullføre. Selve bekreftelsessteget kan ikke
+        kjøres av systembrukeren (SSV-5129, 2026-05-20).
 
         Args:
             skattemelding_xml:        XML fra generer_skattemelding_upersonlig().
@@ -137,7 +143,7 @@ class SkdSkattemeldingClient:
             naeringsspesifikasjon_xml: Valgfri næringsoppgave-XML.
 
         Returns:
-            Altinn3 instans-ID for innsendt skattemelding.
+            URL til Altinn-inboksen der brukeren fullfører innsendingen.
         """
         konvolutt = generer_konvolutt(
             skattemelding_xml=skattemelding_xml,
@@ -162,21 +168,8 @@ class SkdSkattemeldingClient:
             print("Laster opp skattemelding-konvolutt...")
             altinn.last_opp_skattemelding_data(instans, konvolutt)
 
-            print("Bekreftelse...")
-            altinn.neste_prosesssteg("skattemelding", instans)
-
-            print("Tilbakemelding...")
-            altinn.neste_prosesssteg("skattemelding", instans)
-
-            # Skatteetaten legger valideringsresultat i data-elementet «tilbakemelding»
-            # etter at instansen har avansert gjennom prosesstegene. Hent og verifiser
-            # at innsendingen faktisk ble akseptert. Hvis Skatteetaten avviser
-            # innsendingen settes prosessen fortsatt som «fullført» i Altinn, men
-            # tilbakemeldingen inneholder en valideringsfeil.
-            oppdatert = altinn.hent_status("skattemelding", instans)
-            _verifiser_tilbakemelding(altinn, oppdatert)
-
-        return instans["id"]
+            print("Skattemelding klar for bekreftelse i Altinn.")
+            return altinn.fullfoor_instans("skattemelding", instans)
 
     def close(self):
         self._http.close()
@@ -186,69 +179,6 @@ class SkdSkattemeldingClient:
 
     def __exit__(self, *args):
         self.close()
-
-
-_RESPONSE_NS = (
-    "no:skatteetaten:fastsetting:formueinntekt:"
-    "skattemeldingognaeringsspesifikasjon:response:v2"
-)
-
-
-def _verifiser_tilbakemelding(altinn: AltinnClient, instans: dict) -> None:
-    """
-    Henter Skatteetatens tilbakemelding fra instansen og raiser RuntimeError
-    hvis innsendingen ble avvist.
-
-    Skatteetatens prosess ender alltid med en tilbakemelding-XML, selv ved
-    avvisning. Tilbakemeldingen ligger som data-element 'tilbakemelding'.
-    """
-    raw = altinn.hent_data_element_bytes("skattemelding", instans, "tilbakemelding")
-    if raw is None:
-        print(
-            "Advarsel: kunne ikke finne tilbakemelding-data-element. "
-            "Sjekk Altinn meldingsboks for å bekrefte at innsendingen ble akseptert."
-        )
-        return
-
-    try:
-        root = fromstring(raw)
-    except ParseError as e:
-        raise RuntimeError(
-            f"Kunne ikke parse tilbakemelding fra Skatteetaten: {e}"
-        ) from e
-
-    resultat_el = root.find(f"{{{_RESPONSE_NS}}}resultatAvValidering")
-    if resultat_el is None or resultat_el.text is None:
-        # Eldre eller annerledes respons. Klassifiser som ukjent og gi videre.
-        print("Advarsel: tilbakemelding mangler resultatAvValidering-felt.")
-        return
-
-    resultat = resultat_el.text.strip()
-    if resultat == "validertUtenFeil":
-        print(f"Skatteetaten har godkjent skattemeldingen ({resultat}).")
-        return
-
-    aarsak_el = root.find(f"{{{_RESPONSE_NS}}}aarsakTilValidertMedFeil")
-    aarsak = aarsak_el.text.strip() if aarsak_el is not None and aarsak_el.text else ""
-
-    avvik_tekster = []
-    for avvik in root.iter(f"{{{_RESPONSE_NS}}}avvik"):
-        kode_el = avvik.find(f"{{{_RESPONSE_NS}}}avvikstype")
-        besk_el = avvik.find(f"{{{_RESPONSE_NS}}}beskrivelse")
-        kode = kode_el.text if kode_el is not None and kode_el.text else "(uten kode)"
-        besk = besk_el.text if besk_el is not None and besk_el.text else ""
-        avvik_tekster.append(f"  - {kode}: {besk}".rstrip(": "))
-
-    detaljer = ""
-    if aarsak:
-        detaljer += f"\n  Årsak: {aarsak}"
-    if avvik_tekster:
-        detaljer += "\n  Avvik:\n" + "\n".join(avvik_tekster)
-
-    raise RuntimeError(
-        f"Skatteetaten avviste skattemeldingen (resultatAvValidering={resultat}).{detaljer}\n"
-        "Sjekk tilbakemelding-XML i Altinn meldingsboks for full kontekst."
-    )
 
 
 def bygg_og_valider_konvolutt(

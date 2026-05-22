@@ -2595,14 +2595,27 @@ def _bygg_send_fane() -> None:
                         naeringsspesifikasjon_xml=naeringsspesifikasjon_xml,
                     )
 
-            n.message = "Sender skattemelding via Altinn3..."
-            instans_id = await run.io_bound(_hent_og_send)
-            n.message = f"Skattemelding for {state.regnskapsaar} er sendt til Skatteetaten."
+            n.message = "Klargjør skattemelding i Altinn3..."
+            altinn_url = await run.io_bound(_hent_og_send)
+            n.message = (
+                f"Skattemelding for {state.regnskapsaar} er klargjort i Altinn. "
+                "Logg inn og bekreft med BankID for å fullføre innsendingen."
+            )
             n.spinner = False
             n.type = "positive"
             n.timeout = 0
             n.close_button = "Lukk"
-            ui.notify(f"Instans-ID: {instans_id}", type="info")
+            skattemelding_resultat.clear()
+            with skattemelding_resultat:
+                ui.label(
+                    "Skatteetaten krever at en personlig bruker bekrefter "
+                    "innsendingen via ID-porten. Wenche har lastet opp "
+                    "skattemeldingen, men du må logge inn i Altinn og klikke "
+                    "«Send inn» for å fullføre."
+                ).classes("text-sm text-slate-600 mt-1")
+                ui.link(
+                    "Åpne Altinn meldingsboks →", altinn_url, new_tab=True
+                ).classes("text-blue-600 font-medium")
         except Exception as e:
             n.message = f"Innsending feilet: {e}"
             n.spinner = False
@@ -2622,6 +2635,7 @@ def _bygg_send_fane() -> None:
 
     aarsregnskap_resultat = ui.column().classes("mt-3")
     aksjonaer_resultat = ui.column().classes("mt-3")
+    skattemelding_resultat = ui.column().classes("mt-3")
 
 
 # ---------------------------------------------------------------------------
