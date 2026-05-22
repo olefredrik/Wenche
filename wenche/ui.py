@@ -2576,10 +2576,13 @@ def _bygg_send_fane() -> None:
             def _hent_og_send():
                 with SkdSkattemeldingClient(tokens["maskinporten_token"], env=env_valg.value) as skd:
                     test_partsnummer = os.getenv("SKD_TEST_PARTSNUMMER") if env_valg.value == "test" else None
+                    gjeldende_dokument_id: str | None = None
                     if test_partsnummer:
                         partsnummer = int(test_partsnummer)
                     else:
-                        forhåndsutfylt = skd.hent_forhåndsutfylt(int(state.regnskapsaar), orgnr)
+                        forhåndsutfylt, gjeldende_dokument_id = skd.hent_forhåndsutfylt_med_id(
+                            int(state.regnskapsaar), orgnr
+                        )
                         partsnummer = hent_partsnummer(forhåndsutfylt)
                     skattemelding_xml = generer_skattemelding_upersonlig(
                         partsnummer=partsnummer,
@@ -2593,6 +2596,7 @@ def _bygg_send_fane() -> None:
                         skattemelding_xml=skattemelding_xml,
                         altinn_token=tokens["altinn_token"],
                         naeringsspesifikasjon_xml=naeringsspesifikasjon_xml,
+                        gjeldende_dokument_id=gjeldende_dokument_id,
                     )
 
             n.message = "Klargjør skattemelding i Altinn3..."

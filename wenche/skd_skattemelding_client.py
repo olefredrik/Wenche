@@ -67,6 +67,26 @@ class SkdSkattemeldingClient:
 
         API-et returnerer en wrapper-XML med base64-kodet innhold i <content>.
         Denne metoden dekoder automatisk hvis wrapper-format oppdages.
+        For å hente ID-en på forhåndsutfylt-dokumentet (kreves for
+        dokumentreferanseTilGjeldendeDokument i innsending), bruk
+        hent_forhåndsutfylt_med_id() i stedet.
+        """
+        xml, _ = self.hent_forhåndsutfylt_med_id(inntektsaar, orgnr)
+        return xml
+
+    def hent_forhåndsutfylt_med_id(
+        self, inntektsaar: int, orgnr: str
+    ) -> tuple[bytes, str | None]:
+        """
+        Henter forhåndsutfylt skattemelding og dens dokument-ID.
+
+        Returnerer (skattemelding_xml, dokument_id). Dokument-ID-en er
+        identifikatoren Skatteetaten genererer for forhåndsutfylt-dokumentet.
+        Inkluderes som dokumentreferanseTilGjeldendeDokument i konvolutten
+        ved innsending, slik at Skatteetaten kan koble innsendingen til
+        det opprinnelige dokumentet (visning-API-et bruker dette feltet).
+
+        dokument_id er None hvis responsen ikke følger forventet wrapper-format.
         """
         url = f"{self._base}/api/skattemelding/v2/{inntektsaar}/{orgnr}"
         resp = self._http.get(url, headers={"Accept": "application/xml"})
@@ -77,19 +97,30 @@ class SkdSkattemeldingClient:
             )
         raw = resp.content
 
-        # Sjekk om responsen er en wrapper med base64-kodet skattemelding
         try:
             root = fromstring(raw)
-            ns = "no:skatteetaten:fastsetting:formueinntekt:skattemeldingognaeringsspesifikasjon:forespoersel:response:v2"
-            content_el = root.find(f".//{{{ns}}}content")
-            if content_el is None:
-                content_el = root.find(".//{*}content")
-            if content_el is not None and content_el.text:
-                return base64.b64decode(content_el.text)
+            ns = (
+                "no:skatteetaten:fastsetting:formueinntekt:"
+                "skattemeldingognaeringsspesifikasjon:forespoersel:response:v2"
+            )
+            dok_el = root.find(f".//{{{ns}}}skattemeldingdokument")
+            if dok_el is None:
+                # Fallback: tolerér ukjent eller endret namespace
+                dok_el = root.find(".//{*}skattemeldingdokument")
+            if dok_el is not None:
+                content_el = dok_el.find(f"{{{ns}}}content")
+                if content_el is None:
+                    content_el = dok_el.find("{*}content")
+                id_el = dok_el.find(f"{{{ns}}}id")
+                if id_el is None:
+                    id_el = dok_el.find("{*}id")
+                if content_el is not None and content_el.text:
+                    dok_id = id_el.text.strip() if id_el is not None and id_el.text else None
+                    return base64.b64decode(content_el.text), dok_id
         except (ParseError, binascii.Error):
             pass
 
-        return raw
+        return raw, None
 
     def valider(
         self,
@@ -122,6 +153,7 @@ class SkdSkattemeldingClient:
         skattemelding_xml: bytes,
         altinn_token: str,
         naeringsspesifikasjon_xml: bytes | None = None,
+        gjeldende_dokument_id: str | None = None,
     ) -> str:
         """
         Klargjør skattemelding for innsending via Altinn3.
@@ -150,6 +182,7 @@ class SkdSkattemeldingClient:
             inntektsaar=inntektsaar,
             orgnr=orgnr,
             naeringsspesifikasjon_xml=naeringsspesifikasjon_xml,
+            gjeldende_dokument_id=gjeldende_dokument_id,
         )
 
         with AltinnClient(altinn_token, env=self._env) as altinn:
