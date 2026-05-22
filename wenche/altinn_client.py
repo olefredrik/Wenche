@@ -231,10 +231,6 @@ class AltinnClient:
 
         return self._altinn_inbox
 
-    def altinn_inbox_url(self) -> str:
-        """Returnerer URL til Altinn meldingsboks for gjeldende miljø."""
-        return self._altinn_inbox
-
     def hent_status(self, app_key: str, instans: dict) -> dict:
         """Henter status for en instans."""
         instance_id = instans["id"]
