@@ -169,7 +169,10 @@ class SkdSkattemeldingClient:
             altinn.last_opp_skattemelding_data(instans, konvolutt)
 
             print("Skattemelding klar for bekreftelse i Altinn.")
-            return altinn.fullfoor_instans("skattemelding", instans)
+            # Avanser ikke prosessen. Skatteetaten krever at personlig bruker
+            # bekrefter via Altinn-UI med BankID. Altinn-portalen håndterer
+            # selv prosess-avansering når brukeren klikker «Send inn».
+            return altinn.altinn_inbox_url()
 
     def close(self):
         self._http.close()
