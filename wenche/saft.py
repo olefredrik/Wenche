@@ -236,6 +236,12 @@ def importer(saft_fil: str | Path) -> dict:
     Lån fra aksjonær (konto 2250) gir en stub-noteoppføring i
     noter.laan_til_naerstaaende med saldoen ferdig utfylt. Motpart,
     rentesats og sikkerhet finnes ikke i SAF-T og må fylles inn manuelt.
+
+    Fremførbart underskudd (skattemelding.underskudd_til_fremfoering)
+    estimeres fra åpningssaldoen på konto 2080 (udekket tap). For
+    selskaper med ikke-fradragsberettigede kostnader vil regnskapsmessig
+    underskudd avvike fra det skattemessige; verifiser mot fjorårets
+    RF-1028 hvis det er aktuelt.
     """
     tree = ET.parse(str(saft_fil))
     root = tree.getroot()
@@ -284,6 +290,15 @@ def importer(saft_fil: str | Path) -> dict:
 
     aksjekapital = nar["aksjekapital_balanse"]
 
+    # Fremførbart underskudd (estimat): åpningssaldoen på konto 2080
+    # representerer akkumulert udekket tap inn i regnskapsåret. Tallet
+    # er regnskapsmessig og kan avvike fra det skattemessige fremførbare
+    # underskuddet i fjorårets RF-1028; brukeren bør verifisere.
+    underskudd_aapning = 0.0
+    for account in gl.findall(_tag("Account")):
+        if _tekst(account, "GroupingCode") == "2080":
+            underskudd_aapning += _aapning_netto(account)
+
     # Stub-noteoppføring for lån fra aksjonær: saldoen hentes fra konto 2250,
     # men motpart, rentesats og sikkerhet finnes ikke i SAF-T og må fylles
     # inn manuelt av brukeren. retning="låntaker" fordi selskapet er den som
@@ -319,7 +334,7 @@ def importer(saft_fil: str | Path) -> dict:
             "balanse": _bygg_balanse(fjor_b),
         },
         "skattemelding": {
-            "underskudd_til_fremfoering": 0.0,
+            "underskudd_til_fremfoering": underskudd_aapning,
             "anvend_fritaksmetoden": False,
             "eierandel_datterselskap": 100,
         },

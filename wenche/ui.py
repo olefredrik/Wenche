@@ -1861,9 +1861,19 @@ def _bygg_selskap_fane() -> None:
                         eks_verdi = eks.get("selskap", {}).get(felt)
                         if eks_verdi:
                             data["selskap"][felt] = eks_verdi
-                    for bevar in ("aksjonaerer", "skattemelding"):
-                        if eks.get(bevar):
-                            data[bevar] = eks[bevar]
+                    if eks.get("aksjonaerer"):
+                        data["aksjonaerer"] = eks["aksjonaerer"]
+                    # Skattemelding: bevar fritaksmetoden- og eierandel-
+                    # innstillinger som er brukerens valg, og bevar manuelt
+                    # satt underskudd_til_fremfoering (ellers brukes SAF-T-
+                    # estimatet basert på åpningssaldo konto 2080).
+                    eks_sm = eks.get("skattemelding") or {}
+                    if "anvend_fritaksmetoden" in eks_sm:
+                        data["skattemelding"]["anvend_fritaksmetoden"] = eks_sm["anvend_fritaksmetoden"]
+                    if "eierandel_datterselskap" in eks_sm:
+                        data["skattemelding"]["eierandel_datterselskap"] = eks_sm["eierandel_datterselskap"]
+                    if eks_sm.get("underskudd_til_fremfoering"):
+                        data["skattemelding"]["underskudd_til_fremfoering"] = eks_sm["underskudd_til_fremfoering"]
                     # Noter: bevar antall_ansatte hvis satt, og bevar
                     # laan_til_naerstaaende hvis brukeren har fylt ut detaljer
                     # (ellers brukes SAF-T-genererte stub-oppføringer).
