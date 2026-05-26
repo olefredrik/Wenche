@@ -2312,20 +2312,25 @@ def _bygg_dokumenter_fane() -> None:
             tooltip="Finnes i fjorårets skattemelding (RF-1028). Sett til 0 hvis selskapet er nytt.",
         )
         with ui.column():
+            def toggle_fritaksmetoden(e):
+                setattr(state, "fritaksmetoden", e.value)
+                eierandel_el.set_visibility(e.value)
+
             fritaks_sjekkboks = ui.checkbox(
                 "Anvend fritaksmetoden",
                 value=state.fritaksmetoden,
-                on_change=lambda e: setattr(state, "fritaksmetoden", e.value),
+                on_change=toggle_fritaksmetoden,
             ).tooltip(
                 "Gjelder dersom selskapet har mottatt utbytte fra datterselskaper. "
                 "Ved eierandel ≥ 90 % er hele utbyttet skattefritt."
             )
-            num(
+            eierandel_el = num(
                 "Eierandel i datterselskap (%)",
                 "eierandel_datterselskap",
                 step=1,
                 min_val=0,
             )
+            eierandel_el.set_visibility(state.fritaksmetoden)
 
     def lagre_dokumenter():
         state.lagre_config()
