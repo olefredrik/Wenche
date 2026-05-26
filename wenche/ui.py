@@ -2336,10 +2336,6 @@ def _bygg_dokumenter_fane() -> None:
         state.lagre_config()
         ui.notify(f"Lagret til {CONFIG_FIL.resolve()}", type="positive")
 
-    ui.button("Lagre innstillinger og noter", on_click=lagre_dokumenter).props(
-        "color=primary"
-    ).classes("mb-4")
-
     ui.separator().classes("my-4")
 
     # Nedlastinger
@@ -2501,6 +2497,11 @@ def _bygg_dokumenter_fane() -> None:
                 ui.notify(f"Feil: {e}", type="negative", timeout=0)
 
         ui.button("Last ned noter", on_click=last_ned_noter).props("color=primary outline")
+
+    ui.separator().classes("my-4")
+    ui.button("Lagre innstillinger og noter", on_click=lagre_dokumenter).props(
+        "color=primary"
+    )
 
 
 # ---------------------------------------------------------------------------
