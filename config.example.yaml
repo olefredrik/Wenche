@@ -8,12 +8,12 @@
 selskap:
   navn: "Eksempel Holding AS"
   org_nummer: "123456789"           # 9 siffer uten mellomrom
-  daglig_leder: "Kari Nordmann"
-  styreleder: "Kari Nordmann"       # Kan være samme person som daglig leder
+  daglig_leder: ""                  # Navn på daglig leder
+  styreleder: ""                    # Kan være samme person som daglig leder
   forretningsadresse: "Eksempelgata 1, 0001 Oslo"
   stiftelsesaar: 2022
   aksjekapital: 30000               # NOK — fra stiftelsesdokumentene
-  kontakt_epost: "post@eksempel.no" # Påkrevd for aksjonærregisteroppgave (RF-1086)
+  kontakt_epost: ""                 # Påkrevd for aksjonærregisteroppgave (RF-1086)
 
 regnskapsaar: 2025                  # Året regnskapet gjelder for
 
@@ -109,7 +109,7 @@ foregaaende_aar:
 skattemelding:
   underskudd_til_fremfoering: 0     # Fremførbart underskudd fra tidligere år (NOK).
                                     # Finnes i fjorårets skattemelding (RF-1028).
-  anvend_fritaksmetoden: true       # true for holdingselskaper som eier aksjer i
+  anvend_fritaksmetoden: false      # true for holdingselskaper som eier aksjer i
                                     # datterselskaper (skatteloven § 2-38).
   eierandel_datterselskap: 100      # Eierandel i datterselskapet (prosent, 0–100).
                                     # ≥ 90 %: hele utbyttet er skattefritt.

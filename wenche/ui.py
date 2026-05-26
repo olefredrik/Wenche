@@ -613,6 +613,11 @@ _input_elements: dict[str, object] = {}
 # driftsinntekter, driftsresultat, sum eiendeler m.fl.). Settes når
 # regnskap-fanen bygges.
 _oppdater_regnskap_metrikker: callable | None = None
+
+# Refresh-callback for lån-listen i Dokumenter-fanen. Settes når
+# dokumenter-fanen bygges, og kalles etter SAF-T-import slik at
+# auto-genererte lån-stubs blir synlige.
+_laan_liste_refresh: callable | None = None
 state.les_config()
 
 
@@ -782,6 +787,8 @@ def oppdater_alle_inntastingsfelter() -> None:
         el.set_value(getattr(state, attr))
     if _oppdater_regnskap_metrikker is not None:
         _oppdater_regnskap_metrikker()
+    if _laan_liste_refresh is not None:
+        _laan_liste_refresh()
 
 
 # ---------------------------------------------------------------------------
@@ -1844,7 +1851,9 @@ def _bygg_selskap_fane() -> None:
                 data = await run.io_bound(importer_saft_fil, tmp_sti)
                 Path(tmp_sti).unlink(missing_ok=True)
 
-                # Bevar felt SAF-T ikke dekker
+                # Bevar felt SAF-T ikke dekker. kontakt_epost hentes fra
+                # SAF-T Contact/Email hvis tilgjengelig, men brukerens
+                # eksisterende verdi vinner hvis han allerede har fylt den ut.
                 if CONFIG_FIL.exists():
                     with open(CONFIG_FIL, encoding="utf-8") as f_eks:
                         eks = yaml.safe_load(f_eks) or {}
@@ -1852,9 +1861,18 @@ def _bygg_selskap_fane() -> None:
                         eks_verdi = eks.get("selskap", {}).get(felt)
                         if eks_verdi:
                             data["selskap"][felt] = eks_verdi
-                    for bevar in ("aksjonaerer", "skattemelding", "noter"):
+                    for bevar in ("aksjonaerer", "skattemelding"):
                         if eks.get(bevar):
                             data[bevar] = eks[bevar]
+                    # Noter: bevar antall_ansatte hvis satt, og bevar
+                    # laan_til_naerstaaende hvis brukeren har fylt ut detaljer
+                    # (ellers brukes SAF-T-genererte stub-oppføringer).
+                    eks_noter = eks.get("noter") or {}
+                    if eks_noter.get("antall_ansatte"):
+                        data["noter"]["antall_ansatte"] = eks_noter["antall_ansatte"]
+                    eks_laan = eks_noter.get("laan_til_naerstaaende") or []
+                    if eks_laan:
+                        data["noter"]["laan_til_naerstaaende"] = eks_laan
 
                 with open(CONFIG_FIL, "w", encoding="utf-8") as f:
                     yaml.dump(data, f, allow_unicode=True, sort_keys=False)
@@ -2447,6 +2465,8 @@ def _bygg_dokumenter_fane() -> None:
                 ui.button("Fjern lån", on_click=fjern_laan).props("flat color=negative size=sm").classes("mt-2")
 
     laan_liste()
+    global _laan_liste_refresh
+    _laan_liste_refresh = laan_liste.refresh
 
     def legg_til_laan():
         state.laan_til_naerstaaende.append(LaanState())

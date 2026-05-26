@@ -226,10 +226,16 @@ def importer(saft_fil: str | Path) -> dict:
 
     Feltene daglig_leder, styreleder, stiftelsesaar og aksjonaerer
     er ikke tilgjengelig i SAF-T og må fylles inn manuelt etterpå.
+    kontakt_epost hentes fra Company/Contact/Email hvis SAF-T-fila
+    inneholder det, ellers tom streng.
 
     Foregående års resultatregnskap er ikke tilgjengelig i SAF-T
     (P&L-kontoer nullstilles ved årsavslutning) og settes til 0.
     Foregående års balanse hentes fra åpningssaldoene.
+
+    Lån fra aksjonær (konto 2250) gir en stub-noteoppføring i
+    noter.laan_til_naerstaaende med saldoen ferdig utfylt. Motpart,
+    rentesats og sikkerhet finnes ikke i SAF-T og må fylles inn manuelt.
     """
     tree = ET.parse(str(saft_fil))
     root = tree.getroot()
@@ -254,6 +260,14 @@ def importer(saft_fil: str | Path) -> dict:
         deler = [d for d in [gate, f"{postnr} {by}".strip()] if d]
         adresse = ", ".join(deler)
 
+    # SAF-T Company/Contact er valgfri; bruk første Email hvis tilgjengelig.
+    kontakt_epost = ""
+    contact_el = company.find(_tag("Contact"))
+    if contact_el is not None:
+        email_el = contact_el.find(_tag("Email"))
+        if email_el is not None and email_el.text:
+            kontakt_epost = email_el.text.strip()
+
     sel_crit = header.find(_tag("SelectionCriteria"))
     regnskapsaar = int(_tekst(sel_crit, "PeriodStartYear", "0")) if sel_crit is not None else 0
 
@@ -270,6 +284,20 @@ def importer(saft_fil: str | Path) -> dict:
 
     aksjekapital = nar["aksjekapital_balanse"]
 
+    # Stub-noteoppføring for lån fra aksjonær: saldoen hentes fra konto 2250,
+    # men motpart, rentesats og sikkerhet finnes ikke i SAF-T og må fylles
+    # inn manuelt av brukeren. retning="låntaker" fordi selskapet er den som
+    # har lånt penger fra eieren (nærstående part er långiver).
+    laan_til_naerstaaende: list[dict] = []
+    if nar["laan_fra_aksjonaer"] > 0:
+        laan_til_naerstaaende.append({
+            "motpart": "",
+            "saldo": nar["laan_fra_aksjonaer"],
+            "retning": "låntaker",
+            "rente_prosent": 0.0,
+            "sikkerhet": "",
+        })
+
     return {
         "selskap": {
             "navn": navn,
@@ -279,7 +307,7 @@ def importer(saft_fil: str | Path) -> dict:
             "forretningsadresse": adresse,
             "stiftelsesaar": 0,
             "aksjekapital": aksjekapital,
-            "kontakt_epost": "",
+            "kontakt_epost": kontakt_epost,
         },
         "regnskapsaar": regnskapsaar,
         "resultatregnskap": _bygg_resultat(nar),
@@ -298,6 +326,6 @@ def importer(saft_fil: str | Path) -> dict:
         "aksjonaerer": [],
         "noter": {
             "antall_ansatte": 0,
-            "laan_til_naerstaaende": [],
+            "laan_til_naerstaaende": laan_til_naerstaaende,
         },
     }
