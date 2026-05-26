@@ -57,7 +57,7 @@ Denne veiledningen tar deg gjennom en komplett innsending fra start til slutt. V
     Klikk **Lagre konfigurasjon**.
 
     !!! tip "Har du SAF-T fra regnskapssystemet ditt?"
-        Klikk **Importer fra SAF-T Financial** øverst i fanen. Last opp XML-filen og Wenche fyller inn alle regnskapstall automatisk. Du må fortsatt fylle inn daglig leder, styreleder og aksjonærdata manuelt.
+        Klikk **Importer fra SAF-T Financial** øverst i fanen. Last opp XML-filen og Wenche fyller inn alle regnskapstall, kontakt-epost (hvis tilgjengelig), lån fra aksjonær (saldo og retning) og fremførbart underskudd (estimat fra konto 2080) automatisk. Du må fortsatt fylle inn daglig leder, styreleder, aksjonærdata, samt motpart, rente og sikkerhet for lån.
 
 === "Kommandolinje"
 
