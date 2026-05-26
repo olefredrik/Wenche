@@ -28,10 +28,10 @@ resultatregnskap:
   driftskostnader:
     loennskostnader: 0              # Lønn, arbeidsgiveravgift og lignende
     avskrivninger: 0                # Planmessige avskrivninger på anleggsmidler
-    andre_driftskostnader: 5500     # Bank- og regnskapsgebyrer, kontorkostnader o.l.
+    andre_driftskostnader: 0        # Bank- og regnskapsgebyrer, kontorkostnader o.l.
 
   finansposter:
-    utbytte_fra_datterselskap: 250000 # Utbytte mottatt fra datterselskaper (fritaksmetoden)
+    utbytte_fra_datterselskap: 0      # Utbytte mottatt fra datterselskaper (fritaksmetoden)
     andre_finansinntekter: 0          # Renteinntekter og andre finansinntekter
     rentekostnader: 0                 # Renter på lån
     andre_finanskostnader: 0          # Andre finanskostnader
@@ -43,25 +43,25 @@ resultatregnskap:
 balanse:
   eiendeler:
     anleggsmidler:
-      aksjer_i_datterselskap: 100000  # Kostpris for aksjer i heleide datterselskaper
+      aksjer_i_datterselskap: 0       # Kostpris for aksjer i heleide datterselskaper
       andre_aksjer: 0                 # Aksjer i selskaper der du eier under 90 %
       langsiktige_fordringer: 0       # Lån gitt til andre med løpetid over 1 år
     omloepmidler:
       kortsiktige_fordringer: 0       # Kundefordringer og andre kortsiktige krav
-      bankinnskudd: 1200              # Saldo på driftskonto per 31.12
+      bankinnskudd: 0                 # Saldo på driftskonto per 31.12
 
   egenkapital_og_gjeld:
     egenkapital:
       aksjekapital: 30000             # Innbetalt aksjekapital (fra stiftelsesdokumentene)
       overkursfond: 0                 # Innbetalt over pålydende ved emisjon
-      annen_egenkapital: 213700       # Akkumulert overskudd/underskudd. Negativ = underskudd
+      annen_egenkapital: 0            # Akkumulert overskudd/underskudd. Negativ = underskudd
     langsiktig_gjeld:
       laan_fra_aksjonaer: 0           # Lån fra eier med avtalt løpetid over 1 år
       andre_langsiktige_laan: 0       # Banklån og andre lån med løpetid over 1 år
     kortsiktig_gjeld:
       leverandoergjeld: 0             # Ubetalte fakturaer per 31.12
       skyldige_offentlige_avgifter: 0 # Skyldig mva, arbeidsgiveravgift o.l.
-      annen_kortsiktig_gjeld: 52000   # Annen gjeld med forfall innen 1 år
+      annen_kortsiktig_gjeld: 0       # Annen gjeld med forfall innen 1 år
 
 # --- Foregående år (sammenligningstall) ---
 # Obligatorisk etter regnskapslovens § 6-6.
