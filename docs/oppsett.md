@@ -43,6 +43,9 @@ Du skal nå ha to filer: `maskinporten_privat.pem` og `maskinporten_offentlig.pe
 
 Fyll ut [informasjonsskjemaet for Maskinporten-konsumenter](https://samarbeid.digdir.no/maskinporten/konsument/119) på Digdirs nettside. Digdir behandler søknaden og sender deg en e-post med instruksjoner om å signere bruksvilkårene («Bruksvilkår for private verksemder»).
 
+!!! tip "Hva skal stå under «Hvilken API-tilbyder skal dere konsumere fra?»"
+    Oppgi **Altinn 3** og **Skatteetaten**. Wenche bruker scopes fra begge: Altinn 3 for `altinn:instances.*` og `altinn:authentication/*`, og Skatteetaten for skattemelding og aksjonærregister. Årsregnskap til Brønnøysundregistrene går via Altinn 3 og krever ikke separat brreg-tilgang.
+
 !!! info "Behandlingstid"
     Dette kan ta noen virkedager. Maskinporten er gratis for konsumenter.
 
