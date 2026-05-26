@@ -110,12 +110,12 @@ class LaanState:
 @dataclass
 class AppState:
     # Selskap
-    navn: str = "Mitt Holding AS"
-    org_nummer: str = "123456789"
-    daglig_leder: str = "Ola Nordmann"
-    styreleder: str = "Ola Nordmann"
-    forretningsadresse: str = "Gateveien 1, 0001 Oslo"
-    stiftelsesaar: int = 2020
+    navn: str = ""
+    org_nummer: str = ""
+    daglig_leder: str = ""
+    styreleder: str = ""
+    forretningsadresse: str = ""
+    stiftelsesaar: int = 0
     aksjekapital: float = 30000.0
     kontakt_epost: str = ""
     regnskapsaar: int = 2025
@@ -125,24 +125,24 @@ class AppState:
     andre_driftsinntekter: float = 0.0
     loennskostnader: float = 0.0
     avskrivninger: float = 0.0
-    andre_driftskostnader: float = 5500.0
+    andre_driftskostnader: float = 0.0
     utbytte_fra_datterselskap: float = 0.0
     andre_finansinntekter: float = 0.0
     rentekostnader: float = 0.0
     andre_finanskostnader: float = 0.0
 
     # Balanse — Eiendeler
-    aksjer_i_datterselskap: float = 100000.0
+    aksjer_i_datterselskap: float = 0.0
     andre_aksjer: float = 0.0
     langsiktige_fordringer: float = 0.0
     kortsiktige_fordringer: float = 0.0
-    bankinnskudd: float = 1200.0
+    bankinnskudd: float = 0.0
 
     # Balanse — Egenkapital og gjeld
     ek_aksjekapital: float = 30000.0
     overkursfond: float = 0.0
-    annen_egenkapital: float = -34300.0
-    laan_fra_aksjonaer: float = 105500.0
+    annen_egenkapital: float = 0.0
+    laan_fra_aksjonaer: float = 0.0
     andre_langsiktige_laan: float = 0.0
     leverandoergjeld: float = 0.0
     skyldige_offentlige_avgifter: float = 0.0
@@ -360,7 +360,7 @@ class AppState:
             self.andre_driftsinntekter = float(di.get("andre_driftsinntekter", 0))
             self.loennskostnader = float(dk.get("loennskostnader", 0))
             self.avskrivninger = float(dk.get("avskrivninger", 0))
-            self.andre_driftskostnader = float(dk.get("andre_driftskostnader", 5500))
+            self.andre_driftskostnader = float(dk.get("andre_driftskostnader", 0))
             self.utbytte_fra_datterselskap = float(fp.get("utbytte_fra_datterselskap", 0))
             self.andre_finansinntekter = float(fp.get("andre_finansinntekter", 0))
             self.rentekostnader = float(fp.get("rentekostnader", 0))
@@ -372,15 +372,15 @@ class AppState:
             ek = b.get("egenkapital_og_gjeld", {}).get("egenkapital", {})
             lg = b.get("egenkapital_og_gjeld", {}).get("langsiktig_gjeld", {})
             kg = b.get("egenkapital_og_gjeld", {}).get("kortsiktig_gjeld", {})
-            self.aksjer_i_datterselskap = float(anl.get("aksjer_i_datterselskap", 100000))
+            self.aksjer_i_datterselskap = float(anl.get("aksjer_i_datterselskap", 0))
             self.andre_aksjer = float(anl.get("andre_aksjer", 0))
             self.langsiktige_fordringer = float(anl.get("langsiktige_fordringer", 0))
             self.kortsiktige_fordringer = float(oml.get("kortsiktige_fordringer", 0))
-            self.bankinnskudd = float(oml.get("bankinnskudd", 1200))
+            self.bankinnskudd = float(oml.get("bankinnskudd", 0))
             self.ek_aksjekapital = float(ek.get("aksjekapital", 30000))
             self.overkursfond = float(ek.get("overkursfond", 0))
-            self.annen_egenkapital = float(ek.get("annen_egenkapital", -34300))
-            self.laan_fra_aksjonaer = float(lg.get("laan_fra_aksjonaer", 105500))
+            self.annen_egenkapital = float(ek.get("annen_egenkapital", 0))
+            self.laan_fra_aksjonaer = float(lg.get("laan_fra_aksjonaer", 0))
             self.andre_langsiktige_laan = float(lg.get("andre_langsiktige_laan", 0))
             self.leverandoergjeld = float(kg.get("leverandoergjeld", 0))
             self.skyldige_offentlige_avgifter = float(kg.get("skyldige_offentlige_avgifter", 0))
@@ -603,6 +603,21 @@ state = AppState()
 # fanen bygges, og kalles fra Selskap-fanen når aksjekapital eller stiftelses-
 # år endres, så indikatoren reflekterer ny verdi når brukeren bytter tilbake.
 _aksjonaer_liste_refresh: callable | None = None
+
+# Registry over inntastingsfelter knyttet til state-attributter. Populeres av
+# num()/txt() når de bygges, og brukes av SAF-T-importen for å oppdatere
+# UI-verdiene etter at state.les_config() har lest nye verdier fra YAML.
+_input_elements: dict[str, object] = {}
+
+# Callback for å oppdatere metric-etikettene på regnskap-fanen (sum
+# driftsinntekter, driftsresultat, sum eiendeler m.fl.). Settes når
+# regnskap-fanen bygges.
+_oppdater_regnskap_metrikker: callable | None = None
+
+# Refresh-callback for lån-listen i Dokumenter-fanen. Settes når
+# dokumenter-fanen bygges, og kalles etter SAF-T-import slik at
+# auto-genererte lån-stubs blir synlige.
+_laan_liste_refresh: callable | None = None
 state.les_config()
 
 
@@ -734,6 +749,8 @@ def num(label: str, attr: str, obj=None, step: float = 1000, min_val: float | No
     el = ui.number(**kwargs).classes("w-full")
     if tooltip:
         el.tooltip(tooltip)
+    if obj is None:
+        _input_elements[attr] = el
     return el
 
 
@@ -755,7 +772,23 @@ def txt(label: str, attr: str, obj=None, placeholder: str = "", tooltip: str = "
     ).classes("w-full")
     if tooltip:
         el.tooltip(tooltip)
+    if obj is None:
+        _input_elements[attr] = el
     return el
+
+
+def oppdater_alle_inntastingsfelter() -> None:
+    """Synkroniserer registrerte UI-felt med gjeldende state-verdier.
+
+    Brukes etter handlinger som endrer state programmatisk (f.eks. SAF-T-
+    import), siden num()/txt() ikke har toveis-binding mot state.
+    """
+    for attr, el in _input_elements.items():
+        el.set_value(getattr(state, attr))
+    if _oppdater_regnskap_metrikker is not None:
+        _oppdater_regnskap_metrikker()
+    if _laan_liste_refresh is not None:
+        _laan_liste_refresh()
 
 
 # ---------------------------------------------------------------------------
@@ -1818,7 +1851,9 @@ def _bygg_selskap_fane() -> None:
                 data = await run.io_bound(importer_saft_fil, tmp_sti)
                 Path(tmp_sti).unlink(missing_ok=True)
 
-                # Bevar felt SAF-T ikke dekker
+                # Bevar felt SAF-T ikke dekker. kontakt_epost hentes fra
+                # SAF-T Contact/Email hvis tilgjengelig, men brukerens
+                # eksisterende verdi vinner hvis han allerede har fylt den ut.
                 if CONFIG_FIL.exists():
                     with open(CONFIG_FIL, encoding="utf-8") as f_eks:
                         eks = yaml.safe_load(f_eks) or {}
@@ -1826,14 +1861,34 @@ def _bygg_selskap_fane() -> None:
                         eks_verdi = eks.get("selskap", {}).get(felt)
                         if eks_verdi:
                             data["selskap"][felt] = eks_verdi
-                    for bevar in ("aksjonaerer", "skattemelding", "noter"):
-                        if eks.get(bevar):
-                            data[bevar] = eks[bevar]
+                    if eks.get("aksjonaerer"):
+                        data["aksjonaerer"] = eks["aksjonaerer"]
+                    # Skattemelding: bevar fritaksmetoden- og eierandel-
+                    # innstillinger som er brukerens valg, og bevar manuelt
+                    # satt underskudd_til_fremfoering (ellers brukes SAF-T-
+                    # estimatet basert på åpningssaldo konto 2080).
+                    eks_sm = eks.get("skattemelding") or {}
+                    if "anvend_fritaksmetoden" in eks_sm:
+                        data["skattemelding"]["anvend_fritaksmetoden"] = eks_sm["anvend_fritaksmetoden"]
+                    if "eierandel_datterselskap" in eks_sm:
+                        data["skattemelding"]["eierandel_datterselskap"] = eks_sm["eierandel_datterselskap"]
+                    if eks_sm.get("underskudd_til_fremfoering"):
+                        data["skattemelding"]["underskudd_til_fremfoering"] = eks_sm["underskudd_til_fremfoering"]
+                    # Noter: bevar antall_ansatte hvis satt, og bevar
+                    # laan_til_naerstaaende hvis brukeren har fylt ut detaljer
+                    # (ellers brukes SAF-T-genererte stub-oppføringer).
+                    eks_noter = eks.get("noter") or {}
+                    if eks_noter.get("antall_ansatte"):
+                        data["noter"]["antall_ansatte"] = eks_noter["antall_ansatte"]
+                    eks_laan = eks_noter.get("laan_til_naerstaaende") or []
+                    if eks_laan:
+                        data["noter"]["laan_til_naerstaaende"] = eks_laan
 
                 with open(CONFIG_FIL, "w", encoding="utf-8") as f:
                     yaml.dump(data, f, allow_unicode=True, sort_keys=False)
 
                 state.les_config()
+                oppdater_alle_inntastingsfelter()
                 ui.notify(f"SAF-T importert for {state.navn}.", type="positive")
             except Exception as e:
                 ui.notify(f"Feil ved import: {e}", type="negative", timeout=0)
@@ -1940,6 +1995,13 @@ def _bygg_regnskap_fane() -> None:
         else:
             balanse_banner.set_text(f"✗ Differanse: {kr(state.balanseforskjell)}")
             balanse_banner.classes(remove="text-green-600", add="text-red-600")
+
+    def _oppdater_metrikker():
+        oppdater_rr()
+        oppdater_balanse()
+
+    global _oppdater_regnskap_metrikker
+    _oppdater_regnskap_metrikker = _oppdater_metrikker
 
     oppdater_balanse()
 
@@ -2250,28 +2312,29 @@ def _bygg_dokumenter_fane() -> None:
             tooltip="Finnes i fjorårets skattemelding (RF-1028). Sett til 0 hvis selskapet er nytt.",
         )
         with ui.column():
+            def toggle_fritaksmetoden(e):
+                setattr(state, "fritaksmetoden", e.value)
+                eierandel_el.set_visibility(e.value)
+
             fritaks_sjekkboks = ui.checkbox(
                 "Anvend fritaksmetoden",
                 value=state.fritaksmetoden,
-                on_change=lambda e: setattr(state, "fritaksmetoden", e.value),
+                on_change=toggle_fritaksmetoden,
             ).tooltip(
                 "Gjelder dersom selskapet har mottatt utbytte fra datterselskaper. "
                 "Ved eierandel ≥ 90 % er hele utbyttet skattefritt."
             )
-            num(
+            eierandel_el = num(
                 "Eierandel i datterselskap (%)",
                 "eierandel_datterselskap",
                 step=1,
                 min_val=0,
             )
+            eierandel_el.set_visibility(state.fritaksmetoden)
 
     def lagre_dokumenter():
         state.lagre_config()
         ui.notify(f"Lagret til {CONFIG_FIL.resolve()}", type="positive")
-
-    ui.button("Lagre innstillinger og noter", on_click=lagre_dokumenter).props(
-        "color=primary"
-    ).classes("mb-4")
 
     ui.separator().classes("my-4")
 
@@ -2413,6 +2476,8 @@ def _bygg_dokumenter_fane() -> None:
                 ui.button("Fjern lån", on_click=fjern_laan).props("flat color=negative size=sm").classes("mt-2")
 
     laan_liste()
+    global _laan_liste_refresh
+    _laan_liste_refresh = laan_liste.refresh
 
     def legg_til_laan():
         state.laan_til_naerstaaende.append(LaanState())
@@ -2432,6 +2497,11 @@ def _bygg_dokumenter_fane() -> None:
                 ui.notify(f"Feil: {e}", type="negative", timeout=0)
 
         ui.button("Last ned noter", on_click=last_ned_noter).props("color=primary outline")
+
+    ui.separator().classes("my-4")
+    ui.button("Lagre innstillinger og noter", on_click=lagre_dokumenter).props(
+        "color=primary"
+    )
 
 
 # ---------------------------------------------------------------------------
