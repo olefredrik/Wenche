@@ -48,7 +48,10 @@ from wenche.models import (
     SkattemeldingKonfig,
 )
 from wenche.skd_client import SkdAksjonaerClient
-from wenche.skd_skattemelding_client import SkdSkattemeldingClient
+from wenche.skd_skattemelding_client import (
+    SkattemeldingValideringsfeil,
+    SkdSkattemeldingClient,
+)
 from wenche.skattemelding_xml import generer_skattemelding_fra_konfig, hent_partsnummer
 from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
 
@@ -2714,6 +2717,25 @@ def _bygg_send_fane() -> None:
                 ui.link(
                     "Åpne Altinn meldingsboks →", altinn_url, new_tab=True
                 ).classes("text-blue-600 font-medium")
+        except SkattemeldingValideringsfeil as e:
+            n.message = "Validering feilet, ingenting er sendt inn. Rett feilene under og prøv igjen."
+            n.spinner = False
+            n.type = "negative"
+            n.timeout = 0
+            n.close_button = "Lukk"
+            skattemelding_resultat.clear()
+            with skattemelding_resultat:
+                ui.label("Skatteetaten avviste skattemeldingen ved validering:").classes(
+                    "text-sm font-medium text-red-700 mt-1"
+                )
+                for avvik in (e.resultat.get("avvik_ved_validering") or []):
+                    detalj = avvik.get("oevrigInformasjon") or avvik.get("sti") or ""
+                    ui.label(f"• {avvik.get('avvikstype')}: {detalj}".rstrip(": ")).classes(
+                        "text-xs text-slate-600"
+                    )
+                ui.label(
+                    "Ingenting er sendt inn. Skatteetaten lagrer ikke data ved validering."
+                ).classes("text-xs text-slate-400 mt-1")
         except Exception as e:
             n.message = f"Innsending feilet: {e}"
             n.spinner = False

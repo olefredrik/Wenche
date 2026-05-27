@@ -35,6 +35,23 @@ _BASES = {
 }
 
 
+class SkattemeldingValideringsfeil(RuntimeError):
+    """
+    Skatteetatens valider-tjeneste avviste skattemeldingen (validertMedFeil).
+
+    Ingenting er sendt inn. `resultat` holder det strukturerte valideringssvaret,
+    og str(feilen) er en lesbar oppsummering av avvikene.
+    """
+
+    def __init__(self, resultat: dict):
+        self.resultat = resultat
+        super().__init__(
+            f"Skatteetaten avviste skattemeldingen ved validering "
+            f"({resultat.get('resultat')}). Ingenting er sendt inn.\n"
+            + formater_valideringsresultat(resultat)
+        )
+
+
 class SkdSkattemeldingClient:
     """
     Klient for Skatteetatens skattemelding-API (upersonlig/AS).
@@ -165,16 +182,18 @@ class SkdSkattemeldingClient:
         altinn_token: str,
         naeringsspesifikasjon_xml: bytes | None = None,
         gjeldende_dokument_id: str | None = None,
+        valider_foerst: bool = True,
     ) -> str:
         """
         Klargjør skattemelding for innsending via Altinn3.
 
         Flyt:
           1. Generer konvolutt
-          2. Opprett Altinn3-instans
-          3. Sett inntektsaar i Skattemeldingsapp_v2
-          4. Last opp konvolutt
-          5. Returner Altinn-inbox-URL
+          2. Valider mot Skatteetaten (med mindre valider_foerst=False)
+          3. Opprett Altinn3-instans
+          4. Sett inntektsaar i Skattemeldingsapp_v2
+          5. Last opp konvolutt
+          6. Returner Altinn-inbox-URL
 
         Brukeren må deretter logge inn i Altinn med BankID og klikke
         «Send inn» for å fullføre. Selve bekreftelsessteget kan ikke
@@ -184,9 +203,16 @@ class SkdSkattemeldingClient:
             skattemelding_xml:        XML fra generer_skattemelding_upersonlig().
             altinn_token:             Token fra auth.get_skd_skattemelding_tokens().
             naeringsspesifikasjon_xml: Valgfri næringsoppgave-XML.
+            valider_foerst:           Kjør valider-tjenesten før opplasting og
+                                      avbryt uten å sende hvis resultatet ikke er
+                                      validertOK. Standard: True.
 
         Returns:
             URL til Altinn-inboksen der brukeren fullfører innsendingen.
+
+        Raises:
+            SkattemeldingValideringsfeil: hvis forhåndsvalidering gir
+                resultatAvValidering != validertOK. Ingenting er da sendt inn.
         """
         konvolutt = generer_konvolutt(
             skattemelding_xml=skattemelding_xml,
@@ -195,6 +221,13 @@ class SkdSkattemeldingClient:
             naeringsspesifikasjon_xml=naeringsspesifikasjon_xml,
             gjeldende_dokument_id=gjeldende_dokument_id,
         )
+
+        if valider_foerst:
+            print("Validerer mot Skatteetaten før innsending...")
+            resultat = self.valider(inntektsaar, orgnr, konvolutt)
+            if resultat.get("resultat") != "validertOK":
+                raise SkattemeldingValideringsfeil(resultat)
+            print("Validering OK. Laster opp...")
 
         with AltinnClient(altinn_token, env=self._env) as altinn:
             print("Oppretter Altinn3-instans...")

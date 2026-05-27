@@ -322,7 +322,10 @@ def send_skattemelding(config_fil: str, dry_run: bool):
     from wenche.skattemelding import les_config
     from wenche.skattemelding_xml import generer_skattemelding_fra_konfig, hent_partsnummer
     from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
-    from wenche.skd_skattemelding_client import SkdSkattemeldingClient
+    from wenche.skd_skattemelding_client import (
+        SkattemeldingValideringsfeil,
+        SkdSkattemeldingClient,
+    )
 
     click.echo(f"Leser konfigurasjon fra {config_fil}...")
     try:
@@ -366,13 +369,18 @@ def send_skattemelding(config_fil: str, dry_run: bool):
             )
             return
 
-        instans_id = skd.send(
-            inntektsaar=regnskap.regnskapsaar,
-            orgnr=orgnr,
-            skattemelding_xml=skattemelding_xml,
-            altinn_token=tokens["altinn_token"],
-            naeringsspesifikasjon_xml=naeringsspesifikasjon_xml,
-        )
+        try:
+            instans_id = skd.send(
+                inntektsaar=regnskap.regnskapsaar,
+                orgnr=orgnr,
+                skattemelding_xml=skattemelding_xml,
+                altinn_token=tokens["altinn_token"],
+                naeringsspesifikasjon_xml=naeringsspesifikasjon_xml,
+            )
+        except SkattemeldingValideringsfeil as e:
+            click.echo(f"\n{e}")
+            click.echo("\nRett feilene over og kjør på nytt. Kjør «wenche valider-skattemelding» for å sjekke uten å sende.")
+            raise SystemExit(1)
 
     click.echo(f"\nSkattemelding sendt. Instans-ID: {instans_id}")
 
