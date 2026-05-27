@@ -60,19 +60,27 @@ Tokenet lagres i `~/.wenche/token.json` og gjenbrukes automatisk for påfølgend
 
 ## Skattemelding (frist 31. mai)
 
-Wenche genererer et ferdig utfylt sammendrag av RF-1167 (næringsoppgaven) og RF-1028 (skattemeldingen) og sender det inn digitalt til Skatteetaten.
+Wenche fyller ut næringsspesifikasjonen (RF-1167) og skattemeldingen (RF-1028) og sender dem digitalt til Skatteetaten via Altinn. Du fullfører ved å signere med BankID i Altinn.
 
 === "Webgrensesnitt"
 
-    Gå til fanen **Send til Altinn** og klikk **Send skattemelding til Skatteetaten**.
+    Gå til fanen **Send til Altinn** og klikk **Send skattemelding til Skatteetaten**. Når opplastingen er ferdig viser Wenche en lenke til Altinn-innboksen. Åpne lenken og signer med BankID for å fullføre innsendingen.
 
 === "Kommandolinje"
 
-    Send inn digitalt (krever API-tilgang, se under):
+    Forhåndskontroller mot Skatteetatens valideringstjeneste uten å sende inn (anbefalt):
+
+    ```bash
+    wenche valider-skattemelding
+    ```
+
+    Send inn (krever API-tilgang, se under):
 
     ```bash
     wenche send-skattemelding
     ```
+
+    Wenche skriver ut en lenke til Altinn-innboksen. Åpne lenken og signer med BankID for å fullføre.
 
     Test lokalt uten å sende (skriver `skattemelding.xml` og `naeringsspesifikasjon.xml`):
 
@@ -85,6 +93,12 @@ Wenche genererer et ferdig utfylt sammendrag av RF-1167 (næringsoppgaven) og RF
     ```bash
     wenche generer-skattemelding
     ```
+
+!!! note "Signering skjer i Altinn, ikke i Wenche"
+    Skatteetaten krever at en personlig bruker bekrefter skattemeldingen via ID-porten. Wenche laster opp innholdet med systembruker, men selve innsendingen fullføres først når du signerer med BankID i Altinn. Dette kan ikke gjøres maskinelt.
+
+!!! tip "Formuesverdi av aksjer (aksjeoppgaven RF-1088S)"
+    Eier selskapet aksjer i andre selskap, fyll inn **formuesverdien** fra aksjeoppgaven (RF-1088S, post 209) i feltet «Formuesverdi av aksjer selskapet eier» (Dokumenter-fanen, eller `formuesverdi_aksjer` i config.yaml). Wenche bruker den til å beregne formuesverdien bak selskapets egne aksjer, som er grunnlaget for eiernes formuesskatt. Uten den blir feltet stående tomt og Skatteetaten gir en merknad.
 
 Sammendraget inneholder:
 
