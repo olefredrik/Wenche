@@ -75,22 +75,30 @@ def prod_env():
 class TestSjekkSkattemelding:
 
     @patch("wenche.fristsjekk.httpx.get")
-    @patch("wenche.fristsjekk.get_skd_skattemelding_maskinporten_token", create=True)
-    def test_fastsatt_gir_innfridd(self, mock_token, mock_get, prod_env):
+    def test_fastsatt_gir_innfridd(self, mock_get, prod_env):
         """Respons med skattemeldingUpersonligFastsatt → innfridd=True."""
-        # Importer igjen etter patching
-        import wenche.fristsjekk as mod
-        mock_token_fn = MagicMock(return_value="test-token")
-        with patch.object(mod, "sjekk_skattemelding", wraps=mod.sjekk_skattemelding):
-            with patch("wenche.auth.get_skd_skattemelding_maskinporten_token", mock_token_fn):
-                mock_get.return_value = _mock_response(
-                    text=_wrapper_xml("skattemeldingUpersonligFastsatt"),
-                )
-                result = mod.sjekk_skattemelding("931808869", 2025)
+        with patch("wenche.auth.get_skd_skattemelding_maskinporten_token", return_value="t"):
+            mock_get.return_value = _mock_response(
+                text=_wrapper_xml("skattemeldingUpersonligFastsatt"),
+            )
+            result = sjekk_skattemelding("931808869", 2025)
 
         assert result.innfridd is True
         assert "sendt inn og godkjent" in result.brukertekst
         assert "931808869" in result.lenke
+
+    @patch("wenche.fristsjekk.httpx.get")
+    def test_ukjent_fastsatt_variant_gir_ikke_innfridd(self, mock_get, prod_env):
+        """Hypotetisk fremtidig type som inneholder 'Fastsatt' men ikke er i
+        kjent-settet skal ikke falskt markeres som innfridd."""
+        with patch("wenche.auth.get_skd_skattemelding_maskinporten_token", return_value="t"):
+            mock_get.return_value = _mock_response(
+                text=_wrapper_xml("skattemeldingUpersonligFastsattForVurdering"),
+            )
+            result = sjekk_skattemelding("931808869", 2025)
+
+        assert result.innfridd is False
+        assert "ikke innsendt" in result.brukertekst
 
     @patch("wenche.fristsjekk.httpx.get")
     def test_utkast_gir_ikke_innfridd(self, mock_get, prod_env):
