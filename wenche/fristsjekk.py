@@ -58,6 +58,10 @@ _SKD_BASES = {
 # Dokumentasjon: https://data.brreg.no/regnskapsregisteret/openapi/index.html
 _BRG_REGNSKAP_URL = "https://data.brreg.no/regnskapsregisteret/regnskap"
 
+# Eksakte verdier fra Dokumenttype-enum i Skatteetatens XSD (se modul-docstring).
+# Utvid settet hvis XSDen får nye verdier som indikerer "innsendt og fastsatt".
+_FASTSATT_DOKUMENTTYPER = {"skattemeldingUpersonligFastsatt"}
+
 
 @dataclass
 class FristStatus:
@@ -130,11 +134,12 @@ def _utfør_skattemelding_sjekk(token: str, orgnr: str, aar: int) -> FristStatus
         return FristStatus(beskrivelse="Ugyldig svar fra Skatteetaten")
 
     # <type>-elementet i wrapper-XML-en angir dokumentstatus.
-    # "Fastsatt" i verdien betyr at skattemeldingen er innsendt og godkjent.
-    # Ref: Dokumenttype-enum i XSD (se modul-docstring).
+    # Sammenlign eksakt mot kjente "fastsatt"-typer fra XSDen — delstreng-match
+    # ville falskt slå inn hvis Skatteetaten innfører nye typer som inneholder
+    # "Fastsatt" uten å bety "innsendt og godkjent".
     for elem in root.iter():
         tag = elem.tag.split("}")[-1] if "}" in elem.tag else elem.tag
-        if tag == "type" and elem.text and "Fastsatt" in elem.text:
+        if tag == "type" and elem.text and elem.text.strip() in _FASTSATT_DOKUMENTTYPER:
             return FristStatus(
                 innfridd=True,
                 brukertekst=f"Skattemeldingen for {aar} er sendt inn og godkjent.",

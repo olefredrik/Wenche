@@ -834,17 +834,20 @@ def _frist_info(maaned: int, dag: int) -> tuple[str, str, str]:
         return dato_tekst, f"{dager} dager igjen", "green-600"
 
 
-def _fristkort(tittel: str, undertittel: str) -> tuple:
-    """Oppretter fristkort med loading-tilstand. Returnerer (card, content)."""
+def _fristkort(tittel: str, undertittel: str, vis_loading: bool = True) -> tuple:
+    """Oppretter fristkort. Med `vis_loading=False` hoppes spinner-tilstanden over
+    når sluttilstanden allerede er kjent (f.eks. aksjonærregister uten API-sjekk).
+    Returnerer (card, content)."""
     card = ui.card().classes("w-full p-5 border border-slate-200 shadow-none rounded-xl")
     with card:
         content = ui.column().classes("w-full gap-0")
         with content:
             ui.label(tittel).classes("font-semibold text-slate-800 text-base")
             ui.label(undertittel).classes("text-xs text-slate-500 mb-3")
-            with ui.row().classes("items-center gap-2"):
-                ui.spinner(size="sm").classes("text-slate-400")
-                ui.label("Sjekker status...").classes("text-xs text-slate-400 italic")
+            if vis_loading:
+                with ui.row().classes("items-center gap-2"):
+                    ui.spinner(size="sm").classes("text-slate-400")
+                    ui.label("Sjekker status...").classes("text-xs text-slate-400 italic")
     return card, content
 
 
@@ -955,7 +958,7 @@ def _bygg_hjem_fane(tabs=None, t_oppsett=None) -> None:
         for f in frister:
             if f["key"] == "aksjonaerregister":
                 # Ingen automatisk sjekk — vis sluttilstand direkte uten spinner.
-                card, content = _fristkort(f["tittel"], f["undertittel"])
+                card, content = _fristkort(f["tittel"], f["undertittel"], vis_loading=False)
                 _fristkort_ventende(
                     card, content, f["tittel"], f["undertittel"],
                     f["maaned"], f["dag"], f["beskrivelse"],
@@ -963,7 +966,7 @@ def _bygg_hjem_fane(tabs=None, t_oppsett=None) -> None:
                 )
             elif not orgnr_konfigurert:
                 # Ingen API-sjekk uten orgnr — hopp over spinner og vis ventende direkte.
-                card, content = _fristkort(f["tittel"], f["undertittel"])
+                card, content = _fristkort(f["tittel"], f["undertittel"], vis_loading=False)
                 _fristkort_ventende(
                     card, content, f["tittel"], f["undertittel"],
                     f["maaned"], f["dag"], f["beskrivelse"],
