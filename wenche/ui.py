@@ -935,7 +935,7 @@ def _bygg_hjem_fane(tabs=None, t_oppsett=None) -> None:
             oppdater_knapp.tooltip("Fyll inn organisasjonsnummer i Oppsett-fanen først")
 
     frister = [
-        {"key": "skattemelding", "tittel": "Skattemelding", "undertittel": "RF-1167 + RF-1028",
+        {"key": "skattemelding", "tittel": "Skattemelding", "undertittel": "Skattemelding og næringsspesifikasjon",
          "maaned": 5, "dag": 31,
          "beskrivelse": "Wenche beregner skatten og sender skattemeldingen digitalt via Altinn i steg 6."},
         {"key": "aarsregnskap", "tittel": "Årsregnskap", "undertittel": "Brønnøysundregistrene",
@@ -2327,7 +2327,7 @@ def _bygg_dokumenter_fane() -> None:
             "Fremførbart underskudd fra tidligere år (NOK)",
             "underskudd",
             min_val=0,
-            tooltip="Finnes i fjorårets skattemelding (RF-1028). Sett til 0 hvis selskapet er nytt.",
+            tooltip="Finnes i fjorårets skattemelding. Sett til 0 hvis selskapet er nytt.",
         )
         with ui.column():
             def toggle_fritaksmetoden(e):

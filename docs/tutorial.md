@@ -122,7 +122,7 @@ Denne veiledningen tar deg gjennom en komplett innsending fra start til slutt. V
 
 ## Steg 5 — Send skattemeldingen
 
-Wenche fyller ut næringsspesifikasjonen (RF-1167) og skattemeldingen (RF-1028) og sender dem digitalt til Skatteetaten via Altinn. Du fullfører ved å signere med BankID i Altinn.
+Wenche fyller ut næringsspesifikasjonen og skattemeldingen og sender dem digitalt til Skatteetaten via Altinn. Du fullfører ved å signere med BankID i Altinn.
 
 !!! tip "Formuesverdi av aksjer"
     Eier selskapet aksjer i andre selskap, fyll inn **formuesverdien** fra aksjeoppgaven (RF-1088S, post 209) i feltet «Formuesverdi av aksjer selskapet eier» under Dokumenter. Den brukes til å beregne formuesverdien bak selskapets egne aksjer, som er grunnlaget for eiernes formuesskatt.
@@ -218,7 +218,7 @@ Wenche fyller ut næringsspesifikasjonen (RF-1167) og skattemeldingen (RF-1028) 
 
 Du har nå:
 
-- [x] Generert og sendt inn skattemeldingen (RF-1167 + RF-1028)
+- [x] Generert og sendt inn skattemelding og næringsspesifikasjon
 - [x] Sendt inn årsregnskapet til Brønnøysundregistrene
 - [x] Sendt inn aksjonærregisteroppgaven (RF-1086) til Skatteetaten
 

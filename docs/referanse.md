@@ -110,7 +110,7 @@ foregaaende_aar:
 
 | Felt | Type | Påkrevd | Beskrivelse |
 |---|---|---|---|
-| `underskudd_til_fremfoering` | heltall | nei | Fremførbart underskudd fra tidligere år (NOK). Finnes i fjorårets skattemelding (RF-1028). Standard: `0` |
+| `underskudd_til_fremfoering` | heltall | nei | Fremførbart underskudd fra tidligere år (NOK). Finnes i fjorårets skattemelding. Standard: `0` |
 | `anvend_fritaksmetoden` | boolsk | nei | `true` for holdingselskaper som eier aksjer i datterselskaper (sktl. § 2-38). Standard: `false` |
 | `eierandel_datterselskap` | heltall | nei | Eierandel i datterselskapet i prosent (0–100). ≥ 90 %: hele utbyttet fritatt. < 90 %: 3 % skattepliktig (sjablonregelen, sktl. § 2-38 sjette ledd). Standard: `100` |
 | `boersnotert` | boolsk | nei | `true` hvis selskapet er børsnotert. Standard: `false` |
@@ -185,7 +185,7 @@ wenche logout
 
 ### `wenche generer-skattemelding`
 
-Genererer ferdig utfylt sammendrag av RF-1167 (næringsoppgaven) og RF-1028 (skattemeldingen).
+Genererer ferdig utfylt sammendrag av næringsspesifikasjonen og skattemeldingen.
 
 ```bash
 wenche generer-skattemelding [--config FILSTI] [--ut FILSTI]
@@ -312,7 +312,7 @@ Følgende felt fylles inn automatisk så langt det lar seg gjøre fra SAF-T, men
 
 - `selskap.kontakt_epost` hentes fra `Company/Contact/Email` hvis SAF-T-fila inneholder det
 - `noter.laan_til_naerstaaende` får en stub-oppføring med saldo og retning satt hvis konto 2250 (gjeld til eier) har saldo. Motpart, rentesats og sikkerhet må fortsatt fylles inn manuelt
-- `skattemelding.underskudd_til_fremfoering` estimeres fra åpningssaldoen på konto 2080 (udekket tap). Verdien er regnskapsmessig og kan avvike fra det skattemessige fremførbare underskuddet; verifiser mot fjorårets RF-1028 hvis selskapet har ikke-fradragsberettigede kostnader
+- `skattemelding.underskudd_til_fremfoering` estimeres fra åpningssaldoen på konto 2080 (udekket tap). Verdien er regnskapsmessig og kan avvike fra det skattemessige fremførbare underskuddet; verifiser mot fjorårets skattemelding hvis selskapet har ikke-fradragsberettigede kostnader
 
 !!! tip "Tilgjengelig i webgrensesnittet"
     SAF-T-import er også tilgjengelig under fanen **Selskap** i `wenche ui`.

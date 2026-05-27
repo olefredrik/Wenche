@@ -60,7 +60,7 @@ Tokenet lagres i `~/.wenche/token.json` og gjenbrukes automatisk for påfølgend
 
 ## Skattemelding (frist 31. mai)
 
-Wenche fyller ut næringsspesifikasjonen (RF-1167) og skattemeldingen (RF-1028) og sender dem digitalt til Skatteetaten via Altinn. Du fullfører ved å signere med BankID i Altinn.
+Wenche fyller ut næringsspesifikasjonen og skattemeldingen og sender dem digitalt til Skatteetaten via Altinn. Du fullfører ved å signere med BankID i Altinn.
 
 === "Webgrensesnitt"
 
@@ -107,7 +107,7 @@ Wenche fyller ut næringsspesifikasjonen (RF-1167) og skattemeldingen (RF-1028) 
 
 Sammendraget inneholder:
 
-- Alle felt i næringsoppgaven (RF-1167) ferdig utfylt
+- Alle felt i næringsspesifikasjonen ferdig utfylt
 - Skatteberegning med fritaksmetoden der det er aktuelt
 - Beregnet skatt (22 %)
 - Skattekostnad ført i resultatregnskapet
@@ -263,7 +263,7 @@ Kommandoer:
   opprett-systembruker     Opprett systembrukerforespørsel og fa godkjenningslenke
   login                    Autentiser mot Maskinporten med RSA-nokkel
   logout                   Logg ut og slett lagret token
-  generer-skattemelding    Generer ferdig utfylt RF-1167 og RF-1028 som tekstsammendrag
+  generer-skattemelding    Generer ferdig utfylt næringsspesifikasjon og skattemelding som tekstsammendrag
   send-skattemelding       Send inn skattemelding for AS til Skatteetaten via Altinn3
   send-aarsregnskap        Send inn arsregnskap til Bronnoysundregistrene
   send-aksjonaerregister   Send inn aksjonaerregisteroppgave (RF-1086)
