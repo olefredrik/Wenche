@@ -64,17 +64,13 @@ Wenche fyller ut næringsspesifikasjonen (RF-1167) og skattemeldingen (RF-1028) 
 
 === "Webgrensesnitt"
 
-    Gå til fanen **Send til Altinn** og klikk **Send skattemelding til Skatteetaten**. Når opplastingen er ferdig viser Wenche en lenke til Altinn-innboksen. Åpne lenken og signer med BankID for å fullføre innsendingen.
+    Gå til fanen **Send til Altinn** og klikk **Send skattemelding til Skatteetaten**.
+
+    Wenche validerer først skattemeldingen mot Skatteetaten. Er noe feil, stopper Wenche uten å sende noe og viser hva som må rettes. Når valideringen er OK, lastes skattemeldingen opp automatisk og Wenche viser en lenke til Altinn-innboksen. Åpne lenken og signer med BankID for å fullføre innsendingen.
 
 === "Kommandolinje"
 
-    Forhåndskontroller mot Skatteetatens valideringstjeneste uten å sende inn (anbefalt):
-
-    ```bash
-    wenche valider-skattemelding
-    ```
-
-    Send inn (krever API-tilgang, se under):
+    `wenche send-skattemelding` validerer automatisk før opplasting, akkurat som i webgrensesnittet, og sender ingenting hvis valideringen feiler.
 
     ```bash
     wenche send-skattemelding
@@ -82,7 +78,13 @@ Wenche fyller ut næringsspesifikasjonen (RF-1167) og skattemeldingen (RF-1028) 
 
     Wenche skriver ut en lenke til Altinn-innboksen. Åpne lenken og signer med BankID for å fullføre.
 
-    Test lokalt uten å sende (skriver `skattemelding.xml` og `naeringsspesifikasjon.xml`):
+    Vil du bare kontrollere innsendingen uten å sende, for eksempel for å se merknader:
+
+    ```bash
+    wenche valider-skattemelding
+    ```
+
+    Test lokalt uten å sende eller validere (skriver `skattemelding.xml` og `naeringsspesifikasjon.xml`):
 
     ```bash
     wenche send-skattemelding --dry-run
@@ -93,6 +95,9 @@ Wenche fyller ut næringsspesifikasjonen (RF-1167) og skattemeldingen (RF-1028) 
     ```bash
     wenche generer-skattemelding
     ```
+
+!!! info "Automatisk validering før innsending"
+    Både webgrensesnittet og `wenche send-skattemelding` kjører Skatteetatens valideringstjeneste som første steg. Blir innsendingen avvist (`validertMedFeil`), sendes ingenting inn og du får en tydelig feilmelding om hva som må rettes. Validering lagrer ikke data hos Skatteetaten.
 
 !!! note "Signering skjer i Altinn, ikke i Wenche"
     Skatteetaten krever at en personlig bruker bekrefter skattemeldingen via ID-porten. Wenche laster opp innholdet med systembruker, men selve innsendingen fullføres først når du signerer med BankID i Altinn. Dette kan ikke gjøres maskinelt.

@@ -130,12 +130,12 @@ Wenche fyller ut næringsspesifikasjonen (RF-1167) og skattemeldingen (RF-1028) 
 === "Webgrensesnitt"
 
     1. Gå til fanen **Dokumenter**, fyll inn skattemelding-innstillingene og klikk **Last ned skattemelding** for å lese gjennom sammendraget. For Eksempel Holding AS med 100 % eierandel er utbyttet fritatt under fritaksmetoden, så skatten blir **0 kr**.
-    2. Gå til fanen **Send til Altinn** og klikk **Send skattemelding til Skatteetaten**.
-    3. Når opplastingen er ferdig viser Wenche en lenke til Altinn-innboksen. Åpne lenken og signer med BankID for å fullføre innsendingen.
+    2. Gå til fanen **Send til Altinn** og klikk **Send skattemelding til Skatteetaten**. Wenche validerer skattemeldingen mot Skatteetaten først, og sender ingenting hvis noe er feil. Da får du en tydelig melding om hva som må rettes, slik at du kan oppdatere tallene og prøve igjen.
+    3. Når valideringen er OK, lastes skattemeldingen opp automatisk og Wenche viser en lenke til Altinn-innboksen. Åpne lenken og signer med BankID for å fullføre innsendingen.
 
 === "Kommandolinje"
 
-    Forhåndskontroller mot Skatteetatens valideringstjeneste (sender ikke inn):
+    `wenche send-skattemelding` validerer automatisk før opplasting og sender ingenting hvis valideringen feiler. Vil du bare kontrollere uten å sende:
 
     ```bash
     wenche valider-skattemelding
