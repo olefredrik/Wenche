@@ -345,12 +345,15 @@ def send_skattemelding(config_fil: str, dry_run: bool):
 
     with SkdSkattemeldingClient(tokens["maskinporten_token"], env=env) as skd:
         test_partsnummer = os.getenv("SKD_TEST_PARTSNUMMER") if env == "test" else None
+        gjeldende_dokument_id: str | None = None
         if test_partsnummer:
             click.echo(f"Bruker SKD_TEST_PARTSNUMMER={test_partsnummer} (hopper over forhåndsutfylt)")
             partsnummer = int(test_partsnummer)
         else:
             click.echo("Henter forhåndsutfylt skattemelding...")
-            forhåndsutfylt = skd.hent_forhåndsutfylt(regnskap.regnskapsaar, orgnr)
+            forhåndsutfylt, gjeldende_dokument_id = skd.hent_forhåndsutfylt_med_id(
+                regnskap.regnskapsaar, orgnr
+            )
             partsnummer = hent_partsnummer(forhåndsutfylt)
         click.echo(f"Partsnummer: {partsnummer}")
 
@@ -376,6 +379,7 @@ def send_skattemelding(config_fil: str, dry_run: bool):
                 skattemelding_xml=skattemelding_xml,
                 altinn_token=tokens["altinn_token"],
                 naeringsspesifikasjon_xml=naeringsspesifikasjon_xml,
+                gjeldende_dokument_id=gjeldende_dokument_id,
             )
         except SkattemeldingValideringsfeil as e:
             click.echo(f"\n{e}")

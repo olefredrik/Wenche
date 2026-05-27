@@ -119,6 +119,19 @@ class TestKonvolutt:
         info = root.find(f"{{{_NS}}}innsendingsinformasjon")
         assert info.find(f"{{{_NS}}}innsendingsformaal").text == "klage"
 
+    def test_dokumentreferanse_settes_naar_id_oppgitt(self):
+        root = _parse(
+            generer_konvolutt(_DUMMY_XML, 2024, gjeldende_dokument_id="SKI:755:970817908")
+        )
+        ref = root.find(f"{{{_NS}}}dokumentreferanseTilGjeldendeDokument")
+        assert ref is not None
+        assert ref.find(f"{{{_NS}}}dokumenttype").text == "skattemeldingUpersonlig"
+        assert ref.find(f"{{{_NS}}}dokumentidentifikator").text == "SKI:755:970817908"
+
+    def test_dokumentreferanse_mangler_naar_id_ikke_oppgitt(self):
+        root = _parse(generer_konvolutt(_DUMMY_XML, 2024))
+        assert root.find(f"{{{_NS}}}dokumentreferanseTilGjeldendeDokument") is None
+
     def test_output_er_gyldig_utf8_xml(self):
         result = generer_konvolutt(_DUMMY_XML, 2024, orgnr="922020523")
         assert isinstance(result, bytes)
