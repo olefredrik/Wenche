@@ -219,25 +219,11 @@ def generer_naeringsspesifikasjon(
             _balanseforekomst(bv_om_el, "balanseverdi", beloep, kode)
 
     # Gjeld og egenkapital
+    # Rekkefølgen på barneelementene er bundet av XSD-sekvensen i
+    # GjeldOgEgenkapital: langsiktigGjeld -> kortsiktigGjeld -> egenkapital.
+    # Feil rekkefølge gjør XML-en ugyldig mot naeringsspesifikasjon_v6 og er
+    # årsaken til SMEVB-005 fra Skatteetatens visning-API (SSV-5187).
     gek_el = SubElement(balanseregnskap, "gjeldOgEgenkapital")
-
-    # Egenkapital
-    ek = eg.egenkapital
-    ek_poster = [
-        (ek.aksjekapital, "2000"),
-        (ek.overkursfond, "2020"),
-    ]
-    # Annen egenkapital: 2050 (positiv) eller 2080 (udekket tap / negativ)
-    if ek.annen_egenkapital >= 0:
-        ek_poster.append((ek.annen_egenkapital, "2050"))
-    else:
-        ek_poster.append((abs(ek.annen_egenkapital), "2080"))
-
-    ek_poster = [(b, k) for b, k in ek_poster if b]
-    if ek_poster:
-        egenkapital_el = SubElement(gek_el, "egenkapital")
-        for beloep, kode in ek_poster:
-            _balanseforekomst(egenkapital_el, "kapital", beloep, kode)
 
     # Langsiktig gjeld
     lg = eg.langsiktig_gjeld
@@ -263,6 +249,24 @@ def generer_naeringsspesifikasjon(
         kortsiktig_gjeld_el = SubElement(gek_el, "kortsiktigGjeld")
         for beloep, kode in kg_poster:
             _balanseforekomst(kortsiktig_gjeld_el, "gjeld", beloep, kode)
+
+    # Egenkapital
+    ek = eg.egenkapital
+    ek_poster = [
+        (ek.aksjekapital, "2000"),
+        (ek.overkursfond, "2020"),
+    ]
+    # Annen egenkapital: 2050 (positiv) eller 2080 (udekket tap / negativ)
+    if ek.annen_egenkapital >= 0:
+        ek_poster.append((ek.annen_egenkapital, "2050"))
+    else:
+        ek_poster.append((abs(ek.annen_egenkapital), "2080"))
+
+    ek_poster = [(b, k) for b, k in ek_poster if b]
+    if ek_poster:
+        egenkapital_el = SubElement(gek_el, "egenkapital")
+        for beloep, kode in ek_poster:
+            _balanseforekomst(egenkapital_el, "kapital", beloep, kode)
 
     # -----------------------------------------------------------------------
     # Virksomhet (obligatorisk)

@@ -32,7 +32,7 @@ dependencies = [
 
 [project.optional-dependencies]
 ui = ["nicegui>=2.0"]
-dev = ["pytest>=8.0", "mkdocs-material>=9.5"]
+dev = ["pytest>=8.0", "mkdocs-material>=9.5", "lxml>=5.0"]
 
 [project.urls]
 Homepage = "https://github.com/olefredrik/wenche"
