@@ -310,6 +310,45 @@ def _parse_valideringsrespons(raw: bytes) -> dict:
     }
 
 
+# Klartekst-forklaringer for valideringskoder vi har sett i praksis.
+# Skatteetatens koder er kryptiske; her oversetter vi de kjente til hva
+# brukeren faktisk kan gjøre. Rent informativt; påvirker ikke hva som sendes.
+_KODE_FORKLARINGER = {
+    "UP_HAR_NÆRINGSSPESIFIKASJON_MANGLER_SKATTEMELDING": (
+        "Skattemeldingen inneholder ingen skattepliktige poster, mens "
+        "næringsspesifikasjonen har innhold. Wenche støtter kun passive "
+        "holdingselskaper (aksjeinntekt under fritaksmetoden). Selskaper med "
+        "ordinær drift og skattepliktig over- eller underskudd er utenfor "
+        "Wenches støtteområde og må levere via skatteetaten.no eller et "
+        "regnskapsprogram."
+    ),
+    "innkommendeForespoerselManglerReferanseTilGjeldendeSkattemelding": (
+        "Innsendingen mangler referanse til den forhåndsutfylte skattemeldingen. "
+        "Oppgrader Wenche til nyeste versjon og prøv igjen."
+    ),
+    "innkommendeForespoerselManglerSporTilUtfoerende": (
+        "Innsendingen ble forsøkt bekreftet maskinelt. Det siste steget må gjøres "
+        "manuelt: logg inn i Altinn med BankID og klikk «Send inn». Oppgrader "
+        "Wenche til 0.17.0 eller nyere."
+    ),
+}
+
+
+def _koder_i_resultat(res: dict):
+    """Samler alle koder (aarsak, avvikstype, veiledningstype) i rekkefølge, uten duplikater."""
+    koder = []
+    if res.get("aarsak"):
+        koder.append(res["aarsak"])
+    for a in (res.get("avvik_ved_validering") or []) + (res.get("avvik_etter_beregning") or []):
+        if a.get("avvikstype"):
+            koder.append(a["avvikstype"])
+    for v in res.get("veiledning") or []:
+        if v.get("veiledningstype"):
+            koder.append(v["veiledningstype"])
+    # bevar rekkefølge, fjern duplikater
+    return list(dict.fromkeys(koder))
+
+
 def formater_valideringsresultat(res: dict) -> str:
     """Formaterer et valideringsresultat fra valider() til lesbar tekst."""
     linjer = [f"resultatAvValidering: {res.get('resultat')}"]
@@ -337,6 +376,16 @@ def formater_valideringsresultat(res: dict) -> str:
         linjer.append(f"\nVeiledning/merknader ({len(veil)}):")
         for v in veil:
             linjer.append(f"  - {v.get('veiledningstype')}: {v.get('hjelpetekst')}")
+
+    forklaringer = [
+        (kode, _KODE_FORKLARINGER[kode])
+        for kode in _koder_i_resultat(res)
+        if kode in _KODE_FORKLARINGER
+    ]
+    if forklaringer:
+        linjer.append("\nHva betyr dette?")
+        for kode, tekst in forklaringer:
+            linjer.append(f"  - {kode}:\n    {tekst}")
 
     return "\n".join(linjer)
 
