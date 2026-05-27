@@ -133,14 +133,15 @@ class TestKonvoluttXsd:
 
 
 class TestOpplysningOgVerdsettingXsd:
-    def test_opplysning_og_verdsetting_validerer(self):
+    def test_opplysning_og_formue_validerer(self):
         xml = generer_skattemelding_upersonlig(
             partsnummer=_PARTSNUMMER,
             inntektsaar=2025,
             fremfoert_underskudd=0,
             boersnotert=False,
             harytelse=True,
-            samlet_verdi_bak_aksjene=59940,
+            formue_verdi_foer_rabatt=72622,
+            samlet_gjeld=12682,
         )
         _valider(xml, "skattemeldingUpersonlig_v5_ekstern.xsd")
         root = etree.fromstring(xml)
@@ -149,9 +150,18 @@ class TestOpplysningOgVerdsettingXsd:
         assert opl.find(
             f"{_SM_NS}harYtelseMellomAksjonaerEllerNaerstaaendeOgSelskapEllerSelskapetsDatterselskap"
         ).text == "true"
-        vaa = root.find(f"{_SM_NS}verdsettingAvAksje/{_SM_NS}samletVerdiBakAksjeneISelskapet")
-        assert vaa.findtext(f"{_SM_NS}beloep/{_SM_NS}beloepSomHeltall") == "59940"
-        assert vaa.find(f"{_SM_NS}erOverstyrt/{_SM_NS}boolsk").text == "true"
+        # Formue-seksjonen settes overstyrt; Skatteetaten utleder verdi bak aksjene
+        # = 72622 - 12682 = 59940.
+        fog = root.find(f"{_SM_NS}formueOgGjeld")
+        vfr = fog.find(f"{_SM_NS}samletVerdiFoerEventuellVerdsettingsrabatt")
+        assert vfr.findtext(f"{_SM_NS}beloep/{_SM_NS}beloepSomHeltall") == "72622"
+        assert vfr.find(f"{_SM_NS}erOverstyrt/{_SM_NS}boolsk").text == "true"
+        assert fog.find(
+            f"{_SM_NS}samletGjeld/{_SM_NS}beloep/{_SM_NS}beloepSomHeltall"
+        ).text == "12682"
+        # formueOgGjeld skal komme før opplysningOmSkattesubjekt (XSD-sekvens)
+        barn = [c.tag.replace(_SM_NS, "") for c in root]
+        assert barn.index("formueOgGjeld") < barn.index("opplysningOmSkattesubjekt")
 
     def test_beregn_verdi_bak_aksjene(self, eksempel_regnskap):
         # eksempel_regnskap: aksjer 100000 (bok, erstattes), bank 1200,
