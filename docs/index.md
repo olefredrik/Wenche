@@ -14,14 +14,14 @@ Alle AS plikter å levere tre ting hvert år:
 |---|---|---|---|
 | **Årsregnskap** | Brønnøysundregistrene | 31. juli | Automatisk innsending |
 | **Aksjonærregisteroppgave** (RF-1086) | Skatteetaten via Altinn | 31. januar | Automatisk innsending |
-| **Skattemelding for AS** (RF-1028 + RF-1167) | Skatteetaten | 31. mai | Automatisk innsending |
+| **Skattemelding for AS** (skattemelding + næringsspesifikasjon) | Skatteetaten | 31. mai | Automatisk innsending |
 
 ## Hva er de ulike skjemaene?
 
 - **Årsregnskapet** er en oppsummering av selskapets økonomi — hva selskapet eier, hva det skylder, og hva det tjente eller tapte i løpet av året. Dette er offentlig informasjon.
 - **Aksjonærregisteroppgaven (RF-1086)** forteller Skatteetaten hvem som eier aksjer i selskapet og om det er utbetalt utbytte. Brukes blant annet til å forhåndsutfylle aksjonærenes personlige skattemelding.
-- **Næringsoppgaven (RF-1167)** er en detaljert oppstilling av selskapets inntekter og kostnader for skatteformål, og er grunnlaget for skatteberegningen.
-- **Skattemeldingen for AS (RF-1028)** er selve skattemeldingen. For holdingselskaper gjelder **fritaksmetoden**: utbytte fra datterselskaper er i praksis 97 % skattefritt.
+- **Næringsspesifikasjonen** er en detaljert oppstilling av selskapets inntekter og kostnader for skatteformål, og er grunnlaget for skatteberegningen.
+- **Skattemeldingen for AS** er selve skattemeldingen. For holdingselskaper gjelder **fritaksmetoden**: utbytte fra datterselskaper er i praksis 97 % skattefritt.
 
 ## Hvem passer Wenche for?
 

@@ -230,7 +230,7 @@ def send_aksjonaerregister(config_fil: str, dry_run: bool):
     help="Lagre sammendrag til fil i stedet for å skrive til skjermen.",
 )
 def generer_skattemelding(config_fil: str, ut_fil: str | None):
-    """Generer ferdig utfylt RF-1167 og RF-1028 fra config.yaml."""
+    """Generer ferdig utfylt næringsspesifikasjon og skattemelding fra config.yaml."""
     click.echo(f"Leser konfigurasjon fra {config_fil}...")
     try:
         regnskap, konfig = skattemelding.les_config(config_fil)

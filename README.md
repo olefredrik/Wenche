@@ -18,7 +18,7 @@ Autentisering skjer via Maskinporten med et selvgenerert RSA-nøkkelpar — inge
 | Hva | Til hvem | Frist | Status |
 |---|---|---|---|
 | **Aksjonærregisteroppgave** (RF-1086) | Skatteetaten | 31. januar | Automatisk innsending |
-| **Skattemelding for AS** (RF-1028 + RF-1167) | Skatteetaten | 31. mai | Automatisk innsending |
+| **Skattemelding for AS** (skattemelding + næringsspesifikasjon) | Skatteetaten | 31. mai | Automatisk innsending |
 | **Årsregnskap** | Brønnøysundregistrene | 31. juli | Automatisk innsending |
 
 ## Kom i gang
