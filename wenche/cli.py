@@ -320,9 +320,12 @@ def send_skattemelding(config_fil: str, dry_run: bool):
     import os
     from pathlib import Path
     from wenche.skattemelding import les_config
-    from wenche.skattemelding_xml import generer_skattemelding_upersonlig, hent_partsnummer
+    from wenche.skattemelding_xml import generer_skattemelding_fra_konfig, hent_partsnummer
     from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
-    from wenche.skd_skattemelding_client import SkdSkattemeldingClient
+    from wenche.skd_skattemelding_client import (
+        SkattemeldingValideringsfeil,
+        SkdSkattemeldingClient,
+    )
 
     click.echo(f"Leser konfigurasjon fra {config_fil}...")
     try:
@@ -351,11 +354,7 @@ def send_skattemelding(config_fil: str, dry_run: bool):
             partsnummer = hent_partsnummer(forhåndsutfylt)
         click.echo(f"Partsnummer: {partsnummer}")
 
-        skattemelding_xml = generer_skattemelding_upersonlig(
-            partsnummer=partsnummer,
-            inntektsaar=regnskap.regnskapsaar,
-            fremfoert_underskudd=int(konfig.underskudd_til_fremfoering),
-        )
+        skattemelding_xml = generer_skattemelding_fra_konfig(regnskap, konfig, partsnummer)
         naeringsspesifikasjon_xml = generer_naeringsspesifikasjon(regnskap, partsnummer)
 
         if dry_run:
@@ -370,12 +369,90 @@ def send_skattemelding(config_fil: str, dry_run: bool):
             )
             return
 
-        instans_id = skd.send(
-            inntektsaar=regnskap.regnskapsaar,
-            orgnr=orgnr,
-            skattemelding_xml=skattemelding_xml,
-            altinn_token=tokens["altinn_token"],
-            naeringsspesifikasjon_xml=naeringsspesifikasjon_xml,
-        )
+        try:
+            instans_id = skd.send(
+                inntektsaar=regnskap.regnskapsaar,
+                orgnr=orgnr,
+                skattemelding_xml=skattemelding_xml,
+                altinn_token=tokens["altinn_token"],
+                naeringsspesifikasjon_xml=naeringsspesifikasjon_xml,
+            )
+        except SkattemeldingValideringsfeil as e:
+            click.echo(f"\n{e}")
+            click.echo("\nRett feilene over og kjør på nytt. Kjør «wenche valider-skattemelding» for å sjekke uten å sende.")
+            raise SystemExit(1)
 
     click.echo(f"\nSkattemelding sendt. Instans-ID: {instans_id}")
+
+
+@main.command("valider-skattemelding")
+@click.option(
+    "--config",
+    "config_fil",
+    default="config.yaml",
+    show_default=True,
+    help="Sti til konfigurasjonsfil.",
+)
+def valider_skattemelding(config_fil: str):
+    """Valider skattemelding-konvolutten mot Skatteetaten uten å sende inn.
+
+    Kaller Skatteetatens valider-tjeneste og skriver ut eventuelle avvik og
+    veiledning. Validering lagrer ikke data og er ikke en innsending.
+    """
+    import os
+    from wenche.skattemelding import les_config
+    from wenche.skattemelding_xml import generer_skattemelding_fra_konfig, hent_partsnummer
+    from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
+    from wenche.skattemelding_konvolutt import generer_konvolutt
+    from wenche.skd_skattemelding_client import (
+        SkdSkattemeldingClient,
+        formater_valideringsresultat,
+    )
+
+    click.echo(f"Leser konfigurasjon fra {config_fil}...")
+    try:
+        regnskap, konfig = les_config(config_fil)
+    except FileNotFoundError:
+        click.echo(
+            f"Feil: finner ikke {config_fil}.\n"
+            "Kopier config.example.yaml til config.yaml og fyll inn selskapets opplysninger."
+        )
+        raise SystemExit(1)
+
+    env = os.getenv("WENCHE_ENV", "prod")
+    orgnr = (
+        os.getenv("SKD_TEST_ORG_NUMMER", regnskap.selskap.org_nummer)
+        if env == "test"
+        else regnskap.selskap.org_nummer
+    )
+
+    click.echo("Henter tokens for skattemelding...")
+    tokens = auth.get_skd_skattemelding_tokens()
+
+    with SkdSkattemeldingClient(tokens["maskinporten_token"], env=env) as skd:
+        test_partsnummer = os.getenv("SKD_TEST_PARTSNUMMER") if env == "test" else None
+        gjeldende_dokument_id = None
+        if test_partsnummer:
+            partsnummer = int(test_partsnummer)
+        else:
+            click.echo("Henter forhåndsutfylt skattemelding...")
+            forhåndsutfylt, gjeldende_dokument_id = skd.hent_forhåndsutfylt_med_id(
+                regnskap.regnskapsaar, orgnr
+            )
+            partsnummer = hent_partsnummer(forhåndsutfylt)
+        click.echo(f"Partsnummer: {partsnummer}")
+
+        skattemelding_xml = generer_skattemelding_fra_konfig(regnskap, konfig, partsnummer)
+        naeringsspesifikasjon_xml = generer_naeringsspesifikasjon(regnskap, partsnummer)
+        konvolutt = generer_konvolutt(
+            skattemelding_xml=skattemelding_xml,
+            inntektsaar=regnskap.regnskapsaar,
+            orgnr=orgnr,
+            naeringsspesifikasjon_xml=naeringsspesifikasjon_xml,
+            gjeldende_dokument_id=gjeldende_dokument_id,
+        )
+
+        click.echo("Validerer mot Skatteetaten (lagrer ikke data)...\n")
+        resultat = skd.valider(regnskap.regnskapsaar, orgnr, konvolutt)
+
+    click.echo(formater_valideringsresultat(resultat))

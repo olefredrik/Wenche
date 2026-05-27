@@ -29,6 +29,7 @@ def generer_konvolutt(
     naeringsspesifikasjon_xml: bytes | None = None,
     innsendingsformaal: str = "egenfastsetting",
     innsendingstype: str = "komplett",
+    gjeldende_dokument_id: str | None = None,
 ) -> bytes:
     """
     Pakker skattemeldingUpersonlig-XML inn i konvolutten som Skatteetaten krever.
@@ -40,6 +41,11 @@ def generer_konvolutt(
         naeringsspesifikasjon_xml: Valgfri næringsoppgave-XML (RF-1167).
         innsendingsformaal:       'egenfastsetting' | 'klage' | 'endringsanmodning'.
         innsendingstype:          'komplett' | 'ikkeKomplett'.
+        gjeldende_dokument_id:    ID-en på forhåndsutfylt-dokumentet fra
+                                  hent_forhåndsutfylt-API-et. Inkluderes som
+                                  dokumentreferanseTilGjeldendeDokument og er
+                                  påkrevd for at Skatteetatens visning-API skal
+                                  kunne laste skattemeldingen i Altinn-portalen.
 
     Returns:
         Ferdig konvolutt som XML-bytes, klar for opplasting til Altinn3.
@@ -59,6 +65,14 @@ def generer_konvolutt(
     _legg_til_dokument(dokumenter, "skattemeldingUpersonlig", skattemelding_xml)
     if naeringsspesifikasjon_xml is not None:
         _legg_til_dokument(dokumenter, "naeringsspesifikasjon", naeringsspesifikasjon_xml)
+
+    # --- dokumentreferanseTilGjeldendeDokument ---
+    # Kobler innsendingen til forhåndsutfylt-dokumentet. Kreves av Skatteetatens
+    # visning-API for å laste skattemeldingen for bekreftelse i Altinn-portalen.
+    if gjeldende_dokument_id:
+        ref = SubElement(root, "dokumentreferanseTilGjeldendeDokument")
+        SubElement(ref, "dokumenttype").text = "skattemeldingUpersonlig"
+        SubElement(ref, "dokumentidentifikator").text = gjeldende_dokument_id
 
     # --- inntektsaar ---
     SubElement(root, "inntektsaar").text = str(inntektsaar)

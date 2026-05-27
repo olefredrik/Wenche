@@ -48,8 +48,11 @@ from wenche.models import (
     SkattemeldingKonfig,
 )
 from wenche.skd_client import SkdAksjonaerClient
-from wenche.skd_skattemelding_client import SkdSkattemeldingClient
-from wenche.skattemelding_xml import generer_skattemelding_upersonlig, hent_partsnummer
+from wenche.skd_skattemelding_client import (
+    SkattemeldingValideringsfeil,
+    SkdSkattemeldingClient,
+)
+from wenche.skattemelding_xml import generer_skattemelding_fra_konfig, hent_partsnummer
 from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
 
 CONFIG_FIL = Path("config.yaml")
@@ -152,6 +155,8 @@ class AppState:
     underskudd: float = 0.0
     fritaksmetoden: bool = False
     eierandel_datterselskap: int = 100
+    boersnotert: bool = False
+    formuesverdi_aksjer: float = 0.0   # Fra aksjeoppgaven RF-1088S, post 209
 
     # Lister
     aksjonaerer: list[AksjonaerState] = field(default_factory=lambda: [AksjonaerState()])
@@ -302,6 +307,15 @@ class AppState:
             ),
         )
 
+    def bygg_skattemelding_konfig(self) -> SkattemeldingKonfig:
+        return SkattemeldingKonfig(
+            underskudd_til_fremfoering=self.underskudd,
+            anvend_fritaksmetoden=self.fritaksmetoden,
+            eierandel_datterselskap=int(self.eierandel_datterselskap),
+            boersnotert=self.boersnotert,
+            formuesverdi_aksjer=self.formuesverdi_aksjer,
+        )
+
     def bygg_oppgave(self) -> Aksjonaerregisteroppgave:
         return Aksjonaerregisteroppgave(
             selskap=self.bygg_selskap(),
@@ -390,6 +404,8 @@ class AppState:
             self.underskudd = float(sm_cfg.get("underskudd_til_fremfoering", 0))
             self.fritaksmetoden = bool(sm_cfg.get("anvend_fritaksmetoden", False))
             self.eierandel_datterselskap = int(sm_cfg.get("eierandel_datterselskap", 100))
+            self.boersnotert = bool(sm_cfg.get("boersnotert", False))
+            self.formuesverdi_aksjer = float(sm_cfg.get("formuesverdi_aksjer", 0))
 
             fa = cfg.get("foregaaende_aar", {})
             frr = fa.get("resultatregnskap", {})
@@ -518,6 +534,8 @@ class AppState:
                 "underskudd_til_fremfoering": self.underskudd,
                 "anvend_fritaksmetoden": self.fritaksmetoden,
                 "eierandel_datterselskap": int(self.eierandel_datterselskap),
+                "boersnotert": self.boersnotert,
+                "formuesverdi_aksjer": self.formuesverdi_aksjer,
             },
             "aksjonaerer": [
                 {
@@ -2332,6 +2350,21 @@ def _bygg_dokumenter_fane() -> None:
             )
             eierandel_el.set_visibility(state.fritaksmetoden)
 
+        num(
+            "Formuesverdi av aksjer selskapet eier (NOK)",
+            "formuesverdi_aksjer",
+            min_val=0,
+            tooltip="Fra aksjeoppgaven (RF-1088S), post 209. Formuesverdien av "
+            "aksjer selskapet eier i andre selskap. Brukes til å beregne netto "
+            "formuesverdi bak selskapets egne aksjer (grunnlag for eiernes "
+            "formuesskatt). Sett til 0 hvis selskapet ikke eier aksjer.",
+        )
+        ui.checkbox(
+            "Selskapet er børsnotert",
+            value=state.boersnotert,
+            on_change=lambda e: setattr(state, "boersnotert", e.value),
+        ).tooltip("De fleste små holdingselskaper er ikke børsnotert.")
+
     def lagre_dokumenter():
         state.lagre_config()
         ui.notify(f"Lagret til {CONFIG_FIL.resolve()}", type="positive")
@@ -2344,11 +2377,7 @@ def _bygg_dokumenter_fane() -> None:
         async def last_ned_skattemelding():
             try:
                 regnskap = state.bygg_regnskap()
-                konfig = SkattemeldingKonfig(
-                    underskudd_til_fremfoering=state.underskudd,
-                    anvend_fritaksmetoden=state.fritaksmetoden,
-                    eierandel_datterselskap=int(state.eierandel_datterselskap),
-                )
+                konfig = state.bygg_skattemelding_konfig()
                 tekst = await run.io_bound(sm_modul.generer, regnskap, konfig)
                 filnavn = f"skattemelding_{state.regnskapsaar}_{state.org_nummer}.txt"
                 ui.download(tekst.encode("utf-8"), filnavn)
@@ -2646,15 +2675,16 @@ def _bygg_send_fane() -> None:
             def _hent_og_send():
                 with SkdSkattemeldingClient(tokens["maskinporten_token"], env=env_valg.value) as skd:
                     test_partsnummer = os.getenv("SKD_TEST_PARTSNUMMER") if env_valg.value == "test" else None
+                    gjeldende_dokument_id: str | None = None
                     if test_partsnummer:
                         partsnummer = int(test_partsnummer)
                     else:
-                        forhåndsutfylt = skd.hent_forhåndsutfylt(int(state.regnskapsaar), orgnr)
+                        forhåndsutfylt, gjeldende_dokument_id = skd.hent_forhåndsutfylt_med_id(
+                            int(state.regnskapsaar), orgnr
+                        )
                         partsnummer = hent_partsnummer(forhåndsutfylt)
-                    skattemelding_xml = generer_skattemelding_upersonlig(
-                        partsnummer=partsnummer,
-                        inntektsaar=int(state.regnskapsaar),
-                        fremfoert_underskudd=int(state.underskudd),
+                    skattemelding_xml = generer_skattemelding_fra_konfig(
+                        regnskap, state.bygg_skattemelding_konfig(), partsnummer
                     )
                     naeringsspesifikasjon_xml = generer_naeringsspesifikasjon(regnskap, partsnummer)
                     return skd.send(
@@ -2663,16 +2693,49 @@ def _bygg_send_fane() -> None:
                         skattemelding_xml=skattemelding_xml,
                         altinn_token=tokens["altinn_token"],
                         naeringsspesifikasjon_xml=naeringsspesifikasjon_xml,
+                        gjeldende_dokument_id=gjeldende_dokument_id,
                     )
 
-            n.message = "Sender skattemelding via Altinn3..."
-            instans_id = await run.io_bound(_hent_og_send)
-            n.message = f"Skattemelding for {state.regnskapsaar} er sendt til Skatteetaten."
+            n.message = "Klargjør skattemelding i Altinn3..."
+            altinn_url = await run.io_bound(_hent_og_send)
+            n.message = (
+                f"Skattemelding for {state.regnskapsaar} er klargjort i Altinn. "
+                "Logg inn og bekreft med BankID for å fullføre innsendingen."
+            )
             n.spinner = False
             n.type = "positive"
             n.timeout = 0
             n.close_button = "Lukk"
-            ui.notify(f"Instans-ID: {instans_id}", type="info")
+            skattemelding_resultat.clear()
+            with skattemelding_resultat:
+                ui.label(
+                    "Skatteetaten krever at en personlig bruker bekrefter "
+                    "innsendingen via ID-porten. Wenche har lastet opp "
+                    "skattemeldingen, men du må logge inn i Altinn og klikke "
+                    "«Send inn» for å fullføre."
+                ).classes("text-sm text-slate-600 mt-1")
+                ui.link(
+                    "Åpne Altinn meldingsboks →", altinn_url, new_tab=True
+                ).classes("text-blue-600 font-medium")
+        except SkattemeldingValideringsfeil as e:
+            n.message = "Validering feilet, ingenting er sendt inn. Rett feilene under og prøv igjen."
+            n.spinner = False
+            n.type = "negative"
+            n.timeout = 0
+            n.close_button = "Lukk"
+            skattemelding_resultat.clear()
+            with skattemelding_resultat:
+                ui.label("Skatteetaten avviste skattemeldingen ved validering:").classes(
+                    "text-sm font-medium text-red-700 mt-1"
+                )
+                for avvik in (e.resultat.get("avvik_ved_validering") or []):
+                    detalj = avvik.get("oevrigInformasjon") or avvik.get("sti") or ""
+                    ui.label(f"• {avvik.get('avvikstype')}: {detalj}".rstrip(": ")).classes(
+                        "text-xs text-slate-600"
+                    )
+                ui.label(
+                    "Ingenting er sendt inn. Skatteetaten lagrer ikke data ved validering."
+                ).classes("text-xs text-slate-400 mt-1")
         except Exception as e:
             n.message = f"Innsending feilet: {e}"
             n.spinner = False
@@ -2692,6 +2755,7 @@ def _bygg_send_fane() -> None:
 
     aarsregnskap_resultat = ui.column().classes("mt-3")
     aksjonaer_resultat = ui.column().classes("mt-3")
+    skattemelding_resultat = ui.column().classes("mt-3")
 
 
 # ---------------------------------------------------------------------------

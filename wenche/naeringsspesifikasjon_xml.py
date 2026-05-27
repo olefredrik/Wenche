@@ -27,7 +27,6 @@ Implementasjonen dekker en typisk norsk holding AS med:
 
 from __future__ import annotations
 
-import uuid
 from xml.etree.ElementTree import Element, SubElement, tostring
 
 from wenche.models import Aarsregnskap
@@ -36,10 +35,6 @@ _NS = (
     "urn:no:skatteetaten:fastsetting:formueinntekt:"
     "naeringsspesifikasjon:ekstern:v6"
 )
-
-
-def _uid() -> str:
-    return str(uuid.uuid4())
 
 
 def _beloep_element(parent: Element, tag: str, beloep: float) -> Element:
@@ -68,13 +63,16 @@ def _resultatforekomst(
     Legger til én Resultatregnskapsforekomst under parent:
       <{child_tag}>
         <beloep><beloep>123.00</beloep></beloep>
-        <id>uuid</id>
+        <id>KODE</id>
         <type><resultatOgBalanseregnskapstype>KODE</resultatOgBalanseregnskapstype></type>
       </{child_tag}>
+
+    Skatteetaten krever at <id> er lik kodeverdien (resultatOgBalanseregnskaps-
+    type), ikke en tilfeldig UUID. Avvik idAvvikerFraKrav ellers.
     """
     el = SubElement(parent, child_tag)
     _beloep_element(el, "beloep", beloep)
-    SubElement(el, "id").text = _uid()
+    SubElement(el, "id").text = type_kode
     type_el = SubElement(el, "type")
     SubElement(type_el, "resultatOgBalanseregnskapstype").text = type_kode
 
@@ -88,13 +86,16 @@ def _balanseforekomst(
     """
     Legger til én Balanseregnskapsforekomst under parent:
       <{child_tag}>
-        <id>uuid</id>
+        <id>KODE</id>
         <beloep><beloep>123.00</beloep></beloep>
         <type><resultatOgBalanseregnskapstype>KODE</resultatOgBalanseregnskapstype></type>
       </{child_tag}>
+
+    Skatteetaten krever at <id> er lik kodeverdien (resultatOgBalanseregnskaps-
+    type), ikke en tilfeldig UUID. Avvik idAvvikerFraKrav ellers.
     """
     el = SubElement(parent, child_tag)
-    SubElement(el, "id").text = _uid()
+    SubElement(el, "id").text = type_kode
     _beloep_element(el, "beloep", beloep)
     type_el = SubElement(el, "type")
     SubElement(type_el, "resultatOgBalanseregnskapstype").text = type_kode
@@ -219,25 +220,11 @@ def generer_naeringsspesifikasjon(
             _balanseforekomst(bv_om_el, "balanseverdi", beloep, kode)
 
     # Gjeld og egenkapital
+    # Rekkefølgen på barneelementene er bundet av XSD-sekvensen i
+    # GjeldOgEgenkapital: langsiktigGjeld -> kortsiktigGjeld -> egenkapital.
+    # Feil rekkefølge gjør XML-en ugyldig mot naeringsspesifikasjon_v6 og er
+    # årsaken til SMEVB-005 fra Skatteetatens visning-API (SSV-5187).
     gek_el = SubElement(balanseregnskap, "gjeldOgEgenkapital")
-
-    # Egenkapital
-    ek = eg.egenkapital
-    ek_poster = [
-        (ek.aksjekapital, "2000"),
-        (ek.overkursfond, "2020"),
-    ]
-    # Annen egenkapital: 2050 (positiv) eller 2080 (udekket tap / negativ)
-    if ek.annen_egenkapital >= 0:
-        ek_poster.append((ek.annen_egenkapital, "2050"))
-    else:
-        ek_poster.append((abs(ek.annen_egenkapital), "2080"))
-
-    ek_poster = [(b, k) for b, k in ek_poster if b]
-    if ek_poster:
-        egenkapital_el = SubElement(gek_el, "egenkapital")
-        for beloep, kode in ek_poster:
-            _balanseforekomst(egenkapital_el, "kapital", beloep, kode)
 
     # Langsiktig gjeld
     lg = eg.langsiktig_gjeld
@@ -264,6 +251,24 @@ def generer_naeringsspesifikasjon(
         for beloep, kode in kg_poster:
             _balanseforekomst(kortsiktig_gjeld_el, "gjeld", beloep, kode)
 
+    # Egenkapital
+    ek = eg.egenkapital
+    ek_poster = [
+        (ek.aksjekapital, "2000"),
+        (ek.overkursfond, "2020"),
+    ]
+    # Annen egenkapital: 2050 (positiv) eller 2080 (udekket tap / negativ)
+    if ek.annen_egenkapital >= 0:
+        ek_poster.append((ek.annen_egenkapital, "2050"))
+    else:
+        ek_poster.append((abs(ek.annen_egenkapital), "2080"))
+
+    ek_poster = [(b, k) for b, k in ek_poster if b]
+    if ek_poster:
+        egenkapital_el = SubElement(gek_el, "egenkapital")
+        for beloep, kode in ek_poster:
+            _balanseforekomst(egenkapital_el, "kapital", beloep, kode)
+
     # -----------------------------------------------------------------------
     # Virksomhet (obligatorisk)
     # -----------------------------------------------------------------------
@@ -283,6 +288,41 @@ def generer_naeringsspesifikasjon(
 
     rt = SubElement(virksomhet, "regeltypeForAarsregnskap")
     SubElement(rt, "regeltypeForAarsregnskap").text = "regnskapslovensReglerForSmaaForetak"
+
+    # -----------------------------------------------------------------------
+    # Egenkapitalavstemming (XSD-pos: etter virksomhet, før andreForhold)
+    # inngående EK (foregående års utgående) + endring = utgående (avledet).
+    # -----------------------------------------------------------------------
+    inngaaende_ek = regnskap.foregaaende_aar_balanse.egenkapital_og_gjeld.egenkapital.sum
+    utgaaende_ek = eg.egenkapital.sum
+    if inngaaende_ek or utgaaende_ek:
+        ekavst = SubElement(root, "egenkapitalavstemming")
+        _beloep_element(ekavst, "inngaaendeEgenkapital", inngaaende_ek)
+        endring = round(utgaaende_ek - inngaaende_ek, 2)
+        if endring:
+            # aaretsUnderskudd er kategori "fradrag", aaretsOverskudd "tillegg":
+            # utgaaende = inngaaende + tillegg - fradrag. Beløpet føres derfor
+            # som positiv magnitude, og fortegnet styres av kodevalget.
+            kode = "aaretsOverskudd" if endring > 0 else "aaretsUnderskudd"
+            endring_el = SubElement(ekavst, "egenkapitalendring")
+            # id må være lik kodeverdien (jf. idAvvikerFraKrav-regelen).
+            SubElement(endring_el, "id").text = kode
+            ekt = SubElement(endring_el, "egenkapitalendringstype")
+            SubElement(ekt, "egenkapitalendringstype").text = kode
+            _beloep_element(endring_el, "beloep", abs(endring))
+
+    # -----------------------------------------------------------------------
+    # andreForhold: spesifiser ytelse mellom aksjonær og selskap (lån fra
+    # aksjonær). Kreves når opplysningOmSkattesubjekt.harYtelse=true.
+    # -----------------------------------------------------------------------
+    laan_fra_aksjonaer = eg.langsiktig_gjeld.laan_fra_aksjonaer
+    if laan_fra_aksjonaer and laan_fra_aksjonaer > 0:
+        andre = SubElement(root, "andreForhold")
+        ytelse = SubElement(andre, "ytelseFraAksjonaerDeltakerEllerNaerstaaende")
+        laan = SubElement(ytelse, "laan")
+        SubElement(laan, "laanesaldoVedUtgangAvInntektsaar").text = str(
+            int(round(laan_fra_aksjonaer))
+        )
 
     # -----------------------------------------------------------------------
     # skalBekreftesAvRevisor (obligatorisk)

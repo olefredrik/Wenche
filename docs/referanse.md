@@ -113,6 +113,9 @@ foregaaende_aar:
 | `underskudd_til_fremfoering` | heltall | nei | Fremførbart underskudd fra tidligere år (NOK). Finnes i fjorårets skattemelding (RF-1028). Standard: `0` |
 | `anvend_fritaksmetoden` | boolsk | nei | `true` for holdingselskaper som eier aksjer i datterselskaper (sktl. § 2-38). Standard: `false` |
 | `eierandel_datterselskap` | heltall | nei | Eierandel i datterselskapet i prosent (0–100). ≥ 90 %: hele utbyttet fritatt. < 90 %: 3 % skattepliktig (sjablonregelen, sktl. § 2-38 sjette ledd). Standard: `100` |
+| `boersnotert` | boolsk | nei | `true` hvis selskapet er børsnotert. Standard: `false` |
+| `formuesverdi_aksjer` | heltall | nei | Formuesverdi av aksjer selskapet eier i andre selskap, fra aksjeoppgaven (RF-1088S, post 209). Brukes til å beregne netto formuesverdi bak selskapets egne aksjer. Standard: `0` |
+| `samlet_verdi_bak_aksjene` | heltall | nei | Overstyrer den beregnede netto formuesverdien bak aksjene direkte. Utelat for å la Wenche beregne den fra `formuesverdi_aksjer` og balansen |
 
 ### `aksjonaerer`
 
@@ -236,9 +239,27 @@ wenche send-skattemelding [--config FILSTI] [--dry-run]
 | Alternativ | Beskrivelse |
 |---|---|
 | `--config` | Sti til konfigurasjonsfil. Standard: `config.yaml` |
-| `--dry-run` | Henter forhåndsutfylt og genererer XML lokalt (`skattemelding.xml` og `naeringsspesifikasjon.xml`) uten å sende |
+| `--dry-run` | Henter forhåndsutfylt og genererer XML lokalt (`skattemelding.xml` og `naeringsspesifikasjon.xml`) uten å validere eller sende |
+
+Validerer mot Skatteetaten som første steg og laster ikke opp noe hvis resultatet ikke er `validertOK`. Etter opplasting skriver Wenche ut en lenke til Altinn-innboksen. Innsendingen fullføres først når en personlig bruker signerer med BankID i Altinn, det kan ikke gjøres maskinelt.
 
 Krever at Maskinporten-klienten har fått scopet `skatteetaten:formueinntekt/skattemelding` innvilget. Se [steg 2f i oppsett](oppsett.md#2f-sk-om-tilgang-til-skds-api-for-skattemelding).
+
+---
+
+### `wenche valider-skattemelding`
+
+Validerer skattemeldingen mot Skatteetatens valideringstjeneste uten å sende inn, og skriver ut eventuelle avvik og merknader. Nyttig som forhåndskontroll før innsending.
+
+```bash
+wenche valider-skattemelding [--config FILSTI]
+```
+
+| Alternativ | Beskrivelse |
+|---|---|
+| `--config` | Sti til konfigurasjonsfil. Standard: `config.yaml` |
+
+Validering lagrer ikke data hos Skatteetaten og er ikke en innsending. `send-skattemelding` (og Send-knappen i UI) kjører den samme valideringen automatisk, så denne kommandoen er mest nyttig for å inspisere avvik og merknader uten å sende. Bruker samme scope som `send-skattemelding`.
 
 ---
 

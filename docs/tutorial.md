@@ -120,28 +120,46 @@ Denne veiledningen tar deg gjennom en komplett innsending fra start til slutt. V
 
 ---
 
-## Steg 5 — Generer skattemeldingen
+## Steg 5 — Send skattemeldingen
 
-Skattemeldingen (RF-1167 + RF-1028) genereres lokalt og sendes inn manuelt på skatteetaten.no.
+Wenche fyller ut næringsspesifikasjonen (RF-1167) og skattemeldingen (RF-1028) og sender dem digitalt til Skatteetaten via Altinn. Du fullfører ved å signere med BankID i Altinn.
+
+!!! tip "Formuesverdi av aksjer"
+    Eier selskapet aksjer i andre selskap, fyll inn **formuesverdien** fra aksjeoppgaven (RF-1088S, post 209) i feltet «Formuesverdi av aksjer selskapet eier» under Dokumenter. Den brukes til å beregne formuesverdien bak selskapets egne aksjer, som er grunnlaget for eiernes formuesskatt.
 
 === "Webgrensesnitt"
 
-    Gå til fanen **Dokumenter** og klikk **Last ned skattemelding**.
-
-    Sammendraget inneholder næringsoppgaven (RF-1167) og skatteberegningen. For Eksempel Holding AS med 100 % eierandel er utbyttet fritatt under fritaksmetoden — skatten blir **0 kr**.
+    1. Gå til fanen **Dokumenter**, fyll inn skattemelding-innstillingene og klikk **Last ned skattemelding** for å lese gjennom sammendraget. For Eksempel Holding AS med 100 % eierandel er utbyttet fritatt under fritaksmetoden, så skatten blir **0 kr**.
+    2. Gå til fanen **Send til Altinn** og klikk **Send skattemelding til Skatteetaten**. Wenche validerer skattemeldingen mot Skatteetaten først, og sender ingenting hvis noe er feil. Da får du en tydelig melding om hva som må rettes, slik at du kan oppdatere tallene og prøve igjen.
+    3. Når valideringen er OK, lastes skattemeldingen opp automatisk og Wenche viser en lenke til Altinn-innboksen. Åpne lenken og signer med BankID for å fullføre innsendingen.
 
 === "Kommandolinje"
 
+    `wenche send-skattemelding` validerer automatisk før opplasting og sender ingenting hvis valideringen feiler. Vil du bare kontrollere uten å sende:
+
     ```bash
-    wenche generer-skattemelding --ut skattemelding_2024.txt
+    wenche valider-skattemelding
     ```
 
-**Send inn manuelt:**
+    Les gjennom et tekstsammendrag, eller skriv XML-en lokalt med `--dry-run`:
 
-1. Gå til [skatteetaten.no](https://www.skatteetaten.no/) og logg inn med BankID
-2. Åpne **Skattemelding for AS** for 2024
-3. Fyll inn tallene fra sammendraget
-4. Kontroller beregnet skatt og send inn
+    ```bash
+    wenche generer-skattemelding --ut skattemelding_2024.txt
+    wenche send-skattemelding --dry-run
+    ```
+
+    Send inn:
+
+    ```bash
+    wenche login
+    wenche send-skattemelding
+    wenche logout
+    ```
+
+    Wenche skriver ut en lenke til Altinn-innboksen. Åpne lenken og signer med BankID.
+
+!!! note "Signering skjer i Altinn, ikke i Wenche"
+    Skatteetaten krever at en personlig bruker bekrefter skattemeldingen via ID-porten. Wenche laster opp innholdet, men selve innsendingen fullføres først når du signerer med BankID. Dette kan ikke gjøres maskinelt (SSV-5129).
 
 ---
 
