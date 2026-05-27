@@ -114,6 +114,13 @@ skattemelding:
   eierandel_datterselskap: 100      # Eierandel i datterselskapet (prosent, 0–100).
                                     # ≥ 90 %: hele utbyttet er skattefritt.
                                     # < 90 %: 3 % er skattepliktig (sjablonregelen).
+  boersnotert: false                # true hvis selskapet er børsnotert.
+  formuesverdi_aksjer: 0            # Formuesverdi av aksjer selskapet eier, fra
+                                    # aksjeoppgaven RF-1088S (post 209). Brukes til å
+                                    # beregne netto formuesverdi bak selskapets aksjer.
+  # samlet_verdi_bak_aksjene: 0     # Valgfri: overstyr beregnet netto formuesverdi
+                                    # bak aksjene direkte (ellers beregnes den fra
+                                    # formuesverdi_aksjer + balanse).
 
 # --- Aksjonærregister ---
 # List opp alle aksjonærer per 31.12 i regnskapsåret.

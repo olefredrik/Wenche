@@ -290,6 +290,41 @@ def generer_naeringsspesifikasjon(
     SubElement(rt, "regeltypeForAarsregnskap").text = "regnskapslovensReglerForSmaaForetak"
 
     # -----------------------------------------------------------------------
+    # Egenkapitalavstemming (XSD-pos: etter virksomhet, før andreForhold)
+    # inngående EK (foregående års utgående) + endring = utgående (avledet).
+    # -----------------------------------------------------------------------
+    inngaaende_ek = regnskap.foregaaende_aar_balanse.egenkapital_og_gjeld.egenkapital.sum
+    utgaaende_ek = eg.egenkapital.sum
+    if inngaaende_ek or utgaaende_ek:
+        ekavst = SubElement(root, "egenkapitalavstemming")
+        _beloep_element(ekavst, "inngaaendeEgenkapital", inngaaende_ek)
+        endring = round(utgaaende_ek - inngaaende_ek, 2)
+        if endring:
+            # aaretsUnderskudd er kategori "fradrag", aaretsOverskudd "tillegg":
+            # utgaaende = inngaaende + tillegg - fradrag. Beløpet føres derfor
+            # som positiv magnitude, og fortegnet styres av kodevalget.
+            kode = "aaretsOverskudd" if endring > 0 else "aaretsUnderskudd"
+            endring_el = SubElement(ekavst, "egenkapitalendring")
+            # id må være lik kodeverdien (jf. idAvvikerFraKrav-regelen).
+            SubElement(endring_el, "id").text = kode
+            ekt = SubElement(endring_el, "egenkapitalendringstype")
+            SubElement(ekt, "egenkapitalendringstype").text = kode
+            _beloep_element(endring_el, "beloep", abs(endring))
+
+    # -----------------------------------------------------------------------
+    # andreForhold: spesifiser ytelse mellom aksjonær og selskap (lån fra
+    # aksjonær). Kreves når opplysningOmSkattesubjekt.harYtelse=true.
+    # -----------------------------------------------------------------------
+    laan_fra_aksjonaer = eg.langsiktig_gjeld.laan_fra_aksjonaer
+    if laan_fra_aksjonaer and laan_fra_aksjonaer > 0:
+        andre = SubElement(root, "andreForhold")
+        ytelse = SubElement(andre, "ytelseFraAksjonaerDeltakerEllerNaerstaaende")
+        laan = SubElement(ytelse, "laan")
+        SubElement(laan, "laanesaldoVedUtgangAvInntektsaar").text = str(
+            int(round(laan_fra_aksjonaer))
+        )
+
+    # -----------------------------------------------------------------------
     # skalBekreftesAvRevisor (obligatorisk)
     # -----------------------------------------------------------------------
     SubElement(root, "skalBekreftesAvRevisor").text = (

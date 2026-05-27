@@ -72,10 +72,16 @@ def les_config(config_fil: str) -> tuple[Aarsregnskap, SkattemeldingKonfig]:
     )
 
     sm_raw = raw.get("skattemelding", {})
+    _verdi_override = sm_raw.get("samlet_verdi_bak_aksjene")
     konfig = SkattemeldingKonfig(
         underskudd_til_fremfoering=float(sm_raw.get("underskudd_til_fremfoering", 0)),
         anvend_fritaksmetoden=bool(sm_raw.get("anvend_fritaksmetoden", True)),
         eierandel_datterselskap=int(sm_raw.get("eierandel_datterselskap", 100)),
+        boersnotert=bool(sm_raw.get("boersnotert", False)),
+        formuesverdi_aksjer=float(sm_raw.get("formuesverdi_aksjer", 0)),
+        samlet_verdi_bak_aksjene=(
+            float(_verdi_override) if _verdi_override is not None else None
+        ),
     )
 
     return regnskap, konfig

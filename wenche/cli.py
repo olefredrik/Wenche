@@ -320,7 +320,7 @@ def send_skattemelding(config_fil: str, dry_run: bool):
     import os
     from pathlib import Path
     from wenche.skattemelding import les_config
-    from wenche.skattemelding_xml import generer_skattemelding_upersonlig, hent_partsnummer
+    from wenche.skattemelding_xml import generer_skattemelding_fra_konfig, hent_partsnummer
     from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
     from wenche.skd_skattemelding_client import SkdSkattemeldingClient
 
@@ -351,11 +351,7 @@ def send_skattemelding(config_fil: str, dry_run: bool):
             partsnummer = hent_partsnummer(forhåndsutfylt)
         click.echo(f"Partsnummer: {partsnummer}")
 
-        skattemelding_xml = generer_skattemelding_upersonlig(
-            partsnummer=partsnummer,
-            inntektsaar=regnskap.regnskapsaar,
-            fremfoert_underskudd=int(konfig.underskudd_til_fremfoering),
-        )
+        skattemelding_xml = generer_skattemelding_fra_konfig(regnskap, konfig, partsnummer)
         naeringsspesifikasjon_xml = generer_naeringsspesifikasjon(regnskap, partsnummer)
 
         if dry_run:
@@ -397,7 +393,7 @@ def valider_skattemelding(config_fil: str):
     """
     import os
     from wenche.skattemelding import les_config
-    from wenche.skattemelding_xml import generer_skattemelding_upersonlig, hent_partsnummer
+    from wenche.skattemelding_xml import generer_skattemelding_fra_konfig, hent_partsnummer
     from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
     from wenche.skattemelding_konvolutt import generer_konvolutt
     from wenche.skd_skattemelding_client import (
@@ -438,11 +434,7 @@ def valider_skattemelding(config_fil: str):
             partsnummer = hent_partsnummer(forhåndsutfylt)
         click.echo(f"Partsnummer: {partsnummer}")
 
-        skattemelding_xml = generer_skattemelding_upersonlig(
-            partsnummer=partsnummer,
-            inntektsaar=regnskap.regnskapsaar,
-            fremfoert_underskudd=int(konfig.underskudd_til_fremfoering),
-        )
+        skattemelding_xml = generer_skattemelding_fra_konfig(regnskap, konfig, partsnummer)
         naeringsspesifikasjon_xml = generer_naeringsspesifikasjon(regnskap, partsnummer)
         konvolutt = generer_konvolutt(
             skattemelding_xml=skattemelding_xml,
