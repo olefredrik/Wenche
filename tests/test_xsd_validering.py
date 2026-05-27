@@ -83,6 +83,24 @@ class TestNaeringsspesifikasjonXsd:
             f"Feil rekkefølge i gjeldOgEgenkapital: {barn}"
         )
 
+    def test_id_er_lik_kode(self, regnskap_med_utbytte):
+        # Skatteetaten krever at <id> på hver resultat-/balanseforekomst er lik
+        # kodeverdien (resultatOgBalanseregnskapstype), ikke en tilfeldig UUID.
+        # Ellers: avvik idAvvikerFraKrav (validertMedFeil → "Ugyldig innsending").
+        xml = generer_naeringsspesifikasjon(regnskap_med_utbytte, _PARTSNUMMER)
+        root = etree.fromstring(xml)
+        ns = "{urn:no:skatteetaten:fastsetting:formueinntekt:naeringsspesifikasjon:ekstern:v6}"
+        forekomster = 0
+        for el in root.iter():
+            id_el = el.find(f"{ns}id")
+            type_el = el.find(f"{ns}type/{ns}resultatOgBalanseregnskapstype")
+            if id_el is not None and type_el is not None:
+                forekomster += 1
+                assert id_el.text == type_el.text, (
+                    f"id ({id_el.text!r}) != kode ({type_el.text!r}) i <{el.tag.replace(ns, '')}>"
+                )
+        assert forekomster > 0, "Fant ingen forekomster å sjekke"
+
 
 class TestKonvoluttXsd:
     def _konvolutt(self, eksempel_regnskap, gjeldende_dokument_id=None):

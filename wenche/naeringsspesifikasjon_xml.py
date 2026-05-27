@@ -27,7 +27,6 @@ Implementasjonen dekker en typisk norsk holding AS med:
 
 from __future__ import annotations
 
-import uuid
 from xml.etree.ElementTree import Element, SubElement, tostring
 
 from wenche.models import Aarsregnskap
@@ -36,10 +35,6 @@ _NS = (
     "urn:no:skatteetaten:fastsetting:formueinntekt:"
     "naeringsspesifikasjon:ekstern:v6"
 )
-
-
-def _uid() -> str:
-    return str(uuid.uuid4())
 
 
 def _beloep_element(parent: Element, tag: str, beloep: float) -> Element:
@@ -68,13 +63,16 @@ def _resultatforekomst(
     Legger til én Resultatregnskapsforekomst under parent:
       <{child_tag}>
         <beloep><beloep>123.00</beloep></beloep>
-        <id>uuid</id>
+        <id>KODE</id>
         <type><resultatOgBalanseregnskapstype>KODE</resultatOgBalanseregnskapstype></type>
       </{child_tag}>
+
+    Skatteetaten krever at <id> er lik kodeverdien (resultatOgBalanseregnskaps-
+    type), ikke en tilfeldig UUID. Avvik idAvvikerFraKrav ellers.
     """
     el = SubElement(parent, child_tag)
     _beloep_element(el, "beloep", beloep)
-    SubElement(el, "id").text = _uid()
+    SubElement(el, "id").text = type_kode
     type_el = SubElement(el, "type")
     SubElement(type_el, "resultatOgBalanseregnskapstype").text = type_kode
 
@@ -88,13 +86,16 @@ def _balanseforekomst(
     """
     Legger til én Balanseregnskapsforekomst under parent:
       <{child_tag}>
-        <id>uuid</id>
+        <id>KODE</id>
         <beloep><beloep>123.00</beloep></beloep>
         <type><resultatOgBalanseregnskapstype>KODE</resultatOgBalanseregnskapstype></type>
       </{child_tag}>
+
+    Skatteetaten krever at <id> er lik kodeverdien (resultatOgBalanseregnskaps-
+    type), ikke en tilfeldig UUID. Avvik idAvvikerFraKrav ellers.
     """
     el = SubElement(parent, child_tag)
-    SubElement(el, "id").text = _uid()
+    SubElement(el, "id").text = type_kode
     _beloep_element(el, "beloep", beloep)
     type_el = SubElement(el, "type")
     SubElement(type_el, "resultatOgBalanseregnskapstype").text = type_kode
