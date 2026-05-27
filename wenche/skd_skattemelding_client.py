@@ -131,20 +131,31 @@ class SkdSkattemeldingClient:
         """
         Validerer skattemelding-konvolutten mot Skatteetatens API.
 
-        Returnerer valideringsresultat med eventuelle avvik og veiledning.
+        Returnerer et strukturert valideringsresultat:
+            {
+                "resultat": "validertOK" | "validertMedFeil" | ...,
+                "aarsak": str | None,
+                "avvik_ved_validering": [ {avvikstype, sti, ...}, ... ],
+                "avvik_etter_beregning": [ ... ],
+                "veiledning": [ {veiledningstype, hjelpetekst, ...}, ... ],
+            }
+
         Validering lagrer ikke data hos Skatteetaten — det er ikke en innsending.
+
+        NB: endepunktet svarer kun med application/xml. Accept: application/json
+        gir HTTP 406.
         """
         url = f"{self._base}/api/skattemelding/v2/valider/{inntektsaar}/{orgnr}"
         resp = self._http.post(
             url,
             content=konvolutt,
-            headers={"Content-Type": "application/xml"},
+            headers={"Content-Type": "application/xml", "Accept": "application/xml"},
         )
         if not resp.is_success:
             raise RuntimeError(
                 f"Valideringsfeil: {resp.status_code}\n{resp.text}"
             )
-        return resp.json()
+        return _parse_valideringsrespons(resp.content)
 
     def send(
         self,
@@ -216,6 +227,85 @@ class SkdSkattemeldingClient:
 
     def __exit__(self, *args):
         self.close()
+
+
+def _tekst(el, tag: str) -> str | None:
+    """Henter teksten i barneelementet `tag` (namespace-agnostisk)."""
+    funnet = el.findtext(f"{{*}}{tag}")
+    return funnet.strip() if funnet else None
+
+
+def _avvik_liste(root, container_tag: str) -> list[dict]:
+    avvik = []
+    container = root.find(f"{{*}}{container_tag}")
+    if container is None:
+        return avvik
+    for a in container.findall("{*}avvik"):
+        avvik.append(
+            {
+                "avvikstype": _tekst(a, "avvikstype"),
+                "sti": _tekst(a, "sti"),
+                "oevrigInformasjon": _tekst(a, "oevrigInformasjon"),
+                "mottattVerdi": _tekst(a, "mottattVerdi"),
+                "beregnetVerdi": _tekst(a, "beregnetVerdi"),
+                "forekomstidentifikator": _tekst(a, "forekomstidentifikator"),
+            }
+        )
+    return avvik
+
+
+def _parse_valideringsrespons(raw: bytes) -> dict:
+    """Parser Skatteetatens valider-respons (XML) til en strukturert dict."""
+    root = fromstring(raw)
+    veiledning = []
+    cont = root.find("{*}veiledningEtterKontroll")
+    if cont is not None:
+        for v in cont.findall("{*}veiledning"):
+            veiledning.append(
+                {
+                    "veiledningstype": _tekst(v, "veiledningstype"),
+                    "hjelpetekst": _tekst(v, "hjelpetekst"),
+                    "betjeningsstrategi": _tekst(v, "betjeningsstrategi"),
+                }
+            )
+    return {
+        "resultat": _tekst(root, "resultatAvValidering"),
+        "aarsak": _tekst(root, "aarsakTilValidertMedFeil"),
+        "avvik_ved_validering": _avvik_liste(root, "avvikVedValidering"),
+        "avvik_etter_beregning": _avvik_liste(root, "avvikEtterBeregning"),
+        "veiledning": veiledning,
+    }
+
+
+def formater_valideringsresultat(res: dict) -> str:
+    """Formaterer et valideringsresultat fra valider() til lesbar tekst."""
+    linjer = [f"resultatAvValidering: {res.get('resultat')}"]
+    if res.get("aarsak"):
+        linjer.append(f"aarsak: {res['aarsak']}")
+
+    blokkerende = res.get("avvik_ved_validering") or []
+    if blokkerende:
+        linjer.append(f"\nBlokkerende avvik ({len(blokkerende)}):")
+        for a in blokkerende:
+            detalj = a.get("oevrigInformasjon") or a.get("sti") or ""
+            linjer.append(f"  - {a.get('avvikstype')}: {detalj}".rstrip(": "))
+
+    etter = res.get("avvik_etter_beregning") or []
+    if etter:
+        linjer.append(f"\nAvvik etter beregning ({len(etter)}, ikke-blokkerende):")
+        for a in etter:
+            linjer.append(
+                f"  - {a.get('avvikstype')} @ {a.get('sti')}"
+                + (f" (beregnet={a['beregnetVerdi']})" if a.get("beregnetVerdi") else "")
+            )
+
+    veil = res.get("veiledning") or []
+    if veil:
+        linjer.append(f"\nVeiledning/merknader ({len(veil)}):")
+        for v in veil:
+            linjer.append(f"  - {v.get('veiledningstype')}: {v.get('hjelpetekst')}")
+
+    return "\n".join(linjer)
 
 
 def bygg_og_valider_konvolutt(
