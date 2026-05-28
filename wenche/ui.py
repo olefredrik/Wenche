@@ -6,6 +6,7 @@ Start med: wenche ui
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -727,24 +728,36 @@ def _kjor_pip_oppgradering() -> tuple[bool, str]:
         return False, f"Kunne ikke starte pip: {e}"
 
 
-def _kopier_til_utklippstavle_handler(tekst: str):
-    """Returner en NiceGUI-handler som kopierer tekst og viser en toast."""
-    def handler() -> None:
-        ui.run_javascript(f"navigator.clipboard.writeText({tekst!r})")
-        ui.notify("Kopiert", type="positive", position="top")
-    return handler
-
-
 def _kommando_boks(kommando: str) -> None:
-    """Vis en kommando i en monospace-boks med kopier-knapp ved siden av."""
+    """
+    Vis en kommando i en monospace-boks med kopier-knapp ved siden av.
+
+    Kopieringen kjører som en client-side JS-handler (ikke via server-
+    roundtrip), slik at brukerens klikk-aktivering bevares når
+    navigator.clipboard.writeText kalles. Server-toasten «Kopiert» fyres
+    først når clipboard-promisen faktisk er resolved.
+    """
     with ui.row().classes(
         "items-center gap-2 bg-slate-100 px-3 py-2 rounded font-mono text-sm w-full"
     ):
         ui.label(kommando).classes("flex-1 text-slate-800 break-all")
-        ui.button(
-            icon="content_copy",
-            on_click=_kopier_til_utklippstavle_handler(kommando),
-        ).props("flat dense round size=sm color=grey-7").tooltip("Kopier")
+        knapp = (
+            ui.button(icon="content_copy")
+            .props("flat dense round size=sm color=grey-7")
+            .tooltip("Kopier")
+        )
+
+        def kopiert_toast() -> None:
+            ui.notify("Kopiert", type="positive", position="top", timeout=1500)
+
+        knapp.on(
+            "click",
+            handler=kopiert_toast,
+            js_handler=(
+                f"() => navigator.clipboard.writeText({json.dumps(kommando)})"
+                ".then(() => emit())"
+            ),
+        )
 
 
 def _bygg_oppdaterings_dialog(siste: str) -> "ui.dialog":
