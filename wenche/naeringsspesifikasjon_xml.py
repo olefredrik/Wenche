@@ -8,8 +8,12 @@ Namespace: urn:no:skatteetaten:fastsetting:formueinntekt:naeringsspesifikasjon:e
 XSD: naeringsspesifikasjon_v6_ekstern.xsd
 
 Kodeliste: 2025_resultatregnskapOgBalanse.xml
-  Feltene erAvledet="true" i XSD-en beregnes av Skatteetaten — disse
-  settes ikke av Wenche.
+  Feltene erAvledet="true" i XSD-en beregnes også av Skatteetaten, men
+  tilbakemeldingen fra en innsending 2026-05 (OFL Holding) viste at SKD
+  forventer at vi echo-er våre egne beregnede summer for kryssvalidering.
+  Manglende summer flagges som «manglerSkattemelding»/«manglerNaerings-
+  opplysninger» i avvikEtterBeregning selv om resultatAvValidering blir
+  «validertOK». Wenche emitterer derfor de avledede sumemene eksplisitt.
 
 Implementasjonen dekker en typisk norsk holding AS med:
   - Salgsinntekter (3200) og andre driftsinntekter (3900)
@@ -109,8 +113,9 @@ def generer_naeringsspesifikasjon(
     Genererer naeringsspesifikasjon XML for innsending til Skatteetaten.
 
     Næringsoppgaven er obligatorisk for AS — uten den avviser Skatteetaten
-    konvolutten. Avledede felt (sumDriftsinntekt osv.) beregnes av
-    Skatteetaten og settes ikke her.
+    konvolutten. Avledede summer (sumDriftsinntekt, aarsresultat,
+    sumBalanseverdiFor*, sumGjeldOgEgenkapital, skattemessigResultat osv.)
+    emitteres eksplisitt for å unngå avvik i SKDs etterBeregning.
 
     Args:
         regnskap:     Årsregnskap med resultatregnskap og balanse.
@@ -134,8 +139,10 @@ def generer_naeringsspesifikasjon(
 
     resultatregnskap = SubElement(root, "resultatregnskap")
 
-    # Driftsinntekter
+    # Driftsinntekter. sumDriftsinntekt må stå først i Driftsinntekt per XSD.
     driftsinntekt_el = SubElement(resultatregnskap, "driftsinntekt")
+    if di.sum:
+        _beloep_element(driftsinntekt_el, "sumDriftsinntekt", di.sum)
 
     if di.salgsinntekter:
         salgsinntekt_el = SubElement(driftsinntekt_el, "salgsinntekt")
@@ -145,8 +152,10 @@ def generer_naeringsspesifikasjon(
         annen_di_el = SubElement(driftsinntekt_el, "annenDriftsinntekt")
         _resultatforekomst(annen_di_el, "inntekt", di.andre_driftsinntekter, "3900")
 
-    # Driftskostnader
+    # Driftskostnader. sumDriftskostnad må stå først i Driftskostnad per XSD.
     driftskostnad_el = SubElement(resultatregnskap, "driftskostnad")
+    if dk.sum:
+        _beloep_element(driftskostnad_el, "sumDriftskostnad", dk.sum)
 
     if dk.loennskostnader:
         loenn_el = SubElement(driftskostnad_el, "loennskostnad")
@@ -161,6 +170,13 @@ def generer_naeringsspesifikasjon(
         annen_dk_el = SubElement(driftskostnad_el, "annenDriftskostnad")
         for beloep, kode in annen_dk_poster:
             _resultatforekomst(annen_dk_el, "kostnad", beloep, kode)
+
+    # Sum-finansposter må stå på resultatregnskap-nivå før finansinntekt/-kostnad
+    # per XSD-sekvensen.
+    if fp.sum_inntekter:
+        _beloep_element(resultatregnskap, "sumFinansinntekt", fp.sum_inntekter)
+    if fp.sum_kostnader:
+        _beloep_element(resultatregnskap, "sumFinanskostnad", fp.sum_kostnader)
 
     # Finansinntekter
     fi_poster = [
@@ -184,6 +200,10 @@ def generer_naeringsspesifikasjon(
         for beloep, kode in fk_poster:
             _resultatforekomst(finanskostnad_el, "kostnad", beloep, kode)
 
+    # aarsresultat står sist i Resultatregnskap-sekvensen.
+    if res.aarsresultat:
+        _beloep_element(resultatregnskap, "aarsresultat", res.aarsresultat)
+
     # -----------------------------------------------------------------------
     # Balanseregnskap
     # -----------------------------------------------------------------------
@@ -194,40 +214,57 @@ def generer_naeringsspesifikasjon(
 
     balanseregnskap = SubElement(root, "balanseregnskap")
 
-    # Anleggsmidler
+    # Anleggsmidler. sumBalanseverdiForAnleggsmiddel må stå først per XSD.
     am_poster = [
         (am.aksjer_i_datterselskap, "1313"),
         (am.andre_aksjer, "1350"),
         (am.langsiktige_fordringer, "1390"),
     ]
     am_poster = [(b, k) for b, k in am_poster if b]
-    if am_poster:
+    if am_poster or am.sum:
         anleggsmiddel_el = SubElement(balanseregnskap, "anleggsmiddel")
-        bv_am_el = SubElement(anleggsmiddel_el, "balanseverdiForAnleggsmiddel")
-        for beloep, kode in am_poster:
-            _balanseforekomst(bv_am_el, "balanseverdi", beloep, kode)
+        if am.sum:
+            _beloep_element(anleggsmiddel_el, "sumBalanseverdiForAnleggsmiddel", am.sum)
+        if am_poster:
+            bv_am_el = SubElement(anleggsmiddel_el, "balanseverdiForAnleggsmiddel")
+            for beloep, kode in am_poster:
+                _balanseforekomst(bv_am_el, "balanseverdi", beloep, kode)
 
-    # Omløpsmidler
+    # Omløpsmidler. sumBalanseverdiForOmloepsmiddel må stå først per XSD.
     om_poster = [
         (om.kortsiktige_fordringer, "1500"),
         (om.bankinnskudd, "1920"),
     ]
     om_poster = [(b, k) for b, k in om_poster if b]
-    if om_poster:
+    if om_poster or om.sum:
         omloepsmiddel_el = SubElement(balanseregnskap, "omloepsmiddel")
-        bv_om_el = SubElement(omloepsmiddel_el, "balanseverdiForOmloepsmiddel")
-        for beloep, kode in om_poster:
-            _balanseforekomst(bv_om_el, "balanseverdi", beloep, kode)
+        if om.sum:
+            _beloep_element(omloepsmiddel_el, "sumBalanseverdiForOmloepsmiddel", om.sum)
+        if om_poster:
+            bv_om_el = SubElement(omloepsmiddel_el, "balanseverdiForOmloepsmiddel")
+            for beloep, kode in om_poster:
+                _balanseforekomst(bv_om_el, "balanseverdi", beloep, kode)
 
     # Gjeld og egenkapital
-    # Rekkefølgen på barneelementene er bundet av XSD-sekvensen i
-    # GjeldOgEgenkapital: langsiktigGjeld -> kortsiktigGjeld -> egenkapital.
+    # XSD-sekvensen i GjeldOgEgenkapital:
+    #   sumLangsiktigGjeld -> sumKortsiktigGjeld -> sumEgenkapital
+    #   -> langsiktigGjeld -> kortsiktigGjeld -> egenkapital.
     # Feil rekkefølge gjør XML-en ugyldig mot naeringsspesifikasjon_v6 og er
     # årsaken til SMEVB-005 fra Skatteetatens visning-API (SSV-5187).
     gek_el = SubElement(balanseregnskap, "gjeldOgEgenkapital")
 
-    # Langsiktig gjeld
     lg = eg.langsiktig_gjeld
+    kg = eg.kortsiktig_gjeld
+    ek = eg.egenkapital
+
+    if lg.sum:
+        _beloep_element(gek_el, "sumLangsiktigGjeld", lg.sum)
+    if kg.sum:
+        _beloep_element(gek_el, "sumKortsiktigGjeld", kg.sum)
+    if ek.sum:
+        _beloep_element(gek_el, "sumEgenkapital", ek.sum)
+
+    # Langsiktig gjeld
     lg_poster = [
         (lg.laan_fra_aksjonaer, "2250"),
         (lg.andre_langsiktige_laan, "2290"),
@@ -239,7 +276,6 @@ def generer_naeringsspesifikasjon(
             _balanseforekomst(langsiktig_gjeld_el, "gjeld", beloep, kode)
 
     # Kortsiktig gjeld
-    kg = eg.kortsiktig_gjeld
     kg_poster = [
         (kg.leverandoergjeld, "2400"),
         (kg.skyldige_offentlige_avgifter, "2600"),
@@ -252,7 +288,6 @@ def generer_naeringsspesifikasjon(
             _balanseforekomst(kortsiktig_gjeld_el, "gjeld", beloep, kode)
 
     # Egenkapital
-    ek = eg.egenkapital
     ek_poster = [
         (ek.aksjekapital, "2000"),
         (ek.overkursfond, "2020"),
@@ -268,6 +303,32 @@ def generer_naeringsspesifikasjon(
         egenkapital_el = SubElement(gek_el, "egenkapital")
         for beloep, kode in ek_poster:
             _balanseforekomst(egenkapital_el, "kapital", beloep, kode)
+
+    # Balanse-totaler står sist i Balanseregnskap-sekvensen.
+    if bal.eiendeler.sum:
+        _beloep_element(balanseregnskap, "sumBalanseverdiForEiendel", bal.eiendeler.sum)
+    gek_total = lg.sum + kg.sum + ek.sum
+    if gek_total:
+        _beloep_element(balanseregnskap, "sumGjeldOgEgenkapital", gek_total)
+
+    # -----------------------------------------------------------------------
+    # BeregnetNaeringsinntekt (XSD-pos: etter balanseregnskap, før virksomhet)
+    # For et upersonlig skattesubjekt (AS) fordeles skattemessig resultat på
+    # «forekomst 1» (én virksomhet). skattemessigResultat = aarsresultat for
+    # holdingselskap uten skattekostnad. SKD krysstillegger feltet mot
+    # skattemeldingens inntektOgUnderskudd-poster.
+    # -----------------------------------------------------------------------
+    if res.aarsresultat:
+        bni_el = SubElement(root, "beregnetNaeringsinntekt")
+        fordelt_el = SubElement(
+            bni_el, "fordeltBeregnetNaeringsinntektForUpersonligSkattepliktig"
+        )
+        SubElement(fordelt_el, "id").text = "1"
+        _beloep_element(fordelt_el, "fordeltSkattemessigResultat", res.aarsresultat)
+        _beloep_element(
+            fordelt_el, "fordeltSkattemessigResultatEtterKorreksjon", res.aarsresultat
+        )
+        _beloep_element(bni_el, "skattemessigResultat", res.aarsresultat)
 
     # -----------------------------------------------------------------------
     # Virksomhet (obligatorisk)
@@ -299,6 +360,12 @@ def generer_naeringsspesifikasjon(
         ekavst = SubElement(root, "egenkapitalavstemming")
         _beloep_element(ekavst, "inngaaendeEgenkapital", inngaaende_ek)
         endring = round(utgaaende_ek - inngaaende_ek, 2)
+        # sumTilleggIEgenkapital / sumFradragIEgenkapital må stå før
+        # egenkapitalendring-listen per XSD-sekvensen.
+        if endring > 0:
+            _beloep_element(ekavst, "sumTilleggIEgenkapital", endring)
+        elif endring < 0:
+            _beloep_element(ekavst, "sumFradragIEgenkapital", abs(endring))
         if endring:
             # aaretsUnderskudd er kategori "fradrag", aaretsOverskudd "tillegg":
             # utgaaende = inngaaende + tillegg - fradrag. Beløpet føres derfor
@@ -310,6 +377,8 @@ def generer_naeringsspesifikasjon(
             ekt = SubElement(endring_el, "egenkapitalendringstype")
             SubElement(ekt, "egenkapitalendringstype").text = kode
             _beloep_element(endring_el, "beloep", abs(endring))
+        # utgaaendeEgenkapital står sist i Egenkapitalavstemming.
+        _beloep_element(ekavst, "utgaaendeEgenkapital", utgaaende_ek)
 
     # -----------------------------------------------------------------------
     # andreForhold: spesifiser ytelse mellom aksjonær og selskap (lån fra

@@ -7,8 +7,13 @@ via Altinn3. Krever partsnummer fra Skatteetatens forhåndsutfylt-API.
 Namespace: urn:no:skatteetaten:fastsetting:formueinntekt:skattemelding:upersonlig:ekstern:v5
 XSD: skattemeldingUpersonlig_v5_ekstern.xsd
 
-Felter merket erAvledet="true" i XSD-en beregnes av Skatteetaten fra
-næringsoppgaven — disse settes ikke av Wenche.
+Felter merket erAvledet="true" i XSD-en beregnes også av Skatteetaten, men
+en tilbakemelding fra prod-innsending 2026-05 viste at SKD forventer at vi
+echo-er våre egne beregnede summer (samletUnderskudd, inntektsfradrag/
+underskudd, inntektFoerFradragForEventueltAvgittKonsernbidrag,
+fremfoerbartUnderskuddIInntekt) for kryssvalidering. Manglende summer
+flagges som «manglerSkattemelding» i avvikEtterBeregning selv om
+resultatAvValidering blir «validertOK».
 """
 
 from __future__ import annotations
@@ -32,10 +37,17 @@ def _overstyrt_heltall(parent: Element, tag: str, verdi: int) -> None:
     SubElement(erov, "boolsk").text = "true"
 
 
+def _heltall_med_innkapsling(parent: Element, tag: str, verdi: int) -> None:
+    """Bygger et BeloepSomHeltallMedInnkapsling-element (uten erOverstyrt)."""
+    el = SubElement(parent, tag)
+    SubElement(el, "beloepSomHeltall").text = str(int(round(verdi)))
+
+
 def generer_skattemelding_upersonlig(
     partsnummer: int,
     inntektsaar: int,
     fremfoert_underskudd: int = 0,
+    aarets_underskudd: int = 0,
     boersnotert: bool | None = None,
     harytelse: bool | None = None,
     formue_verdi_foer_rabatt: int | None = None,
@@ -52,6 +64,14 @@ def generer_skattemelding_upersonlig(
         fremfoert_underskudd: Fremført underskudd fra tidligere år (kroner, heltall).
                               Korresponderer med konfig.underskudd_til_fremfoering.
                               0 = elementet inkluderes ikke i XML.
+        aarets_underskudd:    Årets underskudd (positiv kroner-heltall, magnitude).
+                              Fra |min(0, aarsresultat)| når aarsresultat < 0.
+                              0 = underskuddsbaserte felter utelates. Når > 0
+                              emitteres samletUnderskudd, inntektsfradrag/underskudd,
+                              inntektFoerFradragForEventueltAvgittKonsernbidrag,
+                              og fremfoerbartUnderskuddIInntekt = aarets +
+                              fremfoert. Med disse blir SKDs etterBeregning ren
+                              (ingen «manglerSkattemelding»-avvik).
         boersnotert:          Om selskapet er børsnotert. None = utelat opplysningen.
         harytelse:            Om det er ytelser mellom aksjonær/nærstående og selskapet
                               (f.eks. lån fra aksjonær). None = utelat opplysningen.
@@ -70,11 +90,35 @@ def generer_skattemelding_upersonlig(
     SubElement(root, "partsnummer").text = str(partsnummer)
     SubElement(root, "inntektsaar").text = str(inntektsaar)
 
-    if fremfoert_underskudd > 0:
+    if fremfoert_underskudd > 0 or aarets_underskudd > 0:
         iou = SubElement(root, "inntektOgUnderskudd")
         utf = SubElement(iou, "underskuddTilFremfoering")
-        fremfoert = SubElement(utf, "fremfoertUnderskuddFraTidligereAar")
-        SubElement(fremfoert, "beloepSomHeltall").text = str(round(fremfoert_underskudd))
+        if fremfoert_underskudd > 0:
+            fremfoert = SubElement(utf, "fremfoertUnderskuddFraTidligereAar")
+            SubElement(fremfoert, "beloepSomHeltall").text = str(
+                int(round(fremfoert_underskudd))
+            )
+        if aarets_underskudd > 0:
+            # fremfoerbartUnderskuddIInntekt = årets + fremført fra tidligere år.
+            # Står sist i UnderskuddTilFremfoering-sekvensen.
+            _overstyrt_heltall(
+                utf,
+                "fremfoerbartUnderskuddIInntekt",
+                aarets_underskudd + fremfoert_underskudd,
+            )
+        if aarets_underskudd > 0:
+            # XSD-sekvens i InntektOgUnderskudd:
+            #   underskuddTilFremfoering -> inntekt -> inntektsfradrag
+            #   -> inntektFoerFradragForEventueltAvgittKonsernbidrag
+            #   -> samletInntekt -> samletUnderskudd
+            ifr = SubElement(iou, "inntektsfradrag")
+            _heltall_med_innkapsling(ifr, "underskudd", aarets_underskudd)
+            _heltall_med_innkapsling(
+                iou,
+                "inntektFoerFradragForEventueltAvgittKonsernbidrag",
+                -aarets_underskudd,
+            )
+            _overstyrt_heltall(iou, "samletUnderskudd", aarets_underskudd)
 
     # formueOgGjeld: formuesgrunnlaget bak aksjene. Skatteetaten utleder
     # samletVerdiBakAksjeneISelskapet = samletVerdiFoerVerdsettingsrabatt -
@@ -162,10 +206,14 @@ def generer_skattemelding_fra_konfig(
     laan_fra_aksjonaer = regnskap.balanse.egenkapital_og_gjeld.langsiktig_gjeld.laan_fra_aksjonaer
     harytelse = bool(laan_fra_aksjonaer and laan_fra_aksjonaer > 0)
     verdi_foer_rabatt, samlet_gjeld = beregn_formue_inputs(regnskap, konfig)
+    # Årets underskudd som positiv kroner-magnitude. For et overskuddsår
+    # (eller nullresultat) blir det 0 og underskuddsbaserte felter utelates.
+    aarets_underskudd = max(0, int(round(-regnskap.resultatregnskap.aarsresultat)))
     return generer_skattemelding_upersonlig(
         partsnummer=partsnummer,
         inntektsaar=regnskap.regnskapsaar,
         fremfoert_underskudd=int(konfig.underskudd_til_fremfoering),
+        aarets_underskudd=aarets_underskudd,
         boersnotert=konfig.boersnotert,
         harytelse=harytelse,
         formue_verdi_foer_rabatt=verdi_foer_rabatt,

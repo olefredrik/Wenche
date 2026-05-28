@@ -83,3 +83,78 @@ class TestSkattemeldingXml:
         result = generer_skattemelding_upersonlig(99887766, 2023)
         assert isinstance(result, bytes)
         fromstring(result.decode("utf-8"))
+
+
+class TestAaretsUnderskudd:
+    """
+    Tester for de avledede underskuddssumene som SKD krever for å unngå
+    «manglerSkattemelding»-avvik i etterBeregning (jf. tilbakemelding 2026-05).
+    """
+
+    def test_aarets_underskudd_inkluderer_alle_avledede_summer(self):
+        root = _parse(generer_skattemelding_upersonlig(
+            12345678, 2024, aarets_underskudd=5000,
+        ))
+        iou = root.find(f"{{{_NS}}}inntektOgUnderskudd")
+        assert iou is not None
+
+        # inntektsfradrag/underskudd = årets underskudd
+        ifr = iou.find(f"{{{_NS}}}inntektsfradrag/{{{_NS}}}underskudd/{{{_NS}}}beloepSomHeltall")
+        assert ifr is not None and ifr.text == "5000"
+
+        # inntektFoerFradragForEventueltAvgittKonsernbidrag = -underskudd
+        ifu = iou.find(
+            f"{{{_NS}}}inntektFoerFradragForEventueltAvgittKonsernbidrag/{{{_NS}}}beloepSomHeltall"
+        )
+        assert ifu is not None and ifu.text == "-5000"
+
+        # samletUnderskudd (overstyrt) = årets underskudd
+        sum_u = iou.find(
+            f"{{{_NS}}}samletUnderskudd/{{{_NS}}}beloep/{{{_NS}}}beloepSomHeltall"
+        )
+        assert sum_u is not None and sum_u.text == "5000"
+
+    def test_fremfoerbart_er_summen_av_aarets_og_fremfoert(self):
+        # Fremført fra tidligere år 1500 + årets underskudd 5000 = 6500
+        root = _parse(generer_skattemelding_upersonlig(
+            12345678, 2024,
+            fremfoert_underskudd=1500,
+            aarets_underskudd=5000,
+        ))
+        utf = root.find(f"{{{_NS}}}inntektOgUnderskudd/{{{_NS}}}underskuddTilFremfoering")
+        assert utf is not None
+
+        fra_tidligere = utf.find(
+            f"{{{_NS}}}fremfoertUnderskuddFraTidligereAar/{{{_NS}}}beloepSomHeltall"
+        )
+        assert fra_tidligere is not None and fra_tidligere.text == "1500"
+
+        fremfoerbart = utf.find(
+            f"{{{_NS}}}fremfoerbartUnderskuddIInntekt/{{{_NS}}}beloep/{{{_NS}}}beloepSomHeltall"
+        )
+        assert fremfoerbart is not None and fremfoerbart.text == "6500"
+
+    def test_aarets_underskudd_uten_fremfoert_genererer_underskuddTilFremfoering(self):
+        root = _parse(generer_skattemelding_upersonlig(
+            12345678, 2024, aarets_underskudd=4000,
+        ))
+        utf = root.find(f"{{{_NS}}}inntektOgUnderskudd/{{{_NS}}}underskuddTilFremfoering")
+        assert utf is not None
+        # Uten fremført fra tidligere år, men med årets underskudd:
+        # fremfoerbartUnderskuddIInntekt = 0 + 4000 = 4000
+        fremfoerbart = utf.find(
+            f"{{{_NS}}}fremfoerbartUnderskuddIInntekt/{{{_NS}}}beloep/{{{_NS}}}beloepSomHeltall"
+        )
+        assert fremfoerbart is not None and fremfoerbart.text == "4000"
+        # fremfoertUnderskuddFraTidligereAar utelates når 0
+        assert utf.find(f"{{{_NS}}}fremfoertUnderskuddFraTidligereAar") is None
+
+    def test_uten_underskudd_ingen_avledede_summer(self):
+        root = _parse(generer_skattemelding_upersonlig(12345678, 2024))
+        assert root.find(f"{{{_NS}}}inntektOgUnderskudd") is None
+
+    def test_output_med_underskudd_er_gyldig_xml(self):
+        result = generer_skattemelding_upersonlig(
+            12345678, 2024, fremfoert_underskudd=1500, aarets_underskudd=5000,
+        )
+        fromstring(result.decode("utf-8"))
