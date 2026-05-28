@@ -158,3 +158,40 @@ class TestAaretsUnderskudd:
             12345678, 2024, fremfoert_underskudd=1500, aarets_underskudd=5000,
         )
         fromstring(result.decode("utf-8"))
+
+
+class TestVerdsettingAvAksje:
+    """
+    SKD beregner samletVerdiBakAksjeneISelskapet = verdiFoerRabatt - gjeld,
+    men forventer at vi echo-er verdien i `verdsettingAvAksje`-blokken for
+    å unngå «manglerSkattemelding»-avvik (jf. OFL Holdings 2025-tilbakemelding).
+    """
+
+    def test_emit_med_positiv_netto(self):
+        root = _parse(generer_skattemelding_upersonlig(
+            12345678, 2024,
+            formue_verdi_foer_rabatt=72622,
+            samlet_gjeld=12682,
+        ))
+        verdi = root.find(
+            f"{{{_NS}}}verdsettingAvAksje/{{{_NS}}}samletVerdiBakAksjeneISelskapet"
+            f"/{{{_NS}}}beloep/{{{_NS}}}beloepSomHeltall"
+        )
+        assert verdi is not None and verdi.text == "59940"
+
+    def test_gulv_paa_null_naar_gjeld_overstiger_formue(self):
+        root = _parse(generer_skattemelding_upersonlig(
+            12345678, 2024,
+            formue_verdi_foer_rabatt=10000,
+            samlet_gjeld=15000,
+        ))
+        verdi = root.find(
+            f"{{{_NS}}}verdsettingAvAksje/{{{_NS}}}samletVerdiBakAksjeneISelskapet"
+            f"/{{{_NS}}}beloep/{{{_NS}}}beloepSomHeltall"
+        )
+        assert verdi is not None and verdi.text == "0"
+
+    def test_utelat_naar_formue_ikke_oppgitt(self):
+        # Ingen formue-input → ingen verdsettingAvAksje-blokk
+        root = _parse(generer_skattemelding_upersonlig(12345678, 2024))
+        assert root.find(f"{{{_NS}}}verdsettingAvAksje") is None
