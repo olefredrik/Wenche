@@ -254,12 +254,11 @@ Start `wenche ui` og gå til **1. Oppsett**-fanen. Under «Per miljø-oppsett» 
 **For å opprette en ny systembruker:**
 
 1. Sørg for at Maskinporten-credentials og organisasjonsnummer er fylt inn i kortet (og lagret).
-2. Åpne **Avansert**-ekspansjonen i kortet og klikk **Registrer system**. Dette registrerer Wenche i Altinns systemregister med de nødvendige tilgangsrettighetene. Idempotent — kan kjøres flere ganger uten skade.
-3. Klikk **Opprett systembruker** i samme kort. Wenche oppretter en forespørsel og viser en «Godkjenn i Altinn →»-lenke.
-4. Åpne lenken og godkjenn:
+2. Klikk **Opprett systembruker**. Wenche registrerer seg i Altinns systemregister automatisk hvis det ikke er gjort, oppretter en forespørsel, og viser en «Godkjenn i Altinn →»-lenke.
+3. Åpne lenken og godkjenn:
     - **Produksjon:** Logg inn med BankID som daglig leder eller styreleder.
     - **Testmiljø:** Logg inn med TestID. Bruk fødselsnummeret til daglig leder for Tenor-orgen din (finnes under **Kildedata → rollegrupper → DAGL** i [Tenor testdatasøk](https://www.skatteetaten.no/testdata/)).
-5. Tilbake i Wenche: klikk **Jeg har godkjent — sjekk status** ved siden av lenken. Status oppdateres til **Systembruker godkjent**.
+4. Tilbake i Wenche: klikk **Jeg har godkjent — sjekk status** ved siden av lenken. Status oppdateres til **Systembruker godkjent**.
 
 **Hvis status fortsatt sier «venter»:** Vent 10-20 sekunder og klikk knappen igjen — Altinn trenger noen sekunder på å registrere godkjenningen.
 

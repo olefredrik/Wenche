@@ -1544,17 +1544,8 @@ def _bygg_oppsett_fane() -> None:
                         # streng på POST i stedet for et dict. Håndter begge.
                         oppdatert = isinstance(svar, dict) and svar.get("oppdatert", False)
                         hva = "System oppdatert." if oppdatert else "System registrert."
-                        # Hvis systembruker ikke er satt opp ennå, dyttene
-                        # brukeren videre til neste logiske handling.
-                        if _siste_status.get(env) in ("ikke_opprettet", None):
-                            n.message = (
-                                f"{hva} Neste steg: klikk «Opprett systembruker» "
-                                "for å lage forespørselen som skal godkjennes."
-                            )
-                            n.timeout = 10
-                        else:
-                            n.message = hva
-                            n.timeout = 5
+                        n.message = hva
+                        n.timeout = 5
                         n.spinner = False
                         n.type = "positive"
                     except Exception as e:
@@ -1566,13 +1557,25 @@ def _bygg_oppsett_fane() -> None:
 
                 async def opprett_handler(env=env_var):
                     n = ui.notification(
-                        f"Oppretter systembruker-forespørsel i "
+                        f"Oppretter systembruker i "
                         f"{('testmiljø' if env == 'test' else 'produksjon')}...",
                         spinner=True, timeout=None,
                     )
                     try:
                         token = await run.io_bound(lambda: _med_env(env, auth.login_admin))
                         vendor_orgnr = os.getenv("ORG_NUMMER")
+                        client_id = _les_konfig_for_milj("MASKINPORTEN_CLIENT_ID", env)
+                        # Sørg for at Wenche er registrert i Altinns systemregister
+                        # før vi oppretter forespørselen — opprett_forespørsel
+                        # forutsetter at systemId finnes. registrer_system er
+                        # idempotent (POST → PUT-fallback hvis allerede registrert),
+                        # så det er trygt å kjøre hver gang.
+                        await run.io_bound(
+                            lambda: _med_env(
+                                env, systembruker.registrer_system,
+                                token, vendor_orgnr, client_id,
+                            )
+                        )
                         party_orgnr = (
                             os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr)
                             if env == "test" else vendor_orgnr
