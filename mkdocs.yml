@@ -36,6 +36,9 @@ nav:
   - Veiledninger:
     - Bruk: bruk.md
   - Referanse: referanse.md
+  - Avansert:
+    - Kommandolinje: avansert/cli.md
+    - Testing mot tt02: avansert/testing.md
 
 markdown_extensions:
   - admonition

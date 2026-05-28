@@ -57,10 +57,25 @@ from wenche.skd_skattemelding_client import (
 from wenche.skattemelding_xml import generer_skattemelding_fra_konfig, hent_partsnummer
 from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
 
-CONFIG_FIL = Path("config.yaml")
 _WENCHE_DIR = Path.home() / ".wenche"
 _BRUKER_ENV_FIL = _WENCHE_DIR / ".env"
 _PRIVAT_NOKKEL_FIL = _WENCHE_DIR / "maskinporten_privat.pem"
+
+# Aktivt miljø for hele UI-sesjonen. Settes av run_app() basert på om brukeren
+# kjørte `wenche` (prod) eller `wenche dev` (test). UI-koden leser denne i
+# stedet for WENCHE_ENV slik at miljøet er låst per kjøring og ikke kan endres
+# via env-variabler eller per-innsending-velgere.
+_AKTIV_ENV: str = "prod"
+
+
+def CONFIG_FIL() -> Path:
+    """Returnér aktiv config-fil for nåværende UI-sesjon.
+
+    `wenche` skriver til `config.yaml`, `wenche dev` skriver til
+    `config.dev.yaml`. Skiller test-data fra ekte selskapsinformasjon slik
+    at Tenor-orgnumre ikke overskriver din virkelige config.
+    """
+    return Path("config.dev.yaml" if _AKTIV_ENV == "test" else "config.yaml")
 
 
 def _sikre_bruker_env_fil() -> bool:
@@ -385,10 +400,10 @@ class AppState:
         )
 
     def les_config(self) -> None:
-        if not CONFIG_FIL.exists():
+        if not CONFIG_FIL().exists():
             return
         try:
-            with open(CONFIG_FIL, encoding="utf-8") as f:
+            with open(CONFIG_FIL(), encoding="utf-8") as f:
                 cfg = yaml.safe_load(f) or {}
 
             s = cfg.get("selskap", {})
@@ -646,7 +661,7 @@ class AppState:
                 ],
             },
         }
-        with open(CONFIG_FIL, "w", encoding="utf-8") as f:
+        with open(CONFIG_FIL(), "w", encoding="utf-8") as f:
             yaml.dump(data, f, allow_unicode=True, sort_keys=False)
 
 
@@ -672,7 +687,10 @@ _oppdater_regnskap_metrikker: callable | None = None
 # dokumenter-fanen bygges, og kalles etter SAF-T-import slik at
 # auto-genererte lån-stubs blir synlige.
 _laan_liste_refresh: callable | None = None
-state.les_config()
+
+# state.les_config() kalles fra run_app() etter at _AKTIV_ENV er satt, slik at
+# wenche dev leser fra config.dev.yaml og wenche fra config.yaml. Hvis dette
+# ble kalt her på modulnivå, ville prod-data lekke inn i test-sesjonen.
 
 
 # ---------------------------------------------------------------------------
@@ -795,8 +813,8 @@ def _bygg_oppdaterings_dialog(siste: str) -> "ui.dialog":
             ).classes("text-sm text-slate-700")
             _kommando_boks("git pull")
             ui.label(
-                'Restart Wenche etter oppdatering. Hvis avhengigheter har endret '
-                'seg, kjør også pip install -e ".[ui]".'
+                "Restart Wenche etter oppdatering. Hvis avhengigheter har endret "
+                "seg, kjør også pip install -e ."
             ).classes("text-xs text-slate-500")
             ui.link(
                 f"Se utgivelsesnotater for v{siste} på GitHub →",
@@ -808,7 +826,7 @@ def _bygg_oppdaterings_dialog(siste: str) -> "ui.dialog":
                 "Stopp Wenche først (Ctrl+C i terminalen som kjører den), "
                 "kjør så denne kommandoen og start Wenche på nytt:"
             ).classes("text-sm text-slate-700")
-            _kommando_boks('pip install --upgrade "wenche[ui]"')
+            _kommando_boks("pip install --upgrade wenche")
             ui.label(
                 "Wenche kan ikke oppgradere seg selv mens den kjører — "
                 "på Windows er wenche.exe filsystem-låst, og på alle "
@@ -846,12 +864,13 @@ def _les_konfig_for_milj(navn: str, env: str, default: str = "") -> str:
 def _sjekk_konfig() -> list[tuple[bool, str, str]]:
     resultater = []
 
-    # Per miljø: credentials + orgnr. Viser status for begge slik at brukeren
-    # ser hva som er på plass uten å måtte tenke på «aktivt miljø».
-    for env, miljo_navn, orgnr_var in [
+    # Viser konfig-status kun for aktivt miljø (_AKTIV_ENV). Det andre miljøet
+    # er fullstendig skjult fra UI-et i denne kjøringen.
+    alle = [
         ("test", "Testmiljø", "SKD_TEST_ORG_NUMMER"),
         ("prod", "Produksjon", "ORG_NUMMER"),
-    ]:
+    ]
+    for env, miljo_navn, orgnr_var in [e for e in alle if e[0] == _AKTIV_ENV]:
         client_id = _les_konfig_for_milj("MASKINPORTEN_CLIENT_ID", env)
         kid = _les_konfig_for_milj("MASKINPORTEN_KID", env)
         orgnr = os.getenv(orgnr_var, "")
@@ -1122,8 +1141,23 @@ def _bygg_hjem_fane(tabs=None, t_oppsett=None) -> None:
     # er Tenor-testdata. Skattemelding-sjekken tvinger uansett prod-env internt.
     prod_orgnr = os.getenv("ORG_NUMMER", "").strip()
     orgnr_konfigurert = bool(prod_orgnr) and prod_orgnr != "123456789"
+    # I dev-modus deaktiveres automatisk statussjekk. Status mot myndighetene
+    # er en prod-sak, og testmiljøet har ingen tilsvarende statusoversikt.
+    statussjekk_aktiv = orgnr_konfigurert and _AKTIV_ENV == "prod"
 
-    if not orgnr_konfigurert:
+    if _AKTIV_ENV == "test":
+        with ui.card().classes(
+            "w-full p-4 mb-4 bg-amber-50 border border-amber-200 shadow-none rounded-xl"
+        ):
+            with ui.row().classes("items-center gap-3 w-full"):
+                ui.icon("science").classes("text-amber-600 text-2xl")
+                with ui.column().classes("gap-1"):
+                    ui.label("Testmodus").classes("font-semibold text-amber-900")
+                    ui.label(
+                        "Statussjekk mot myndighetene er deaktivert i testmiljø. "
+                        "Frister vises som vanlig, men ingen oppslag mot Skatteetaten eller Brønnøysund."
+                    ).classes("text-sm text-amber-900")
+    elif not orgnr_konfigurert:
         with ui.card().classes(
             "w-full p-4 mb-4 bg-amber-50 border border-amber-200 shadow-none rounded-xl"
         ):
@@ -1150,9 +1184,12 @@ def _bygg_hjem_fane(tabs=None, t_oppsett=None) -> None:
             "Oppdater status",
             on_click=lambda: sjekk_alle_frister(),
         ).props("outline color=primary size=sm flat icon=refresh")
-        if not orgnr_konfigurert:
+        if not statussjekk_aktiv:
             oppdater_knapp.disable()
-            oppdater_knapp.tooltip("Fyll inn organisasjonsnummer i Oppsett-fanen først")
+            if _AKTIV_ENV == "test":
+                oppdater_knapp.tooltip("Statussjekk er deaktivert i testmodus")
+            else:
+                oppdater_knapp.tooltip("Fyll inn organisasjonsnummer i Oppsett-fanen først")
 
     frister = [
         {"key": "skattemelding", "tittel": "Skattemelding", "undertittel": "Skattemelding og næringsspesifikasjon",
@@ -1181,8 +1218,9 @@ def _bygg_hjem_fane(tabs=None, t_oppsett=None) -> None:
                     f["maaned"], f["dag"], f["beskrivelse"],
                     FristStatus(beskrivelse="Ingen automatisk sjekk tilgjengelig"),
                 )
-            elif not orgnr_konfigurert:
-                # Ingen API-sjekk uten orgnr — hopp over spinner og vis ventende direkte.
+            elif not statussjekk_aktiv:
+                # Ingen API-sjekk uten orgnr, eller i dev-modus.
+                # Hopp over spinner og vis ventende direkte.
                 card, content = _fristkort(f["tittel"], f["undertittel"], vis_loading=False)
                 _fristkort_ventende(
                     card, content, f["tittel"], f["undertittel"],
@@ -1241,8 +1279,9 @@ def _bygg_hjem_fane(tabs=None, t_oppsett=None) -> None:
             _sjekk_en_frist("aarsregnskap", sjekk_aarsregnskap, orgnr, aarsregnskap_aar),
         )
 
-    # Sjekk automatisk ved sidelasting kun hvis orgnr er konfigurert.
-    if orgnr_konfigurert:
+    # Sjekk automatisk ved sidelasting kun hvis statussjekk er aktiv
+    # (krever konfigurert orgnr og prod-modus).
+    if statussjekk_aktiv:
         ui.timer(1.0, sjekk_alle_frister, once=True)
 
     ui.separator().classes("my-6")
@@ -1272,14 +1311,21 @@ def _bygg_oppsett_fane() -> None:
     # startes fra. Cwd/.env leses som fallback for bakoverkompatibilitet.
     dot_env_fil = _BRUKER_ENV_FIL
 
-    # --- Miljø-oppsett (credentials + systembruker per miljø) ---
+    # --- Miljø-oppsett (credentials + systembruker) ---
     ui.separator().classes("my-4")
-    seksjonstittel("Per miljø-oppsett")
-    ui.label(
-        "Klient-ID og Nøkkel-ID finner du i Digdirs selvbetjeningsportal. "
-        "Test og prod er separate Maskinporten-registre — hvert miljø har egne "
-        "credentials og egen systembruker som settes opp uavhengig av hverandre."
-    ).classes("text-sm text-slate-500 mb-3")
+    if _AKTIV_ENV == "test":
+        seksjonstittel("Testmiljø-oppsett")
+        ui.label(
+            "Klient-ID og Nøkkel-ID finner du i Digdirs test-portal "
+            "(sjolvbetjening.test.samarbeid.digdir.no). Organisasjonsnummeret "
+            "må være en syntetisk Tenor-org."
+        ).classes("text-sm text-slate-500 mb-3")
+    else:
+        seksjonstittel("Oppsett")
+        ui.label(
+            "Klient-ID og Nøkkel-ID finner du i Digdirs selvbetjeningsportal. "
+            "Systembrukeren godkjennes av daglig leder eller styreleder i Altinn."
+        ).classes("text-sm text-slate-500 mb-3")
 
     test_card_inputs: dict[str, ui.input] = {}
     prod_card_inputs: dict[str, ui.input] = {}
@@ -1455,11 +1501,14 @@ def _bygg_oppsett_fane() -> None:
         _siste_status[env] = "ikke_opprettet" if status == "ikke_opprettet" else status
         _render_handlinger(env)
 
-    with ui.grid(columns=2).classes("w-full gap-4"):
-        for env_var, miljo_navn, ikon_navn, ikon_farge, card_inputs in [
-            ("test", "Testmiljø (tt02)", "science", "text-slate-500", test_card_inputs),
-            ("prod", "Produksjon", "business", "text-slate-700", prod_card_inputs),
-        ]:
+    alle_milj = [
+        ("test", "Testmiljø (tt02)", "science", "text-slate-500", test_card_inputs),
+        ("prod", "Produksjon", "business", "text-slate-700", prod_card_inputs),
+    ]
+    synlige_milj = [m for m in alle_milj if m[0] == _AKTIV_ENV]
+    kolonner = len(synlige_milj)
+    with ui.grid(columns=kolonner).classes("w-full gap-4"):
+        for env_var, miljo_navn, ikon_navn, ikon_farge, card_inputs in synlige_milj:
             with ui.card().classes("w-full p-4 border border-slate-200 shadow-none rounded-xl"):
                 # Header
                 with ui.row().classes("items-center gap-2 mb-3"):
@@ -1726,13 +1775,12 @@ def _bygg_oppsett_fane() -> None:
 
                     ui.timer(3.0, _auto_sjekk_med_retry, once=True)
 
-    # --- Felles for begge miljø ---
+    # --- Privat nøkkel ---
     ui.separator().classes("my-4")
-    seksjonstittel("Felles for begge miljø")
+    seksjonstittel("Privat nøkkel")
     ui.label(
-        "Samme private nøkkel kan brukes i begge miljø — vanligvis genererer "
-        "du ett nøkkelpar og laster opp den offentlige nøkkelen til både "
-        "test- og prod-klienten i Digdir."
+        "Last opp den private RSA-nøkkelen Wenche skal bruke til Maskinporten. "
+        "Nøkkelen lagres lokalt og sendes aldri til noen server."
     ).classes("text-sm text-slate-500 mb-3")
 
     pem_bytes_holder: list[bytes] = []
@@ -1754,35 +1802,32 @@ def _bygg_oppsett_fane() -> None:
         from dotenv import set_key
         migrert_fra_cwd = _sikre_bruker_env_fil()
 
-        # Lagre credentials per miljø — begge sett skrives uavhengig av hverandre.
-        # Skriver alltid eksplisitt (selv om tomt) slik at tomming fra UI faktisk
-        # persisteres. _les_konfig_for_milj behandler eksplisitt tom som
-        # autoritativ (ikke fallback til generisk legacy-verdi).
-        for kort_env, inputs in [("test", test_card_inputs), ("prod", prod_card_inputs)]:
-            suffix = kort_env.upper()
-            for felt_navn, env_navn in [
-                ("client_id", f"MASKINPORTEN_CLIENT_ID_{suffix}"),
-                ("kid", f"MASKINPORTEN_KID_{suffix}"),
-            ]:
-                verdi = inputs[felt_navn].value or ""
-                set_key(str(dot_env_fil), env_navn, verdi)
-                os.environ[env_navn] = verdi
+        # Lagre credentials for aktivt miljø — kun det miljøet UI-en viser nå.
+        # Det andre miljøets credentials i ~/.wenche/.env røres ikke, slik at
+        # `wenche dev`/`wenche` kan brukes om hverandre uten å overskrive.
+        aktive_inputs = test_card_inputs if _AKTIV_ENV == "test" else prod_card_inputs
+        suffix = _AKTIV_ENV.upper()
+        for felt_navn, env_navn in [
+            ("client_id", f"MASKINPORTEN_CLIENT_ID_{suffix}"),
+            ("kid", f"MASKINPORTEN_KID_{suffix}"),
+        ]:
+            verdi = aktive_inputs[felt_navn].value or ""
+            set_key(str(dot_env_fil), env_navn, verdi)
+            os.environ[env_navn] = verdi
 
-        # Orgnr per miljø: test-kort → SKD_TEST_ORG_NUMMER (Tenor-syntetisk),
-        # prod-kort → ORG_NUMMER (din egen virksomhet).
-        test_orgnr = test_card_inputs["orgnr"].value or ""
-        set_key(str(dot_env_fil), "SKD_TEST_ORG_NUMMER", test_orgnr)
-        if test_orgnr:
-            os.environ["SKD_TEST_ORG_NUMMER"] = test_orgnr
+        orgnr_verdi = aktive_inputs["orgnr"].value or ""
+        if _AKTIV_ENV == "test":
+            set_key(str(dot_env_fil), "SKD_TEST_ORG_NUMMER", orgnr_verdi)
+            if orgnr_verdi:
+                os.environ["SKD_TEST_ORG_NUMMER"] = orgnr_verdi
+            else:
+                os.environ.pop("SKD_TEST_ORG_NUMMER", None)
         else:
-            os.environ.pop("SKD_TEST_ORG_NUMMER", None)
-
-        prod_orgnr = prod_card_inputs["orgnr"].value or ""
-        set_key(str(dot_env_fil), "ORG_NUMMER", prod_orgnr)
-        if prod_orgnr:
-            os.environ["ORG_NUMMER"] = prod_orgnr
-        else:
-            os.environ.pop("ORG_NUMMER", None)
+            set_key(str(dot_env_fil), "ORG_NUMMER", orgnr_verdi)
+            if orgnr_verdi:
+                os.environ["ORG_NUMMER"] = orgnr_verdi
+            else:
+                os.environ.pop("ORG_NUMMER", None)
 
         if pem_bytes_holder:
             # Lagre i ~/.wenche/ (fast lokasjon, samme som .env). Skriv
@@ -1966,14 +2011,14 @@ def _bygg_oppsett_fane() -> None:
 
     async def test_tilkobling():
         test_resultat_container.clear()
-        n = ui.notification("Tester begge miljø...", spinner=True, timeout=None)
+        milj_navn = "testmiljø (tt02)" if _AKTIV_ENV == "test" else "produksjon"
+        n = ui.notification(f"Tester {milj_navn}...", spinner=True, timeout=None)
 
         resultater = []
-        for env in ["test", "prod"]:
-            if not _milj_har_credentials(env):
-                resultater.append({"env": env, "auth": None, "systembruker": None})
-                continue
-            res = await run.io_bound(_test_for_milj, env)
+        if not _milj_har_credentials(_AKTIV_ENV):
+            resultater.append({"env": _AKTIV_ENV, "auth": None, "systembruker": None})
+        else:
+            res = await run.io_bound(_test_for_milj, _AKTIV_ENV)
             resultater.append(res)
 
         n.dismiss()
@@ -2114,8 +2159,8 @@ def _bygg_selskap_fane() -> None:
                 # Bevar felt SAF-T ikke dekker. kontakt_epost hentes fra
                 # SAF-T Contact/Email hvis tilgjengelig, men brukerens
                 # eksisterende verdi vinner hvis han allerede har fylt den ut.
-                if CONFIG_FIL.exists():
-                    with open(CONFIG_FIL, encoding="utf-8") as f_eks:
+                if CONFIG_FIL().exists():
+                    with open(CONFIG_FIL(), encoding="utf-8") as f_eks:
                         eks = yaml.safe_load(f_eks) or {}
                     for felt in ("daglig_leder", "styreleder", "stiftelsesaar", "kontakt_epost"):
                         eks_verdi = eks.get("selskap", {}).get(felt)
@@ -2144,7 +2189,7 @@ def _bygg_selskap_fane() -> None:
                     if eks_laan:
                         data["noter"]["laan_til_naerstaaende"] = eks_laan
 
-                with open(CONFIG_FIL, "w", encoding="utf-8") as f:
+                with open(CONFIG_FIL(), "w", encoding="utf-8") as f:
                     yaml.dump(data, f, allow_unicode=True, sort_keys=False)
 
                 state.les_config()
@@ -2183,7 +2228,7 @@ def _bygg_selskap_fane() -> None:
 
     def lagre_selskap():
         state.lagre_config()
-        ui.notify(f"Lagret til {CONFIG_FIL.resolve()}", type="positive")
+        ui.notify(f"Lagret til {CONFIG_FIL().resolve()}", type="positive")
 
     ui.button("Lagre selskapsopplysninger", on_click=lagre_selskap).props("color=primary")
 
@@ -2359,8 +2404,8 @@ def _bygg_regnskap_fane() -> None:
                         )
 
                     eks = {}
-                    if CONFIG_FIL.exists():
-                        with open(CONFIG_FIL, encoding="utf-8") as f_eks:
+                    if CONFIG_FIL().exists():
+                        with open(CONFIG_FIL(), encoding="utf-8") as f_eks:
                             eks = yaml.safe_load(f_eks) or {}
 
                     # SAF-T-en for fjoråret har fjorårets resultat og fjorårets closing balanse.
@@ -2370,7 +2415,7 @@ def _bygg_regnskap_fane() -> None:
                         "balanse": data["balanse"],
                     }
 
-                    with open(CONFIG_FIL, "w", encoding="utf-8") as f:
+                    with open(CONFIG_FIL(), "w", encoding="utf-8") as f:
                         yaml.dump(eks, f, allow_unicode=True, sort_keys=False)
 
                     state.les_config()
@@ -2440,7 +2485,7 @@ def _bygg_regnskap_fane() -> None:
 
     def lagre_regnskap():
         state.lagre_config()
-        ui.notify(f"Lagret til {CONFIG_FIL.resolve()}", type="positive")
+        ui.notify(f"Lagret til {CONFIG_FIL().resolve()}", type="positive")
 
     ui.button("Lagre regnskapstall", on_click=lagre_regnskap).props("color=primary")
 
@@ -2544,7 +2589,7 @@ def _bygg_aksjonaer_fane() -> None:
 
         def lagre_aksjonaerer():
             state.lagre_config()
-            ui.notify(f"Lagret til {CONFIG_FIL.resolve()}", type="positive")
+            ui.notify(f"Lagret til {CONFIG_FIL().resolve()}", type="positive")
 
         ui.button("Lagre aksjonærer", on_click=lagre_aksjonaerer).props("color=primary")
 
@@ -2614,7 +2659,7 @@ def _bygg_dokumenter_fane() -> None:
 
     def lagre_dokumenter():
         state.lagre_config()
-        ui.notify(f"Lagret til {CONFIG_FIL.resolve()}", type="positive")
+        ui.notify(f"Lagret til {CONFIG_FIL().resolve()}", type="positive")
 
     ui.separator().classes("my-4")
 
@@ -2785,29 +2830,26 @@ def _bygg_dokumenter_fane() -> None:
 # ---------------------------------------------------------------------------
 
 def _bygg_send_fane() -> None:
+    env = _AKTIV_ENV
     ui.label("Steg 6 av 6").classes("text-xs text-slate-400 mt-2 uppercase tracking-wide")
     ui.label("Send til Altinn").classes("text-lg font-semibold")
     ui.label(
         "Send dokumentene digitalt til Brønnøysundregistrene og Skatteetaten via Altinn."
     ).classes("text-slate-500 text-sm mb-4")
 
-    prod_advarsel = ui.label(
-        "⚠️  Du har valgt produksjonsmiljøet. Innsending er bindende og kan ikke trekkes tilbake."
-    ).classes("text-amber-700 text-sm mb-4")
-    prod_advarsel.set_visibility(False)
-
-    def env_endret(e):
-        prod_advarsel.set_visibility(e.value == "prod")
-
-    env_valg = ui.radio(
-        {"test": "Testmiljø (tt02), ingen ekte innsending", "prod": "Produksjon, innsending er bindende"},
-        value="test",
-        on_change=env_endret,
-    ).classes("mb-2")
+    if env == "prod":
+        ui.label(
+            "ℹ️  Innsending går til produksjon. Skattemelding og årsregnskap må signeres "
+            "i Altinn for å fullføres, men sjekk likevel tallene før du klikker send."
+        ).classes("text-slate-600 text-sm mb-4")
+    else:
+        ui.label(
+            "ℹ️  Innsending går til Skatteetatens testmiljø (tt02). Ingen ekte innsending til myndighetene."
+        ).classes("text-slate-600 text-sm mb-4")
 
     async def hent_altinn_token() -> str | None:
         try:
-            return await run.io_bound(lambda: _med_env(env_valg.value, auth.get_altinn_token))
+            return await run.io_bound(lambda: _med_env(env, auth.get_altinn_token))
         except RuntimeError as e:
             feilmelding = str(e)
             if "invalid_altinn_customer_configuration" in feilmelding:
@@ -2835,7 +2877,7 @@ def _bygg_send_fane() -> None:
         try:
             n.message = "Laster opp årsregnskap til Altinn..."
             def _send():
-                with AltinnClient(token, env=env_valg.value) as klient:
+                with AltinnClient(token, env=env) as klient:
                     return ar_modul.send_inn(regnskap, klient)
             sign_url = await run.io_bound(_send)
             n.message = f"Årsregnskap for {regnskap.regnskapsaar} er lastet opp og klar for signering."
@@ -2863,7 +2905,7 @@ def _bygg_send_fane() -> None:
             return
 
         # BRG-stiftelsesårssjekk kun mot prod — Tenor-orger finnes ikke i BRG.
-        if env_valg.value == "prod":
+        if env == "prod":
             brg_advarsler = await run.io_bound(akr_modul.valider_mot_brg, oppgave)
             if brg_advarsler:
                 for advarsel in brg_advarsler:
@@ -2872,11 +2914,11 @@ def _bygg_send_fane() -> None:
 
         n = ui.notification("Henter Maskinporten-token med SKD-scope...", spinner=True, timeout=None)
         try:
-            skd_token = await run.io_bound(lambda: _med_env(env_valg.value, auth.get_skd_aksjonaer_token))
+            skd_token = await run.io_bound(lambda: _med_env(env, auth.get_skd_aksjonaer_token))
             n.message = "Sender aksjonærregisteroppgave til Skatteetaten..."
 
             def _send():
-                with SkdAksjonaerClient(skd_token, env=env_valg.value) as klient:
+                with SkdAksjonaerClient(skd_token, env=env) as klient:
                     return akr_modul.send_inn(oppgave, klient)
 
             svar = await run.io_bound(_send)
@@ -2896,7 +2938,7 @@ def _bygg_send_fane() -> None:
                     "Altinn meldingsboks i løpet av minutter. Hvis oppgaven blir avvist, "
                     "vil tilbakemeldingen forklare hva som må rettes."
                 ).classes("text-sm text-slate-600 mt-1")
-                altinn_base = "https://tt02.altinn.no" if env_valg.value == "test" else "https://af.altinn.no"
+                altinn_base = "https://tt02.altinn.no" if env == "test" else "https://af.altinn.no"
                 meldingsboks_url = (
                     f"{altinn_base}/?party=urn%3Aaltinn%3Aorganization%3Aidentifier-no%3A"
                     f"{oppgave.selskap.org_nummer}"
@@ -2913,15 +2955,15 @@ def _bygg_send_fane() -> None:
 
     async def send_skattemelding():
         regnskap = state.bygg_regnskap()
-        orgnr = os.getenv("SKD_TEST_ORG_NUMMER", state.org_nummer) if env_valg.value == "test" else state.org_nummer
+        orgnr = os.getenv("SKD_TEST_ORG_NUMMER", state.org_nummer) if env == "test" else state.org_nummer
         n = ui.notification("Henter tokens for skattemelding...", spinner=True, timeout=None)
         try:
-            tokens = await run.io_bound(lambda: _med_env(env_valg.value, auth.get_skd_skattemelding_tokens))
+            tokens = await run.io_bound(lambda: _med_env(env, auth.get_skd_skattemelding_tokens))
             n.message = "Henter forhåndsutfylt skattemelding..."
 
             def _hent_og_send():
-                with SkdSkattemeldingClient(tokens["maskinporten_token"], env=env_valg.value) as skd:
-                    test_partsnummer = os.getenv("SKD_TEST_PARTSNUMMER") if env_valg.value == "test" else None
+                with SkdSkattemeldingClient(tokens["maskinporten_token"], env=env) as skd:
+                    test_partsnummer = os.getenv("SKD_TEST_PARTSNUMMER") if env == "test" else None
                     gjeldende_dokument_id: str | None = None
                     if test_partsnummer:
                         partsnummer = int(test_partsnummer)
@@ -3031,9 +3073,20 @@ def main() -> None:
         '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">'
     )
 
+    er_test = _AKTIV_ENV == "test"
     with ui.header().classes("bg-slate-800 text-white px-6 py-3 flex items-center gap-4 shadow"):
-        ui.label("Wenche").classes("text-xl font-semibold tracking-tight")
-        ui.label("Innsending til norske myndigheter").classes("text-sm text-slate-400")
+        with ui.row().classes("items-center gap-2"):
+            ui.label("Wenche").classes("text-xl font-semibold tracking-tight")
+            if er_test:
+                ui.label("TEST").classes(
+                    "text-xs font-mono px-2 py-0.5 rounded bg-amber-500/30 text-amber-200"
+                )
+        if er_test:
+            ui.label("Testmiljø (tt02) — ingen ekte innsending til myndighetene").classes(
+                "text-sm text-amber-200"
+            )
+        else:
+            ui.label("Innsending til norske myndigheter").classes("text-sm text-slate-400")
         with ui.row().classes("items-center gap-2 ml-auto") as versjon_rad:
             ui.label(f"v{__version__}").classes("text-xs text-slate-400 font-mono")
 
@@ -3090,9 +3143,22 @@ def main() -> None:
 # Inngangspunkt
 # ---------------------------------------------------------------------------
 
-def run_app() -> None:
+def run_app(env: str = "prod") -> None:
+    """Start NiceGUI-serveren med valgt miljø låst for hele sesjonen.
+
+    env="prod": standard inngang via `wenche`. UI viser kun prod-oppsett og
+                sender til ekte myndigheter.
+    env="test": utvikler-inngang via `wenche dev`. UI viser kun test-oppsett
+                og sender til Skatteetatens tt02.
+    """
+    global _AKTIV_ENV
+    if env not in ("prod", "test"):
+        raise ValueError(f"Ukjent miljø: {env!r}. Bruk 'prod' eller 'test'.")
+    _AKTIV_ENV = env
+    state.les_config()
+    tittel = "Wenche [TEST]" if env == "test" else "Wenche"
     ui.run(
-        title="Wenche",
+        title=tittel,
         port=8080,
         reload=False,
         show=True,

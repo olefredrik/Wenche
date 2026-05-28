@@ -1,12 +1,12 @@
 # Bruk
 
-Wenche brukes primært via **webgrensesnittet** (`wenche ui`) — et grafisk grensesnitt i nettleseren der du fyller ut og sender inn alt. Kommandolinjen er tilgjengelig som alternativ for de som foretrekker det.
+Wenche brukes via webgrensesnittet. Start med `wenche` i terminalen, og nettleseren åpner `http://localhost:8080` automatisk.
 
 ---
 
 ## Hjem-fanen
 
-Når du åpner `wenche ui` lander du på **Hjem**-fanen. Den viser tre fristkort — ett for hver årlige innsending:
+Når du åpner `wenche` lander du på **Hjem**-fanen. Den viser tre fristkort, ett for hver årlige innsending:
 
 - **Skattemelding** (frist 31. mai)
 - **Årsregnskap** (frist 31. juli)
@@ -16,13 +16,11 @@ Hvert kort viser hvor mange dager det er igjen til neste frist, og kjører en au
 
 | Kort | Statuskilde |
 |---|---|
-| Skattemelding | Skatteetatens skattemelding-API (krever prod-Maskinporten-konfig) |
+| Skattemelding | Skatteetatens skattemelding-API |
 | Årsregnskap | Brønnøysundregistrenes åpne Regnskapsregister |
-| Aksjonærregisteroppgave | Ingen offentlig status-API — sjekk manuelt hos Skatteetaten |
+| Aksjonærregisteroppgave | Ingen offentlig status-API, sjekk manuelt hos Skatteetaten |
 
 Når statussjekken bekrefter at innsendingen er gjort, vises kortet grønt med «Levert» og en lenke til Altinn-kvitteringen. Knappen **Oppdater status** kjører sjekkene på nytt.
-
-Statussjekkene refererer alltid til **produksjonsmiljøet**, uavhengig av om du har konfigurert test- eller prod-credentials i Oppsett. Frister og innsendinger er reelle hendelser for din virksomhet, og test-API-ene ville bare avvist din ekte org.nr. uansett. Hvis du ikke har prod-credentials konfigurert ennå, viser skattemelding-kortet en pen feilmelding i status-raden — det stopper deg ikke fra å bruke testmiljø-flyten i resten av appen.
 
 Statussjekkene gjøres mot regnskapsåret som tilhører neste frist (f.eks. 31. juli 2026 → regnskapsår 2025).
 
@@ -30,31 +28,13 @@ Statussjekkene gjøres mot regnskapsåret som tilhører neste frist (f.eks. 31. 
 
 ## Oppsett-fanen
 
-Under **1. Oppsett** finner du «Per miljø-oppsett» med to kort side om side — Testmiljø (tt02) og Produksjon. Hvert kort er et selvstendig oppsett for sitt miljø:
+Under **1. Oppsett** finner du:
 
-- **Maskinporten-credentials:** Klient-ID og Nøkkel-ID. Test og prod er separate Maskinporten-registre, så hver har sin UUID.
-- **Organisasjonsnummer:** Test krever et syntetisk Tenor-orgnr fra [skatteetaten.no/testdata](https://www.skatteetaten.no/testdata/); prod bruker din egen org.
+- **Maskinporten-credentials:** Klient-ID og Nøkkel-ID fra Digdirs selvbetjeningsportal.
+- **Organisasjonsnummer:** Ditt eget organisasjonsnummer (9 siffer).
 - **Systembruker i Altinn:** Status oppdateres automatisk ved sidelasting. Statuskortet viser hva som mangler eller hva som er klart, og **Avansert**-ekspansjonen har knapper for å registrere system, opprette eller fornye systembruker, og oppdatere rettigheter.
 
-Under kortene ligger felles innstillinger (privat nøkkel), en **Lagre konfigurasjon**-knapp, og en **Tilkoblingstest** som sjekker alle tre forutsetninger per miljø (Maskinporten, Altinn-veksling og systembruker) og oppsummerer «klar for innsending» eller hva som mangler.
-
-Når du senere sender inn, velger du test eller prod direkte i Send-fanen — Oppsett-fanen har ikke noen aktivt-miljø-bryter, fordi du kan ha begge miljø konfigurert samtidig.
-
----
-
-## Autentisering
-
-Innsending av årsregnskap og aksjonærregisteroppgave krever innlogging mot Maskinporten:
-
-```bash
-wenche login     # Autentiserer med systembruker-token og lagrer Altinn-token lokalt
-wenche logout    # Sletter lagret token
-```
-
-Tokenet lagres i `~/.wenche/token.json` og gjenbrukes automatisk for påfølgende kommandoer. Bruker du webgrensesnittet håndteres innlogging derfra.
-
-!!! note "Systembruker må settes opp først"
-    `wenche login` forutsetter at systembrukeren er godkjent (steg 5 i [oppsett](oppsett.md)). Får du feilen `invalid_altinn_customer_configuration` betyr det at systembrukeren ikke er godkjent ennå.
+Under credentials-feltet ligger opplasting av privat nøkkel, en **Lagre konfigurasjon**-knapp, og en **Tilkoblingstest** som sjekker alle tre forutsetninger (Maskinporten, Altinn-veksling og systembruker) og oppsummerer «klar for innsending» eller hva som mangler.
 
 ---
 
@@ -62,42 +42,12 @@ Tokenet lagres i `~/.wenche/token.json` og gjenbrukes automatisk for påfølgend
 
 Wenche fyller ut næringsspesifikasjonen og skattemeldingen og sender dem digitalt til Skatteetaten via Altinn. Du fullfører ved å signere med BankID i Altinn.
 
-=== "Webgrensesnitt"
+Gå til fanen **Send til Altinn** og klikk **Send skattemelding til Skatteetaten**.
 
-    Gå til fanen **Send til Altinn** og klikk **Send skattemelding til Skatteetaten**.
-
-    Wenche validerer først skattemeldingen mot Skatteetaten. Er noe feil, stopper Wenche uten å sende noe og viser hva som må rettes. Når valideringen er OK, lastes skattemeldingen opp automatisk og Wenche viser en lenke til Altinn-innboksen. Åpne lenken og signer med BankID for å fullføre innsendingen.
-
-=== "Kommandolinje"
-
-    `wenche send-skattemelding` validerer automatisk før opplasting, akkurat som i webgrensesnittet, og sender ingenting hvis valideringen feiler.
-
-    ```bash
-    wenche send-skattemelding
-    ```
-
-    Wenche skriver ut en lenke til Altinn-innboksen. Åpne lenken og signer med BankID for å fullføre.
-
-    Vil du bare kontrollere innsendingen uten å sende, for eksempel for å se merknader:
-
-    ```bash
-    wenche valider-skattemelding
-    ```
-
-    Test lokalt uten å sende eller validere (skriver `skattemelding.xml` og `naeringsspesifikasjon.xml`):
-
-    ```bash
-    wenche send-skattemelding --dry-run
-    ```
-
-    Generer tekstsammendrag for gjennomlesing:
-
-    ```bash
-    wenche generer-skattemelding
-    ```
+Wenche validerer først skattemeldingen mot Skatteetaten. Er noe feil, stopper Wenche uten å sende noe og viser hva som må rettes. Når valideringen er OK, lastes skattemeldingen opp automatisk og Wenche viser en lenke til Altinn-innboksen. Åpne lenken og signer med BankID for å fullføre innsendingen.
 
 !!! info "Automatisk validering før innsending"
-    Både webgrensesnittet og `wenche send-skattemelding` kjører Skatteetatens valideringstjeneste som første steg. Blir innsendingen avvist (`validertMedFeil`), sendes ingenting inn og du får en tydelig feilmelding om hva som må rettes. Validering lagrer ikke data hos Skatteetaten.
+    Webgrensesnittet kjører Skatteetatens valideringstjeneste som første steg. Blir innsendingen avvist (`validertMedFeil`), sendes ingenting inn og du får en tydelig feilmelding om hva som må rettes. Validering lagrer ikke data hos Skatteetaten.
 
 !!! note "Signering skjer i Altinn, ikke i Wenche"
     Skatteetaten krever at en personlig bruker bekrefter skattemeldingen via ID-porten. Wenche laster opp innholdet med systembruker, men selve innsendingen fullføres først når du signerer med BankID i Altinn. Dette kan ikke gjøres maskinelt.
@@ -145,34 +95,12 @@ Teknisk dokumentasjon: [github.com/Skatteetaten/skattemeldingen](https://github.
 
 ## Årsregnskap (frist 31. juli)
 
-=== "Webgrensesnitt"
+Gå til fanen **Send til Altinn** og klikk **Send årsregnskap**.
 
-    Gå til fanen **Send til Altinn** og klikk **Send årsregnskap**.
-
-    Når opplastingen er ferdig vises en knapp **Signer i Altinn**. Klikk den og signer med BankID for å fullføre innsendingen.
-
-=== "Kommandolinje"
-
-    Test uten innsending (anbefalt første gang):
-
-    ```bash
-    wenche send-aarsregnskap --dry-run
-    ```
-
-    `--dry-run` lagrer de genererte XML-dokumentene lokalt slik at du kan inspisere dem før du sender.
-
-    Send inn:
-
-    ```bash
-    wenche login
-    wenche send-aarsregnskap
-    wenche logout
-    ```
-
-    Wenche skriver ut en lenke til Altinn-innboksen når opplastingen er ferdig. Åpne lenken i nettleseren, finn skjemaet i innboksen og signer med BankID for å fullføre innsendingen.
+Når opplastingen er ferdig vises en knapp **Signer i Altinn**. Klikk den og signer med BankID for å fullføre innsendingen.
 
 !!! note "Signering skjer i Altinn, ikke i Wenche"
-    Wenche laster opp regnskapet og klargjør det for signering. Selve signeringen må gjøres av daglig leder eller styreleder i Altinn med BankID — dette er et juridisk krav og kan ikke gjøres maskinelt.
+    Wenche laster opp regnskapet og klargjør det for signering. Selve signeringen må gjøres av daglig leder eller styreleder i Altinn med BankID, dette er et juridisk krav og kan ikke gjøres maskinelt.
 
 !!! info "Sammenligningstall (rskl. § 6-6)"
     Årsregnskapet inkluderer automatisk sammenligningstall fra foregående år når `foregaaende_aar` er utfylt i `config.yaml`. Dette er obligatorisk etter regnskapsloven § 6-6. For selskaper stiftet i inneværende regnskapsår kan seksjonen utelates.
@@ -181,37 +109,16 @@ Teknisk dokumentasjon: [github.com/Skatteetaten/skattemeldingen](https://github.
 
 ## Aksjonærregisteroppgave (frist 31. januar)
 
-Wenche sender RF-1086 direkte til Skatteetatens eget REST-API — ikke via Altinn-instansflyt. Innsendingen er maskinell og krever ikke manuell signering.
+Wenche sender RF-1086 direkte til Skatteetatens eget REST-API, ikke via Altinn-instansflyt. Innsendingen er maskinell og krever ikke manuell signering.
 
 !!! note "Forutsetninger"
-    - Maskinporten-klienten din må ha fått scopet `skatteetaten:innrapporteringaksjonaerregisteroppgave` innvilget. Se [steg 2e i oppsett](oppsett.md#2e-sk-om-tilgang-til-skds-api-for-aksjonrregisteroppgave).
-    - Systembrukeren for din organisasjon må inkludere SKD-rettigheten. Denne settes opp automatisk av `wenche opprett-systembruker` — se [steg 5 i oppsett](oppsett.md#steg-5-registrer-systembruker-i-altinn).
-    - `kontakt_epost` må være utfylt under `selskap` i `config.yaml` (eller i Wenche UI under **Selskap**).
+    - Maskinporten-klienten din må ha fått scopet `skatteetaten:innrapporteringaksjonaerregisteroppgave` innvilget. Se [steg 2f i oppsett](oppsett.md#2f-sk-om-tilgang-til-skds-api-for-aksjonrregisteroppgave).
+    - Systembrukeren for din organisasjon må inkludere SKD-rettigheten. Denne settes opp automatisk når du oppretter systembruker fra Oppsett-fanen, se [steg 5 i oppsett](oppsett.md#steg-5-registrer-systembruker-i-altinn).
+    - `kontakt_epost` må være utfylt under `selskap` i `config.yaml` (eller i Wenche under **Selskap**).
 
-!!! warning "Testmiljø krever syntetiske testdata"
-    Bruker du `WENCHE_ENV=test` må systembrukeren tilhøre en syntetisk testorganisasjon fra Tenor, og `SKD_TEST_ORG_NUMMER` må være satt i `.env`. Se [steg 5 i oppsett](oppsett.md#steg-5-registrer-systembruker-i-altinn) for fullstendig veiledning.
+Gå til fanen **Send til Altinn** og klikk **Send aksjonærregister til Skatteetaten**.
 
-=== "Webgrensesnitt"
-
-    Gå til fanen **Send til Altinn** og klikk **Send aksjonærregister til Skatteetaten**.
-
-    Forsendelse-ID vises i grensesnittet når innsendingen er fullført.
-
-=== "Kommandolinje"
-
-    Test og generer XML lokalt uten å sende:
-
-    ```bash
-    wenche send-aksjonaerregister --dry-run
-    ```
-
-    Send inn:
-
-    ```bash
-    wenche send-aksjonaerregister
-    ```
-
-    Wenche skriver ut forsendelse-ID når innsendingen er fullført.
+Forsendelse-ID vises i grensesnittet når innsendingen er fullført.
 
 ---
 
@@ -232,59 +139,22 @@ Notene er en juridisk del av årsregnskapet. Styret fastsetter regnskapet inklud
 
 ### Hva er notene ikke?
 
-Notene sendes **ikke** inn digitalt til Brønnøysundregistrene. Skjemaet RR-0002 har ingen felt for fritekstnoter — det er kun tall som overføres via Altinn. Notene er et dokument du oppbevarer selv.
+Notene sendes **ikke** inn digitalt til Brønnøysundregistrene. Skjemaet RR-0002 har ingen felt for fritekstnoter, det er kun tall som overføres via Altinn. Notene er et dokument du oppbevarer selv.
 
 ### Hvordan bruke notene i Wenche?
 
-=== "Webgrensesnitt"
-
-    1. Gå til fanen **Dokumenter** og scroll ned til **Obligatoriske noter**
-    2. Fyll inn antall ansatte (typisk 0 for holdingselskaper)
-    3. Fyll inn eventuelle lån til nærstående (aksjonærer, styremedlemmer)
-    4. Klikk **Last ned noter** — du får en forhåndsvisning og en nedlastingsknapp for `noter_ÅÅÅÅ_ORGNR.txt`
-    5. Les gjennom teksten og tilpass om nødvendig
-    6. Arkiver filen sammen med det signerte årsregnskapet
+1. Gå til fanen **Dokumenter** og scroll ned til **Obligatoriske noter**
+2. Fyll inn antall ansatte (typisk 0 for holdingselskaper)
+3. Fyll inn eventuelle lån til nærstående (aksjonærer, styremedlemmer)
+4. Klikk **Last ned noter**, du får en forhåndsvisning og en nedlastingsknapp for `noter_ÅÅÅÅ_ORGNR.txt`
+5. Les gjennom teksten og tilpass om nødvendig
+6. Arkiver filen sammen med det signerte årsregnskapet
 
 !!! note "Tilpass gjerne noteteksten"
-    Wenche genererer et standardoppsett som passer de fleste holdingselskaper. Har selskapet særskilte forhold som bør beskrives — for eksempel eierskapsbegrensninger, konsernforhold eller pantsettelse av aksjer — bør du tilpasse teksten i den nedlastede filen.
+    Wenche genererer et standardoppsett som passer de fleste holdingselskaper. Har selskapet særskilte forhold som bør beskrives, for eksempel eierskapsbegrensninger, konsernforhold eller pantsettelse av aksjer, bør du tilpasse teksten i den nedlastede filen.
 
 !!! warning "Notene er obligatoriske, men ikke verifiserbart fullstendige"
     Wenche dekker minimumskravene etter NRS 8 (God regnskapsskikk for små foretak). For selskaper med mer komplekse forhold kan ytterligere noter være påkrevd. Ved tvil, kontakt en regnskapsfører eller revisor.
-
----
-
-## Alle kommandoer
-
-```
-wenche --help
-
-Kommandoer:
-  registrer-system         Registrer Wenche i Altinns systemregister (en gang per miljo)
-  opprett-systembruker     Opprett systembrukerforespørsel og fa godkjenningslenke
-  login                    Autentiser mot Maskinporten med RSA-nokkel
-  logout                   Logg ut og slett lagret token
-  generer-skattemelding    Generer ferdig utfylt næringsspesifikasjon og skattemelding som tekstsammendrag
-  send-skattemelding       Send inn skattemelding for AS til Skatteetaten via Altinn3
-  send-aarsregnskap        Send inn arsregnskap til Bronnoysundregistrene
-  send-aksjonaerregister   Send inn aksjonaerregisteroppgave (RF-1086)
-  importer-saft            Importer SAF-T Financial XML og generer config.yaml
-  ui                       Start webgrensesnittet i nettleseren
-
-Alternativer (send-aarsregnskap, send-aksjonaerregister og send-skattemelding):
-  --config TEXT            Sti til konfigurasjonsfil [standard: config.yaml]
-  --dry-run                Generer dokument lokalt uten a sende til Altinn
-
-Alternativer (generer-skattemelding):
-  --config TEXT            Sti til konfigurasjonsfil [standard: config.yaml]
-  --ut TEXT                Lagre sammendrag til fil
-
-Alternativer (importer-saft):
-  SAF-T-FIL                Sti til SAF-T Financial XML-fil (pakrevd argument)
-  --ut TEXT                Sti til config.yaml som skal skrives [standard: config.yaml]
-```
-
-!!! note
-    Kommandolisten viser utskriften slik den faktisk ser ut i terminalen. Noen norske tegn vises ikke korrekt i terminalutskriften.
 
 ---
 
