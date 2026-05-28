@@ -165,6 +165,9 @@ class TestVerdsettingAvAksje:
     SKD beregner samletVerdiBakAksjeneISelskapet = verdiFoerRabatt - gjeld,
     men forventer at vi echo-er verdien i `verdsettingAvAksje`-blokken for
     å unngå «manglerSkattemelding»-avvik (jf. OFL Holdings 2025-tilbakemelding).
+
+    Feltet emitteres UTEN erOverstyrt-flagget — Skatteetatens PDF-visning
+    skjuler verdien fra Formue-seksjonen hvis flagget er satt.
     """
 
     def test_emit_med_positiv_netto(self):
@@ -173,11 +176,13 @@ class TestVerdsettingAvAksje:
             formue_verdi_foer_rabatt=72622,
             samlet_gjeld=12682,
         ))
-        verdi = root.find(
+        sva = root.find(
             f"{{{_NS}}}verdsettingAvAksje/{{{_NS}}}samletVerdiBakAksjeneISelskapet"
-            f"/{{{_NS}}}beloep/{{{_NS}}}beloepSomHeltall"
         )
-        assert verdi is not None and verdi.text == "59940"
+        assert sva is not None
+        assert sva.findtext(f"{{{_NS}}}beloep/{{{_NS}}}beloepSomHeltall") == "59940"
+        # Eksplisitt: erOverstyrt skal IKKE være satt
+        assert sva.find(f"{{{_NS}}}erOverstyrt") is None
 
     def test_gulv_paa_null_naar_gjeld_overstiger_formue(self):
         root = _parse(generer_skattemelding_upersonlig(

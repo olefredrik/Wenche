@@ -43,6 +43,19 @@ def _heltall_med_innkapsling(parent: Element, tag: str, verdi: int) -> None:
     SubElement(el, "beloepSomHeltall").text = str(int(round(verdi)))
 
 
+def _heltall_med_beloep(parent: Element, tag: str, verdi: int) -> None:
+    """
+    Bygger et StortBeloepSomHeltallMedOverstyring-element UTEN erOverstyrt.
+    Matcher formatet SKD selv bruker når de beregner et erAvledet-felt — vi
+    setter verdien, men signaliserer ikke overstyring. Brukes for felt der
+    Skatteetatens visning-API skjuler verdien hvis erOverstyrt=true er satt
+    (jf. samletVerdiBakAksjeneISelskapet).
+    """
+    el = SubElement(parent, tag)
+    beloep = SubElement(el, "beloep")
+    SubElement(beloep, "beloepSomHeltall").text = str(int(round(verdi)))
+
+
 def generer_skattemelding_upersonlig(
     partsnummer: int,
     inntektsaar: int,
@@ -149,10 +162,16 @@ def generer_skattemelding_upersonlig(
     # tilbakemeldingen ikke flagger «manglerSkattemelding» for feltet (jf.
     # OFL Holdings 2025-innsending hvor dette var siste gjenstående avvik).
     # XSD-pos: etter opplysningOmSkattesubjekt.
+    #
+    # Emitteres UTEN erOverstyrt fordi Skatteetatens visning-API skjuler
+    # verdien fra «Samlet formue og gjeld»-seksjonen på PDF-en hvis
+    # erOverstyrt=true er satt — selv om feltet er teknisk korrekt for
+    # avviks-detektoren. Uten flagget vises verdien som forventet (matcher
+    # formatet SKD returnerte i tidligere etterBeregning).
     if formue_verdi_foer_rabatt is not None:
         verdi_bak = max(0, formue_verdi_foer_rabatt - (samlet_gjeld or 0))
         vav = SubElement(root, "verdsettingAvAksje")
-        _overstyrt_heltall(vav, "samletVerdiBakAksjeneISelskapet", verdi_bak)
+        _heltall_med_beloep(vav, "samletVerdiBakAksjeneISelskapet", verdi_bak)
 
     return tostring(root, encoding="unicode").encode("utf-8")
 

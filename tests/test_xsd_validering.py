@@ -165,12 +165,14 @@ class TestOpplysningOgVerdsettingXsd:
         # verdsettingAvAksje/samletVerdiBakAksjeneISelskapet skal emittes
         # eksplisitt (72622 - 12682 = 59940) for å unngå «manglerSkattemelding»-
         # avvik i SKDs etterBeregning. Plassering: etter opplysningOmSkattesubjekt.
+        # UTEN erOverstyrt-flagget — Skatteetatens PDF-visning skjuler verdien
+        # fra Formue-seksjonen hvis flagget er satt.
         vav = root.find(f"{_SM_NS}verdsettingAvAksje")
         assert vav is not None
         verdi_bak = vav.find(f"{_SM_NS}samletVerdiBakAksjeneISelskapet")
         assert verdi_bak is not None
         assert verdi_bak.findtext(f"{_SM_NS}beloep/{_SM_NS}beloepSomHeltall") == "59940"
-        assert verdi_bak.find(f"{_SM_NS}erOverstyrt/{_SM_NS}boolsk").text == "true"
+        assert verdi_bak.find(f"{_SM_NS}erOverstyrt") is None
         assert barn.index("opplysningOmSkattesubjekt") < barn.index("verdsettingAvAksje")
 
     def test_beregn_verdi_bak_aksjene(self, eksempel_regnskap):
