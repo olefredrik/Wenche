@@ -144,6 +144,16 @@ def generer_skattemelding_upersonlig(
                 "harYtelseMellomAksjonaerEllerNaerstaaendeOgSelskapEllerSelskapetsDatterselskap",
             ).text = "true" if harytelse else "false"
 
+    # verdsettingAvAksje/samletVerdiBakAksjeneISelskapet — derivert sum SKD
+    # beregner som verdiFoerRabatt - gjeld. Vi echo-er den slik at
+    # tilbakemeldingen ikke flagger «manglerSkattemelding» for feltet (jf.
+    # OFL Holdings 2025-innsending hvor dette var siste gjenstående avvik).
+    # XSD-pos: etter opplysningOmSkattesubjekt.
+    if formue_verdi_foer_rabatt is not None:
+        verdi_bak = max(0, formue_verdi_foer_rabatt - (samlet_gjeld or 0))
+        vav = SubElement(root, "verdsettingAvAksje")
+        _overstyrt_heltall(vav, "samletVerdiBakAksjeneISelskapet", verdi_bak)
+
     return tostring(root, encoding="unicode").encode("utf-8")
 
 
