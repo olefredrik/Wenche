@@ -21,11 +21,17 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from datetime import date
+from pathlib import Path
 from xml.etree import ElementTree as ET
 
 import httpx
 from dotenv import load_dotenv
 
+# Last fra ~/.wenche/.env først (fast lokasjon), så cwd/.env som fallback.
+# Matcher load-rekkefølgen i wenche.auth.
+_BRUKER_ENV_FIL = Path.home() / ".wenche" / ".env"
+if _BRUKER_ENV_FIL.is_file():
+    load_dotenv(_BRUKER_ENV_FIL)
 load_dotenv()
 
 
