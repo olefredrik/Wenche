@@ -119,11 +119,54 @@ def test_hovedskjema_antall_aksjer(eksempel_oppgave):
 
 
 def test_hovedskjema_paalydende(eksempel_oppgave):
-    """Pålydende per aksje = aksjekapital // antall_aksjer = 30000 // 100 = 300."""
+    """Pålydende per aksje = aksjekapital / antall_aksjer = 30000 / 100 = 300."""
     root = _parse(generer_hovedskjema_xml(eksempel_oppgave))
     paalydende = root.find(".//{*}AksjeMvPalydende-datadef-23945")
     assert paalydende is not None
-    assert int(paalydende.text) == 300
+    # Heltallspålydende skal formateres uten desimalpunktum
+    assert paalydende.text == "300"
+
+
+def test_hovedskjema_paalydende_desimal():
+    """
+    Selskaper med fri pålydende (lovlig siden 2013) kan ha brøkdeler av en
+    krone som pålydende. For 30 000 kr aksjekapital fordelt på 300 000 aksjer
+    er pålydende 0,10. Skjemaet må representere dette eksakt, ikke trunkere
+    til 0 som integer-divisjon ville gjort. RF-1086 tillater opptil 6
+    desimaler (bekreftet i SSV-5278), og vi stripper etterstilte nuller for
+    kompakt representasjon.
+    """
+    selskap = Selskap(
+        navn="Fragmentert Holding AS",
+        org_nummer="987654321",
+        daglig_leder="Kari Nordmann",
+        styreleder="Kari Nordmann",
+        forretningsadresse="Testveien 2, 0001 Oslo",
+        stiftelsesaar=2020,
+        aksjekapital=30000,
+        kontakt_epost="kari@test.no",
+    )
+    aksjonaer = Aksjonaer(
+        navn="Kari Nordmann",
+        fodselsnummer="20916997389",
+        antall_aksjer=300000,
+        aksjeklasse="A",
+        utbytte_utbetalt=0,
+        innbetalt_kapital_per_aksje=0.10,
+    )
+    oppgave = Aksjonaerregisteroppgave(
+        selskap=selskap,
+        regnskapsaar=2024,
+        aksjonaerer=[aksjonaer],
+    )
+    root = _parse(generer_hovedskjema_xml(oppgave))
+    paalydende = root.find(".//{*}AksjeMvPalydende-datadef-23945")
+    assert paalydende is not None
+    assert paalydende.text == "0.1"
+    # Fjorår-pålydende skal også reflektere desimalverdien (ikke stiftelsesår)
+    fjor = root.find(".//{*}AksjeMvPalydendeFjoraret-datadef-23944")
+    assert fjor is not None
+    assert fjor.text == "0.1"
 
 
 def test_hovedskjema_kontakt_epost(eksempel_oppgave):
