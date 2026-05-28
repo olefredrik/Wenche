@@ -7,6 +7,8 @@ Start med: wenche ui
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
 import tempfile
 from dataclasses import dataclass, field
 from datetime import date
@@ -17,6 +19,7 @@ import yaml
 from nicegui import app, run, ui
 
 from wenche import (
+    __version__,
     aarsregnskap as ar_modul,
     aksjonaerregister as akr_modul,
     auth,
@@ -646,6 +649,184 @@ state.les_config()
 def kr(v: float) -> str:
     """Formater beløp med norsk tusenskilletegn."""
     return f"{v:,.0f}".replace(",", "\u00a0") + " kr"
+
+
+def _parse_versjon(v: str) -> tuple[int, ...]:
+    """
+    Parser semver-strenger som "0.18.0" til tupler av ints for sammenligning.
+    Ikke-numeriske suffikser (f.eks. "0.18.0rc1") tolkes konservativt: vi
+    klipper på første ikke-siffer i hvert ledd og sammenligner kun
+    hovedkomponentene.
+    """
+    deler: list[int] = []
+    for ledd in v.split("."):
+        siffer = ""
+        for ch in ledd:
+            if ch.isdigit():
+                siffer += ch
+            else:
+                break
+        if siffer:
+            deler.append(int(siffer))
+    return tuple(deler)
+
+
+def _er_nyere_versjon(siste: str, naavaerende: str) -> bool:
+    """True hvis `siste` er strengt nyere enn `naavaerende`."""
+    return _parse_versjon(siste) > _parse_versjon(naavaerende)
+
+
+def _hent_nyeste_pypi_versjon() -> str | None:
+    """
+    Spør PyPI om siste publiserte Wenche-versjon. Returnerer None ved
+    nettverks- eller parse-feil, slik at UI faller stille tilbake til å vise
+    kun installert versjon.
+
+    WENCHE_FAKE_NY_VERSJON kan settes for å overstyre PyPI-svaret. Brukes til
+    å verifisere oppdaterings-badgen visuelt uten å vente på en faktisk
+    nyere utgivelse.
+    """
+    fake = os.environ.get("WENCHE_FAKE_NY_VERSJON")
+    if fake:
+        return fake
+    try:
+        resp = httpx.get("https://pypi.org/pypi/wenche/json", timeout=3.0)
+        resp.raise_for_status()
+        return resp.json()["info"]["version"]
+    except Exception:
+        return None
+
+
+def _kjorer_fra_git_klone() -> bool:
+    """
+    True hvis Wenche kjøres fra et git-arbeidstre (klone eller fork), False
+    hvis vi sannsynligvis er installert via pip fra PyPI. Brukes for å velge
+    riktig oppdaterings-instruksjon (git pull vs pip install --upgrade).
+    """
+    return (Path(__file__).resolve().parent.parent / ".git").exists()
+
+
+def _kjor_pip_oppgradering() -> tuple[bool, str]:
+    """
+    Kjør `pip install --upgrade "wenche[ui]"` mot den Python-tolken som kjører
+    Wenche nå. Returnerer (suksess, kombinert stdout+stderr). Blokkerer, så
+    må kalles via run.io_bound for å holde UI responsivt.
+    """
+    try:
+        resultat = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "--upgrade", "wenche[ui]"],
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+        utdata = (resultat.stdout or "") + (resultat.stderr or "")
+        return resultat.returncode == 0, utdata.strip()
+    except subprocess.TimeoutExpired:
+        return False, "Oppgraderingen tok for lang tid (over 3 minutter) og ble avbrutt."
+    except Exception as e:
+        return False, f"Kunne ikke starte pip: {e}"
+
+
+def _kopier_til_utklippstavle_handler(tekst: str):
+    """Returner en NiceGUI-handler som kopierer tekst og viser en toast."""
+    def handler() -> None:
+        ui.run_javascript(f"navigator.clipboard.writeText({tekst!r})")
+        ui.notify("Kopiert", type="positive", position="top")
+    return handler
+
+
+def _kommando_boks(kommando: str) -> None:
+    """Vis en kommando i en monospace-boks med kopier-knapp ved siden av."""
+    with ui.row().classes(
+        "items-center gap-2 bg-slate-100 px-3 py-2 rounded font-mono text-sm w-full"
+    ):
+        ui.label(kommando).classes("flex-1 text-slate-800 break-all")
+        ui.button(
+            icon="content_copy",
+            on_click=_kopier_til_utklippstavle_handler(kommando),
+        ).props("flat dense round size=sm color=grey-7").tooltip("Kopier")
+
+
+def _bygg_oppdaterings_dialog(siste: str) -> "ui.dialog":
+    """
+    Bygg en oppdaterings-dialog tilpasset installmodus. Klone-brukere får
+    git-instruksjoner; pip-brukere får en knapp som kjører oppgraderingen i
+    en subprocess. Returnerer dialogen så kalleren kan binde den til en
+    åpne-trigger.
+    """
+    er_git = _kjorer_fra_git_klone()
+
+    with ui.dialog() as dialog, ui.card().classes("min-w-[420px] max-w-[560px] gap-3"):
+        ui.label("Oppdatering tilgjengelig").classes("text-lg font-semibold text-slate-800")
+        ui.label(
+            f"Du kjører versjon {__version__}. Siste versjon på PyPI er {siste}."
+        ).classes("text-sm text-slate-600")
+
+        if er_git:
+            ui.label(
+                "Du kjører Wenche fra et git-klone. Hent ned siste versjon fra "
+                "GitHub i terminalen:"
+            ).classes("text-sm text-slate-700")
+            _kommando_boks("git pull")
+            ui.label(
+                'Restart Wenche etter oppdatering. Hvis avhengigheter har endret '
+                'seg, kjør også pip install -e ".[ui]".'
+            ).classes("text-xs text-slate-500")
+            ui.link(
+                f"Se utgivelsesnotater for v{siste} på GitHub →",
+                f"https://github.com/olefredrik/Wenche/releases/tag/v{siste}",
+                new_tab=True,
+            ).classes("text-sm text-blue-600 hover:underline")
+        else:
+            status_omraade = ui.column().classes("w-full gap-2")
+            with status_omraade:
+                ui.label(
+                    "Trykk «Oppdater nå» for å laste ned og installere siste "
+                    "versjon, eller kjør kommandoen selv i terminalen:"
+                ).classes("text-sm text-slate-700")
+                _kommando_boks('pip install --upgrade "wenche[ui]"')
+
+            handlinger = ui.column().classes("w-full gap-2")
+
+            async def kjor_oppdatering() -> None:
+                oppdater_knapp.disable()
+                oppdater_knapp.set_text("Oppdaterer...")
+                handlinger.clear()
+                with handlinger:
+                    with ui.row().classes("items-center gap-2"):
+                        ui.spinner().classes("text-blue-500")
+                        progress_label = ui.label(
+                            "Kjører pip install. Dette kan ta et minutt..."
+                        ).classes("text-sm text-slate-700")
+                suksess, utdata = await run.io_bound(_kjor_pip_oppgradering)
+                handlinger.clear()
+                with handlinger:
+                    if suksess:
+                        ui.label(
+                            f"Oppdatert til versjon {siste}."
+                        ).classes("text-sm font-medium text-green-700")
+                        ui.label(
+                            "Stopp Wenche (Ctrl+C i terminalen) og start på nytt "
+                            "med «wenche ui» for å ta i bruk den nye versjonen."
+                        ).classes("text-sm text-slate-700")
+                    else:
+                        ui.label("Oppdateringen feilet.").classes(
+                            "text-sm font-medium text-red-700"
+                        )
+                        with ui.scroll_area().classes("w-full h-40 bg-slate-100 rounded"):
+                            ui.label(utdata or "(ingen utdata)").classes(
+                                "text-xs font-mono text-slate-700 whitespace-pre-wrap p-2"
+                            )
+
+            with handlinger:
+                oppdater_knapp = ui.button(
+                    "Oppdater nå", on_click=kjor_oppdatering
+                ).props("color=primary")
+
+        with ui.row().classes("justify-end w-full"):
+            ui.button("Lukk", on_click=dialog.close).props("flat")
+
+    return dialog
 
 
 def _les_konfig_for_milj(navn: str, env: str, default: str = "") -> str:
@@ -2790,6 +2971,25 @@ def main() -> None:
     with ui.header().classes("bg-slate-800 text-white px-6 py-3 flex items-center gap-4 shadow"):
         ui.label("Wenche").classes("text-xl font-semibold tracking-tight")
         ui.label("Innsending til norske myndigheter").classes("text-sm text-slate-400")
+        with ui.row().classes("items-center gap-2 ml-auto") as versjon_rad:
+            ui.label(f"v{__version__}").classes("text-xs text-slate-400 font-mono")
+
+    async def _sjekk_oppdatering() -> None:
+        if not _parse_versjon(__version__):
+            return
+        siste = await run.io_bound(_hent_nyeste_pypi_versjon)
+        if siste and _er_nyere_versjon(siste, __version__):
+            dialog = _bygg_oppdaterings_dialog(siste)
+            with versjon_rad:
+                ui.button(
+                    f"Ny versjon {siste} →",
+                    on_click=dialog.open,
+                ).props("flat dense no-caps").classes(
+                    "text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-200 "
+                    "hover:bg-blue-500/30 min-h-0"
+                )
+
+    ui.timer(0.1, _sjekk_oppdatering, once=True)
 
     with ui.footer().classes("bg-white border-t border-slate-200 px-6 py-3"):
         with ui.row().classes("items-center justify-center gap-1 text-xs text-slate-400 w-full"):
