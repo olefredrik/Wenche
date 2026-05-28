@@ -3,6 +3,7 @@
 *.pem
 *.p12
 config.yaml
+config.dev.yaml
 
 # Python
 __pycache__/

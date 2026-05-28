@@ -2,7 +2,8 @@
 Wenche — kommandolinjegrensesnitt.
 
 Bruk:
-  wenche ui
+  wenche                    Starter UI mot produksjon
+  wenche dev                Starter UI mot testmiljø (tt02)
   wenche login
   wenche logout
   wenche send-aarsregnskap [--config config.yaml] [--dry-run]
@@ -19,28 +20,26 @@ from wenche.altinn_client import AltinnClient
 from wenche.skd_client import SkdAksjonaerClient
 
 
-@click.group()
+@click.group(invoke_without_command=True)
 @click.version_option(__version__, prog_name="Wenche")
-def main():
-    """Wenche — enkel innsending til Altinn for holdingselskaper."""
-    pass
+@click.pass_context
+def main(ctx: click.Context):
+    """Wenche — enkel innsending til Altinn for holdingselskaper.
 
+    Uten argumenter starter webgrensesnittet mot produksjonsmiljøet.
+    Bruk `wenche dev` for å åpne UI mot Skatteetatens testmiljø (tt02).
+    """
+    if ctx.invoked_subcommand is not None:
+        return
+    from wenche.ui import run_app
+    run_app(env="prod")
 
-# ---------------------------------------------------------------------------
-# Autentisering
-# ---------------------------------------------------------------------------
 
 @main.command()
-def ui():
-    """Start webgrensesnitt i nettleseren (krever pip install wenche[ui])."""
-    try:
-        from wenche.ui import run_app
-    except ImportError:
-        click.echo(
-            "NiceGUI er ikke installert. Kjør:\n  pip install wenche[ui]", err=True
-        )
-        raise SystemExit(1)
-    run_app()
+def dev():
+    """Start webgrensesnittet mot testmiljøet (tt02) for tørrtrening."""
+    from wenche.ui import run_app
+    run_app(env="test")
 
 
 @main.command()

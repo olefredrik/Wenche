@@ -2,7 +2,7 @@
 
 Wenche er et verktøy for holdingselskaper og småaksjeselskaper som må levere regnskap og skattedokumenter til norske myndigheter — uten behov for et fullverdig regnskapsprogram.
 
-Du fyller ut selskapsinformasjon, regnskapstall og aksjonærdata i et grafisk webgrensesnitt, og Wenche håndterer innsendingen til riktig myndighet. Kommandolinjen er tilgjengelig for de som foretrekker det.
+Du fyller ut selskapsinformasjon, regnskapstall og aksjonærdata i et grafisk webgrensesnitt, og Wenche håndterer innsendingen til riktig myndighet.
 
 Autentisering skjer via Maskinporten med et selvgenerert RSA-nøkkelpar. Ingen virksomhetssertifikat eller BankID-innlogging nødvendig.
 
