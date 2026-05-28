@@ -940,9 +940,47 @@ def metric_kort(tittel: str, verdi: str, farge: str = "slate") -> ui.label:
 
 
 def num(label: str, attr: str, obj=None, step: float = 1000, min_val: float | None = 0,
-        on_change=None, tooltip: str = "") -> ui.number:
-    """Tallinnfelt som oppdaterer state-attributt ved endring."""
+        on_change=None, tooltip: str = "", desimaler: int | None = 0):
+    """
+    Tallinnfelt som oppdaterer state-attributt ved endring.
+
+    `desimaler` styrer både visningsformat og hvilken type input som brukes:
+      - `int` (standard 0): bruker `ui.number` med fast format `%.Nf`, slik
+        som tidligere. Heltallsfelt og felt med fast desimal-presisjon.
+      - `None`: bruker `ui.input` (tekst-felt) med `inputmode=decimal`. Da
+        kan brukeren skrive både "," og "." som desimalskille (HTML5
+        `type=number` aksepterer kun "."), og visningen padder ikke med
+        etterstilte nuller — 300 vises som "300", 0,10 vises som "0,1".
+        Husk å sette `step` lavt (typisk 0.01) hvis du beholder felt med
+        spinner-knapper andre steder; for tekst-varianten har `step` ingen
+        synlig effekt, men beholdes for API-kompatibilitet.
+    """
     target = obj if obj is not None else state
+
+    if desimaler is None:
+        # Tekst-input som aksepterer både norsk og engelsk desimalskille.
+        def tekst_handler(e):
+            raw = (e.value or "").replace(",", ".").strip()
+            try:
+                verdi = float(raw) if raw else 0.0
+            except ValueError:
+                return
+            setattr(target, attr, verdi)
+            if on_change:
+                on_change()
+
+        startverdi = getattr(target, attr)
+        if isinstance(startverdi, (int, float)) and float(startverdi).is_integer():
+            visning = str(int(startverdi))
+        else:
+            visning = str(startverdi)
+        el = ui.input(label=label, value=visning, on_change=tekst_handler).classes("w-full")
+        el.props("inputmode=decimal")
+        if tooltip:
+            el.tooltip(tooltip)
+        if obj is None:
+            _input_elements[attr] = el
+        return el
 
     def handler(e):
         setattr(target, attr, float(e.value) if e.value is not None else 0.0)
@@ -953,7 +991,7 @@ def num(label: str, attr: str, obj=None, step: float = 1000, min_val: float | No
         "label": label,
         "value": getattr(target, attr),
         "step": step,
-        "format": "%.0f",
+        "format": f"%.{desimaler}f",
         "on_change": handler,
     }
     if min_val is not None:
@@ -2470,9 +2508,14 @@ def _bygg_aksjonaer_fane() -> None:
                         "Innbetalt kapital per aksje (NOK)",
                         "innbetalt_kapital_per_aksje",
                         obj=a,
-                        step=1,
+                        step=0.01,
                         min_val=0,
-                        tooltip="Aksjekapital delt på antall aksjer. Eks: 30 000 kr / 100 aksjer = 300 kr per aksje.",
+                        desimaler=None,
+                        tooltip=(
+                            "Aksjekapital delt på antall aksjer. "
+                            "Eks: 30 000 kr / 100 aksjer = 300 kr per aksje, "
+                            "eller 30 000 kr / 300 000 aksjer = 0,10 kr per aksje."
+                        ),
                     )
                     innbetalt_inp.on("blur", lambda _: aksjonaer_liste.refresh())
 

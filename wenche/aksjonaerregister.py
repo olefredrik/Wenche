@@ -25,6 +25,20 @@ from wenche.skd_client import SkdAksjonaerClient
 _BRG_ENHET_URL = "https://data.brreg.no/enhetsregisteret/api/enheter"
 
 
+def _format_paalydende(verdi: float) -> str:
+    """
+    Formater pålydende per aksje for RF-1086-XMLen. Rundes til to desimaler
+    for å absorbere flyttalls-støy fra divisjonen, og returneres som
+    heltallstreng når verdien er et helt kronebeløp (f.eks. 300 → "300").
+    Ellers beholdes to desimaler (f.eks. 0,10 → "0.10"), slik at selskaper
+    med fri pålydende (lovlig siden 2013) representeres riktig i skjemaet.
+    """
+    rundet = round(verdi, 2)
+    if rundet.is_integer():
+        return str(int(rundet))
+    return f"{rundet:.2f}"
+
+
 def les_config(config_fil: str) -> Aksjonaerregisteroppgave:
     """Leser config.yaml og returnerer en Aksjonaerregisteroppgave."""
     with open(config_fil, encoding="utf-8") as f:
@@ -77,7 +91,11 @@ def generer_hovedskjema_xml(
     org = innsending_org or s.org_nummer
     aar = oppgave.regnskapsaar
     totalt_aksjer = oppgave.totalt_antall_aksjer
-    paalydende = round(s.aksjekapital) // totalt_aksjer if totalt_aksjer > 0 else 0
+    paalydende = (
+        _format_paalydende(s.aksjekapital / totalt_aksjer)
+        if totalt_aksjer > 0
+        else "0"
+    )
     stiftelsesdato = f"{s.stiftelsesaar}-01-01T00:00:00"
 
     # Fjorår-felter og stiftelsestransaksjon skal kun inkluderes i stiftelsesåret.
@@ -86,7 +104,7 @@ def generer_hovedskjema_xml(
     er_stiftelsesaar = s.stiftelsesaar == aar
     fjoraret_aksjekapital = 0 if er_stiftelsesaar else round(s.aksjekapital)
     fjoraret_aksjer = 0 if er_stiftelsesaar else totalt_aksjer
-    fjoraret_paalydende = 0 if er_stiftelsesaar else paalydende
+    fjoraret_paalydende = "0" if er_stiftelsesaar else paalydende
     if er_stiftelsesaar:
         stiftelse_innhold = f"""
             <AksjerNyutstedteStiftelseMvAntall-datadef-17668 orid="17668">{totalt_aksjer}</AksjerNyutstedteStiftelseMvAntall-datadef-17668>
