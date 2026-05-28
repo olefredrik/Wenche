@@ -2839,12 +2839,13 @@ def _bygg_send_fane() -> None:
 
     if env == "prod":
         ui.label(
-            "⚠️  Innsending mot produksjon er bindende og kan ikke trekkes tilbake."
-        ).classes("text-amber-700 text-sm mb-4")
+            "ℹ️  Innsending går til produksjon. Skattemelding og årsregnskap må signeres "
+            "i Altinn for å fullføres, men sjekk likevel tallene før du klikker send."
+        ).classes("text-slate-600 text-sm mb-4")
     else:
         ui.label(
             "ℹ️  Innsending går til Skatteetatens testmiljø (tt02). Ingen ekte innsending til myndighetene."
-        ).classes("text-amber-700 text-sm mb-4")
+        ).classes("text-slate-600 text-sm mb-4")
 
     async def hent_altinn_token() -> str | None:
         try:
