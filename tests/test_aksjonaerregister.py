@@ -132,7 +132,9 @@ def test_hovedskjema_paalydende_desimal():
     Selskaper med fri pålydende (lovlig siden 2013) kan ha brøkdeler av en
     krone som pålydende. For 30 000 kr aksjekapital fordelt på 300 000 aksjer
     er pålydende 0,10. Skjemaet må representere dette eksakt, ikke trunkere
-    til 0 som integer-divisjon ville gjort.
+    til 0 som integer-divisjon ville gjort. RF-1086 tillater opptil 6
+    desimaler (bekreftet i SSV-5278), og vi stripper etterstilte nuller for
+    kompakt representasjon.
     """
     selskap = Selskap(
         navn="Fragmentert Holding AS",
@@ -160,11 +162,11 @@ def test_hovedskjema_paalydende_desimal():
     root = _parse(generer_hovedskjema_xml(oppgave))
     paalydende = root.find(".//{*}AksjeMvPalydende-datadef-23945")
     assert paalydende is not None
-    assert paalydende.text == "0.10"
+    assert paalydende.text == "0.1"
     # Fjorår-pålydende skal også reflektere desimalverdien (ikke stiftelsesår)
     fjor = root.find(".//{*}AksjeMvPalydendeFjoraret-datadef-23944")
     assert fjor is not None
-    assert fjor.text == "0.10"
+    assert fjor.text == "0.1"
 
 
 def test_hovedskjema_kontakt_epost(eksempel_oppgave):

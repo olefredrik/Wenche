@@ -27,16 +27,20 @@ _BRG_ENHET_URL = "https://data.brreg.no/enhetsregisteret/api/enheter"
 
 def _format_paalydende(verdi: float) -> str:
     """
-    Formater pålydende per aksje for RF-1086-XMLen. Rundes til to desimaler
-    for å absorbere flyttalls-støy fra divisjonen, og returneres som
-    heltallstreng når verdien er et helt kronebeløp (f.eks. 300 → "300").
-    Ellers beholdes to desimaler (f.eks. 0,10 → "0.10"), slik at selskaper
-    med fri pålydende (lovlig siden 2013) representeres riktig i skjemaet.
+    Formater pålydende per aksje for RF-1086-XMLen.
+
+    RF-1086 tillater opptil 6 desimaler i pålydende-feltet (bekreftet av
+    Skatteetaten i SSV-5278). Verdien rundes derfor til 6 desimaler for å
+    fjerne flyttalls-støy fra divisjonen og overhold spec-grensen. Resultatet
+    returneres som heltallstreng for hele kroner (f.eks. 300 → "300") og
+    desimalstreng uten unødvendige etterstilte nuller ellers (f.eks. 0,10
+    → "0.1", 0,123456 → "0.123456"), slik at selskaper med fri pålydende
+    (lovlig siden 2013) representeres kompakt i skjemaet.
     """
-    rundet = round(verdi, 2)
+    rundet = round(verdi, 6)
     if rundet.is_integer():
         return str(int(rundet))
-    return f"{rundet:.2f}"
+    return f"{rundet:.6f}".rstrip("0").rstrip(".")
 
 
 def les_config(config_fil: str) -> Aksjonaerregisteroppgave:
