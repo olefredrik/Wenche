@@ -48,3 +48,23 @@ Bidrag er velkomne. Åpne gjerne en issue eller pull request.
 ## Lisens
 
 MIT, se [LICENSE](LICENSE).
+
+## 🎵 Bonus: En helt unødvendig folkevise
+
+> "Alle gode åpen-kildekode-prosjekter trenger dokumentasjon. Men bare de store trenger en oppriktig folkevise om skatteinnsending."
+
+Med dyp respekt for sjangeren presenterer jeg ...
+
+En stillferdig, bittersøt og oppriktig kjærlighetsvise om skattemelding, aksjonærregister og maskinell innsending til Altinn.
+
+Inkluderer:
+
+- akustisk gitar med fingerspill
+- lett piano og myke strykere
+- en varm, intim mannlig vokal med et streif av ironi
+- en holdingeier som forteller sin historie med ettertanke
+
+🎧 Hør "Wenche" her:
+👉 https://suno.com/s/QSz9P1EylWOF7vnz
+
+Og ja, refrenget vil sette seg fast i hodet ditt.
