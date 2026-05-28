@@ -453,3 +453,168 @@ class TestBeloepsformat:
             if el.text:
                 assert "." in el.text
                 break
+
+
+# ---------------------------------------------------------------------------
+# Avledede summer
+#
+# SKD krever at vi echo-er våre egne beregnede summer for kryssvalidering.
+# Manglende felt flagges som «manglerNaeringsopplysninger» i etterBeregning
+# (SSV/tilbakemelding 2026-05) selv om resultatAvValidering er «validertOK».
+# ---------------------------------------------------------------------------
+
+class TestAvledetSummer:
+    def _beloep(self, root, path: str) -> float:
+        """
+        Hent ut det innerste beloep-elementets verdi (struktur
+        <{tag}><beloep><beloep>...</beloep></beloep></{tag}>) for en gitt sti.
+        """
+        ns_path = ".//".join(f"{{{_NS}}}{p}" for p in path.split("/"))
+        el = root.find(f".//{ns_path}")
+        assert el is not None, f"Fant ikke {path}"
+        verdi = el.find(f"{{{_NS}}}beloep/{{{_NS}}}beloep")
+        assert verdi is not None and verdi.text, f"Fant ikke beloep-tekst i {path}"
+        return float(verdi.text)
+
+    def test_sumDriftsinntekt(self):
+        regnskap = _lag_regnskap(
+            resultatregnskap=Resultatregnskap(
+                driftsinntekter=Driftsinntekter(
+                    salgsinntekter=100000, andre_driftsinntekter=5000
+                ),
+                driftskostnader=Driftskostnader(),
+                finansposter=Finansposter(),
+            )
+        )
+        assert self._beloep(_parse(regnskap), "sumDriftsinntekt") == 105000.0
+
+    def test_sumDriftskostnad(self):
+        regnskap = _lag_regnskap(
+            resultatregnskap=Resultatregnskap(
+                driftsinntekter=Driftsinntekter(),
+                driftskostnader=Driftskostnader(
+                    loennskostnader=20000,
+                    avskrivninger=3000,
+                    andre_driftskostnader=5000,
+                ),
+                finansposter=Finansposter(),
+            )
+        )
+        assert self._beloep(_parse(regnskap), "sumDriftskostnad") == 28000.0
+
+    def test_sum_finansinntekt_og_finanskostnad(self):
+        regnskap = _lag_regnskap(
+            resultatregnskap=Resultatregnskap(
+                driftsinntekter=Driftsinntekter(),
+                driftskostnader=Driftskostnader(),
+                finansposter=Finansposter(
+                    utbytte_fra_datterselskap=10000,
+                    andre_finansinntekter=2000,
+                    rentekostnader=1500,
+                    andre_finanskostnader=500,
+                ),
+            )
+        )
+        root = _parse(regnskap)
+        assert self._beloep(root, "sumFinansinntekt") == 12000.0
+        assert self._beloep(root, "sumFinanskostnad") == 2000.0
+
+    def test_aarsresultat_er_resultat_foer_skatt(self):
+        # Holdingselskap uten skattekostnad: aarsresultat = resultat_foer_skatt
+        regnskap = _lag_regnskap(
+            resultatregnskap=Resultatregnskap(
+                driftsinntekter=Driftsinntekter(salgsinntekter=100000),
+                driftskostnader=Driftskostnader(andre_driftskostnader=80000),
+                finansposter=Finansposter(rentekostnader=5000),
+            )
+        )
+        # 100000 - 80000 - 5000 = 15000
+        assert self._beloep(_parse(regnskap), "aarsresultat") == 15000.0
+
+    def test_sumBalanseverdiForAnleggsmiddel_og_omloepsmiddel(self):
+        regnskap = _lag_regnskap(
+            balanse=Balanse(
+                eiendeler=Eiendeler(
+                    anleggsmidler=Anleggsmidler(
+                        aksjer_i_datterselskap=50000, andre_aksjer=20000
+                    ),
+                    omloepmidler=Omloepmidler(
+                        kortsiktige_fordringer=3000, bankinnskudd=10000
+                    ),
+                ),
+                egenkapital_og_gjeld=EgenkapitalOgGjeld(
+                    egenkapital=Egenkapital(aksjekapital=30000),
+                ),
+            )
+        )
+        root = _parse(regnskap)
+        assert self._beloep(root, "sumBalanseverdiForAnleggsmiddel") == 70000.0
+        assert self._beloep(root, "sumBalanseverdiForOmloepsmiddel") == 13000.0
+        assert self._beloep(root, "sumBalanseverdiForEiendel") == 83000.0
+
+    def test_gjeldOgEgenkapital_summer(self):
+        regnskap = _lag_regnskap(
+            balanse=Balanse(
+                eiendeler=Eiendeler(
+                    anleggsmidler=Anleggsmidler(aksjer_i_datterselskap=100000),
+                ),
+                egenkapital_og_gjeld=EgenkapitalOgGjeld(
+                    egenkapital=Egenkapital(aksjekapital=30000, annen_egenkapital=10000),
+                    langsiktig_gjeld=LangsiktigGjeld(laan_fra_aksjonaer=50000),
+                    kortsiktig_gjeld=KortsiktigGjeld(annen_kortsiktig_gjeld=10000),
+                ),
+            )
+        )
+        root = _parse(regnskap)
+        assert self._beloep(root, "sumLangsiktigGjeld") == 50000.0
+        assert self._beloep(root, "sumKortsiktigGjeld") == 10000.0
+        assert self._beloep(root, "sumEgenkapital") == 40000.0
+        assert self._beloep(root, "sumGjeldOgEgenkapital") == 100000.0
+
+    def test_beregnetNaeringsinntekt_med_underskudd(self):
+        regnskap = _lag_regnskap(
+            resultatregnskap=Resultatregnskap(
+                driftsinntekter=Driftsinntekter(salgsinntekter=10000),
+                driftskostnader=Driftskostnader(andre_driftskostnader=15000),
+                finansposter=Finansposter(),
+            )
+        )
+        root = _parse(regnskap)
+        assert root.find(f".//{{{_NS}}}beregnetNaeringsinntekt") is not None
+        # skattemessigResultat = aarsresultat = -5000
+        assert self._beloep(root, "skattemessigResultat") == -5000.0
+        # Fordeling på forekomst id=1
+        fordelt = root.find(
+            f".//{{{_NS}}}fordeltBeregnetNaeringsinntektForUpersonligSkattepliktig"
+        )
+        assert fordelt is not None
+        assert fordelt.find(f"{{{_NS}}}id").text == "1"
+
+    def test_egenkapitalavstemming_har_sumFradragOgUtgaaendeEK_ved_underskudd(self):
+        # Inngående EK 30000, årets underskudd 5000 → utgående 25000,
+        # sumFradragIEgenkapital = 5000.
+        regnskap = _lag_regnskap(
+            resultatregnskap=Resultatregnskap(
+                driftsinntekter=Driftsinntekter(),
+                driftskostnader=Driftskostnader(andre_driftskostnader=5000),
+                finansposter=Finansposter(),
+            ),
+            balanse=Balanse(
+                eiendeler=Eiendeler(
+                    anleggsmidler=Anleggsmidler(aksjer_i_datterselskap=25000),
+                ),
+                egenkapital_og_gjeld=EgenkapitalOgGjeld(
+                    egenkapital=Egenkapital(aksjekapital=30000, annen_egenkapital=-5000),
+                ),
+            ),
+            foregaaende_aar_balanse=Balanse(
+                egenkapital_og_gjeld=EgenkapitalOgGjeld(
+                    egenkapital=Egenkapital(aksjekapital=30000),
+                ),
+            ),
+        )
+        root = _parse(regnskap)
+        assert self._beloep(root, "sumFradragIEgenkapital") == 5000.0
+        assert self._beloep(root, "utgaaendeEgenkapital") == 25000.0
+        # Ingen sumTilleggIEgenkapital ved underskudd
+        assert root.find(f".//{{{_NS}}}sumTilleggIEgenkapital") is None
