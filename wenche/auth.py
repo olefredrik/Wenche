@@ -20,6 +20,12 @@ import httpx
 from authlib.jose import jwt
 from dotenv import load_dotenv
 
+# Last credentials fra ~/.wenche/.env (fast lokasjon, brukerbundet, utenfor
+# cwd og git-trees). Faller tilbake til cwd/.env for bakoverkompatibilitet
+# med oppsett gjort i tidligere versjoner av Wenche.
+_BRUKER_ENV_FIL = Path.home() / ".wenche" / ".env"
+if _BRUKER_ENV_FIL.is_file():
+    load_dotenv(_BRUKER_ENV_FIL)
 load_dotenv()
 
 # Miljø-spesifikke URL-er evalueres ved hvert kall (ikke ved modulinnlastning),

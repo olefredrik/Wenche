@@ -180,15 +180,27 @@ Når SKD bekrefter at tilgangen er innvilget, logg inn i Digdirs selvbetjeningsp
 ## Steg 3 — Konfigurer miljøvariabler
 
 !!! tip "Webgrensesnittet håndterer dette for deg"
-    Starter du `wenche ui` og går til **Oppsett**-fanen, kan du fylle inn alle credentials direkte i nettleseren. Hvert miljø (Test og Produksjon) har sitt eget kort der du angir klient-ID, nøkkel-ID og organisasjonsnummer. Lagre-knappen skriver til `.env` for deg. Manuell redigering under er for de som foretrekker terminal.
+    Starter du `wenche ui` og går til **Oppsett**-fanen, kan du fylle inn alle credentials direkte i nettleseren. Hvert miljø (Test og Produksjon) har sitt eget kort der du angir klient-ID, nøkkel-ID og organisasjonsnummer. Lagre-knappen skriver til `~/.wenche/.env` for deg (på Windows: `%USERPROFILE%\.wenche\.env`). Manuell redigering under er for de som foretrekker terminal.
 
-Kopier eksempelfilen:
+!!! info "Hvor lagres credentials?"
+    `~/.wenche/.env` (Mac/Linux) eller `%USERPROFILE%\.wenche\.env` (Windows) er den primære lokasjonen. Wenche leser også fra `.env` i den mappen du starter `wenche ui` fra som fallback, slik at oppsett gjort med tidligere versjoner fortsatt fungerer. Når du lagrer via UI-en, migreres innholdet til den faste lokasjonen automatisk.
+
+Kopier eksempelfilen til den faste lokasjonen:
 
 ```bash
-cp .env.example .env
+mkdir -p ~/.wenche
+cp .env.example ~/.wenche/.env
+chmod 600 ~/.wenche/.env
 ```
 
-Åpne `.env` og fyll inn verdiene fra portalen. Variabelnavnene har miljø-suffix (`_TEST` / `_PROD`) slik at samme `.env`-fil kan inneholde begge oppsett:
+På Windows tilsvarende i PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force $env:USERPROFILE\.wenche
+Copy-Item .env.example $env:USERPROFILE\.wenche\.env
+```
+
+Åpne `~/.wenche/.env` og fyll inn verdiene fra portalen. Variabelnavnene har miljø-suffix (`_TEST` / `_PROD`) slik at samme `.env`-fil kan inneholde begge oppsett:
 
 ```
 # Test (Altinn tt02)

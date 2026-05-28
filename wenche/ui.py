@@ -8,8 +8,6 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
-import sys
 import tempfile
 from dataclasses import dataclass, field
 from datetime import date
@@ -61,6 +59,40 @@ from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
 
 CONFIG_FIL = Path("config.yaml")
 _WENCHE_DIR = Path.home() / ".wenche"
+_BRUKER_ENV_FIL = _WENCHE_DIR / ".env"
+_PRIVAT_NOKKEL_FIL = _WENCHE_DIR / "maskinporten_privat.pem"
+
+
+def _sikre_bruker_env_fil() -> bool:
+    """
+    Sørg for at ~/.wenche/.env eksisterer og er trygt rettighetssatt.
+
+    Hvis fila ikke finnes ennå, men cwd/.env gjør det (oppsett fra eldre
+    Wenche-versjoner), kopieres innholdet over slik at eksisterende
+    credentials bevares. Setter chmod 600 på unix-systemer. På Windows
+    er %USERPROFILE% typisk user-only ACL by default, så chmod-feilen
+    ignoreres pent.
+
+    Returnerer True hvis migrering ble utført i denne kallet, slik at
+    kalleren kan vise en notifikasjon til brukeren.
+    """
+    _WENCHE_DIR.mkdir(exist_ok=True)
+    if _BRUKER_ENV_FIL.exists():
+        return False
+    migrert = False
+    cwd_env = Path(".env")
+    if cwd_env.is_file():
+        _BRUKER_ENV_FIL.write_text(
+            cwd_env.read_text(encoding="utf-8"), encoding="utf-8"
+        )
+        migrert = True
+    else:
+        _BRUKER_ENV_FIL.touch()
+    try:
+        _BRUKER_ENV_FIL.chmod(0o600)
+    except OSError:
+        pass
+    return migrert
 
 
 def _med_env(env: str, fn, *args, **kwargs):
@@ -707,27 +739,6 @@ def _kjorer_fra_git_klone() -> bool:
     return (Path(__file__).resolve().parent.parent / ".git").exists()
 
 
-def _kjor_pip_oppgradering() -> tuple[bool, str]:
-    """
-    Kjør `pip install --upgrade "wenche[ui]"` mot den Python-tolken som kjører
-    Wenche nå. Returnerer (suksess, kombinert stdout+stderr). Blokkerer, så
-    må kalles via run.io_bound for å holde UI responsivt.
-    """
-    try:
-        resultat = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "--upgrade", "wenche[ui]"],
-            capture_output=True,
-            text=True,
-            timeout=180,
-        )
-        utdata = (resultat.stdout or "") + (resultat.stderr or "")
-        return resultat.returncode == 0, utdata.strip()
-    except subprocess.TimeoutExpired:
-        return False, "Oppgraderingen tok for lang tid (over 3 minutter) og ble avbrutt."
-    except Exception as e:
-        return False, f"Kunne ikke starte pip: {e}"
-
-
 def _kommando_boks(kommando: str) -> None:
     """
     Vis en kommando i en monospace-boks med kopier-knapp ved siden av.
@@ -763,9 +774,11 @@ def _kommando_boks(kommando: str) -> None:
 def _bygg_oppdaterings_dialog(siste: str) -> "ui.dialog":
     """
     Bygg en oppdaterings-dialog tilpasset installmodus. Klone-brukere får
-    git-instruksjoner; pip-brukere får en knapp som kjører oppgraderingen i
-    en subprocess. Returnerer dialogen så kalleren kan binde den til en
-    åpne-trigger.
+    git-instruksjoner; pip-brukere får pip-kommandoen med kopier-knapp.
+    Selve oppgraderingen må brukeren kjøre selv i terminal — Wenche kan
+    ikke trygt erstatte sin egen kjørende prosess (på Windows er
+    wenche.exe filsystem-låst så lenge prosessen kjører).
+    Returnerer dialogen så kalleren kan binde den til en åpne-trigger.
     """
     er_git = _kjorer_fra_git_klone()
 
@@ -791,50 +804,22 @@ def _bygg_oppdaterings_dialog(siste: str) -> "ui.dialog":
                 new_tab=True,
             ).classes("text-sm text-blue-600 hover:underline")
         else:
-            status_omraade = ui.column().classes("w-full gap-2")
-            with status_omraade:
-                ui.label(
-                    "Trykk «Oppdater nå» for å laste ned og installere siste "
-                    "versjon, eller kjør kommandoen selv i terminalen:"
-                ).classes("text-sm text-slate-700")
-                _kommando_boks('pip install --upgrade "wenche[ui]"')
-
-            handlinger = ui.column().classes("w-full gap-2")
-
-            async def kjor_oppdatering() -> None:
-                oppdater_knapp.disable()
-                oppdater_knapp.set_text("Oppdaterer...")
-                handlinger.clear()
-                with handlinger:
-                    with ui.row().classes("items-center gap-2"):
-                        ui.spinner().classes("text-blue-500")
-                        progress_label = ui.label(
-                            "Kjører pip install. Dette kan ta et minutt..."
-                        ).classes("text-sm text-slate-700")
-                suksess, utdata = await run.io_bound(_kjor_pip_oppgradering)
-                handlinger.clear()
-                with handlinger:
-                    if suksess:
-                        ui.label(
-                            f"Oppdatert til versjon {siste}."
-                        ).classes("text-sm font-medium text-green-700")
-                        ui.label(
-                            "Stopp Wenche (Ctrl+C i terminalen) og start på nytt "
-                            "med «wenche ui» for å ta i bruk den nye versjonen."
-                        ).classes("text-sm text-slate-700")
-                    else:
-                        ui.label("Oppdateringen feilet.").classes(
-                            "text-sm font-medium text-red-700"
-                        )
-                        with ui.scroll_area().classes("w-full h-40 bg-slate-100 rounded"):
-                            ui.label(utdata or "(ingen utdata)").classes(
-                                "text-xs font-mono text-slate-700 whitespace-pre-wrap p-2"
-                            )
-
-            with handlinger:
-                oppdater_knapp = ui.button(
-                    "Oppdater nå", on_click=kjor_oppdatering
-                ).props("color=primary")
+            ui.label(
+                "Stopp Wenche først (Ctrl+C i terminalen som kjører den), "
+                "kjør så denne kommandoen og start Wenche på nytt:"
+            ).classes("text-sm text-slate-700")
+            _kommando_boks('pip install --upgrade "wenche[ui]"')
+            ui.label(
+                "Wenche kan ikke oppgradere seg selv mens den kjører — "
+                "på Windows er wenche.exe filsystem-låst, og på alle "
+                "plattformer holder Python den gamle koden i minnet til "
+                "prosessen restartes."
+            ).classes("text-xs text-slate-500")
+            ui.link(
+                f"Se utgivelsesnotater for v{siste} på GitHub →",
+                f"https://github.com/olefredrik/Wenche/releases/tag/v{siste}",
+                new_tab=True,
+            ).classes("text-sm text-blue-600 hover:underline")
 
         with ui.row().classes("justify-end w-full"):
             ui.button("Lukk", on_click=dialog.close).props("flat")
@@ -1282,7 +1267,10 @@ def _bygg_oppsett_fane() -> None:
     ).classes("text-slate-500 text-sm mb-4")
 
     # --- Aktivt miljø ---
-    dot_env_fil = Path(".env")
+    # Konfig lagres i ~/.wenche/.env (fast lokasjon, brukerbundet) slik at
+    # credentials følger brukeren uavhengig av hvilken mappe `wenche ui`
+    # startes fra. Cwd/.env leses som fallback for bakoverkompatibilitet.
+    dot_env_fil = _BRUKER_ENV_FIL
 
     # --- Miljø-oppsett (credentials + systembruker per miljø) ---
     ui.separator().classes("my-4")
@@ -1764,7 +1752,7 @@ def _bygg_oppsett_fane() -> None:
 
     async def lagre_konfig():
         from dotenv import set_key
-        dot_env_fil.touch(exist_ok=True)
+        migrert_fra_cwd = _sikre_bruker_env_fil()
 
         # Lagre credentials per miljø — begge sett skrives uavhengig av hverandre.
         # Skriver alltid eksplisitt (selv om tomt) slik at tomming fra UI faktisk
@@ -1797,13 +1785,29 @@ def _bygg_oppsett_fane() -> None:
             os.environ.pop("ORG_NUMMER", None)
 
         if pem_bytes_holder:
-            nokkel_sti = Path("maskinporten_privat.pem")
-            nokkel_sti.write_bytes(pem_bytes_holder[0])
-            nokkel_sti.chmod(0o600)
-            set_key(str(dot_env_fil), "MASKINPORTEN_PRIVAT_NOKKEL", str(nokkel_sti))
-            os.environ["MASKINPORTEN_PRIVAT_NOKKEL"] = str(nokkel_sti)
+            # Lagre i ~/.wenche/ (fast lokasjon, samme som .env). Skriv
+            # absolutt sti til .env så MASKINPORTEN_PRIVAT_NOKKEL fungerer
+            # uavhengig av hvilken cwd Wenche startes fra senere.
+            _PRIVAT_NOKKEL_FIL.write_bytes(pem_bytes_holder[0])
+            try:
+                _PRIVAT_NOKKEL_FIL.chmod(0o600)
+            except OSError:
+                pass
+            abs_sti = str(_PRIVAT_NOKKEL_FIL)
+            set_key(str(dot_env_fil), "MASKINPORTEN_PRIVAT_NOKKEL", abs_sti)
+            os.environ["MASKINPORTEN_PRIVAT_NOKKEL"] = abs_sti
         konfig_status.refresh()
-        ui.notify("Konfigurasjon lagret.", type="positive")
+        if migrert_fra_cwd:
+            ui.notify(
+                f"Konfig flyttet fra .env i denne mappen til {dot_env_fil}. "
+                "Den gamle fila er beholdt for sikkerhets skyld og kan slettes "
+                "manuelt når du har verifisert at alt fungerer.",
+                type="info",
+                timeout=10,
+                close_button="OK",
+            )
+        else:
+            ui.notify("Konfigurasjon lagret.", type="positive")
 
     ui.button("Lagre konfigurasjon", on_click=lagre_konfig).props("color=primary").classes("mt-2")
 
