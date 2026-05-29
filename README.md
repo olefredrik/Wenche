@@ -21,6 +21,17 @@ Autentisering skjer via Maskinporten med et selvgenerert RSA-nøkkelpar, ingen v
 | **Skattemelding for AS** (skattemelding + næringsspesifikasjon) | Skatteetaten | 31. mai | Automatisk innsending |
 | **Årsregnskap** | Brønnøysundregistrene | 31. juli | Automatisk innsending |
 
+## Trenger du å føre regnskapet først?
+
+Wenche sender inn, men forutsetter at du allerede har tallene. For
+**passive holdingselskaper** finnes søsterprosjektet
+[Wenche-regnskap](https://github.com/olefredrik/Wenche-regnskap): et
+template-repo drevet av Claude Code som gjør en bankeksport om til et
+lesbart regnskap, en generalforsamlingsprotokoll og en ferdig
+`config.yaml` som Wenche leser direkte. Du fører bøkene i git, Wenche
+sender inn, og sammen blir det en komplett flyt. Lag din egen private
+kopi via «Use this template».
+
 ## Kom i gang
 
 Wenche krever Python 3.11 eller nyere. Installer i et virtuelt miljø (macOS/Linux):
