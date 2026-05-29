@@ -9,7 +9,7 @@
 
 Wenche er et verktøy for holdingselskaper og småaksjeselskaper som må levere regnskap og skattedokumenter til norske myndigheter, uten behov for et fullverdig regnskapsprogram.
 
-Kjør `wenche` for å åpne et grafisk webgrensesnitt i nettleseren der du fyller ut og sender inn alt.
+Etter installasjon kjører du `wenche` for å åpne et grafisk webgrensesnitt i nettleseren der du fyller ut og sender inn alt.
 
 Autentisering skjer via Maskinporten med et selvgenerert RSA-nøkkelpar, ingen virksomhetssertifikat eller BankID-innlogging nødvendig.
 
@@ -22,6 +22,28 @@ Autentisering skjer via Maskinporten med et selvgenerert RSA-nøkkelpar, ingen v
 | **Årsregnskap** | Brønnøysundregistrene | 31. juli | Automatisk innsending |
 
 ## Kom i gang
+
+Wenche krever Python 3.11 eller nyere. Installer i et virtuelt miljø (macOS/Linux):
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install wenche
+```
+
+> På Windows er kommandoene litt annerledes. Se [installasjonsveiledningen](https://olefredrik.github.io/Wenche/installasjon/) for fullstendig oppsett på macOS, Linux og Windows.
+
+Start deretter webgrensesnittet:
+
+```bash
+wenche
+```
+
+Wenche åpner `http://localhost:8080` i nettleseren, der du fyller ut oppsett og sender inn.
+
+Før første innsending må du generere et RSA-nøkkelpar og registrere en Maskinporten-klient. Hele veiledningen for installasjon, oppsett og bruk finner du i dokumentasjonen.
+
+## Dokumentasjon
 
 Fullstendig veiledning for installasjon, oppsett og bruk:
 
@@ -49,22 +71,10 @@ Bidrag er velkomne. Åpne gjerne en issue eller pull request.
 
 MIT, se [LICENSE](LICENSE).
 
-## 🎵 Bonus: En helt unødvendig folkevise
+---
 
-> "Alle gode åpen-kildekode-prosjekter trenger dokumentasjon. Men bare de store trenger en oppriktig folkevise om skatteinnsending."
-
-Med dyp respekt for sjangeren presenterer jeg ...
+### Bonus: en helt unødvendig folkevise
 
 En stillferdig, bittersøt og oppriktig kjærlighetsvise om skattemelding, aksjonærregister og maskinell innsending til Altinn.
 
-Inkluderer:
-
-- akustisk gitar med fingerspill
-- lett piano og myke strykere
-- en varm, intim mannlig vokal med et streif av ironi
-- en holdingeier som forteller sin historie med ettertanke
-
-🎧 Hør "Wenche" her:
-👉 https://suno.com/s/QSz9P1EylWOF7vnz
-
-Og ja, refrenget vil sette seg fast i hodet ditt.
+🎧 Hør "Wenche": https://suno.com/s/QSz9P1EylWOF7vnz
