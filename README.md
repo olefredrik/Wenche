@@ -29,8 +29,11 @@ Wenche sender inn, men forutsetter at du allerede har tallene. For
 template-repo drevet av Claude Code som gjør en bankeksport om til et
 lesbart regnskap, en generalforsamlingsprotokoll og en ferdig
 `config.yaml` som Wenche leser direkte. Du fører bøkene i git, Wenche
-sender inn, og sammen blir det en komplett flyt. Lag din egen private
-kopi via «Use this template».
+sender inn, og sammen blir det en komplett flyt.
+
+Trykk «Use this template» på repoet for å opprette ditt eget repo med
+verktøyet i. Velg **Private** når du oppretter det, så holder du
+regnskapstallene dine for deg selv.
 
 ## Kom i gang
 
