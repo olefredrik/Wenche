@@ -134,6 +134,35 @@ def valider(regnskap: Aarsregnskap) -> list[str]:
     return feil
 
 
+def advarsler(regnskap: Aarsregnskap) -> list[str]:
+    """
+    Ikke-blokkerende advarsler om forhold som ikke gjør innsendingen ugyldig,
+    men som ofte tyder på en feil i tallene. Tom liste betyr ingen advarsler.
+
+    I motsetning til valider() stopper ikke disse innsendingen. De er ment som
+    et varsku som brukeren (eller et verktøy som genererer config.yaml) kan lene
+    seg på.
+    """
+    adv = []
+
+    # Utbytte kan bare deles ut av fri egenkapital (aksjeloven § 8-1). Fri
+    # egenkapital = overkursfond + annen egenkapital (aksjekapital er bundet).
+    # I modellen reduserer utbytte annen_egenkapital, så hvis utdelingen
+    # overstiger det utdelbare, blir fri egenkapital negativ etter utdelingen.
+    ek = regnskap.balanse.egenkapital_og_gjeld.egenkapital
+    fri_egenkapital = ek.overkursfond + ek.annen_egenkapital
+    if regnskap.utbytte_utbetalt > 0 and fri_egenkapital < -0.01:
+        adv.append(
+            f"Det er utbetalt utbytte ({regnskap.utbytte_utbetalt:,.0f} NOK), men "
+            f"fri egenkapital etter utdelingen er negativ ({fri_egenkapital:,.0f} "
+            "NOK). Utbytte kan bare deles ut av fri egenkapital (aksjeloven § 8-1). "
+            "Kontroller at utbetalingen faktisk er utbytte og ikke f.eks. lån til "
+            "aksjonær eller tilbakebetaling av innbetalt kapital."
+        )
+
+    return adv
+
+
 def send_inn(regnskap: Aarsregnskap, klient: AltinnClient, dry_run: bool = False) -> str | None:
     """
     Sender inn årsregnskapet til Brønnøysundregistrene via Altinn.
@@ -157,6 +186,9 @@ def send_inn(regnskap: Aarsregnskap, klient: AltinnClient, dry_run: bool = False
         raise SystemExit(1)
 
     print("Validering OK.")
+
+    for a in advarsler(regnskap):
+        print(f"  ADVARSEL: {a}")
 
     hovedskjema = generer_hovedskjema(regnskap)
     underskjema = generer_underskjema(regnskap)
