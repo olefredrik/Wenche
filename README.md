@@ -28,12 +28,9 @@ Wenche sender inn, men forutsetter at du allerede har tallene. For
 [Wenche-regnskap](https://github.com/olefredrik/Wenche-regnskap): et
 template-repo drevet av Claude Code som gjør en bankeksport om til et
 lesbart regnskap, en generalforsamlingsprotokoll og en ferdig
-`config.yaml` som Wenche leser direkte. Du fører bøkene i git, Wenche
-sender inn, og sammen blir det en komplett flyt.
-
-Trykk «Use this template» på repoet for å opprette ditt eget repo med
-verktøyet i. Velg **Private** når du oppretter det, så holder du
-regnskapstallene dine for deg selv.
+`config.yaml` som Wenche leser direkte. Trykk «Use this template» på
+repoet for å opprette ditt eget repo med verktøyet i, og velg
+**Private** så regnskapstallene blir hos deg.
 
 ## Kom i gang
 
