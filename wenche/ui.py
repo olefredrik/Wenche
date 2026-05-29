@@ -53,9 +53,11 @@ from wenche.skd_client import SkdAksjonaerClient
 from wenche.skd_skattemelding_client import (
     SkattemeldingValideringsfeil,
     SkdSkattemeldingClient,
+    formater_valideringsresultat,
 )
 from wenche.skattemelding_xml import generer_skattemelding_fra_konfig, hent_partsnummer
 from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
+from wenche.skattemelding_konvolutt import generer_konvolutt
 
 _WENCHE_DIR = Path.home() / ".wenche"
 _BRUKER_ENV_FIL = _WENCHE_DIR / ".env"
@@ -2862,6 +2864,101 @@ def _bygg_send_fane() -> None:
                 ui.notify(f"Autentisering feilet: {feilmelding}", type="negative", timeout=0)
             return None
 
+    def _vis_lokalt_resultat(container, feil: list[str], advarsler_liste: list[str]):
+        """Render et lokalt valideringsresultat (feil + advarsler) inline."""
+        container.clear()
+        with container:
+            if feil:
+                ui.label("Validering mislyktes:").classes("text-sm font-semibold text-red-600")
+                for f in feil:
+                    ui.label(f"• {f}").classes("text-sm text-red-600")
+            for a in advarsler_liste:
+                ui.label(f"⚠ {a}").classes("text-sm text-amber-600")
+            if not feil and not advarsler_liste:
+                ui.label("✓ Validering OK. Klar for innsending.").classes(
+                    "text-sm font-medium text-green-600"
+                )
+            elif not feil:
+                ui.label("Validering OK, men sjekk advarslene over.").classes(
+                    "text-sm text-slate-600"
+                )
+
+    def valider_aarsregnskap():
+        """Kjør de lokale årsregnskap-sjekkene uten å sende inn."""
+        regnskap = state.bygg_regnskap()
+        _vis_lokalt_resultat(
+            aarsregnskap_resultat,
+            ar_modul.valider(regnskap),
+            ar_modul.advarsler(regnskap),
+        )
+
+    async def valider_aksjonaerregister():
+        """Valider aksjonærregisteroppgaven lokalt (+ mot BRG i prod) uten å sende."""
+        oppgave = state.bygg_oppgave()
+        feil = akr_modul.valider(oppgave)
+        # BRG-funn blokkerer innsending, så de vises som feil (rødt), ikke advarsler.
+        if env == "prod" and not feil:
+            feil = await run.io_bound(akr_modul.valider_mot_brg, oppgave)
+        _vis_lokalt_resultat(aksjonaer_resultat, feil, [])
+
+    async def valider_skattemelding():
+        """Valider skattemeldingen mot Skatteetatens valider-tjeneste (lagrer ikke data)."""
+        regnskap = state.bygg_regnskap()
+        orgnr = os.getenv("SKD_TEST_ORG_NUMMER", state.org_nummer) if env == "test" else state.org_nummer
+        n = ui.notification("Henter tokens for skattemelding...", spinner=True, timeout=None)
+        try:
+            tokens = await run.io_bound(lambda: _med_env(env, auth.get_skd_skattemelding_tokens))
+            n.message = "Validerer mot Skatteetaten (lagrer ikke data)..."
+
+            def _bygg_og_valider():
+                with SkdSkattemeldingClient(tokens["maskinporten_token"], env=env) as skd:
+                    test_partsnummer = os.getenv("SKD_TEST_PARTSNUMMER") if env == "test" else None
+                    gjeldende_dokument_id: str | None = None
+                    if test_partsnummer:
+                        partsnummer = int(test_partsnummer)
+                    else:
+                        forhåndsutfylt, gjeldende_dokument_id = skd.hent_forhåndsutfylt_med_id(
+                            int(state.regnskapsaar), orgnr
+                        )
+                        partsnummer = hent_partsnummer(forhåndsutfylt)
+                    skattemelding_xml = generer_skattemelding_fra_konfig(
+                        regnskap, state.bygg_skattemelding_konfig(), partsnummer
+                    )
+                    naeringsspesifikasjon_xml = generer_naeringsspesifikasjon(regnskap, partsnummer)
+                    konvolutt = generer_konvolutt(
+                        skattemelding_xml=skattemelding_xml,
+                        inntektsaar=int(state.regnskapsaar),
+                        orgnr=orgnr,
+                        naeringsspesifikasjon_xml=naeringsspesifikasjon_xml,
+                        gjeldende_dokument_id=gjeldende_dokument_id,
+                    )
+                    return skd.valider(int(state.regnskapsaar), orgnr, konvolutt)
+
+            resultat = await run.io_bound(_bygg_og_valider)
+            n.dismiss()
+            skattemelding_resultat.clear()
+            with skattemelding_resultat:
+                if resultat.get("resultat") == "validertOK":
+                    ui.label("✓ Skatteetaten: validertOK").classes(
+                        "text-sm font-medium text-green-600"
+                    )
+                else:
+                    ui.label(f"Skatteetaten: {resultat.get('resultat')}").classes(
+                        "text-sm font-semibold text-red-600"
+                    )
+                ui.label(formater_valideringsresultat(resultat)).classes(
+                    "text-xs whitespace-pre-wrap font-mono text-slate-600 mt-1"
+                )
+                ui.label("Validering lagrer ikke data hos Skatteetaten.").classes(
+                    "text-xs text-slate-400 mt-1"
+                )
+        except Exception as e:
+            n.message = f"Validering feilet: {e}"
+            n.spinner = False
+            n.type = "negative"
+            n.timeout = 0
+            n.close_button = "Lukk"
+
     async def send_aarsregnskap():
         regnskap = state.bygg_regnskap()
         feil = ar_modul.valider(regnskap)
@@ -2869,6 +2966,8 @@ def _bygg_send_fane() -> None:
             for f in feil:
                 ui.notify(f, type="negative")
             return
+        for advarsel in ar_modul.advarsler(regnskap):
+            ui.notify(advarsel, type="warning", timeout=0, close_button="Lukk")
         n = ui.notification("Henter Altinn-token...", spinner=True, timeout=None)
         token = await hent_altinn_token()
         if not token:
@@ -3033,14 +3132,28 @@ def _bygg_send_fane() -> None:
             n.close_button = "Lukk"
 
     ui.separator().classes("my-4")
-    with ui.grid(columns=3).classes("w-full gap-4"):
-        ui.button("Send årsregnskap til Altinn", on_click=send_aarsregnskap).props("color=primary").classes("w-full")
-        ui.button(
-            "Send aksjonærregister til Skatteetaten", on_click=send_aksjonaerregister
-        ).props("color=primary").classes("w-full")
-        ui.button(
-            "Send skattemelding til Skatteetaten", on_click=send_skattemelding
-        ).props("color=primary").classes("w-full")
+    ui.label("Valider dokumentene før innsending (ingenting sendes):").classes(
+        "text-sm text-slate-500 mb-2"
+    )
+    with ui.column().classes("w-full gap-3"):
+        with ui.grid(columns=3).classes("w-full gap-4"):
+            ui.button("Valider årsregnskap", on_click=valider_aarsregnskap).props(
+                "color=primary outline"
+            ).classes("w-full")
+            ui.button("Valider aksjonærregister", on_click=valider_aksjonaerregister).props(
+                "color=primary outline"
+            ).classes("w-full")
+            ui.button("Valider skattemelding", on_click=valider_skattemelding).props(
+                "color=primary outline"
+            ).classes("w-full")
+        with ui.grid(columns=3).classes("w-full gap-4"):
+            ui.button("Send årsregnskap til Altinn", on_click=send_aarsregnskap).props("color=primary").classes("w-full")
+            ui.button(
+                "Send aksjonærregister til Skatteetaten", on_click=send_aksjonaerregister
+            ).props("color=primary").classes("w-full")
+            ui.button(
+                "Send skattemelding til Skatteetaten", on_click=send_skattemelding
+            ).props("color=primary").classes("w-full")
 
     aarsregnskap_resultat = ui.column().classes("mt-3")
     aksjonaer_resultat = ui.column().classes("mt-3")

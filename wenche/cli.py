@@ -6,6 +6,7 @@ Bruk:
   wenche dev                Starter UI mot testmiljø (tt02)
   wenche login
   wenche logout
+  wenche valider-aarsregnskap [--config config.yaml]
   wenche send-aarsregnskap [--config config.yaml] [--dry-run]
   wenche send-aksjonaerregister [--config config.yaml] [--dry-run]
   wenche generer-skattemelding [--config config.yaml] [--ut skattemelding.txt]
@@ -156,6 +157,56 @@ def send_aarsregnskap(config_fil: str, dry_run: bool):
     token = auth.get_altinn_token()
     with AltinnClient(token) as klient:
         aarsregnskap.send_inn(regnskap, klient)
+
+
+@main.command("valider-aarsregnskap")
+@click.option(
+    "--config",
+    "config_fil",
+    default="config.yaml",
+    show_default=True,
+    help="Sti til konfigurasjonsfilen.",
+)
+def valider_aarsregnskap(config_fil: str):
+    """Valider årsregnskapet lokalt uten å sende inn.
+
+    Kjører de samme sjekkene som innsendingen (balanse, org.nr.) pluss
+    ikke-blokkerende advarsler (f.eks. utbytte uten dekning i fri egenkapital).
+    Ingenting genereres eller sendes. Avslutter med exit-kode 1 hvis det finnes
+    blokkerende feil, ellers 0 (advarsler alene gir ikke feilkode).
+    """
+    click.echo(f"Leser konfigurasjon fra {config_fil}...")
+    try:
+        regnskap = aarsregnskap.les_config(config_fil)
+    except FileNotFoundError:
+        click.echo(
+            f"Feil: finner ikke {config_fil}.\n"
+            "Kopier config.example.yaml til config.yaml og fyll inn dine verdier.",
+            err=True,
+        )
+        raise SystemExit(1)
+
+    click.echo(
+        f"Aarsregnskap {regnskap.regnskapsaar} for {regnskap.selskap.navn} "
+        f"({regnskap.selskap.org_nummer})\n"
+    )
+
+    feil = aarsregnskap.valider(regnskap)
+    advarsler = aarsregnskap.advarsler(regnskap)
+
+    for a in advarsler:
+        click.echo(f"ADVARSEL: {a}")
+
+    if feil:
+        click.echo("\nValidering mislyktes:", err=True)
+        for f in feil:
+            click.echo(f"  - {f}", err=True)
+        raise SystemExit(1)
+
+    if advarsler:
+        click.echo("\nValidering OK, men sjekk advarslene over.")
+    else:
+        click.echo("Validering OK.")
 
 
 # ---------------------------------------------------------------------------
