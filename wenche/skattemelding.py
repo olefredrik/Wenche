@@ -76,7 +76,7 @@ def les_config(config_fil: str) -> tuple[Aarsregnskap, SkattemeldingKonfig]:
     konfig = SkattemeldingKonfig(
         underskudd_til_fremfoering=float(sm_raw.get("underskudd_til_fremfoering", 0)),
         anvend_fritaksmetoden=bool(sm_raw.get("anvend_fritaksmetoden", True)),
-        eierandel_datterselskap=int(sm_raw.get("eierandel_datterselskap", 100)),
+        eierandel_for_fritaksmetoden=int(sm_raw.get("eierandel_for_fritaksmetoden", 100)),
         boersnotert=bool(sm_raw.get("boersnotert", False)),
         formuesverdi_aksjer=float(sm_raw.get("formuesverdi_aksjer", 0)),
         samlet_verdi_bak_aksjene=(
@@ -128,7 +128,7 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
     # Merk: dette er basert på faglig vurdering — sjekk alltid mot gjeldende regelverk.
     utbytte = r.finansposter.utbytte_fra_datterselskap
     if konfig.anvend_fritaksmetoden and utbytte > 0:
-        if konfig.eierandel_datterselskap >= 90:
+        if konfig.eierandel_for_fritaksmetoden >= 90:
             skattepliktig_utbytte = 0
             fritatt_utbytte = utbytte
         else:
@@ -221,7 +221,7 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
     ]
 
     if konfig.anvend_fritaksmetoden and utbytte > 0:
-        if konfig.eierandel_datterselskap >= 90:
+        if konfig.eierandel_for_fritaksmetoden >= 90:
             linjer += [
                 f"    Utbytte (100 % fritatt)      {_nok(fritatt_utbytte)}",
             ]

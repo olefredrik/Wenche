@@ -207,7 +207,7 @@ class AppState:
     # Skattemelding
     underskudd: float = 0.0
     fritaksmetoden: bool = False
-    eierandel_datterselskap: int = 100
+    eierandel_for_fritaksmetoden: int = 100
     boersnotert: bool = False
     formuesverdi_aksjer: float = 0.0   # Fra aksjeoppgaven RF-1088S, post 209
 
@@ -364,7 +364,7 @@ class AppState:
         return SkattemeldingKonfig(
             underskudd_til_fremfoering=self.underskudd,
             anvend_fritaksmetoden=self.fritaksmetoden,
-            eierandel_datterselskap=int(self.eierandel_datterselskap),
+            eierandel_for_fritaksmetoden=int(self.eierandel_for_fritaksmetoden),
             boersnotert=self.boersnotert,
             formuesverdi_aksjer=self.formuesverdi_aksjer,
         )
@@ -456,7 +456,7 @@ class AppState:
             sm_cfg = cfg.get("skattemelding", {})
             self.underskudd = float(sm_cfg.get("underskudd_til_fremfoering", 0))
             self.fritaksmetoden = bool(sm_cfg.get("anvend_fritaksmetoden", False))
-            self.eierandel_datterselskap = int(sm_cfg.get("eierandel_datterselskap", 100))
+            self.eierandel_for_fritaksmetoden = int(sm_cfg.get("eierandel_for_fritaksmetoden", 100))
             self.boersnotert = bool(sm_cfg.get("boersnotert", False))
             self.formuesverdi_aksjer = float(sm_cfg.get("formuesverdi_aksjer", 0))
 
@@ -586,7 +586,11 @@ class AppState:
             "skattemelding": {
                 "underskudd_til_fremfoering": self.underskudd,
                 "anvend_fritaksmetoden": self.fritaksmetoden,
-                "eierandel_datterselskap": int(self.eierandel_datterselskap),
+                **(
+                    {"eierandel_for_fritaksmetoden": int(self.eierandel_for_fritaksmetoden)}
+                    if self.fritaksmetoden
+                    else {}
+                ),
                 "boersnotert": self.boersnotert,
                 "formuesverdi_aksjer": self.formuesverdi_aksjer,
             },
@@ -2177,8 +2181,8 @@ def _bygg_selskap_fane() -> None:
                     eks_sm = eks.get("skattemelding") or {}
                     if "anvend_fritaksmetoden" in eks_sm:
                         data["skattemelding"]["anvend_fritaksmetoden"] = eks_sm["anvend_fritaksmetoden"]
-                    if "eierandel_datterselskap" in eks_sm:
-                        data["skattemelding"]["eierandel_datterselskap"] = eks_sm["eierandel_datterselskap"]
+                    if "eierandel_for_fritaksmetoden" in eks_sm:
+                        data["skattemelding"]["eierandel_for_fritaksmetoden"] = eks_sm["eierandel_for_fritaksmetoden"]
                     if eks_sm.get("underskudd_til_fremfoering"):
                         data["skattemelding"]["underskudd_til_fremfoering"] = eks_sm["underskudd_til_fremfoering"]
                     # Noter: bevar antall_ansatte hvis satt, og bevar
@@ -2637,8 +2641,8 @@ def _bygg_dokumenter_fane() -> None:
                 "Ved eierandel ≥ 90 % er hele utbyttet skattefritt."
             )
             eierandel_el = num(
-                "Eierandel i datterselskap (%)",
-                "eierandel_datterselskap",
+                "Eierandel i utbyttegivende selskap (%)",
+                "eierandel_for_fritaksmetoden",
                 step=1,
                 min_val=0,
             )

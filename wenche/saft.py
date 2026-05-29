@@ -336,7 +336,6 @@ def importer(saft_fil: str | Path) -> dict:
         "skattemelding": {
             "underskudd_til_fremfoering": underskudd_aapning,
             "anvend_fritaksmetoden": False,
-            "eierandel_datterselskap": 100,
         },
         "aksjonaerer": [],
         "noter": {

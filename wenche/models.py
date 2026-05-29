@@ -263,7 +263,8 @@ class Noter:
 class SkattemeldingKonfig:
     underskudd_til_fremfoering: float = 0.0   # Ubenyttet underskudd fra tidligere år
     anvend_fritaksmetoden: bool = True         # True for holdingselskaper som eier aksjer
-    eierandel_datterselskap: int = 100         # Eierandel i datterselskap (prosent, 0–100)
+    eierandel_for_fritaksmetoden: int = 100    # Eierandel i utbyttegivende selskap (prosent, 0–100).
+                                               # Brukes bare når anvend_fritaksmetoden er True.
     boersnotert: bool = False                  # True hvis selskapet er børsnotert
     formuesverdi_aksjer: float = 0.0           # Formuesverdi av aksjer selskapet eier
                                                # (fra aksjeoppgaven RF-1088S, post 209)

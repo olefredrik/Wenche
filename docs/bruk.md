@@ -65,7 +65,7 @@ Sammendraget inneholder:
 - **Egenkapitalnote** (rskl. § 7-2b) med bevegelse per egenkapitalpost (inngående balanse, årsresultat, utbytte og utgående balanse)
 
 !!! info "Fritaksmetoden og sjablonregelen"
-    Wenche håndterer **to tilfeller** avhengig av eierandel i datterselskapet (`eierandel_datterselskap` i config.yaml):
+    Wenche håndterer **to tilfeller** avhengig av eierandelen i selskapet som deler ut utbytte (`eierandel_for_fritaksmetoden` i config.yaml):
 
     - **Eierandel ≥ 90 %:** Hele utbyttet er skattefritt (fritaksmetoden, sktl. § 2-38).
     - **Eierandel < 90 %:** 3 % av utbyttet er skattepliktig (sjablonregelen, sktl. § 2-38 sjette ledd). Skatteberegningen justeres automatisk.

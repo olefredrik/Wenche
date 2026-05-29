@@ -111,7 +111,9 @@ skattemelding:
                                     # Finnes i fjorårets skattemelding (RF-1028).
   anvend_fritaksmetoden: false      # true for holdingselskaper som eier aksjer i
                                     # datterselskaper (skatteloven § 2-38).
-  eierandel_datterselskap: 100      # Eierandel i datterselskapet (prosent, 0–100).
+  # eierandel_for_fritaksmetoden: 100  # Eierandel i selskapet som deler ut utbytte
+                                    # (prosent, 0–100). Brukes bare når
+                                    # anvend_fritaksmetoden er true.
                                     # ≥ 90 %: hele utbyttet er skattefritt.
                                     # < 90 %: 3 % er skattepliktig (sjablonregelen).
   boersnotert: false                # true hvis selskapet er børsnotert.
