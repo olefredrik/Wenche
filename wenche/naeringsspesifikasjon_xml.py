@@ -49,11 +49,19 @@ def _beloep_element(parent: Element, tag: str, beloep: float) -> Element:
           <beloep>123.00</beloep>
         </beloep>
       </{tag}>
+
+    Beløp rundes til hele kroner (formatet beholder to desimaler, «.00»).
+    Skatteetaten avkorter ører i visningen av næringsspesifikasjonen, mens
+    årsregnskapet til Brønnøysund (brg_xml.py) rundes til hele kroner. Øre her
+    ga derfor 1-krones sprik mellom de to innsendingene og en balanse som ikke
+    gikk opp visuelt. Hele kroner gjør innsendingene konsistente; siden både
+    linjeposter og de avledede summene (jf. #92) går gjennom denne helperen,
+    rundes de likt og SKDs etterBeregning-kryssvalidering forblir ren.
     """
     el = SubElement(parent, tag)
     outer = SubElement(el, "beloep")     # BeloepMedSkattemessigeEgenskaper
     inner = SubElement(outer, "beloep")  # BeloepMedInnkapsling → BeloepMed2Desimaler
-    inner.text = f"{round(beloep, 2):.2f}"
+    inner.text = f"{round(beloep):.2f}"
     return el
 
 
@@ -354,12 +362,14 @@ def generer_naeringsspesifikasjon(
     # Egenkapitalavstemming (XSD-pos: etter virksomhet, før andreForhold)
     # inngående EK (foregående års utgående) + endring = utgående (avledet).
     # -----------------------------------------------------------------------
-    inngaaende_ek = regnskap.foregaaende_aar_balanse.egenkapital_og_gjeld.egenkapital.sum
-    utgaaende_ek = eg.egenkapital.sum
+    inngaaende_ek = round(regnskap.foregaaende_aar_balanse.egenkapital_og_gjeld.egenkapital.sum)
+    utgaaende_ek = round(eg.egenkapital.sum)
     if inngaaende_ek or utgaaende_ek:
         ekavst = SubElement(root, "egenkapitalavstemming")
         _beloep_element(ekavst, "inngaaendeEgenkapital", inngaaende_ek)
-        endring = round(utgaaende_ek - inngaaende_ek, 2)
+        # Endringen utledes fra de allerede rundede verdiene, slik at
+        # inngaaende ± endring == utgaaende går nøyaktig opp i hele kroner.
+        endring = utgaaende_ek - inngaaende_ek
         # sumTilleggIEgenkapital / sumFradragIEgenkapital må stå før
         # egenkapitalendring-listen per XSD-sekvensen.
         if endring > 0:
