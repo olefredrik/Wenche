@@ -25,12 +25,11 @@ Autentisering skjer via Maskinporten med et selvgenerert RSA-nøkkelpar, ingen v
 
 Wenche sender inn, men forutsetter at du allerede har tallene. For
 **passive holdingselskaper** finnes søsterprosjektet
-[Wenche-regnskap](https://github.com/olefredrik/Wenche-regnskap): et
-template-repo drevet av Claude Code som gjør en bankeksport om til et
-lesbart regnskap, en generalforsamlingsprotokoll og en ferdig
-`config.yaml` som Wenche leser direkte. Trykk «Use this template» på
-repoet for å opprette ditt eget repo med verktøyet i, og velg
-**Private** så regnskapstallene blir hos deg.
+[Bodil](https://github.com/olefredrik/Bodil): et template-repo drevet av
+Claude Code som gjør en bankeksport om til et lesbart regnskap, en
+generalforsamlingsprotokoll og en ferdig `config.yaml` som Wenche leser
+direkte. Trykk «Use this template» på repoet for å opprette ditt eget repo
+med verktøyet i, og velg **Private** så regnskapstallene blir hos deg.
 
 ## Kom i gang
 
