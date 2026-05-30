@@ -10,6 +10,7 @@ Flyt:
   3. Veksle Maskinporten-token mot Altinn-token
 """
 
+import base64
 import json
 import os
 import time
@@ -87,7 +88,48 @@ SKD_SKATTEMELDING_SCOPE = (
 
 # Scope for lesestatus fra SKDs skattemelding-API (ingen Altinn-instanser)
 SKD_SKATTEMELDING_LESE_SCOPE = "skatteetaten:formueinntekt/skattemelding"
-TOKEN_FILE = Path.home() / ".wenche" / "token.json"
+
+
+def _token_file(env: str | None = None) -> Path:
+    """
+    Sti til token-cachen for gitt miljø.
+
+    Prod og test holdes i hver sin fil slik at et test-token (tt02) aldri kan
+    gjenbrukes i produksjon. Speiler config-splittingen (config.yaml /
+    config.dev.yaml) fra PR #96 — token-cachen ble den gang oversett og forble
+    delt, noe som ga 401 ved miljøbytte.
+    """
+    if env is None:
+        env = _gjeldende_env()
+    navn = "token.dev.json" if env == "test" else "token.json"
+    return Path.home() / ".wenche" / navn
+
+
+def _env_fra_iss(iss: str) -> str:
+    """Avleder miljø fra Altinn-tokenets utsteder (iss). tt02 ⇒ test."""
+    return "test" if "tt02" in (iss or "") else "prod"
+
+
+def _altinn_token_gyldig(altinn_token: str, env: str, margin_sek: int = 60) -> bool:
+    """
+    Om et cachet Altinn-token trygt kan gjenbrukes i gitt miljø.
+
+    Returnerer False (⇒ re-autentisering) hvis tokenet er utløpt eller utløper
+    innen margin_sek, tilhører feil miljø (iss), eller ikke lar seg dekode.
+    Defensiv: enhver tvil gir False.
+    """
+    try:
+        deler = altinn_token.split(".")
+        if len(deler) < 2:
+            return False
+        pad = deler[1] + "=" * (-len(deler[1]) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(pad))
+    except Exception:
+        return False
+    exp = payload.get("exp")
+    if not isinstance(exp, (int, float)) or exp <= time.time() + margin_sek:
+        return False
+    return _env_fra_iss(payload.get("iss", "")) == env
 
 
 def _lag_jwt(
@@ -256,9 +298,10 @@ def login(lagre_token: bool = True) -> dict:
         print("Autentisering vellykket (token ikke lagret).\n")
         return tokens
 
-    TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
-    TOKEN_FILE.write_text(json.dumps(tokens))
-    TOKEN_FILE.chmod(0o600)
+    fil = _token_file(env)
+    fil.parent.mkdir(parents=True, exist_ok=True)
+    fil.write_text(json.dumps(tokens))
+    fil.chmod(0o600)
 
     print("Autentisering vellykket.\n")
     return tokens
@@ -288,10 +331,22 @@ def login_admin() -> str:
 
 
 def get_altinn_token() -> str:
-    """Returnerer gjeldende Altinn-token, eller henter nytt."""
-    if TOKEN_FILE.exists():
-        tokens = json.loads(TOKEN_FILE.read_text())
-        return tokens["altinn_token"]
+    """
+    Returnerer et gyldig Altinn-token for aktivt miljø.
+
+    Gjenbruker cachet token kun hvis det ikke er utløpt og tilhører riktig
+    miljø; ellers re-autentiseres det. Hindrer 401 ved miljøbytte og utløpt
+    cache (tidligere ble cachet token returnert ukritisk).
+    """
+    env = _gjeldende_env()
+    fil = _token_file(env)
+    if fil.exists():
+        try:
+            tokens = json.loads(fil.read_text())
+        except (json.JSONDecodeError, OSError):
+            tokens = None
+        if tokens and _altinn_token_gyldig(tokens.get("altinn_token", ""), env):
+            return tokens["altinn_token"]
     return login()["altinn_token"]
 
 
@@ -411,9 +466,10 @@ def get_skd_skattemelding_tokens() -> dict:
 
 
 def logout():
-    """Sletter lagret token."""
-    if TOKEN_FILE.exists():
-        TOKEN_FILE.unlink()
+    """Sletter lagret token for aktivt miljø."""
+    fil = _token_file()
+    if fil.exists():
+        fil.unlink()
         print("Token slettet.")
     else:
         print("Ingen aktiv sesjon å logge ut fra.")
