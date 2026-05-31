@@ -69,3 +69,22 @@ klient-side `config.yaml`-nedlasting, SAF-T parses i minne.
 ## Risiko
 **Fase 1** er eneste fase som berører delt kode, sikres med backward-compatible env-wrappere +
 grønne auth-tester. Resten er nytt og isolert i `hosted/`, så self-hosted kan ikke brekke.
+
+---
+
+## Live-verifisering (B), utført mot tt02
+
+Før SPA-en (5b) ble hele den hostede backend-stien verifisert ende-til-ende mot tt02:
+magic-link-innlogging → systembruker-onboarding → ephemeral data → **ekte aksjonær-innsending
+gjennom det hostede API-et** for kunde-org `314273818` (≠ vendor). Resultat: HTTP 200 med
+forsendelse-ID. Beviser at den parameteriserte auth-en + klientene faktisk sender inn via
+FastAPI-laget, ikke bare i dry-run.
+
+To funn underveis:
+- **Forbedring (committet):** onboardingen oppdager nå eksisterende systembruker
+  (`reporteeOrgNo`-treff) og binder kunde-org direkte, så gjenkommende kunder slipper ny
+  BankID-godkjenning. Uten dette feilet Altinn med `AUTH-00004` for en allerede godkjent org.
+- **Testmiljø-merknad (ikke prod):** `aksjonaerregister.send_inn` overstyrer i `env=test`
+  XML-orgen med `SKD_TEST_ORG_NUMMER` (en self-hosted enkelt-kunde-konvensjon). Kjøres hosted
+  i test, må denne settes lik kunde-orgen, ellers oppstår autorisasjonssprik. I prod
+  (`env=prod`) skjer ingen slik overstyring.
