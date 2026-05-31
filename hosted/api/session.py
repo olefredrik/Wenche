@@ -17,6 +17,8 @@ from typing import Any
 class SessionState:
     epost: str | None = None
     kunde_org: str | None = None          # org med godkjent systembruker for denne brukeren
+    request_id: str | None = None         # aktiv systembruker-forespørsel (venter på godkjenning)
+    pending_org: str | None = None        # org det er bedt om systembruker for
     data: dict[str, Any] = field(default_factory=dict)  # ephemeral innsendingsdata
 
 

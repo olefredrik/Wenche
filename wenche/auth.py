@@ -221,7 +221,7 @@ def veksle_til_altinn_token(maskinporten_token: str) -> str:
 
 def hent_tokens_for(
     creds: VendorCredentials,
-    org_nummer: str,
+    org_nummer: str | None = None,
     scopes: str = SCOPES,
     *,
     veksle_altinn: bool = False,
@@ -233,6 +233,9 @@ def hent_tokens_for(
     hostet tjeneste der vendor-creds kommer fra server-config/KMS og kunde-org fra
     sesjonen. Self-hosted bruker fortsatt login()/get_*_token(). Miljø (prod/test)
     styres av WENCHE_ENV i prosessen som vanlig.
+
+    org_nummer=None gir et token uten systembruker-authorization_details, brukt for
+    admin-scopes (systemregister/systembruker) der vendor opptrer som seg selv.
     """
     maskinporten_token = _hent_maskinporten_token(
         creds.client_id, creds.private_key_pem, creds.kid,
