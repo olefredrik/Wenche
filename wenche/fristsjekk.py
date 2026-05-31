@@ -76,6 +76,11 @@ class FristStatus:
     beskrivelse: str = ""
     brukertekst: str = ""
     lenke: str | None = None
+    # Saksreferanse fra myndighetenes register (f.eks. Brønnøysunds journalnr),
+    # vist på det innfridde kortet. referanse_etikett gir riktig ledetekst siden
+    # ulike etater bruker ulike begreper.
+    referanse: str | None = None
+    referanse_etikett: str = "Referanse"
 
 
 def sjekk_skattemelding(orgnr: str, aar: int) -> FristStatus:
@@ -170,12 +175,9 @@ def sjekk_aarsregnskap(orgnr: str, aar: int) -> FristStatus:
         return FristStatus(beskrivelse="Kunne ikke kontakte Regnskapsregisteret")
 
     # 404 betyr at orgnr ikke har innleverte regnskap i registeret — det er
-    # samme tilstand som "ikke levert ennå" for inneværende regnskapsår.
+    # samme tilstand som "ikke synlig ennå" for inneværende regnskapsår.
     if resp.status_code == 404:
-        return FristStatus(
-            beskrivelse="Ikke levert",
-            brukertekst=f"Brønnøysundregistrene har ikke mottatt årsregnskapet for {aar} ennå.",
-        )
+        return _aarsregnskap_ikke_synlig(aar)
 
     if not resp.is_success:
         return FristStatus(
@@ -195,15 +197,33 @@ def sjekk_aarsregnskap(orgnr: str, aar: int) -> FristStatus:
         fra = periode.get("fraDato", "")
         if fra.startswith(str(aar)):
             mottatt = regnskap.get("mottaksdag")
+            journalnr = regnskap.get("journalnr")
             return FristStatus(
                 innfridd=True,
                 tidspunkt=mottatt,
                 brukertekst=f"Brønnøysundregistrene har mottatt årsregnskapet for {aar}.",
+                referanse=journalnr,
+                referanse_etikett="Journalnr",
             )
 
+    return _aarsregnskap_ikke_synlig(aar)
+
+
+def _aarsregnskap_ikke_synlig(aar: int) -> FristStatus:
+    """
+    Status når årsregnskapet ikke (ennå) finnes i Regnskapsregisteret.
+
+    Det åpne API-et viser kun ferdig behandlede, publiserte regnskap. Et
+    årsregnskap som nettopp er sendt inn og signert i Altinn er ikke publisert
+    umiddelbart, så vi formulerer dette som et publiseringsetterslep, ikke som
+    en bekreftet "ikke levert" — sistnevnte er villedende rett etter innsending.
+    """
     return FristStatus(
-        beskrivelse="Ikke levert",
-        brukertekst=f"Brønnøysundregistrene har ikke mottatt årsregnskapet for {aar} ennå.",
+        beskrivelse="Ikke synlig i registeret ennå",
+        brukertekst=(
+            f"Regnskapsregisteret viser ikke årsregnskapet for {aar} ennå. "
+            "Et nylig innsendt regnskap kan ta noen dager før det publiseres."
+        ),
     )
 
 
