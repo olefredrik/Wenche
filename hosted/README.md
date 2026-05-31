@@ -9,7 +9,15 @@ Status: bygges fasevis (se `docs/hosted/mvp-plan.md`). Fase 2 = backend-skjelett
 
 ## Komponenter
 - `api/` — FastAPI JSON-API (importerer `wenche`).
-- (senere) `web/` — SPA (React + Vite + Tailwind 4).
+- `web/` — SPA (React + Vite + TypeScript + Tailwind 4). Tynn happy-path: innlogging →
+  systembruker-onboarding → lim inn data → dry-run/innsending. Snakker med `api/` via
+  Vite-proxy (`/api` → `127.0.0.1:8077`), så alt er same-origin i dev.
+
+## Kjøre frontenden (dev)
+```bash
+cd hosted/web && npm install && npm run dev   # http://localhost:5173
+# kjør backend samtidig (egen terminal): uvicorn hosted.api.main:app --port 8077
+```
 
 ## Kjøre lokalt (dev)
 ```bash
