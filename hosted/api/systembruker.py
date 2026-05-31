@@ -29,12 +29,24 @@ class OrgForespoersel(BaseModel):
 
 @router.post("/request")
 def request_systembruker(body: OrgForespoersel, request: Request) -> dict:
-    """Opprett en systembruker-forespørsel for kundens org og returner godkjenningslenke."""
+    """
+    Start systembruker-onboarding for kundens org.
+
+    Gjenkommende kunde: har org allerede en godkjent systembruker for vårt system,
+    bindes kunde-org direkte (ingen ny BankID-godkjenning). Ny kunde: opprett
+    forespørsel og returner godkjenningslenke.
+    """
     st = krev_sesjon(request)
     creds, vendor_orgnr = krev_vendor()
     org = body.org.strip()
     token = admin_token(creds)
-    # Sikre at systemet er registrert (idempotent), så opprett forespørselen.
+    eksisterende = wsb.hent_systembrukere(token, vendor_orgnr)
+    if any(b.get("reporteeOrgNo") == org for b in eksisterende):
+        st.kunde_org = org
+        st.pending_org = None
+        st.request_id = None
+        return {"status": "AlreadyApproved", "godkjent": True, "kunde_org": org}
+    # Ny kunde: sikre at systemet er registrert (idempotent), så opprett forespørselen.
     wsb.registrer_system(token, vendor_orgnr, creds.client_id)
     svar = wsb.opprett_forespørsel(token, vendor_orgnr, org)
     st.request_id = svar.get("id")
