@@ -21,7 +21,7 @@ venv/
 .nicegui/
 
 # Genererte filer
-site/
+/site/
 *.xml
 *.xbrl
 *.html

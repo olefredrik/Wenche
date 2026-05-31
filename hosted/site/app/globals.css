@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+/* Wenches palett, varm regnskaps-grønn */
+@theme {
+  --color-krem: #fbf7f0;
+  --color-krem-myk: #f4ecdf;
+  --color-blekk: #1c2a24;
+  --color-blekk-myk: #4a5a52;
+  --color-gran: #1f5c3d;
+  --color-gran-myk: #2f7350;
+
+  --font-heading: var(--font-fraunces);
+  --font-body: var(--font-inter);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-heading), Georgia, serif;
+}
+
+body {
+  font-family: var(--font-body), system-ui, sans-serif;
+  background-color: var(--color-krem);
+  color: var(--color-blekk);
+}
