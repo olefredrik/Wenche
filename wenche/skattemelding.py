@@ -34,10 +34,13 @@ from wenche.models import (
 SKATTESATS = 0.22  # 22 % selskapsskatt
 
 
-def les_config(config_fil: str) -> tuple[Aarsregnskap, SkattemeldingKonfig]:
-    """Leser config.yaml og returnerer (Aarsregnskap, SkattemeldingKonfig)."""
-    with open(config_fil, encoding="utf-8") as f:
-        raw = yaml.safe_load(f)
+def les_config(config_fil: str | dict) -> tuple[Aarsregnskap, SkattemeldingKonfig]:
+    """Leser config (filsti eller allerede parset dict) og returnerer (Aarsregnskap, SkattemeldingKonfig)."""
+    if isinstance(config_fil, dict):
+        raw = config_fil
+    else:
+        with open(config_fil, encoding="utf-8") as f:
+            raw = yaml.safe_load(f)
 
     s = raw["selskap"]
     selskap = Selskap(

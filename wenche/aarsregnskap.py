@@ -76,10 +76,13 @@ def _les_balanse(b: dict) -> Balanse:
     )
 
 
-def les_config(config_fil: str) -> Aarsregnskap:
-    """Leser config.yaml og returnerer et Aarsregnskap-objekt."""
-    with open(config_fil, encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
+def les_config(config_fil: str | dict) -> Aarsregnskap:
+    """Leser config (filsti eller allerede parset dict) og returnerer et Aarsregnskap-objekt."""
+    if isinstance(config_fil, dict):
+        cfg = config_fil
+    else:
+        with open(config_fil, encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
 
     s = cfg["selskap"]
     selskap = Selskap(
