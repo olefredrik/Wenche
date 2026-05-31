@@ -46,8 +46,11 @@ os.environ["WENCHE_ENV"] = "test"
 os.environ.setdefault("HOSTED_ALLOWLIST", "test@example.no")
 os.environ.setdefault("HOSTED_SESSION_SECRET", "dev-local-secret")
 os.environ.setdefault("HOSTED_PUBLIC_URL", "http://localhost:5173")
-# Align test-modus XML-org-overstyring med den godkjente test-orgen (kun test).
-os.environ.setdefault("SKD_TEST_ORG_NUMMER", "314273818")
+# Hosted bruker org fra dataene/sesjonen (som i prod), ikke self-hosted sin globale
+# test-override. Sett tomme (ikke pop, da ville wenche.auth sin load_dotenv re-lese
+# repoets .env) så aksjonær/skattemelding bruker config-orgen = kunde-org.
+os.environ["SKD_TEST_ORG_NUMMER"] = ""
+os.environ["SKD_TEST_PARTSNUMMER"] = ""
 
 if __name__ == "__main__":
     import uvicorn
