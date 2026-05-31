@@ -30,6 +30,10 @@ class Settings:
             for o in os.getenv("HOSTED_CORS_ORIGINS", "http://localhost:5173").split(",")
             if o.strip()
         ]
+        # Magic-link-innlogging
+        self.public_url: str = os.getenv("HOSTED_PUBLIC_URL", "http://localhost:8000")
+        self.link_max_age_sec: int = int(os.getenv("HOSTED_LINK_MAX_AGE_SEC", "900"))
+        self.expose_dev_link: bool = self.env != "prod"
         self._vendor_client_id = os.getenv("HOSTED_VENDOR_CLIENT_ID")
         self._vendor_kid = os.getenv("HOSTED_VENDOR_KID")
         self._vendor_key_path = os.getenv("HOSTED_VENDOR_KEY_PATH")

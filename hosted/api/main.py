@@ -16,6 +16,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from wenche import __version__ as WENCHE_VERSJON
 
+from .auth import router as auth_router
 from .config import settings
 
 s = settings()
@@ -38,6 +39,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth_router)
 
 
 @app.get("/api/health")
