@@ -13,11 +13,17 @@ Status: bygges fasevis (se `docs/hosted/mvp-plan.md`). Fase 2 = backend-skjelett
   systembruker-onboarding → lim inn data → dry-run/innsending. Snakker med `api/` via
   Vite-proxy (`/api` → `127.0.0.1:8077`), så alt er same-origin i dev.
 
-## Kjøre frontenden (dev)
+## Kjøre hele MVP-en lokalt (dev/test)
+Enkleste vei, `dev_local.py` wirer test-credentials automatisk fra dine `.env`-filer:
 ```bash
-cd hosted/web && npm install && npm run dev   # http://localhost:5173
-# kjør backend samtidig (egen terminal): uvicorn hosted.api.main:app --port 8077
+# Terminal 1 (backend mot tt02):
+./.venv/bin/python hosted/dev_local.py            # http://127.0.0.1:8077
+
+# Terminal 2 (frontend):
+cd hosted/web && npm install && npm run dev       # http://localhost:5173
 ```
+Åpne http://localhost:5173, logg inn med allowlist-eposten (`test@example.no`), koble
+systembruker for en godkjent test-org, lim inn data og kjør dry-run/innsending.
 
 ## Kjøre lokalt (dev)
 ```bash
