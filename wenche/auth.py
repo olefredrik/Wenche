@@ -15,6 +15,7 @@ import json
 import os
 import time
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
@@ -88,6 +89,20 @@ SKD_SKATTEMELDING_SCOPE = (
 
 # Scope for lesestatus fra SKDs skattemelding-API (ingen Altinn-instanser)
 SKD_SKATTEMELDING_LESE_SCOPE = "skatteetaten:formueinntekt/skattemelding"
+
+
+@dataclass
+class VendorCredentials:
+    """
+    Maskinporten-credentials for én leverandør (vendor).
+
+    Self-hosted bygger disse implisitt fra env (se login/get_*_token). En hostet
+    tjeneste bygger dem fra server-config/KMS og sender dem eksplisitt til
+    hent_tokens_for(), uten å lese .env eller skrive token-cache.
+    """
+    client_id: str
+    kid: str
+    private_key_pem: bytes
 
 
 def _token_file(env: str | None = None) -> Path:
@@ -193,6 +208,42 @@ def _hent_maskinporten_token(
     return resp.json()["access_token"]
 
 
+def veksle_til_altinn_token(maskinporten_token: str) -> str:
+    """Veksler et Maskinporten-token mot et Altinn-token for gjeldende miljø."""
+    resp = httpx.get(
+        _altinn_exchange_url(),
+        headers={"Authorization": f"Bearer {maskinporten_token}"},
+        timeout=15,
+    )
+    resp.raise_for_status()
+    return resp.text.strip().strip('"')
+
+
+def hent_tokens_for(
+    creds: VendorCredentials,
+    org_nummer: str,
+    scopes: str = SCOPES,
+    *,
+    veksle_altinn: bool = False,
+) -> dict:
+    """
+    Henter token(s) for en vendor som handler på vegne av org_nummer.
+
+    Env-fri og fil-fri: leser ikke .env og skriver ikke token-cache. Brukt av en
+    hostet tjeneste der vendor-creds kommer fra server-config/KMS og kunde-org fra
+    sesjonen. Self-hosted bruker fortsatt login()/get_*_token(). Miljø (prod/test)
+    styres av WENCHE_ENV i prosessen som vanlig.
+    """
+    maskinporten_token = _hent_maskinporten_token(
+        creds.client_id, creds.private_key_pem, creds.kid,
+        scopes=scopes, org_nummer=org_nummer,
+    )
+    tokens = {"maskinporten_token": maskinporten_token}
+    if veksle_altinn:
+        tokens["altinn_token"] = veksle_til_altinn_token(maskinporten_token)
+    return tokens
+
+
 def _les_nokkel(nokkel_sti: str) -> bytes:
     try:
         return Path(nokkel_sti).read_bytes()
@@ -281,13 +332,7 @@ def login(lagre_token: bool = True) -> dict:
     )
 
     print("Maskinporten-token mottatt. Henter Altinn-token...")
-    altinn_resp = httpx.get(
-        _altinn_exchange_url(),
-        headers={"Authorization": f"Bearer {maskinporten_token}"},
-        timeout=15,
-    )
-    altinn_resp.raise_for_status()
-    altinn_token = altinn_resp.text.strip().strip('"')
+    altinn_token = veksle_til_altinn_token(maskinporten_token)
 
     tokens = {
         "maskinporten_token": maskinporten_token,
@@ -451,13 +496,7 @@ def get_skd_skattemelding_tokens() -> dict:
         org_nummer=org_nummer,
     )
 
-    altinn_resp = httpx.get(
-        _altinn_exchange_url(),
-        headers={"Authorization": f"Bearer {maskinporten_token}"},
-        timeout=15,
-    )
-    altinn_resp.raise_for_status()
-    altinn_token = altinn_resp.text.strip().strip('"')
+    altinn_token = veksle_til_altinn_token(maskinporten_token)
 
     return {
         "maskinporten_token": maskinporten_token,
