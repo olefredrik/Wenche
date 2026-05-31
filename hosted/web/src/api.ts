@@ -19,8 +19,8 @@ async function req(path: string, opts: RequestInit = {}): Promise<any> {
 
 export const api = {
   me: () => req("/api/auth/me"),
-  requestLink: (epost: string) =>
-    req("/api/auth/request-link", { method: "POST", body: JSON.stringify({ epost }) }),
+  invite: (token: string) =>
+    req("/api/auth/invite", { method: "POST", body: JSON.stringify({ token }) }),
   logout: () => req("/api/auth/logout", { method: "POST" }),
   systembrukerRequest: (org: string) =>
     req("/api/systembruker/request", { method: "POST", body: JSON.stringify({ org }) }),

@@ -29,7 +29,7 @@ from wenche.skd_skattemelding_client import (
 )
 
 from .config import settings
-from .deps import krev_kunde_org, krev_sesjon, krev_vendor
+from .deps import krev_kunde_org, krev_invitert, krev_vendor
 
 logger = logging.getLogger("wenche.hosted.innsending")
 router = APIRouter(prefix="/api", tags=["innsending"])
@@ -54,27 +54,27 @@ def _sjekk_org(cfg: dict, kunde_org: str) -> None:
 
 @router.put("/data")
 def lagre_data(request: Request, config: dict[str, Any] = Body(...)) -> dict:
-    st = krev_sesjon(request)
+    st = krev_invitert(request)
     st.data["config"] = config
     return {"lagret": True}
 
 
 @router.get("/data")
 def hent_data(request: Request) -> dict:
-    st = krev_sesjon(request)
+    st = krev_invitert(request)
     return st.data.get("config", {})
 
 
 @router.delete("/data")
 def slett_data(request: Request) -> dict:
-    st = krev_sesjon(request)
+    st = krev_invitert(request)
     st.data.pop("config", None)
     return {"slettet": True}
 
 
 @router.post("/innsending/aarsregnskap")
 def innsending_aarsregnskap(request: Request, dry_run: bool = False) -> dict:
-    st = krev_sesjon(request)
+    st = krev_invitert(request)
     cfg = _config(st)
     regnskap = ar.les_config(cfg)
     feil = ar.valider(regnskap)
@@ -94,7 +94,7 @@ def innsending_aarsregnskap(request: Request, dry_run: bool = False) -> dict:
 
 @router.post("/innsending/aksjonaer")
 def innsending_aksjonaer(request: Request, dry_run: bool = False) -> dict:
-    st = krev_sesjon(request)
+    st = krev_invitert(request)
     cfg = _config(st)
     oppgave = akr.les_config(cfg)
     if dry_run:
@@ -111,7 +111,7 @@ def innsending_aksjonaer(request: Request, dry_run: bool = False) -> dict:
 
 @router.post("/innsending/skattemelding")
 def innsending_skattemelding(request: Request, dry_run: bool = False) -> dict:
-    st = krev_sesjon(request)
+    st = krev_invitert(request)
     cfg = _config(st)
     regnskap, konfig = sm.les_config(cfg)
     if dry_run:

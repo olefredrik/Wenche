@@ -43,7 +43,7 @@ _cands = [
 os.environ["HOSTED_VENDOR_KEY_PATH"] = next((str(p) for p in _cands if p.exists()), _key)
 
 os.environ["WENCHE_ENV"] = "test"
-os.environ.setdefault("HOSTED_ALLOWLIST", "test@example.no")
+os.environ.setdefault("HOSTED_INVITE_SECRET", "dev-invite-secret-bytt-i-prod")
 os.environ.setdefault("HOSTED_SESSION_SECRET", "dev-local-secret")
 os.environ.setdefault("HOSTED_PUBLIC_URL", "http://localhost:5173")
 # Hosted bruker org fra dataene/sesjonen (som i prod), ikke self-hosted sin globale
@@ -54,7 +54,11 @@ os.environ["SKD_TEST_PARTSNUMMER"] = ""
 
 if __name__ == "__main__":
     import uvicorn
+    from itsdangerous import URLSafeSerializer
 
+    _token = URLSafeSerializer(
+        os.environ["HOSTED_INVITE_SECRET"], salt="invite"
+    ).dumps("wenche-invite")
     print("Hosted Wenche (dev/test) -> http://127.0.0.1:8077")
-    print("Logg inn i SPA-en med allowlist-epost:", os.environ["HOSTED_ALLOWLIST"])
+    print(f"Invite-lenke (åpne i SPA-en): {os.environ['HOSTED_PUBLIC_URL']}/?invite={_token}")
     uvicorn.run("hosted.api.main:app", host="127.0.0.1", port=8077, reload=True)

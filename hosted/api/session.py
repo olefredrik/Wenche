@@ -1,10 +1,10 @@
 """
 Ephemeral per-sesjon-tilstand, i minne. Ingen database, ingenting på disk.
 
-Identitet (e-post, godkjent kunde-org) bæres i en signert sesjonscookie. Selve
-innsendingsdataene (regnskap, fødselsnummer m.m.) holdes server-side i minne kun
-for den aktive sesjonen, nøklet på en sesjon-ID, og slettes ved utlogging eller
-etter innsending. Dette er GDPR-dataminimeringen i praksis.
+«Invitert»-status og en sesjon-ID bæres i en signert cookie (se main.py). Selve
+innsendingsdataene (regnskap, fødselsnummer m.m.) holdes server-side i minne kun for
+den aktive sesjonen, nøklet på sesjon-ID-en, og slettes ved utlogging eller etter
+innsending. Dette er GDPR-dataminimeringen i praksis.
 
 MVP-merknad: in-memory dict forutsetter én prosess (én uvicorn-worker), som er
 tilstrekkelig for invite-only. Multi-worker ville krevd delt, kortlevd lager.
@@ -15,7 +15,6 @@ from typing import Any
 
 @dataclass
 class SessionState:
-    epost: str | None = None
     kunde_org: str | None = None          # org med godkjent systembruker for denne brukeren
     request_id: str | None = None         # aktiv systembruker-forespørsel (venter på godkjenning)
     pending_org: str | None = None        # org det er bedt om systembruker for

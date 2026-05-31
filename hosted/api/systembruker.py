@@ -17,7 +17,7 @@ from pydantic import BaseModel
 
 from wenche import systembruker as wsb
 
-from .deps import admin_token, krev_sesjon, krev_vendor
+from .deps import admin_token, krev_invitert, krev_vendor
 
 logger = logging.getLogger("wenche.hosted.systembruker")
 router = APIRouter(prefix="/api/systembruker", tags=["systembruker"])
@@ -36,7 +36,7 @@ def request_systembruker(body: OrgForespoersel, request: Request) -> dict:
     bindes kunde-org direkte (ingen ny BankID-godkjenning). Ny kunde: opprett
     forespørsel og returner godkjenningslenke.
     """
-    st = krev_sesjon(request)
+    st = krev_invitert(request)
     creds, vendor_orgnr = krev_vendor()
     org = body.org.strip()
     token = admin_token(creds)
@@ -61,7 +61,7 @@ def request_systembruker(body: OrgForespoersel, request: Request) -> dict:
 @router.post("/status")
 def status_systembruker(request: Request) -> dict:
     """Sjekk status; ved 'Accepted' bindes kunde-org til sesjonen."""
-    st = krev_sesjon(request)
+    st = krev_invitert(request)
     creds, _ = krev_vendor()
     if not st.request_id:
         raise HTTPException(status_code=400, detail="Ingen aktiv systembruker-forespørsel.")

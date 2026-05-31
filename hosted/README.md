@@ -5,7 +5,9 @@ gjenbruker domene-, auth- og klientlaget. Self-hosted NiceGUI-appen (`wenche` / 
 er **upåvirket** av alt her, og denne mappen er ikke en del av `wenche`-wheelen som publiseres
 til PyPI.
 
-Status: bygges fasevis (se `docs/hosted/mvp-plan.md`). Fase 2 = backend-skjelett.
+Status: backend + tynn SPA bygget og tt02-verifisert (se `docs/hosted/mvp-plan.md`).
+Onboarding: **invite-lenke + BankID**, invite-lenke som invite-only-port, Altinn
+systembruker-godkjenning (BankID) som selve innloggingen. Ingen e-post, passord eller database.
 
 ## Komponenter
 - `api/` — FastAPI JSON-API (importerer `wenche`).
@@ -22,8 +24,9 @@ Enkleste vei, `dev_local.py` wirer test-credentials automatisk fra dine `.env`-f
 # Terminal 2 (frontend):
 cd hosted/web && npm install && npm run dev       # http://localhost:5173
 ```
-Åpne http://localhost:5173, logg inn med allowlist-eposten (`test@example.no`), koble
-systembruker for en godkjent test-org, lim inn data og kjør dry-run/innsending.
+`dev_local.py` skriver ut en **invite-lenke** ved oppstart. Åpne den (den setter økten som
+invitert), koble systembruker for en godkjent test-org, lim inn data og kjør dry-run/innsending.
+Lenken kan også lages med `./.venv/bin/python hosted/mint_invite.py`.
 
 ## Kjøre lokalt (dev)
 ```bash
@@ -37,8 +40,10 @@ uvicorn hosted.api.main:app --reload --port 8000
 |---|---|
 | `WENCHE_ENV` | `prod` (default) eller `test`. Pinnes i hostet drift. |
 | `HOSTED_SESSION_SECRET` | Nøkkel for signerte sesjonscookies. |
-| `HOSTED_ALLOWLIST` | Komma-separert liste over inviterte e-poster. |
+| `HOSTED_INVITE_SECRET` | Signerer invite-lenken. Roter for å ugyldiggjøre utdelte lenker. |
 | `HOSTED_CORS_ORIGINS` | Tillatte frontend-origins (default `http://localhost:5173`). |
+| `HOSTED_PUBLIC_URL` | App-origin som invite-lenken peker på (default `http://localhost:5173`). |
+| `HOSTED_VENDOR_ORGNR` | Operatørens organisasjonsnummer (vendor). |
 | `HOSTED_VENDOR_CLIENT_ID` | Operatørens Maskinporten-klient-ID. |
 | `HOSTED_VENDOR_KID` | Operatørens nøkkel-ID (KID). |
 | `HOSTED_VENDOR_KEY_PATH` | Sti til operatørens private RSA-nøkkel (PEM). I prod: hent fra KMS. |

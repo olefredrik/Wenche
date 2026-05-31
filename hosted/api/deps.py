@@ -1,4 +1,6 @@
 """Delte FastAPI-vakter/avhengigheter for hosted-appen."""
+import secrets
+
 from fastapi import HTTPException, Request
 
 from wenche import auth as wauth
@@ -8,10 +10,14 @@ from . import session as sesjon
 from .config import settings
 
 
-def krev_sesjon(request: Request) -> sesjon.SessionState:
+def krev_invitert(request: Request) -> sesjon.SessionState:
+    """Krev at økten har løst inn en gyldig invite-lenke. Sikrer også en sesjon-ID."""
+    if not request.session.get("invited"):
+        raise HTTPException(status_code=401, detail="Wenche er kun for inviterte.")
     sid = request.session.get("sid")
-    if not sid or not request.session.get("epost"):
-        raise HTTPException(status_code=401, detail="Ikke innlogget.")
+    if not sid:
+        sid = secrets.token_urlsafe(16)
+        request.session["sid"] = sid
     return sesjon.hent(sid)
 
 

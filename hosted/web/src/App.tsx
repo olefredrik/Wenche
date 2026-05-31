@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "./api";
 
 interface Me {
-  innlogget: boolean;
-  epost?: string;
+  invited: boolean;
   kunde_org?: string | null;
 }
 
@@ -22,58 +21,14 @@ function Skall({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
-  const [epost, setEpost] = useState("");
-  const [sendt, setSendt] = useState(false);
-  const [devLenke, setDevLenke] = useState<string | null>(null);
-  const [feil, setFeil] = useState<string | null>(null);
-
-  const send = async () => {
-    setFeil(null);
-    try {
-      const r = await api.requestLink(epost);
-      setSendt(true);
-      setDevLenke(r.dev_lenke ?? null);
-    } catch (e) {
-      setFeil((e as Error).message);
-    }
-  };
-
+function KunInviterte() {
   return (
-    <div className="mx-auto max-w-md space-y-4 rounded-lg border bg-white p-6">
-      <h1 className="text-xl font-semibold">Logg inn</h1>
+    <div className="mx-auto max-w-md rounded-lg border bg-white p-6 text-center">
+      <h1 className="mb-2 text-xl font-semibold">Wenche er kun for inviterte</h1>
       <p className="text-sm text-slate-500">
-        Skriv inn e-postadressen din, så får du en innloggingslenke.
+        Har du en invite-lenke, åpne den for å komme i gang. Ellers er tjenesten foreløpig
+        lukket.
       </p>
-      <input
-        className={felt}
-        type="email"
-        placeholder="navn@firma.no"
-        value={epost}
-        onChange={(e) => setEpost(e.target.value)}
-      />
-      <button className={knapp} onClick={send} disabled={!epost}>
-        Send innloggingslenke
-      </button>
-      {sendt && (
-        <p className="text-sm text-green-700">
-          Hvis adressen er invitert, er en lenke sendt. Åpne den for å logge inn.
-        </p>
-      )}
-      {devLenke && (
-        <div className="rounded bg-amber-50 p-3 text-xs">
-          <p className="mb-1 font-medium text-amber-800">Dev-lenke (kun testmiljø):</p>
-          <a className="break-all text-blue-700 underline" href={devLenke} target="_blank">
-            {devLenke}
-          </a>
-          <div className="mt-2">
-            <button className={knapp} onClick={onLoggedIn}>
-              Jeg har åpnet lenken — sjekk innlogging
-            </button>
-          </div>
-        </div>
-      )}
-      {feil && <p className="text-sm text-red-600">{feil}</p>}
     </div>
   );
 }
@@ -145,7 +100,11 @@ function Innsending() {
       await api.putData(config);
       setLagret(true);
     } catch (e) {
-      setFeil((e as Error).message.startsWith("Unexpected") ? "Ugyldig JSON." : (e as Error).message);
+      setFeil(
+        (e as Error).message.startsWith("Unexpected")
+          ? "Ugyldig JSON."
+          : (e as Error).message,
+      );
     }
   };
 
@@ -209,10 +168,7 @@ function Hjem({ me, onChange }: { me: Me; onChange: () => void }) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between text-sm text-slate-500">
-        <span>
-          Innlogget som {me.epost}
-          {me.kunde_org ? ` · org ${me.kunde_org}` : ""}
-        </span>
+        <span>Innlogget{me.kunde_org ? ` · org ${me.kunde_org}` : ""}</span>
         <button
           className="text-slate-500 underline"
           onClick={() => api.logout().then(onChange)}
@@ -227,18 +183,33 @@ function Hjem({ me, onChange }: { me: Me; onChange: () => void }) {
 
 export default function App() {
   const [me, setMe] = useState<Me | null>(null);
+
   const refresh = () =>
-    api.me().then(setMe).catch(() => setMe({ innlogget: false }));
+    api.me().then(setMe).catch(() => setMe({ invited: false }));
+
   useEffect(() => {
-    refresh();
+    // Løs inn en evt. invite-lenke (?invite=...) og rydd den ut av URL-en.
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("invite");
+    if (token) {
+      api
+        .invite(token)
+        .catch(() => {})
+        .finally(() => {
+          window.history.replaceState({}, "", window.location.pathname);
+          refresh();
+        });
+    } else {
+      refresh();
+    }
   }, []);
 
   return (
     <Skall>
       {!me ? (
         <p className="text-slate-500">Laster…</p>
-      ) : !me.innlogget ? (
-        <Login onLoggedIn={refresh} />
+      ) : !me.invited ? (
+        <KunInviterte />
       ) : (
         <Hjem me={me} onChange={refresh} />
       )}

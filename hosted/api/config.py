@@ -16,24 +16,22 @@ class Settings:
     def __init__(self) -> None:
         # Miljø pinnes til prod i hostet drift; kan settes til test for verifisering.
         self.env: str = os.getenv("WENCHE_ENV", "prod")
+        # Signering av sesjonscookie.
         self.session_secret: str = os.getenv(
             "HOSTED_SESSION_SECRET", "dev-secret-bytt-i-prod"
         )
-        # Invite-allowlist (e-poster). MVP: komma-separert env-variabel.
-        self.allowlist: set[str] = {
-            e.strip().lower()
-            for e in os.getenv("HOSTED_ALLOWLIST", "").split(",")
-            if e.strip()
-        }
+        # Invite-only: signert invite-lenke. Roter ved å bytte denne (ugyldiggjør
+        # alle utdelte lenker).
+        self.invite_secret: str = os.getenv(
+            "HOSTED_INVITE_SECRET", "dev-invite-secret-bytt-i-prod"
+        )
         self.cors_origins: list[str] = [
             o.strip()
             for o in os.getenv("HOSTED_CORS_ORIGINS", "http://localhost:5173").split(",")
             if o.strip()
         ]
-        # Magic-link-innlogging
-        self.public_url: str = os.getenv("HOSTED_PUBLIC_URL", "http://localhost:8000")
-        self.link_max_age_sec: int = int(os.getenv("HOSTED_LINK_MAX_AGE_SEC", "900"))
-        self.expose_dev_link: bool = self.env != "prod"
+        # Brukes til å bygge invite-lenken (peker på app-en der invitten løses inn).
+        self.public_url: str = os.getenv("HOSTED_PUBLIC_URL", "http://localhost:5173")
         self.vendor_orgnr = os.getenv("HOSTED_VENDOR_ORGNR")
         self._vendor_client_id = os.getenv("HOSTED_VENDOR_CLIENT_ID")
         self._vendor_kid = os.getenv("HOSTED_VENDOR_KID")
