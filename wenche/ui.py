@@ -15,6 +15,7 @@ from pathlib import Path
 
 import httpx
 import yaml
+from fastapi import Response
 from nicegui import app, run, ui
 
 from wenche import (
@@ -1106,6 +1107,10 @@ def _fristkort_innfridd(card, content, tittel: str, undertittel: str, result) ->
         ui.label(result.brukertekst).classes("text-sm text-slate-600 mt-2")
         if result.tidspunkt:
             ui.label(f"Mottatt {result.tidspunkt}").classes("text-xs text-slate-400 mt-1")
+        if result.referanse:
+            ui.label(f"{result.referanse_etikett}: {result.referanse}").classes(
+                "text-xs text-slate-400 mt-1"
+            )
         if result.lenke:
             ui.separator().classes("my-3")
             ui.link(
@@ -1127,6 +1132,10 @@ def _fristkort_ventende(card, content, tittel: str, undertittel: str, maaned: in
                 ui.label(result.beskrivelse).classes("text-sm text-slate-500")
         ui.label(dato_tekst).classes(f"text-sm font-medium text-{farge}")
         ui.label(countdown).classes(f"text-xs text-{farge}")
+        # Statusdetalj fra API-sjekken (f.eks. forklaring på publiseringsetterslep
+        # i Regnskapsregisteret) — gir kontekst utover den korte status-chippen.
+        if result and result.brukertekst:
+            ui.label(result.brukertekst).classes("text-xs text-slate-500 mt-2")
         ui.separator().classes("my-3")
         ui.label(beskrivelse).classes("text-sm text-slate-600")
 
@@ -1203,8 +1212,8 @@ def _bygg_hjem_fane(tabs=None, t_oppsett=None) -> None:
          "beskrivelse": "Wenche beregner skatten og sender skattemeldingen digitalt via Altinn i steg 6."},
         {"key": "aarsregnskap", "tittel": "Årsregnskap", "undertittel": "Brønnøysundregistrene",
          "maaned": 7, "dag": 31,
-         "beskrivelse": "Sendes digitalt via Altinn i steg 6. "
-                        "Krever signering med BankID av daglig leder eller styreleder."},
+         "beskrivelse": "Sendes digitalt via Altinn i steg 6 og signeres der av en "
+                        "person med signeringsrett."},
         {"key": "aksjonaerregister", "tittel": "Aksjonærregisteroppgave",
          "undertittel": "RF-1086, Skatteetaten", "maaned": 1, "dag": 31,
          "beskrivelse": "Sendes maskinelt til Skatteetatens API via steg 6. "
@@ -3259,6 +3268,16 @@ def main() -> None:
 # ---------------------------------------------------------------------------
 # Inngangspunkt
 # ---------------------------------------------------------------------------
+
+# Safari/iOS ber automatisk om apple-touch-icon-*.png uavhengig av om vi bruker
+# dem. Uten en matchende rute logger NiceGUI en 404 for hver forespørsel ved
+# oppstart. Vi har kun emoji-favicon og ingen touch-ikon, så vi svarer 204 No
+# Content for å holde terminalloggen ren.
+@app.get("/apple-touch-icon-precomposed.png")
+@app.get("/apple-touch-icon.png")
+def _apple_touch_icon() -> Response:
+    return Response(status_code=204)
+
 
 def run_app(env: str = "prod") -> None:
     """Start NiceGUI-serveren med valgt miljø låst for hele sesjonen.

@@ -193,6 +193,7 @@ class TestSjekkAarsregnskap:
             {
                 "regnskapsperiode": {"fraDato": "2025-01-01", "tilDato": "2025-12-31"},
                 "mottaksdag": "2026-04-15",
+                "journalnr": "2026505123",
             },
         ])
         result = sjekk_aarsregnskap("931808869", 2025)
@@ -201,6 +202,19 @@ class TestSjekkAarsregnskap:
         assert "mottatt" in result.brukertekst.lower()
         assert "2025" in result.brukertekst
         assert result.tidspunkt == "2026-04-15"
+        assert result.referanse == "2026505123"
+        assert result.referanse_etikett == "Journalnr"
+
+    @patch("wenche.fristsjekk.httpx.get")
+    def test_manglende_journalnr_gir_none_referanse(self, mock_get):
+        """BRG-svar uten journalnr → innfridd, men referanse=None (vises ikke)."""
+        mock_get.return_value = _mock_response(json_data=[
+            {"regnskapsperiode": {"fraDato": "2025-01-01", "tilDato": "2025-12-31"}},
+        ])
+        result = sjekk_aarsregnskap("931808869", 2025)
+
+        assert result.innfridd is True
+        assert result.referanse is None
 
     @patch("wenche.fristsjekk.httpx.get")
     def test_annet_aar_gir_ikke_innfridd(self, mock_get):
@@ -213,7 +227,9 @@ class TestSjekkAarsregnskap:
         result = sjekk_aarsregnskap("931808869", 2025)
 
         assert result.innfridd is False
-        assert "ikke mottatt" in result.brukertekst.lower()
+        assert result.beskrivelse == "Ikke synlig i registeret ennå"
+        assert "ennå" in result.brukertekst.lower()
+        assert "2025" in result.brukertekst
 
     @patch("wenche.fristsjekk.httpx.get")
     def test_tom_liste_gir_ikke_innfridd(self, mock_get):
@@ -224,14 +240,18 @@ class TestSjekkAarsregnskap:
         assert result.innfridd is False
 
     @patch("wenche.fristsjekk.httpx.get")
-    def test_404_gir_ikke_levert(self, mock_get):
-        """404 fra BRG → orgnr har ingen innleverte regnskap → 'Ikke levert'."""
+    def test_404_gir_ikke_synlig(self, mock_get):
+        """404 fra BRG → orgnr har ingen publiserte regnskap → 'Ikke synlig ennå'.
+
+        Formuleres som publiseringsetterslep, ikke bekreftet 'ikke levert', siden
+        et nettopp innsendt regnskap ikke er publisert i registeret umiddelbart.
+        """
         mock_get.return_value = _mock_response(status_code=404)
         result = sjekk_aarsregnskap("931808869", 2025)
 
         assert result.innfridd is False
-        assert result.beskrivelse == "Ikke levert"
-        assert "ikke mottatt" in result.brukertekst.lower()
+        assert result.beskrivelse == "Ikke synlig i registeret ennå"
+        assert "publiseres" in result.brukertekst.lower()
 
     @patch("wenche.fristsjekk.httpx.get")
     def test_http_feil_gir_beskrivelse(self, mock_get):
