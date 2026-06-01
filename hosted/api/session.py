@@ -6,8 +6,8 @@ innsendingsdataene (regnskap, fødselsnummer m.m.) holdes server-side i minne ku
 den aktive sesjonen, nøklet på sesjon-ID-en, og slettes ved utlogging eller etter
 innsending. Dette er GDPR-dataminimeringen i praksis.
 
-MVP-merknad: in-memory dict forutsetter én prosess (én uvicorn-worker), som er
-tilstrekkelig for invite-only. Multi-worker ville krevd delt, kortlevd lager.
+Merknad: in-memory dict forutsetter én prosess (én uvicorn-worker / én maskin), som er
+tilstrekkelig for invite-only. Multi-worker/multi-maskin ville krevd delt, kortlevd lager.
 """
 from dataclasses import dataclass, field
 from typing import Any

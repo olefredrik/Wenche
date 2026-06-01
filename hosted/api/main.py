@@ -1,14 +1,10 @@
 """
-FastAPI-skjelett for hostet Wenche (MVP).
+FastAPI-app for den hostede Wenche-tjenesten.
 
-Importerer `wenche` som bibliotek. Server-side ephemeral sesjon, ingen database.
-Self-hosted NiceGUI-appen (`wenche/ui.py`) er upåvirket av denne appen.
-
-Faser bygges inkrementelt (se docs/hosted/mvp-plan.md):
-  Fase 2 (her): skjelett, helse, sesjon, CORS.
-  Fase 3: magic-link-innlogging + invite-allowlist.
-  Fase 4: systembruker-onboarding.
-  Fase 5: innsendings-endepunkter + SPA.
+Importerer `wenche` som bibliotek og gjenbruker domene-, auth- og klientlaget. Server-side
+ephemeral sesjon, ingen database. Onboarding: per-org invite-lenke + Altinn systembruker-
+godkjenning (BankID). Serverer også den bygde SPA-en (web/dist) på samme origin i prod.
+Self-hosted NiceGUI-appen (`wenche/ui.py`) er upåvirket. Se hosted/README.md.
 """
 from pathlib import Path
 
@@ -26,7 +22,7 @@ from .systembruker import router as systembruker_router
 
 s = settings()
 
-app = FastAPI(title="Wenche hosted (MVP)", version=WENCHE_VERSJON)
+app = FastAPI(title="Wenche hosted", version=WENCHE_VERSJON)
 
 # Signert sesjonscookie for identitet (e-post, kunde-org). Holder IKKE finansdata.
 app.add_middleware(

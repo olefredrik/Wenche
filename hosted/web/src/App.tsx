@@ -14,8 +14,8 @@ const btnPrimar =
   "rounded-full bg-spruce px-5 py-2.5 text-sm font-medium text-background transition hover:brightness-110 disabled:opacity-40";
 const btnOutline =
   "rounded-full border border-foreground px-5 py-2.5 text-sm font-medium transition hover:bg-foreground hover:text-background disabled:opacity-40";
-// Lenke til vilkårene (bor på markedssiden wenche-web). TODO: sett til endelig wenche-web-URL.
-const VILKAAR_URL = "https://wenche-web.vercel.app/vilkaar";
+// Lenke til vilkårene (publisert på markedssiden wenche-web).
+const VILKAAR_URL = "https://www.wenche.cloud/vilkaar";
 
 function Skall({ children }: { children: React.ReactNode }) {
   return (

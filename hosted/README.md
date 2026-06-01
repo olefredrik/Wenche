@@ -1,13 +1,13 @@
-# Wenche hosted (MVP)
+# Wenche hosted
 
 Separat, hostet multi-tenant-variant av Wenche. Importerer `wenche`-pakken som bibliotek og
 gjenbruker domene-, auth- og klientlaget. Self-hosted NiceGUI-appen (`wenche` / `wenche dev`)
 er **upåvirket** av alt her, og denne mappen er ikke en del av `wenche`-wheelen som publiseres
 til PyPI.
 
-Status: backend + tynn SPA bygget og tt02-verifisert (se `docs/hosted/mvp-plan.md`).
-Onboarding: **invite-lenke + BankID**, invite-lenke som invite-only-port, Altinn
-systembruker-godkjenning (BankID) som selve innloggingen. Ingen e-post, passord eller database.
+Status: **live på https://app.wenche.cloud** (invite-only). Onboarding: en **per-org
+invite-lenke** som invite-only-port, og Altinn systembruker-godkjenning (BankID) som selve
+autorisasjonen. Ingen e-post, passord eller database.
 
 ## Komponenter
 - `api/` — FastAPI JSON-API (importerer `wenche`).
@@ -15,7 +15,7 @@ systembruker-godkjenning (BankID) som selve innloggingen. Ingen e-post, passord 
   systembruker-onboarding → lim inn data → dry-run/innsending. Snakker med `api/` via
   Vite-proxy (`/api` → `127.0.0.1:8077`), så alt er same-origin i dev.
 
-## Kjøre hele MVP-en lokalt (dev/test)
+## Kjøre lokalt mot tt02 (dev)
 Enkleste vei, `dev_local.py` wirer test-credentials automatisk fra dine `.env`-filer:
 ```bash
 # Terminal 1 (backend mot tt02):
@@ -26,14 +26,7 @@ cd hosted/web && npm install && npm run dev       # http://localhost:5173
 ```
 `dev_local.py` skriver ut en **invite-lenke** ved oppstart. Åpne den (den setter økten som
 invitert), koble systembruker for en godkjent test-org, lim inn data og kjør dry-run/innsending.
-Lenken kan også lages med `./.venv/bin/python hosted/mint_invite.py`.
-
-## Kjøre lokalt (dev)
-```bash
-pip install -r hosted/requirements.txt        # i samme venv som wenche
-uvicorn hosted.api.main:app --reload --port 8000
-# helse: http://localhost:8000/api/health
-```
+Per-org invite-lenker lages med `./.venv/bin/python hosted/mint_invite.py <orgnr>`.
 
 ## Miljøvariabler (server-hemmeligheter, aldri i koden)
 | Variabel | Beskrivelse |

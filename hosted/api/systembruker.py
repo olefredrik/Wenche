@@ -1,5 +1,5 @@
 """
-Systembruker-onboarding for hostet Wenche (Fase 4).
+Systembruker-onboarding for hostet Wenche.
 
 Operatøren (vendor) registrerer sluttbrukersystemet i Altinn én gang. Per kunde:
   1. POST /api/systembruker/request {org}  -> opprett forespørsel, returner confirmUrl.
