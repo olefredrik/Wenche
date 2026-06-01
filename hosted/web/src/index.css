@@ -15,6 +15,10 @@
   --font-sans: "Inter Tight", system-ui, sans-serif;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   background-color: var(--color-background);
   color: var(--color-foreground);

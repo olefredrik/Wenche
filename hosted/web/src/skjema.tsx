@@ -11,12 +11,14 @@ interface Felt {
   help?: string;
 }
 interface Seksjon {
+  id: string;
   tittel: string;
   felter: Felt[];
 }
 
 const SEKSJONER: Seksjon[] = [
   {
+    id: "selskap",
     tittel: "Selskap",
     felter: [
       { key: "selskap.navn", label: "Selskapsnavn", type: "text" },
@@ -31,6 +33,7 @@ const SEKSJONER: Seksjon[] = [
     ],
   },
   {
+    id: "resultatregnskap",
     tittel: "Resultatregnskap",
     felter: [
       { key: "resultatregnskap.driftsinntekter.salgsinntekter", label: "Salgsinntekter", type: "number" },
@@ -45,6 +48,7 @@ const SEKSJONER: Seksjon[] = [
     ],
   },
   {
+    id: "balanse",
     tittel: "Balanse",
     felter: [
       { key: "balanse.eiendeler.anleggsmidler.aksjer_i_datterselskap", label: "Aksjer i datterselskap", type: "number" },
@@ -63,6 +67,7 @@ const SEKSJONER: Seksjon[] = [
     ],
   },
   {
+    id: "skattemelding",
     tittel: "Skattemelding",
     felter: [
       { key: "skattemelding.underskudd_til_fremfoering", label: "Underskudd til fremføring", type: "number" },
@@ -192,8 +197,22 @@ const btnPrimar =
 const btnOutline =
   "rounded-full border border-border px-4 py-2 text-sm transition hover:border-foreground";
 
-function kr(n: number): string {
+export function kr(n: number): string {
   return (Number(n) || 0).toLocaleString("nb-NO") + " kr";
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function oppsummer(config: any) {
+  const sumE = BALANSE_EIENDELER.reduce((s, k) => s + (Number(hent(config, k)) || 0), 0);
+  const sumG = BALANSE_EK_GJELD.reduce((s, k) => s + (Number(hent(config, k)) || 0), 0);
+  return {
+    navn: hent(config, "selskap.navn") || "",
+    org: hent(config, "selskap.org_nummer") || "",
+    aar: hent(config, "regnskapsaar") || "",
+    balanseDiff: sumE - sumG,
+    balansererOk: Math.abs(sumE - sumG) < 0.01,
+    antallAksjonaerer: (config.aksjonaerer ?? []).length,
+  };
 }
 
 export function DataSkjema({ onLagre }: { onLagre: (config: unknown) => Promise<void> }) {
@@ -241,7 +260,7 @@ export function DataSkjema({ onLagre }: { onLagre: (config: unknown) => Promise<
       </div>
 
       {SEKSJONER.map((s) => (
-        <section key={s.tittel}>
+        <section key={s.tittel} id={s.id} className="scroll-mt-32">
           <h3 className="mb-4 font-display text-xl font-normal">{s.tittel}</h3>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {s.felter.map((f) => (
@@ -291,7 +310,7 @@ export function DataSkjema({ onLagre }: { onLagre: (config: unknown) => Promise<
         </section>
       ))}
 
-      <section>
+      <section id="aksjonaerer" className="scroll-mt-32">
         <h3 className="mb-4 font-display text-xl font-normal">Aksjonærer</h3>
         <div className="space-y-4">
           {aksjonaerer.map((a, i) => (

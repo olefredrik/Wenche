@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
-import { DataSkjema } from "./skjema";
+import { DataSkjema, kr, oppsummer } from "./skjema";
 
 interface Me {
   invited: boolean;
@@ -122,17 +122,43 @@ const KVITTERING_ETIKETT: Record<string, string> = {
   oppgavegiversLeveranseReferanse: "Leveranse-referanse",
 };
 
+function SeksjonsNav({ visSend }: { visSend: boolean }) {
+  const lenker: [string, string][] = [
+    ["#selskap", "Selskap"],
+    ["#resultatregnskap", "Regnskap"],
+    ["#skattemelding", "Skattemelding"],
+    ["#aksjonaerer", "Aksjonærer"],
+  ];
+  if (visSend) lenker.push(["#send", "Send"]);
+  return (
+    <nav className="sticky top-16 z-40 -mx-6 border-b border-border bg-background/85 px-6 py-3 backdrop-blur-sm">
+      <div className="flex flex-wrap gap-x-5 gap-y-1">
+        {lenker.map(([h, navn]) => (
+          <a
+            key={h}
+            href={h}
+            className="font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground transition hover:text-spruce"
+          >
+            {navn}
+          </a>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
 function Innsending() {
-  const [lagret, setLagret] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [config, setConfig] = useState<any | null>(null);
   const [lagreFeil, setLagreFeil] = useState<string | null>(null);
   const [aktiv, setAktiv] = useState<string | null>(null);
   const [utfall, setUtfall] = useState<Utfall | null>(null);
 
-  const lagre = async (config: unknown) => {
+  const lagre = async (c: unknown) => {
     setLagreFeil(null);
     try {
-      await api.putData(config);
-      setLagret(true);
+      await api.putData(c);
+      setConfig(c);
     } catch (e) {
       setLagreFeil((e as Error).message);
     }
@@ -157,42 +183,59 @@ function Innsending() {
     ["skattemelding", "Skattemelding"],
   ];
 
+  const o = config ? oppsummer(config) : null;
+
   return (
     <div className="space-y-6">
+      <SeksjonsNav visSend={o !== null} />
       <Kort>
         <DataSkjema onLagre={lagre} />
       </Kort>
-      {!lagret && lagreFeil && <p className="text-sm text-red-700">{lagreFeil}</p>}
+      {!o && lagreFeil && <p className="text-sm text-red-700">{lagreFeil}</p>}
 
-      {lagret && (
+      {o && (
         <Kort>
-          <p className={monoLabel}>Steg 3 · Innsending</p>
-          <p className="mt-3 text-sm text-muted-foreground">
-            Dataene er lagret i økten. Kjør en dry-run (sender ingenting), eller send inn til
-            myndighetene.
-          </p>
-          <div className="mt-6 space-y-3">
-            {typer.map(([t, navn]) => (
-              <div key={t} className="flex flex-wrap items-center gap-3">
-                <span className="w-40 text-sm">{navn}</span>
-                <button
-                  className={btnOutline}
-                  disabled={aktiv !== null}
-                  onClick={() => kjor(t, true)}
-                >
-                  {aktiv === `${t}:true` ? "Kjører…" : "Dry-run"}
-                </button>
-                <button
-                  className={btnPrimar}
-                  disabled={aktiv !== null}
-                  onClick={() => kjor(t, false)}
-                >
-                  {aktiv === `${t}:false` ? "Sender…" : "Send inn"}
-                </button>
-              </div>
-            ))}
+          <div id="send" className="scroll-mt-32">
+            <p className={monoLabel}>Steg 3 · Se over og send</p>
+            <div className="mt-4 rounded-sm border border-border bg-background p-4 text-sm">
+              <p className="font-medium">
+                {o.navn || "Selskap"} · org {o.org}
+              </p>
+              <p className="mt-1 text-muted-foreground">
+                Regnskapsår {o.aar} · {o.antallAksjonaerer} aksjonær(er) ·{" "}
+                {o.balansererOk ? (
+                  <span className="text-spruce">balansen går opp</span>
+                ) : (
+                  <span className="text-red-700">balanse-differanse {kr(o.balanseDiff)}</span>
+                )}
+              </p>
+            </div>
+            <p className="mt-4 text-sm text-muted-foreground">
+              Kjør gjerne en dry-run (sender ingenting), og send inn når du er klar.
+            </p>
+            <div className="mt-5 space-y-3">
+              {typer.map(([t, navn]) => (
+                <div key={t} className="flex flex-wrap items-center gap-3">
+                  <span className="w-40 text-sm">{navn}</span>
+                  <button
+                    className={btnOutline}
+                    disabled={aktiv !== null}
+                    onClick={() => kjor(t, true)}
+                  >
+                    {aktiv === `${t}:true` ? "Kjører…" : "Dry-run"}
+                  </button>
+                  <button
+                    className={btnPrimar}
+                    disabled={aktiv !== null}
+                    onClick={() => kjor(t, false)}
+                  >
+                    {aktiv === `${t}:false` ? "Sender…" : "Send inn"}
+                  </button>
+                </div>
+              ))}
+            </div>
+            {utfall && <Resultatpanel utfall={utfall} />}
           </div>
-          {utfall && <Resultatpanel utfall={utfall} />}
         </Kort>
       )}
     </div>
