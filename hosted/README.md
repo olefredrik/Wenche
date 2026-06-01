@@ -91,3 +91,15 @@ bevisst, så merge til `main` ikke auto-deployer.
 
 Vil du senere ha auto-deploy ved merge til `main`, legg tilbake en `push:`-trigger i
 workflowen (fork-PR-er får uansett hverken secret eller deploy).
+
+## Invitasjoner (prod)
+
+Per-org invite-lenker myntes med:
+```sh
+hosted/invite.sh <orgnr>
+```
+Scriptet velger metode automatisk: **lokalt** hvis `~/.wenche/hosted-prod.env` finnes (med
+`HOSTED_INVITE_SECRET` + `HOSTED_PUBLIC_URL`), ellers via **`flyctl ssh`** på Fly-maskinen
+(krever `flyctl ssh issue --agent` én gang), slik at secret-en kan bli værende kun på
+serveren. Del lenken via en privat kanal, den er knyttet til ett organisasjonsnummer.
+Roter `HOSTED_INVITE_SECRET` for å ugyldiggjøre alle utdelte lenker på én gang.
