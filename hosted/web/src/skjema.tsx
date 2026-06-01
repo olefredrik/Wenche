@@ -1,4 +1,5 @@
 import { useState } from "react";
+import yaml from "js-yaml";
 
 // Skjema-drevet datainntasting. Feltstrukturen er data; én generisk renderer bygger
 // config-objektet (samme form som config.yaml) som sendes til /api/data.
@@ -219,6 +220,8 @@ export function DataSkjema({ onLagre }: { onLagre: (config: unknown) => Promise<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [config, setConfig] = useState<any>(grunnConfig);
   const [lagrer, setLagrer] = useState(false);
+  const [visBodil, setVisBodil] = useState(false);
+  const [importMelding, setImportMelding] = useState<string | null>(null);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const oppdater = (key: string, val: any) => setConfig((c: any) => sett(c, key, val));
@@ -247,17 +250,92 @@ export function DataSkjema({ onLagre }: { onLagre: (config: unknown) => Promise<
     }
   };
 
+  const importerBodil = async (file: File) => {
+    setImportMelding(null);
+    try {
+      const parsed = yaml.load(await file.text());
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (!parsed || typeof parsed !== "object" || !(parsed as any).selskap) {
+        setImportMelding("Dette ser ikke ut som en Wenche/Bodil config.yaml.");
+        return;
+      }
+      setConfig(parsed);
+      setVisBodil(false);
+    } catch (e) {
+      setImportMelding("Kunne ikke lese filen: " + (e as Error).message);
+    }
+  };
+
   return (
     <div className="space-y-10">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <p className={monoLabel}>Steg 2 · Årets tall</p>
-        <button
-          className="text-xs text-muted-foreground underline-offset-2 hover:text-spruce hover:underline"
-          onClick={() => setConfig(structuredClone(EKSEMPEL))}
-        >
-          Fyll inn eksempeldata (test)
-        </button>
+        <div className="flex items-center gap-4">
+          <button
+            className="text-xs font-medium text-spruce underline-offset-2 hover:underline"
+            onClick={() => {
+              setImportMelding(null);
+              setVisBodil(true);
+            }}
+          >
+            Hent tall fra Bodil
+          </button>
+          <button
+            className="text-xs text-muted-foreground underline-offset-2 hover:text-spruce hover:underline"
+            onClick={() => setConfig(structuredClone(EKSEMPEL))}
+          >
+            Fyll inn eksempeldata (test)
+          </button>
+        </div>
       </div>
+
+      {visBodil && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 p-4"
+          onClick={() => setVisBodil(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-sm border border-border bg-background p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className={monoLabel}>Hent tall fra Bodil</p>
+            <h3 className="mt-2 font-display text-xl font-normal">Fører du regnskapet i Bodil?</h3>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              Bodil er følgeverktøyet som fører regnskapet for passive holdingselskaper og lager
+              en <code className="font-mono">config.yaml</code> med årets tall. Last den opp her,
+              så fyller vi inn regnskapet for deg. Du ser over alt og sender som vanlig.
+            </p>
+            <label className="mt-5 block">
+              <span className="mb-1 block text-xs text-muted-foreground">
+                config.yaml fra Bodil
+              </span>
+              <input
+                type="file"
+                accept=".yaml,.yml,.json"
+                className="block w-full text-sm"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) importerBodil(f);
+                }}
+              />
+            </label>
+            {importMelding && <p className="mt-3 text-sm text-red-700">{importMelding}</p>}
+            <div className="mt-6 flex items-center justify-between">
+              <a
+                href="https://github.com/olefredrik/Bodil"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-spruce underline-offset-2 hover:underline"
+              >
+                Hva er Bodil?
+              </a>
+              <button className={btnOutline} onClick={() => setVisBodil(false)}>
+                Lukk
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {SEKSJONER.map((s) => (
         <section key={s.tittel} id={s.id} className="scroll-mt-32">
