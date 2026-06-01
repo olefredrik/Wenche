@@ -47,6 +47,34 @@ def _stub_vendor(monkeypatch):
     monkeypatch.setattr(sb, "admin_token", lambda creds: "fake-token")
 
 
+def _gyldig_config(org="314273818"):
+    """Komplett, balansert årsregnskap-config (eiendeler = EK = 30000)."""
+    return {
+        "selskap": {"navn": "Test AS", "org_nummer": org, "daglig_leder": "D L",
+                    "styreleder": "D L", "forretningsadresse": "Vei 1, 0001 OSLO",
+                    "stiftelsesaar": 2018, "aksjekapital": 30000, "kontakt_epost": "a@b.no"},
+        "regnskapsaar": 2024,
+        "resultatregnskap": {
+            "driftsinntekter": {"salgsinntekter": 0, "andre_driftsinntekter": 0},
+            "driftskostnader": {"loennskostnader": 0, "avskrivninger": 0, "andre_driftskostnader": 0},
+            "finansposter": {"utbytte_fra_datterselskap": 0, "andre_finansinntekter": 0,
+                             "rentekostnader": 0, "andre_finanskostnader": 0}},
+        "balanse": {
+            "eiendeler": {"anleggsmidler": {"aksjer_i_datterselskap": 0, "andre_aksjer": 0, "langsiktige_fordringer": 0},
+                          "omloepmidler": {"kortsiktige_fordringer": 0, "bankinnskudd": 30000}},
+            "egenkapital_og_gjeld": {
+                "egenkapital": {"aksjekapital": 30000, "overkursfond": 0, "annen_egenkapital": 0},
+                "langsiktig_gjeld": {"laan_fra_aksjonaer": 0, "andre_langsiktige_laan": 0},
+                "kortsiktig_gjeld": {"leverandoergjeld": 0, "skyldige_offentlige_avgifter": 0,
+                                     "annen_kortsiktig_gjeld": 0}}},
+        "skattemelding": {"anvend_fritaksmetoden": False, "boersnotert": False,
+                          "underskudd_til_fremfoering": 0, "formuesverdi_aksjer": 0},
+        "aksjonaerer": [{"navn": "X", "fodselsnummer": "24847799354", "antall_aksjer": 300,
+                         "aksjeklasse": "ordinære", "utbytte_utbetalt": 0,
+                         "innbetalt_kapital_per_aksje": 100}],
+    }
+
+
 def test_uten_invite_er_stengt(klient):
     assert klient.get("/api/auth/me").json() == {"invited": False}
     assert klient.post("/api/systembruker/request").status_code == 401
@@ -102,6 +130,45 @@ def test_request_bruker_token_org_ikke_body(klient, monkeypatch):
     assert res.status_code == 200
     assert res.json()["confirm_url"] == "https://altinn/confirm"
     assert fanget["org"] == "314273818"  # token-org, ikke body-org
+
+
+def test_dryrun_aarsregnskap_fra_body(klient):
+    # Config sendes i body (klienten er fasit); dry-run krever verken binding eller vendor.
+    klient.post("/api/auth/invite", json={"token": lag_invite_token("314273818")})
+    r = klient.post("/api/innsending/aarsregnskap?dry_run=true", json=_gyldig_config())
+    assert r.status_code == 200
+    j = r.json()
+    assert j["dry_run"] is True and j["ok"] is True and j["feil"] == []
+    # Ubalansert config → dry-run fanger det (ok=false), uten å sende noe.
+    cfg = _gyldig_config()
+    cfg["balanse"]["eiendeler"]["omloepmidler"]["bankinnskudd"] = 0
+    j2 = klient.post("/api/innsending/aarsregnskap?dry_run=true", json=cfg).json()
+    assert j2["ok"] is False and any("Balansen" in f for f in j2["feil"])
+
+
+def test_innsending_avviser_feil_org(klient, monkeypatch):
+    """Org-vakt: kan ikke sende på vegne av en annen org enn den bundne (409, før noe sendes)."""
+    import hosted.api.innsending as ins
+
+    _stub_vendor(monkeypatch)
+    monkeypatch.setattr(ins, "krev_vendor", lambda: (SimpleNamespace(client_id="x"), "999999999"))
+    monkeypatch.setattr(sb.wsb, "hent_systembrukere", lambda tok, vendor: [{"reporteeOrgNo": "314273818"}])
+
+    klient.post("/api/auth/invite", json={"token": lag_invite_token("314273818")})
+    klient.post("/api/systembruker/request")  # binder kunde_org = 314273818
+    r = klient.post("/api/innsending/aarsregnskap?dry_run=false", json=_gyldig_config(org="312223309"))
+    assert r.status_code == 409
+
+
+def test_innsending_uten_binding_gir_409(klient, monkeypatch):
+    """Mistet binding (f.eks. serveren sov/restartet) → 409, som frontenden selvheler på."""
+    import hosted.api.innsending as ins
+
+    monkeypatch.setattr(ins, "krev_vendor", lambda: (SimpleNamespace(client_id="x"), "999999999"))
+    klient.post("/api/auth/invite", json={"token": lag_invite_token("314273818")})
+    # Ingen systembruker/request → kunde_org ikke bundet i serverminnet.
+    r = klient.post("/api/innsending/aarsregnskap?dry_run=false", json=_gyldig_config())
+    assert r.status_code == 409
 
 
 def test_prod_uten_secrets_nekter_oppstart(monkeypatch):

@@ -1,13 +1,15 @@
 """
-Data- og innsendings-endepunkter for hostet Wenche (Fase 5a).
+Innsendings-endepunkter for hostet Wenche.
 
-- PUT/GET/DELETE /api/data                  -> kundens config-formede data i sesjonen (ephemeral).
-- POST /api/innsending/{type}?dry_run=...   -> bygg fra sesjonsdata via wenche-domenet.
-    dry_run: lokal bygging/validering, ingen nettverk, ingen disk.
+- POST /api/innsending/{type}?dry_run=...   -> config sendes i request-body (klienten er
+    fasit), ingen server-side lagring av kundedata mellom kall. Bygger via wenche-domenet.
+    dry_run: lokal bygging/validering, ingen nettverk, ingen disk, ingen binding kreves.
     ekte: vendor-creds + godkjent kunde-org; gjenbruker domene + klienter.
 
-Sikkerhet: ekte innsending krever at data-org == godkjent systembruker-org (kunde_org),
-så vi aldri sender på vegne av en annen org enn den brukeren har godkjent.
+Personvern: innsendingsdata (inkl. fødselsnummer) lever kun i minnet i det ene kallet som
+behandler det, aldri lagret mellom requester. Robusthet: en sovende/restartende server kan
+ikke miste utfyllingen, klienten (re)sender den. Sikkerhet: ekte innsending krever at
+data-org == godkjent systembruker-org (kunde_org), så vi aldri sender på vegne av feil org.
 """
 import logging
 from typing import Any
@@ -35,13 +37,6 @@ logger = logging.getLogger("wenche.hosted.innsending")
 router = APIRouter(prefix="/api", tags=["innsending"])
 
 
-def _config(st) -> dict:
-    cfg = st.data.get("config")
-    if not cfg:
-        raise HTTPException(status_code=400, detail="Ingen data i sesjonen. Send PUT /api/data først.")
-    return cfg
-
-
 def _sjekk_org(cfg: dict, kunde_org: str) -> None:
     """Hindrer innsending på vegne av en annen org enn den med godkjent systembruker."""
     cfg_org = str((cfg.get("selskap") or {}).get("org_nummer", "")).strip()
@@ -52,30 +47,12 @@ def _sjekk_org(cfg: dict, kunde_org: str) -> None:
         )
 
 
-@router.put("/data")
-def lagre_data(request: Request, config: dict[str, Any] = Body(...)) -> dict:
-    st = krev_invitert(request)
-    st.data["config"] = config
-    return {"lagret": True}
-
-
-@router.get("/data")
-def hent_data(request: Request) -> dict:
-    st = krev_invitert(request)
-    return st.data.get("config", {})
-
-
-@router.delete("/data")
-def slett_data(request: Request) -> dict:
-    st = krev_invitert(request)
-    st.data.pop("config", None)
-    return {"slettet": True}
-
-
 @router.post("/innsending/aarsregnskap")
-def innsending_aarsregnskap(request: Request, dry_run: bool = False) -> dict:
+def innsending_aarsregnskap(
+    request: Request, config: dict[str, Any] = Body(...), dry_run: bool = False
+) -> dict:
     st = krev_invitert(request)
-    cfg = _config(st)
+    cfg = config
     regnskap = ar.les_config(cfg)
     feil = ar.valider(regnskap)
     if dry_run:
@@ -93,9 +70,11 @@ def innsending_aarsregnskap(request: Request, dry_run: bool = False) -> dict:
 
 
 @router.post("/innsending/aksjonaer")
-def innsending_aksjonaer(request: Request, dry_run: bool = False) -> dict:
+def innsending_aksjonaer(
+    request: Request, config: dict[str, Any] = Body(...), dry_run: bool = False
+) -> dict:
     st = krev_invitert(request)
-    cfg = _config(st)
+    cfg = config
     oppgave = akr.les_config(cfg)
     if dry_run:
         return {"dry_run": True, "ok": True, "antall_aksjonaerer": len(oppgave.aksjonaerer)}
@@ -110,9 +89,11 @@ def innsending_aksjonaer(request: Request, dry_run: bool = False) -> dict:
 
 
 @router.post("/innsending/skattemelding")
-def innsending_skattemelding(request: Request, dry_run: bool = False) -> dict:
+def innsending_skattemelding(
+    request: Request, config: dict[str, Any] = Body(...), dry_run: bool = False
+) -> dict:
     st = krev_invitert(request)
-    cfg = _config(st)
+    cfg = config
     regnskap, konfig = sm.les_config(cfg)
     if dry_run:
         # Lokal bygging uten nettverk/partsnummer. SKD-validering skjer server-side ved ekte innsending.

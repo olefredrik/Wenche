@@ -17,7 +17,9 @@ async function req(path: string, opts: RequestInit = {}): Promise<any> {
       if (Array.isArray(d.feil)) melding = d.feil.join(" · ");
       else if (d.validering) melding = String(d.validering);
     }
-    throw new Error(melding);
+    const err = new Error(melding) as Error & { status?: number };
+    err.status = res.status;
+    throw err;
   }
   return data;
 }
@@ -28,8 +30,12 @@ export const api = {
     req("/api/auth/invite", { method: "POST", body: JSON.stringify({ token }) }),
   logout: () => req("/api/auth/logout", { method: "POST" }),
   systembrukerRequest: () => req("/api/systembruker/request", { method: "POST" }),
-  putData: (config: unknown) =>
-    req("/api/data", { method: "PUT", body: JSON.stringify(config) }),
-  innsending: (type: string, dryRun: boolean) =>
-    req(`/api/innsending/${type}?dry_run=${dryRun}`, { method: "POST" }),
+  systembrukerStatus: () => req("/api/systembruker/status", { method: "POST" }),
+  // Config sendes i body (klienten er fasit), så en sovende/restartende server ikke kan
+  // miste utfyllingen. Ingen server-side datalagring mellom kall.
+  innsending: (type: string, dryRun: boolean, config: unknown) =>
+    req(`/api/innsending/${type}?dry_run=${dryRun}`, {
+      method: "POST",
+      body: JSON.stringify(config),
+    }),
 };

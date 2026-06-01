@@ -56,6 +56,7 @@ function Onboarding({ org, onApproved }: { org?: string | null; onApproved: () =
   const [confirmUrl, setConfirmUrl] = useState<string | null>(null);
   const [feil, setFeil] = useState<string | null>(null);
   const [kobler, setKobler] = useState(false);
+  const [venter, setVenter] = useState(false); // venter på godkjenning i Altinn
 
   const koble = async () => {
     setFeil(null);
@@ -67,6 +68,7 @@ function Onboarding({ org, onApproved }: { org?: string | null; onApproved: () =
         onApproved();
       } else {
         setConfirmUrl(r.confirm_url ?? null);
+        setVenter(true);
       }
     } catch (e) {
       setFeil((e as Error).message);
@@ -74,6 +76,37 @@ function Onboarding({ org, onApproved }: { org?: string | null; onApproved: () =
       setKobler(false);
     }
   };
+
+  const sjekkNaa = async () => {
+    setFeil(null);
+    try {
+      const r = await api.systembrukerStatus();
+      if (r.godkjent) onApproved();
+      else setFeil("Ikke godkjent ennå. Fullfør i Altinn og prøv igjen om litt.");
+    } catch (e) {
+      setFeil((e as Error).message);
+    }
+  };
+
+  // Mens vi venter på godkjenning i Altinn: poll status, så UI-et går videre av seg selv
+  // når daglig leder/styreleder har godkjent (uten at brukeren må trykke noe).
+  useEffect(() => {
+    if (!venter) return;
+    const id = setInterval(async () => {
+      try {
+        const r = await api.systembrukerStatus();
+        if (r.godkjent) {
+          clearInterval(id);
+          onApproved();
+        }
+      } catch {
+        /* nettverksglipp e.l.: prøver igjen ved neste intervall */
+      }
+    }, 4000);
+    return () => clearInterval(id);
+    // onApproved utelatt med vilje: den er funksjonelt stabil (frisker opp me).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [venter]);
 
   return (
     <Kort>
@@ -102,13 +135,26 @@ function Onboarding({ org, onApproved }: { org?: string | null; onApproved: () =
       )}
       {confirmUrl && (
         <div className="mt-5 rounded-sm border border-border bg-background p-4 text-sm">
-          <p className="text-muted-foreground">Godkjenn i Altinn, så kom tilbake:</p>
-          <a className="mt-1 block break-all text-spruce underline-offset-2 hover:underline" href={confirmUrl} target="_blank">
+          <p className="text-muted-foreground">
+            Daglig leder eller styreleder må godkjenne Wenche i Altinn med BankID. Åpne lenken,
+            godkjenn, så kommer du videre automatisk her:
+          </p>
+          <a
+            className="mt-2 block break-all text-spruce underline-offset-2 hover:underline"
+            href={confirmUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             {confirmUrl}
           </a>
-          <button className={`${btnOutline} mt-4`} onClick={onApproved}>
-            Jeg har godkjent, sjekk på nytt
-          </button>
+          <div className="mt-4 flex items-center gap-3">
+            <button className={btnOutline} onClick={sjekkNaa}>
+              Jeg har godkjent, sjekk nå
+            </button>
+            {venter && (
+              <span className="text-xs text-muted-foreground">Venter på godkjenning…</span>
+            )}
+          </div>
         </div>
       )}
       {feil && <p className="mt-4 text-sm text-red-700">{feil}</p>}
@@ -174,13 +220,10 @@ function Innsending({ env }: { env?: string }) {
   const [utfall, setUtfall] = useState<Utfall | null>(null);
 
   const lagre = async (c: unknown) => {
+    // Klienten er fasit: vi holder config lokalt og sender den med innsendings-requesten.
+    // Ingenting lagres server-side mellom kall (bedre personvern + tåler at serveren sover).
     setLagreFeil(null);
-    try {
-      await api.putData(c);
-      setConfig(c);
-    } catch (e) {
-      setLagreFeil((e as Error).message);
-    }
+    setConfig(c);
   };
 
   // Steg 1 av innsending: åpne bekreft-modal og kontroller tallene (dry-run).
@@ -189,7 +232,7 @@ function Innsending({ env }: { env?: string }) {
     setBekreft({ type, navn });
     setValidering({ laster: true });
     try {
-      const data = await api.innsending(type, true);
+      const data = await api.innsending(type, true, config);
       const feil: string[] = data.feil ?? [];
       setValidering({
         laster: false,
@@ -213,7 +256,21 @@ function Innsending({ env }: { env?: string }) {
     const { type } = bekreft;
     setSender(true);
     try {
-      const data = await api.innsending(type, false);
+      let data;
+      try {
+        data = await api.innsending(type, false, config);
+      } catch (e) {
+        // Bindingen kan ha gått tapt hvis serveren sov/restartet (scale-to-zero). En 409
+        // reises FØR noen innsending skjer, så det er trygt å rebinde (AlreadyApproved,
+        // ingen BankID) og prøve én gang til. Ingen dobbeltinnsending: første forsøk nådde
+        // aldri Altinn.
+        if ((e as { status?: number }).status === 409) {
+          await api.systembrukerRequest();
+          data = await api.innsending(type, false, config);
+        } else {
+          throw e;
+        }
+      }
       setUtfall({ dryRun: false, type, data });
     } catch (e) {
       setUtfall({ dryRun: false, type, feil: (e as Error).message });
