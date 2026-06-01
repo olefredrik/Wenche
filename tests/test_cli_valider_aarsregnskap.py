@@ -47,6 +47,24 @@ _BASE = {
             },
         },
     },
+    # Sammenligningstall for fjoråret (selskapet er stiftet 2020, ikke nystiftet).
+    "foregaaende_aar": {
+        "balanse": {
+            "eiendeler": {
+                "anleggsmidler": {"aksjer_i_datterselskap": 0, "andre_aksjer": 0, "langsiktige_fordringer": 0},
+                "omloepmidler": {"kortsiktige_fordringer": 0, "bankinnskudd": 30000},
+            },
+            "egenkapital_og_gjeld": {
+                "egenkapital": {"aksjekapital": 30000, "overkursfond": 0, "annen_egenkapital": 0},
+                "langsiktig_gjeld": {"laan_fra_aksjonaer": 0, "andre_langsiktige_laan": 0},
+                "kortsiktig_gjeld": {
+                    "leverandoergjeld": 0,
+                    "skyldige_offentlige_avgifter": 0,
+                    "annen_kortsiktig_gjeld": 0,
+                },
+            },
+        },
+    },
     "aksjonaerer": [
         {
             "navn": "Kari Nordmann",

@@ -328,9 +328,12 @@ function BekreftModal({
 
         <div className="mt-4 text-sm">
           {validering?.laster && <p className="text-muted-foreground">Kontrollerer tallene…</p>}
-          {validering && !validering.laster && klar && (
-            <p className="text-spruce">✓ Alt ser bra ut. Klar til innsending.</p>
-          )}
+          {validering && !validering.laster && klar &&
+            ((validering.advarsler?.length ?? 0) > 0 ? (
+              <p className="text-spruce">✓ Tallene er gyldige. Les merknadene under før du sender.</p>
+            ) : (
+              <p className="text-spruce">✓ Alt ser bra ut. Klar til innsending.</p>
+            ))}
           {validering && !validering.laster && !klar && (
             <div className="text-amber-800">
               <p className="font-medium">Noen ting bør rettes først:</p>
@@ -343,9 +346,9 @@ function BekreftModal({
             </div>
           )}
           {klar && (validering?.advarsler?.length ?? 0) > 0 && (
-            <div className="mt-2 text-xs text-muted-foreground">
-              <p>Merknader:</p>
-              <ul className="list-disc pl-5">
+            <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800">
+              <p className="font-medium">Merknader (ikke-blokkerende):</p>
+              <ul className="mt-1 list-disc space-y-1 pl-5">
                 {validering!.advarsler!.map((t, i) => (
                   <li key={i}>{t}</li>
                 ))}

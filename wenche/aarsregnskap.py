@@ -163,6 +163,23 @@ def advarsler(regnskap: Aarsregnskap) -> list[str]:
             "aksjonær eller tilbakebetaling av innbetalt kapital."
         )
 
+    # Sammenligningstall for fjoråret er påkrevd etter regnskapsloven § 6-6 for
+    # selskaper som ikke er nystiftet. Et selskap stiftet før regnskapsåret skal
+    # ha et fjorår å sammenligne med; er fjorårstallene helt tomme, mangler de
+    # sannsynligvis. (Ikke-blokkerende: et genuint hvilende selskap kan ha hatt
+    # reelt null i fjor, så dette er et varsku, ikke en hard feil.)
+    stiftelsesaar = regnskap.selskap.stiftelsesaar
+    fb = regnskap.foregaaende_aar_balanse
+    fjoraar_tomt = abs(fb.eiendeler.sum) < 0.01 and abs(fb.egenkapital_og_gjeld.sum) < 0.01
+    if stiftelsesaar and stiftelsesaar < regnskap.regnskapsaar and fjoraar_tomt:
+        adv.append(
+            f"Selskapet ble stiftet i {stiftelsesaar}, men det er ikke oppgitt "
+            f"sammenligningstall for fjoråret ({regnskap.regnskapsaar - 1}). "
+            "Regnskapsloven § 6-6 krever sammenligningstall for selskaper som ikke "
+            "er nystiftet. Fyll inn «Fjorårets tall», eller bekreft at fjoråret "
+            "faktisk var null hvis selskapet var helt uten aktivitet."
+        )
+
     return adv
 
 
