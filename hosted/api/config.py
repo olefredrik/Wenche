@@ -37,6 +37,9 @@ class Settings:
         self.vendor_orgnr = os.getenv("HOSTED_VENDOR_ORGNR")
         self._vendor_client_id = os.getenv("HOSTED_VENDOR_CLIENT_ID")
         self._vendor_kid = os.getenv("HOSTED_VENDOR_KID")
+        # Privat nøkkel: enten som PEM-innhold rett i en env-variabel (foretrukket i
+        # container/Fly, holder nøkkelen unna disk), eller som sti til en PEM-fil (dev).
+        self._vendor_key_pem = os.getenv("HOSTED_VENDOR_KEY_PEM")
         self._vendor_key_path = os.getenv("HOSTED_VENDOR_KEY_PATH")
         self._fail_closed_i_prod()
 
@@ -65,14 +68,21 @@ class Settings:
         """
         Operatørens Maskinporten-credentials, eller None hvis ikke konfigurert.
 
-        I prod bør den private nøkkelen hentes fra KMS i stedet for fil.
+        Nøkkelen tas fra HOSTED_VENDOR_KEY_PEM (PEM-innhold, foretrukket i prod/container,
+        f.eks. fra KMS/Fly-secret) eller HOSTED_VENDOR_KEY_PATH (fil, dev).
         """
-        if not (self._vendor_client_id and self._vendor_kid and self._vendor_key_path):
+        if not (self._vendor_client_id and self._vendor_kid):
+            return None
+        if self._vendor_key_pem:
+            pem = self._vendor_key_pem.encode()
+        elif self._vendor_key_path:
+            pem = Path(self._vendor_key_path).read_bytes()
+        else:
             return None
         return VendorCredentials(
             client_id=self._vendor_client_id,
             kid=self._vendor_kid,
-            private_key_pem=Path(self._vendor_key_path).read_bytes(),
+            private_key_pem=pem,
         )
 
 

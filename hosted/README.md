@@ -46,4 +46,42 @@ uvicorn hosted.api.main:app --reload --port 8000
 | `HOSTED_VENDOR_ORGNR` | Operatørens organisasjonsnummer (vendor). |
 | `HOSTED_VENDOR_CLIENT_ID` | Operatørens Maskinporten-klient-ID. |
 | `HOSTED_VENDOR_KID` | Operatørens nøkkel-ID (KID). |
-| `HOSTED_VENDOR_KEY_PATH` | Sti til operatørens private RSA-nøkkel (PEM). I prod: hent fra KMS. |
+| `HOSTED_VENDOR_KEY_PATH` | Sti til operatørens private RSA-nøkkel (PEM). Brukes i dev. |
+| `HOSTED_VENDOR_KEY_PEM` | Selve PEM-innholdet til nøkkelen. Foretrukket i prod/container (holder nøkkelen unna disk); settes som Fly-secret. Har forrang over `_PATH`. |
+
+## Deploy (Fly.io)
+
+Tjenesten kjøres som **én alltid-på container** på Fly.io i EØS-region (in-memory-sesjonen
+krever én prosess). `Dockerfile` og `fly.toml` ligger i repo-roten. Engangsoppsett:
+
+1. **Installer flyctl og logg inn:**
+   ```sh
+   curl -L https://fly.io/install.sh | sh
+   flyctl auth signup     # eller: flyctl auth login
+   ```
+2. **Opprett appen** (fra repo-roten). Velg appnavn + region (arn/Stockholm eller ams),
+   ikke deploy ennå:
+   ```sh
+   flyctl launch --no-deploy --copy-config --name <ditt-appnavn> --region arn
+   ```
+   Oppdater `app = "..."` i `fly.toml` til navnet du valgte.
+3. **Sett prod-hemmeligheter** (aldri i repoet):
+   ```sh
+   flyctl secrets set \
+     HOSTED_SESSION_SECRET="$(openssl rand -hex 32)" \
+     HOSTED_INVITE_SECRET="$(openssl rand -hex 32)" \
+     HOSTED_VENDOR_ORGNR="<operatørens orgnr>" \
+     HOSTED_VENDOR_CLIENT_ID="<maskinporten-klient-id, prod>" \
+     HOSTED_VENDOR_KID="<kid, prod>" \
+     HOSTED_VENDOR_KEY_PEM="$(cat operatør_prod.pem)"
+   ```
+   Sett også `HOSTED_PUBLIC_URL` (app-URL-en, til invite-lenkene), enten som secret eller i
+   `fly.toml` `[env]`. Uten egne secrets nekter appen å starte i prod (fail-closed).
+4. **Første deploy:** `flyctl deploy`. Test på `https://<appnavn>.fly.dev` (helsesjekk: `/api/health`).
+
+### Automatisk deploy ved merge til main
+`.github/workflows/deploy-hosted.yml` deployer ved push til `main`. Oppsett én gang:
+- Lag en deploy-token: `flyctl tokens create deploy`, og legg den som **repo-secret**
+  `FLY_API_TOKEN` (Settings → Secrets and variables → Actions).
+- Opprett et **`production`-environment** (Settings → Environments), gjerne låst til `main`
+  med påkrevd godkjenning. Fork-PR-er får hverken secret eller deploy.

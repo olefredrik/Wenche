@@ -1,0 +1,15 @@
+# Hold byggekonteksten liten og unngå å dra hemmeligheter/artefakter inn i imaget.
+.git
+.venv
+**/__pycache__
+**/*.pyc
+**/node_modules
+hosted/web/dist
+hosted/web/.vite
+**/.pytest_cache
+**/.mypy_cache
+site
+.env
+*.pem
+*.xml
+*.xbrl

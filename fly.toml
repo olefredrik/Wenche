@@ -1,0 +1,34 @@
+# Fly.io-konfig for den HOSTEDE Wenche-tjenesten (operatørselskapets drift).
+# Deploy: `flyctl deploy` lokalt, eller automatisk via .github/workflows/deploy-hosted.yml.
+# Hemmeligheter settes med `flyctl secrets set ...`, ALDRI her (denne fila er åpen kildekode).
+
+app = "wenche-hosted"          # bytt til ditt faktiske Fly-appnavn (settes av `flyctl launch`)
+primary_region = "arn"         # Stockholm, EØS. Alternativ: "ams" (Amsterdam).
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  WENCHE_ENV = "prod"
+  # Settes til din faktiske URL etter første deploy (brukes i invite-lenkene):
+  # HOSTED_PUBLIC_URL = "https://wenche-hosted.fly.dev"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # ALLTID PÅ: in-memory-sesjonen krever én levende prosess. Ikke skru på auto-stop,
+  # og ikke skaler til flere maskiner (da ville sesjoner spostes mellom dem).
+  auto_stop_machines = false
+  auto_start_machines = false
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "get"
+    path = "/api/health"
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "10s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
