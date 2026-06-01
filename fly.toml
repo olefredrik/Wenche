@@ -9,9 +9,11 @@ primary_region = "arn"         # Stockholm, EØS. Alternativ: "ams" (Amsterdam).
   dockerfile = "Dockerfile"
 
 [env]
-  WENCHE_ENV = "prod"
-  # Settes til din faktiske URL etter første deploy (brukes i invite-lenkene):
-  # HOSTED_PUBLIC_URL = "https://wenche-hosted.fly.dev"
+  # Testfase mot tt02. Flip til "prod" når operatørselskapets prod-Maskinporten er klar
+  # (og pass på at prod-secrets er satt, ellers fail-closer appen).
+  WENCHE_ENV = "test"
+  # App-URL brukt i invite-lenkene. Oppdateres til https://app.wenche.cloud når domenet kobles.
+  HOSTED_PUBLIC_URL = "https://wenche-hosted.fly.dev"
 
 [http_service]
   internal_port = 8080
