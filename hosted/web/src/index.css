@@ -38,3 +38,15 @@ body {
   font-weight: 500;
   letter-spacing: 0;
 }
+
+/* Tailwind 4 gir ikke lenger knapper cursor: pointer automatisk. Gjør alle
+   klikkbare flater tydelig klikkbare (lenker har det fra før). */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  label:has(input[type="checkbox"]:not(:disabled)),
+  summary {
+    cursor: pointer;
+  }
+}
