@@ -4,6 +4,7 @@ import { DataSkjema, kr, oppsummer } from "./skjema";
 
 interface Me {
   invited: boolean;
+  invite_org?: string | null;
   kunde_org?: string | null;
 }
 
@@ -12,8 +13,6 @@ const btnPrimar =
   "rounded-full bg-spruce px-5 py-2.5 text-sm font-medium text-background transition hover:brightness-110 disabled:opacity-40";
 const btnOutline =
   "rounded-full border border-foreground px-5 py-2.5 text-sm font-medium transition hover:bg-foreground hover:text-background disabled:opacity-40";
-const input =
-  "w-full rounded-md border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-spruce";
 
 function Skall({ children }: { children: React.ReactNode }) {
   return (
@@ -52,16 +51,17 @@ function KunInviterte() {
   );
 }
 
-function Onboarding({ onApproved }: { onApproved: () => void }) {
-  const [org, setOrg] = useState("");
+function Onboarding({ org, onApproved }: { org?: string | null; onApproved: () => void }) {
   const [confirmUrl, setConfirmUrl] = useState<string | null>(null);
   const [feil, setFeil] = useState<string | null>(null);
+  const [kobler, setKobler] = useState(false);
 
   const koble = async () => {
     setFeil(null);
     setConfirmUrl(null);
+    setKobler(true);
     try {
-      const r = await api.systembrukerRequest(org.trim());
+      const r = await api.systembrukerRequest();
       if (r.godkjent || r.status === "AlreadyApproved") {
         onApproved();
       } else {
@@ -69,6 +69,8 @@ function Onboarding({ onApproved }: { onApproved: () => void }) {
       }
     } catch (e) {
       setFeil((e as Error).message);
+    } finally {
+      setKobler(false);
     }
   };
 
@@ -76,21 +78,27 @@ function Onboarding({ onApproved }: { onApproved: () => void }) {
     <Kort>
       <p className={monoLabel}>Steg 1 · Koble selskap</p>
       <h2 className="mt-3 font-display text-2xl font-normal">Koble til selskapet ditt</h2>
-      <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-        Oppgi organisasjonsnummeret. Første gang må daglig leder eller styreleder godkjenne
-        Wenche i Altinn med BankID. Har selskapet allerede godkjent, kobles du til direkte.
-      </p>
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-        <input
-          className={input}
-          placeholder="9 siffer"
-          value={org}
-          onChange={(e) => setOrg(e.target.value)}
-        />
-        <button className={btnPrimar} onClick={koble} disabled={!org}>
-          Koble systembruker
-        </button>
-      </div>
+      {org ? (
+        <>
+          <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+            Invitasjonen din gjelder selskapet under. Første gang må daglig leder eller
+            styreleder godkjenne Wenche i Altinn med BankID. Har selskapet allerede godkjent,
+            kobles du til direkte.
+          </p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="rounded-md border border-border bg-background px-4 py-2.5 text-sm">
+              <span className={monoLabel}>Org</span> <span className="font-mono">{org}</span>
+            </div>
+            <button className={btnPrimar} onClick={koble} disabled={kobler}>
+              {kobler ? "Kobler…" : "Koble systembruker"}
+            </button>
+          </div>
+        </>
+      ) : (
+        <p className="mt-4 text-sm text-red-700">
+          Invite-lenken er ikke knyttet til et selskap. Be om en ny lenke.
+        </p>
+      )}
       {confirmUrl && (
         <div className="mt-5 rounded-sm border border-border bg-background p-4 text-sm">
           <p className="text-muted-foreground">Godkjenn i Altinn, så kom tilbake:</p>
@@ -488,7 +496,7 @@ function Hjem({ me, onChange }: { me: Me; onChange: () => void }) {
           Logg ut
         </button>
       </div>
-      {me.kunde_org ? <Innsending /> : <Onboarding onApproved={onChange} />}
+      {me.kunde_org ? <Innsending /> : <Onboarding org={me.invite_org} onApproved={onChange} />}
     </div>
   );
 }

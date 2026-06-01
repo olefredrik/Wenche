@@ -29,6 +29,17 @@ def krev_vendor() -> tuple[VendorCredentials, str]:
     return creds, s.vendor_orgnr
 
 
+def krev_invite_org(request: Request) -> str:
+    """Org-en invitasjonen gjelder, autoritativt fra den signerte invite-lenken (ikke brukerinput)."""
+    org = request.session.get("invite_org")
+    if not org:
+        raise HTTPException(
+            status_code=409,
+            detail="Invite-lenken er ikke knyttet til et selskap. Be om en ny lenke.",
+        )
+    return str(org).strip()
+
+
 def krev_kunde_org(st: sesjon.SessionState) -> str:
     if not st.kunde_org:
         raise HTTPException(

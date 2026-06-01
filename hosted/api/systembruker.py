@@ -13,32 +13,30 @@ sesjonen, ikke i filer.
 import logging
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
 
 from wenche import systembruker as wsb
 
-from .deps import admin_token, krev_invitert, krev_vendor
+from .deps import admin_token, krev_invite_org, krev_invitert, krev_vendor
 
 logger = logging.getLogger("wenche.hosted.systembruker")
 router = APIRouter(prefix="/api/systembruker", tags=["systembruker"])
 
 
-class OrgForespoersel(BaseModel):
-    org: str
-
-
 @router.post("/request")
-def request_systembruker(body: OrgForespoersel, request: Request) -> dict:
+def request_systembruker(request: Request) -> dict:
     """
-    Start systembruker-onboarding for kundens org.
+    Start systembruker-onboarding for selskapet i invitasjonen.
+
+    Org-en kommer fra den signerte invite-lenken (krev_invite_org), ikke fra brukerinput,
+    så ingen kan be om eller bindes til et selskap de ikke er invitert for.
 
     Gjenkommende kunde: har org allerede en godkjent systembruker for vårt system,
     bindes kunde-org direkte (ingen ny BankID-godkjenning). Ny kunde: opprett
     forespørsel og returner godkjenningslenke.
     """
     st = krev_invitert(request)
+    org = krev_invite_org(request)
     creds, vendor_orgnr = krev_vendor()
-    org = body.org.strip()
     token = admin_token(creds)
     eksisterende = wsb.hent_systembrukere(token, vendor_orgnr)
     if any(b.get("reporteeOrgNo") == org for b in eksisterende):

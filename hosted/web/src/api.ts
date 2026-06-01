@@ -27,8 +27,7 @@ export const api = {
   invite: (token: string) =>
     req("/api/auth/invite", { method: "POST", body: JSON.stringify({ token }) }),
   logout: () => req("/api/auth/logout", { method: "POST" }),
-  systembrukerRequest: (org: string) =>
-    req("/api/systembruker/request", { method: "POST", body: JSON.stringify({ org }) }),
+  systembrukerRequest: () => req("/api/systembruker/request", { method: "POST" }),
   putData: (config: unknown) =>
     req("/api/data", { method: "PUT", body: JSON.stringify(config) }),
   innsending: (type: string, dryRun: boolean) =>

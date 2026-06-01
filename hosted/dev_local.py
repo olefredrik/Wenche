@@ -56,9 +56,12 @@ if __name__ == "__main__":
     import uvicorn
     from itsdangerous import URLSafeSerializer
 
+    # Per-org invite-lenke for dev. Default-org er test-selskapet eksempeldataene bruker;
+    # overstyr med HOSTED_DEV_ORG=<orgnr> ved behov.
+    _dev_org = os.environ.get("HOSTED_DEV_ORG", "314273818")
     _token = URLSafeSerializer(
         os.environ["HOSTED_INVITE_SECRET"], salt="invite"
-    ).dumps("wenche-invite")
+    ).dumps({"org": _dev_org})
     print("Hosted Wenche (dev/test) -> http://127.0.0.1:8077")
-    print(f"Invite-lenke (åpne i SPA-en): {os.environ['HOSTED_PUBLIC_URL']}/?invite={_token}")
+    print(f"Invite-lenke (org {_dev_org}, åpne i SPA-en): {os.environ['HOSTED_PUBLIC_URL']}/?invite={_token}")
     uvicorn.run("hosted.api.main:app", host="127.0.0.1", port=8077, reload=True)
