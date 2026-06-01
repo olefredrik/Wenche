@@ -111,6 +111,31 @@ def sjekk_skattemelding(orgnr: str, aar: int) -> FristStatus:
 
 
 def _utfør_skattemelding_sjekk(token: str, orgnr: str, aar: int) -> FristStatus:
+    status, tilgjengelig = _hent_skattemelding_status(token, orgnr, aar)
+
+    # Så snart årets frist har passert ruller Hjem-fanen fram til neste frist og
+    # spør om det kommende inntektsåret. Det året har Skatteetaten ennå ikke
+    # åpnet (svarer 403/404), så for en bruker som nettopp har levert ville
+    # kortet ellers vist en forvirrende "ikke klargjort"-status rett etter
+    # innsending. Når det forespurte året ikke er tilgjengelig, sjekk derfor om
+    # fjorårets melding er levert og bekreft heller den.
+    if not tilgjengelig:
+        forrige, _ = _hent_skattemelding_status(token, orgnr, aar - 1)
+        if forrige.innfridd:
+            return forrige
+
+    return status
+
+
+def _hent_skattemelding_status(token: str, orgnr: str, aar: int) -> tuple[FristStatus, bool]:
+    """Hent skattemeldingstatus for ett konkret år.
+
+    Returnerer (status, tilgjengelig). `tilgjengelig=False` betyr at Skatteetaten
+    ikke har en skattemelding å vise for orgnr/år (HTTP 403/404) — da kan
+    kalleren trygt falle tilbake til fjoråret. Transiente feil (5xx, nettverk,
+    ugyldig svar) gir `tilgjengelig=True` slik at de ikke trigger fallback som
+    ville skjult den reelle feilen.
+    """
     base = _SKD_BASES["prod"]
 
     try:
@@ -123,26 +148,29 @@ def _utfør_skattemelding_sjekk(token: str, orgnr: str, aar: int) -> FristStatus
             timeout=30,
         )
     except httpx.HTTPError:
-        return FristStatus(beskrivelse="Kunne ikke kontakte Skatteetaten")
+        return FristStatus(beskrivelse="Kunne ikke kontakte Skatteetaten"), True
 
-    # 404 fra Skatteetaten betyr at ingen skattemelding er klargjort for orgnr/år
-    # ennå — det er normal status før forhåndsutfylt utkast publiseres.
-    if resp.status_code == 404:
+    # 404 betyr at ingen skattemelding er klargjort for orgnr/år ennå. 403 får vi
+    # når året ikke er åpnet for oppslag (typisk det kommende inntektsåret som
+    # ikke er avsluttet). Begge betyr i praksis "ingen melding å vise for {aar}":
+    # vis en forklarende status framfor en kryptisk HTTP-kode, og la kalleren
+    # falle tilbake til fjoråret.
+    if resp.status_code in (403, 404):
         return FristStatus(
             beskrivelse="Ikke klargjort ennå",
             brukertekst=(
                 f"Skatteetaten har ikke klargjort skattemelding for {aar} ennå. "
                 "Forhåndsutfylt utkast kommer normalt i mars/april."
             ),
-        )
+        ), False
 
     if not resp.is_success:
-        return FristStatus(beskrivelse=f"Skatteetaten svarte med HTTP {resp.status_code}")
+        return FristStatus(beskrivelse=f"Skatteetaten svarte med HTTP {resp.status_code}"), True
 
     try:
         root = ET.fromstring(resp.text)
     except ET.ParseError:
-        return FristStatus(beskrivelse="Ugyldig svar fra Skatteetaten")
+        return FristStatus(beskrivelse="Ugyldig svar fra Skatteetaten"), True
 
     # <type>-elementet i wrapper-XML-en angir dokumentstatus.
     # Sammenlign eksakt mot kjente "fastsatt"-typer fra XSDen — delstreng-match
@@ -155,12 +183,12 @@ def _utfør_skattemelding_sjekk(token: str, orgnr: str, aar: int) -> FristStatus
                 innfridd=True,
                 brukertekst=f"Skattemeldingen for {aar} er sendt inn og godkjent.",
                 lenke=f"https://af.altinn.no/?party=urn%3Aaltinn%3Aorganization%3Aidentifier-no%3A{orgnr}",
-            )
+            ), True
 
     return FristStatus(
         beskrivelse="Ikke innsendt",
         brukertekst=f"Skattemeldingen for {aar} er ikke innsendt ennå.",
-    )
+    ), True
 
 
 def sjekk_aarsregnskap(orgnr: str, aar: int) -> FristStatus:
