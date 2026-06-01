@@ -14,6 +14,8 @@ const btnPrimar =
   "rounded-full bg-spruce px-5 py-2.5 text-sm font-medium text-background transition hover:brightness-110 disabled:opacity-40";
 const btnOutline =
   "rounded-full border border-foreground px-5 py-2.5 text-sm font-medium transition hover:bg-foreground hover:text-background disabled:opacity-40";
+// Lenke til vilkårene (bor på markedssiden wenche-web). TODO: sett til endelig wenche-web-URL.
+const VILKAAR_URL = "https://wenche-web.vercel.app/vilkaar";
 
 function Skall({ children }: { children: React.ReactNode }) {
   return (
@@ -369,6 +371,7 @@ function BekreftModal({
   onBekreft: () => void;
   onAvbryt: () => void;
 }) {
+  const [godtatt, setGodtatt] = useState(false);
   const klar = validering?.ok === true;
   return (
     <div
@@ -427,6 +430,31 @@ function BekreftModal({
           Sendes til myndighetene via Altinn, og er bindende.
         </p>
 
+        {klar && (
+          <label className="mt-4 flex items-start gap-2 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 accent-[oklch(0.46_0.08_155)]"
+              checked={godtatt}
+              onChange={(e) => setGodtatt(e.target.checked)}
+            />
+            <span>
+              Jeg har lest og godtar{" "}
+              <a
+                href={VILKAAR_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-spruce underline-offset-2 hover:underline"
+              >
+                vilkårene
+              </a>
+              , sender på eget ansvar, og bekrefter at jeg har fullmakt til å sende på vegne
+              av selskapet og at tallene er korrekte. OFL Holding AS kan ikke holdes ansvarlig
+              for feil eller tap ved bruk av tjenesten.
+            </span>
+          </label>
+        )}
+
         <div className="mt-5 flex items-center justify-end gap-3">
           <button className={btnOutline} onClick={onAvbryt} disabled={sender}>
             Avbryt
@@ -434,7 +462,7 @@ function BekreftModal({
           <button
             className={`${btnPrimar} min-w-52 text-center`}
             onClick={onBekreft}
-            disabled={!klar || sender}
+            disabled={!klar || sender || !godtatt}
           >
             {sender ? "Sender…" : "Bekreft og send inn"}
           </button>

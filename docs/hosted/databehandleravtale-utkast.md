@@ -6,7 +6,7 @@
 Avtale i henhold til personvernforordningen (GDPR) artikkel 28, mellom:
 
 - **Behandlingsansvarlig:** kunden, `[selskapsnavn]`, org.nr. `[…]` («Kunden»)
-- **Databehandler:** Operatørselskapet, `[nytt datterselskap av OFL Holding AS]`, org.nr. `[…]` («Operatøren»)
+- **Databehandler:** OFL Holding AS, org.nr. 922 020 523 («Operatøren»)
 
 ## 1. Bakgrunn og formål
 Operatøren drifter en nettjeneste som lar Kunden sende inn årsregnskap, skattemelding og
