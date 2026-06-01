@@ -147,11 +147,21 @@ function SeksjonsNav({ visSend }: { visSend: boolean }) {
   );
 }
 
+interface Validering {
+  laster: boolean;
+  ok?: boolean;
+  feil?: string[];
+  advarsler?: string[];
+  melding?: string;
+}
+
 function Innsending() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [config, setConfig] = useState<any | null>(null);
   const [lagreFeil, setLagreFeil] = useState<string | null>(null);
-  const [aktiv, setAktiv] = useState<string | null>(null);
+  const [bekreft, setBekreft] = useState<{ type: string; navn: string } | null>(null);
+  const [validering, setValidering] = useState<Validering | null>(null);
+  const [sender, setSender] = useState(false);
   const [utfall, setUtfall] = useState<Utfall | null>(null);
 
   const lagre = async (c: unknown) => {
@@ -164,16 +174,43 @@ function Innsending() {
     }
   };
 
-  const kjor = async (type: string, dryRun: boolean) => {
-    setAktiv(`${type}:${dryRun}`);
+  // Steg 1 av innsending: åpne bekreft-modal og kontroller tallene (dry-run).
+  const aapneBekreft = async (type: string, navn: string) => {
     setUtfall(null);
+    setBekreft({ type, navn });
+    setValidering({ laster: true });
     try {
-      const data = await api.innsending(type, dryRun);
-      setUtfall({ dryRun, type, data });
+      const data = await api.innsending(type, true);
+      const feil: string[] = data.feil ?? [];
+      setValidering({
+        laster: false,
+        ok: !!data.ok && feil.length === 0,
+        feil,
+        advarsler: data.advarsler ?? [],
+      });
     } catch (e) {
-      setUtfall({ dryRun, type, feil: (e as Error).message });
+      setValidering({ laster: false, ok: false, melding: (e as Error).message });
+    }
+  };
+
+  const lukkBekreft = () => {
+    setBekreft(null);
+    setValidering(null);
+  };
+
+  // Steg 2: brukeren har bekreftet, send inn på ekte.
+  const bekreftSend = async () => {
+    if (!bekreft) return;
+    const { type } = bekreft;
+    setSender(true);
+    try {
+      const data = await api.innsending(type, false);
+      setUtfall({ dryRun: false, type, data });
+    } catch (e) {
+      setUtfall({ dryRun: false, type, feil: (e as Error).message });
     } finally {
-      setAktiv(null);
+      setSender(false);
+      lukkBekreft();
     }
   };
 
@@ -210,26 +247,23 @@ function Innsending() {
                 )}
               </p>
             </div>
-            <p className="mt-4 text-sm text-muted-foreground">
-              Kjør gjerne en dry-run (sender ingenting), og send inn når du er klar.
+            <p className="mt-4 flex items-start gap-2 text-sm text-muted-foreground">
+              <span className="text-spruce">✓</span>
+              <span>
+                Trygt: når du trykker «Send inn», kontrollerer Wenche tallene og viser deg en
+                oppsummering. Ingenting sendes til myndighetene før du bekrefter.
+              </span>
             </p>
             <div className="mt-5 space-y-3">
               {typer.map(([t, navn]) => (
                 <div key={t} className="flex flex-wrap items-center gap-3">
                   <span className="w-40 text-sm">{navn}</span>
                   <button
-                    className={btnOutline}
-                    disabled={aktiv !== null}
-                    onClick={() => kjor(t, true)}
-                  >
-                    {aktiv === `${t}:true` ? "Kjører…" : "Dry-run"}
-                  </button>
-                  <button
                     className={btnPrimar}
-                    disabled={aktiv !== null}
-                    onClick={() => kjor(t, false)}
+                    disabled={bekreft !== null || sender}
+                    onClick={() => aapneBekreft(t, navn)}
                   >
-                    {aktiv === `${t}:false` ? "Sender…" : "Send inn"}
+                    Send inn …
                   </button>
                 </div>
               ))}
@@ -238,6 +272,101 @@ function Innsending() {
           </div>
         </Kort>
       )}
+
+      {bekreft && o && (
+        <BekreftModal
+          navn={bekreft.navn}
+          o={o}
+          validering={validering}
+          sender={sender}
+          onBekreft={bekreftSend}
+          onAvbryt={lukkBekreft}
+        />
+      )}
+    </div>
+  );
+}
+
+function BekreftModal({
+  navn,
+  o,
+  validering,
+  sender,
+  onBekreft,
+  onAvbryt,
+}: {
+  navn: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  o: any;
+  validering: Validering | null;
+  sender: boolean;
+  onBekreft: () => void;
+  onAvbryt: () => void;
+}) {
+  const klar = validering?.ok === true;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 p-4"
+      onClick={onAvbryt}
+    >
+      <div
+        className="w-full max-w-md rounded-sm border border-border bg-background p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className={monoLabel}>Bekreft innsending</p>
+        <h3 className="mt-2 font-display text-xl font-normal">{navn}</h3>
+
+        <div className="mt-4 rounded-sm border border-border bg-paper p-4 text-sm">
+          <p className="font-medium">
+            {o.navn || "Selskap"} · org {o.org}
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            Regnskapsår {o.aar} · {o.antallAksjonaerer} aksjonær(er) ·{" "}
+            {o.balansererOk ? "balansen går opp" : `balanse-differanse ${kr(o.balanseDiff)}`}
+          </p>
+        </div>
+
+        <div className="mt-4 text-sm">
+          {validering?.laster && <p className="text-muted-foreground">Kontrollerer tallene…</p>}
+          {validering && !validering.laster && klar && (
+            <p className="text-spruce">✓ Alt ser bra ut. Klar til innsending.</p>
+          )}
+          {validering && !validering.laster && !klar && (
+            <div className="text-amber-800">
+              <p className="font-medium">Noen ting bør rettes først:</p>
+              <ul className="mt-1 list-disc space-y-1 pl-5">
+                {(validering.feil ?? []).map((t, i) => (
+                  <li key={i}>{t}</li>
+                ))}
+                {validering.melding && <li>{validering.melding}</li>}
+              </ul>
+            </div>
+          )}
+          {klar && (validering?.advarsler?.length ?? 0) > 0 && (
+            <div className="mt-2 text-xs text-muted-foreground">
+              <p>Merknader:</p>
+              <ul className="list-disc pl-5">
+                {validering!.advarsler!.map((t, i) => (
+                  <li key={i}>{t}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        <p className="mt-4 text-xs text-muted-foreground">
+          Sendes til myndighetene via Altinn, og er bindende.
+        </p>
+
+        <div className="mt-5 flex items-center justify-end gap-3">
+          <button className={btnOutline} onClick={onAvbryt} disabled={sender}>
+            Avbryt
+          </button>
+          <button className={btnPrimar} onClick={onBekreft} disabled={!klar || sender}>
+            {sender ? "Sender…" : "Bekreft og send inn"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
