@@ -9,9 +9,9 @@ primary_region = "arn"         # Stockholm, EØS. Alternativ: "ams" (Amsterdam).
   dockerfile = "Dockerfile"
 
 [env]
-  # Testfase mot tt02. Flip til "prod" når operatørselskapets prod-Maskinporten er klar
-  # (og pass på at prod-secrets er satt, ellers fail-closer appen).
-  WENCHE_ENV = "test"
+  # PROD: invite-only prod-drift. Krever prod-vendor-secrets satt (ellers fail-closer appen).
+  # Flip til "test" igjen for å peke mot tt02.
+  WENCHE_ENV = "prod"
   # App-URL brukt i invite-lenkene.
   HOSTED_PUBLIC_URL = "https://app.wenche.cloud"
 
