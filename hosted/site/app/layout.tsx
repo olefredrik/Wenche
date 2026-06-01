@@ -1,18 +1,38 @@
 import type { Metadata } from "next";
-import { Fraunces, Inter } from "next/font/google";
+import { Caveat, Inter_Tight, JetBrains_Mono, Newsreader } from "next/font/google";
 import "./globals.css";
 
-const fraunces = Fraunces({
+const newsreader = Newsreader({
   subsets: ["latin"],
-  variable: "--font-fraunces",
-  weight: ["400", "600"],
+  variable: "--font-newsreader",
+  weight: ["300", "400", "500", "600"],
+  style: ["normal"],
+  display: "swap",
 });
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const interTight = Inter_Tight({
+  subsets: ["latin"],
+  variable: "--font-inter-tight",
+  weight: ["400", "500", "600"],
+  display: "swap",
+});
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains",
+  weight: ["400", "500"],
+  display: "swap",
+});
+const caveat = Caveat({
+  subsets: ["latin"],
+  variable: "--font-caveat",
+  weight: ["500", "600"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
-  title: "Wenche, årsoppgjør for holdingselskapet",
+  title: "Wenche, årsoppgjøret for ditt holdingselskap",
   description:
-    "Wenche tar årsregnskap, skattemelding og aksjonærregister for passive holdingselskaper, sendt rett til Altinn og Skatteetaten. Du fyller inn tallene; Wenche ordner resten.",
+    "Wenche sender inn årsregnskap, skattemelding og aksjonærregisteroppgave for små, passive holdingselskaper rett til Altinn. Foreløpig kun for spesielt inviterte.",
+  authors: [{ name: "Ole Fredrik Lie" }],
 };
 
 export default function RootLayout({
@@ -21,7 +41,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="nb" className={`${fraunces.variable} ${inter.variable}`}>
+    <html
+      lang="nb"
+      className={`${newsreader.variable} ${interTight.variable} ${jetbrainsMono.variable} ${caveat.variable}`}
+    >
       <body>{children}</body>
     </html>
   );
