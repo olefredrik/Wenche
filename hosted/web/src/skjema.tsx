@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import yaml from "js-yaml";
 
 // Skjema-drevet datainntasting. Feltstrukturen er data; én generisk renderer bygger
@@ -290,6 +290,22 @@ export function DataSkjema({
   const [importMelding, setImportMelding] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const filRef = useRef<HTMLInputElement>(null);
+
+  // Advar mot å forlate siden (logo-/tilbake-klikk, nettleser-tilbake, lukke fane) hvis
+  // skjemaet har ulagret innhold, så en bruker ikke mister utfyllingen ved et uhell.
+  const pristine = useRef(JSON.stringify(grunnConfig()));
+  const configRef = useRef(config);
+  configRef.current = config;
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (JSON.stringify(configRef.current) !== pristine.current) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, []);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const oppdater = (key: string, val: any) => setConfig((c: any) => sett(c, key, val));

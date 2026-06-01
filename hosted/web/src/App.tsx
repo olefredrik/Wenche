@@ -23,7 +23,12 @@ function Skall({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-50 border-b border-border bg-background/85 backdrop-blur-sm">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-6 py-4">
           <span className="font-display text-2xl font-medium tracking-tight">Wenche</span>
-          <span className="hidden text-xs text-muted-foreground sm:inline">Enkel innsending for holdingselskap</span>
+          <a
+            href="https://www.wenche.cloud"
+            className="text-xs text-muted-foreground transition hover:text-spruce"
+          >
+            ← wenche.cloud
+          </a>
         </div>
       </header>
       <main className="mx-auto max-w-2xl px-6 py-12">{children}</main>
