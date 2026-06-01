@@ -31,4 +31,5 @@ primary_region = "arn"         # Stockholm, EØS. Alternativ: "ams" (Amsterdam).
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "512mb"
+  memory = "256mb"          # billigste nivå (~2 USD/mnd). Bump til "512mb" KUN hvis
+                            # du ser OOM-/restart i Fly-dashbordet under faktisk bruk.
