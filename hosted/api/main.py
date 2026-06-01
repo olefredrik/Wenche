@@ -6,10 +6,12 @@ ephemeral sesjon, ingen database. Onboarding: per-org invite-lenke + Altinn syst
 godkjenning (BankID). Serverer også den bygde SPA-en (web/dist) på samme origin i prod.
 Self-hosted NiceGUI-appen (`wenche/ui.py`) er upåvirket. Se hosted/README.md.
 """
+import os
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -58,8 +60,25 @@ def health() -> dict:
 
 
 # Server den bygde SPA-en fra samme origin i prod (slipper CORS/cookie-kryssorigin).
-# Monteres SIST, så /api/*-rutene over matcher først; html=True gir index.html på "/".
 # I dev finnes ikke dist (Vite serverer SPA-en på 5173), så dette er en no-op da.
 _SPA_DIST = Path(__file__).resolve().parent.parent / "web" / "dist"
 if _SPA_DIST.is_dir():
+    # index.html serveres via egen rute så vi kan injisere anonymisert Umami-statistikk
+    # (env-styrt, ingen verdier i repoet). data-auto-track="false": SPA-en sporer manuelt
+    # FØRST etter at invite-tokenet er fjernet fra URL-en, så tokenet aldri når analytics.
+    _index_html = (_SPA_DIST / "index.html").read_text(encoding="utf-8")
+    _umami_src = os.getenv("HOSTED_UMAMI_SRC")
+    _umami_id = os.getenv("HOSTED_UMAMI_WEBSITE_ID")
+    if _umami_src and _umami_id:
+        _tag = (
+            f'<script defer src="{_umami_src}" data-website-id="{_umami_id}" '
+            'data-auto-track="false"></script>'
+        )
+        _index_html = _index_html.replace("</head>", _tag + "</head>")
+
+    @app.get("/", response_class=HTMLResponse, include_in_schema=False)
+    def spa_index() -> HTMLResponse:
+        return HTMLResponse(_index_html)
+
+    # Resten (assets m.m.) serveres statisk. Montert SIST, så /api/* + "/" matcher først.
     app.mount("/", StaticFiles(directory=_SPA_DIST, html=True), name="spa")

@@ -41,6 +41,8 @@ Per-org invite-lenker lages med `./.venv/bin/python hosted/mint_invite.py <orgnr
 | `HOSTED_VENDOR_KID` | Operatørens nøkkel-ID (KID). |
 | `HOSTED_VENDOR_KEY_PATH` | Sti til operatørens private RSA-nøkkel (PEM). Brukes i dev. |
 | `HOSTED_VENDOR_KEY_PEM` | Selve PEM-innholdet til nøkkelen. Foretrukket i prod/container (holder nøkkelen unna disk); settes som Fly-secret. Har forrang over `_PATH`. |
+| `HOSTED_UMAMI_SRC` | (valgfri) URL til Umami-script. Injiseres i `index.html` ved servering. Tom = ingen analytics. (Self-host i EØS for region-garanti; cloud.umami.is sin region er ikke bekreftet.) |
+| `HOSTED_UMAMI_WEBSITE_ID` | (valgfri) Umami website-id. Sammen med `_SRC` skrur det på anonymisert sporing (auto-track av; SPA-en sporer manuelt etter at invite-tokenet er fjernet fra URL-en). |
 
 ## Deploy (Fly.io)
 

@@ -617,6 +617,15 @@ function Hjem({ me, onChange }: { me: Me; onChange: () => void }) {
   );
 }
 
+// Manuell Umami-pageview (auto-track er av i index.html). Kalles FØRST etter at
+// invite-tokenet er fjernet fra URL-en, så tokenet aldri sendes til analytics.
+function sporVisning() {
+  const w = window as Window & { umami?: { track?: () => void } };
+  const kjor = () => w.umami?.track?.();
+  if (w.umami) kjor();
+  else window.addEventListener("load", kjor, { once: true });
+}
+
 export default function App() {
   const [me, setMe] = useState<Me | null>(null);
 
@@ -633,9 +642,11 @@ export default function App() {
         .finally(() => {
           window.history.replaceState({}, "", window.location.pathname);
           refresh();
+          sporVisning();
         });
     } else {
       refresh();
+      sporVisning();
     }
   }, []);
 
