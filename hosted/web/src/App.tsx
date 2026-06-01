@@ -306,11 +306,11 @@ function BekreftModal({
   const klar = validering?.ok === true;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4 backdrop-blur-sm"
       onClick={onAvbryt}
     >
       <div
-        className="w-full max-w-md rounded-sm border border-border bg-background p-6"
+        className="w-full max-w-md rounded-sm border border-border bg-background p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <p className={monoLabel}>Bekreft innsending</p>
