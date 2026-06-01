@@ -250,8 +250,8 @@ function Innsending() {
             <p className="mt-4 flex items-start gap-2 text-sm text-muted-foreground">
               <span className="text-spruce">✓</span>
               <span>
-                Trygt: når du trykker «Send inn», kontrollerer Wenche tallene og viser deg en
-                oppsummering. Ingenting sendes til myndighetene før du bekrefter.
+                Trygt: når du trykker «Fortsett til innsending», kontrollerer Wenche tallene og
+                viser deg en oppsummering. Ingenting sendes til myndighetene før du bekrefter.
               </span>
             </p>
             <div className="mt-5 space-y-3">
@@ -263,7 +263,7 @@ function Innsending() {
                     disabled={bekreft !== null || sender}
                     onClick={() => aapneBekreft(t, navn)}
                   >
-                    Send inn …
+                    Fortsett til innsending
                   </button>
                 </div>
               ))}
