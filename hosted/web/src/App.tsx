@@ -609,13 +609,26 @@ export default function App() {
     }
   }, []);
 
-  // Keep-alive-heartbeat: holder Fly-maskinen våken mens appen er åpen, så scale-to-zero
-  // ikke sovner midt i en økt og mister in-memory-tilstanden. Lett GET mot /api/health.
+  // Keep-alive-heartbeat: holder Fly-maskinen våken mens appen er i AKTIV bruk, så scale-to-zero
+  // ikke sovner midt i en økt. Pinger KUN når fanen er synlig OG brukeren har vært aktiv siste
+  // 10 min, så en glemt åpen fane lar maskinen sove (ingen løpsk kostnad). Trygt å la den sove
+  // takket være at klienten er fasit + selvhelende binding.
   useEffect(() => {
+    let sisteAktivitet = Date.now();
+    const merkAktiv = () => {
+      sisteAktivitet = Date.now();
+    };
+    const hendelser = ["mousemove", "keydown", "click", "touchstart", "scroll"];
+    hendelser.forEach((e) => window.addEventListener(e, merkAktiv, { passive: true }));
     const id = setInterval(() => {
-      fetch("/api/health").catch(() => {});
+      const aktiv =
+        document.visibilityState === "visible" && Date.now() - sisteAktivitet < 10 * 60 * 1000;
+      if (aktiv) fetch("/api/health").catch(() => {});
     }, 45000);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      hendelser.forEach((e) => window.removeEventListener(e, merkAktiv));
+    };
   }, []);
 
   return (
