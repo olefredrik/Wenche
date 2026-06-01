@@ -43,10 +43,13 @@ def _format_paalydende(verdi: float) -> str:
     return f"{rundet:.6f}".rstrip("0").rstrip(".")
 
 
-def les_config(config_fil: str) -> Aksjonaerregisteroppgave:
-    """Leser config.yaml og returnerer en Aksjonaerregisteroppgave."""
-    with open(config_fil, encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
+def les_config(config_fil: str | dict) -> Aksjonaerregisteroppgave:
+    """Leser config (filsti eller allerede parset dict) og returnerer en Aksjonaerregisteroppgave."""
+    if isinstance(config_fil, dict):
+        cfg = config_fil
+    else:
+        with open(config_fil, encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
 
     s = cfg["selskap"]
     selskap = Selskap(

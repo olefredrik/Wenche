@@ -1,0 +1,33 @@
+# Deployer den hostede Wenche-tjenesten til Fly.io.
+#
+# MANUELL utløsing (workflow_dispatch) med vilje, så merge til main IKKE auto-deployer.
+# Vi deployer foreløpig manuelt med `flyctl deploy --remote-only` lokalt. Vil du senere ha
+# auto-deploy ved merge til main, legg tilbake en `push:`-trigger + sett FLY_API_TOKEN.
+#
+# Sikkerhet (åpen kildekode): kjører aldri fra fork-PR-er, og GitHub eksponerer ikke secrets
+# til fork-workflows. FLY_API_TOKEN bor i GitHub-secret, aldri i repoet.
+#
+# Forutsetninger for å bruke denne (Settings → Actions, kjør manuelt):
+#   1. Fly-appen finnes (`flyctl launch`/`apps create`), app-navnet matcher fly.toml.
+#   2. Secrets satt med `flyctl secrets set ...` (session/invite/vendor).
+#   3. GitHub: repo-secret FLY_API_TOKEN + et "production"-environment.
+
+name: Deploy hosted
+
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-hosted
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

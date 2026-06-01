@@ -1,0 +1,41 @@
+# Fly.io-konfig for den HOSTEDE Wenche-tjenesten (operatørselskapets drift).
+# Deploy: `flyctl deploy` lokalt, eller automatisk via .github/workflows/deploy-hosted.yml.
+# Hemmeligheter settes med `flyctl secrets set ...`, ALDRI her (denne fila er åpen kildekode).
+
+app = "wenche-hosted"          # bytt til ditt faktiske Fly-appnavn (settes av `flyctl launch`)
+primary_region = "arn"         # Stockholm, EØS. Alternativ: "ams" (Amsterdam).
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  # PROD: invite-only prod-drift. Krever prod-vendor-secrets satt (ellers fail-closer appen).
+  # Flip til "test" igjen for å peke mot tt02.
+  WENCHE_ENV = "prod"
+  # App-URL brukt i invite-lenkene.
+  HOSTED_PUBLIC_URL = "https://app.wenche.cloud"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # SCALE-TO-ZERO for minimal kostnad (invite-only test): maskinen sovner når ingen
+  # bruker den, og våkner automatisk på første request. SPA-en kjører en keep-alive-
+  # heartbeat (App.tsx) så den ikke sovner MIDT i en økt og mister in-memory-tilstanden.
+  # Ikke skaler til flere maskiner (da ville sesjoner spostes mellom dem).
+  # Tips: bytt "stop" -> "suspend" for å bevare minnet over dvale (raskere vekking +
+  # in-memory-tilstand overlever), hvis Fly-planen din støtter det.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    method = "get"
+    path = "/api/health"
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "10s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"          # billigste nivå (~2 USD/mnd). Bump til "512mb" KUN hvis
+                            # du ser OOM-/restart i Fly-dashbordet under faktisk bruk.
