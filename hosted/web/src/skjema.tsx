@@ -467,11 +467,12 @@ export function DataSkjema({ onLagre }: { onLagre: (config: unknown) => Promise<
 
       <details id="fjoraaret" className="scroll-mt-32 border-t border-border pt-6">
         <summary className="cursor-pointer font-display text-xl font-normal">
-          Fjorårets tall (valgfritt)
+          Fjorårets tall
         </summary>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Sammenligningstall for fjoråret. Obligatorisk hvis selskapet ikke ble stiftet i
-          regnskapsåret. Importerer du fra Bodil, er disse allerede fylt inn.
+          Sammenligningstall for fjoråret, påkrevd etter regnskapsloven. Kan stå tomt kun
+          hvis selskapet ble stiftet i dette regnskapsåret og ikke har et fjorår å
+          sammenligne med. Importerer du fra Bodil, er disse allerede fylt inn.
         </p>
         <div className="mt-4">
           <Feltrutenett felter={FJORARET_FELTER} config={config} oppdater={oppdater} />
