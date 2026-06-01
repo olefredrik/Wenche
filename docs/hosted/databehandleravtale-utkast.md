@@ -53,11 +53,17 @@ behandlingsgrunnlag, og for den endelige kontrollen og godkjenningen av innsendi
 ## 6. Underdatabehandlere
 | Underdatabehandler | Tjeneste | Lokasjon |
 |---|---|---|
-| `[hosting-leverandør]` | Drift/hosting | `[EØS-region]` |
-| `[innloggings-/e-postleverandør]` | Innlogging/varsling | `[EØS-region]` |
+| Fly.io | Drift/hosting av tjenesten (server) | EØS-region |
 
-Operatøren varsler Kunden ved endringer. All behandling skjer innenfor **EØS**; ingen
-tredjelandsoverføring.
+Operatøren varsler Kunden ved endringer i underdatabehandlere. Behandlingen skjer i **EØS-region**.
+Fly.io har morselskap utenfor EØS; for en eventuell overføring gjelder EUs standardavtalevilkår
+(SCC), og fordi opplysningene kun behandles i minne under sesjonen og **aldri lagres**, er
+overføringseksponeringen minimal.
+
+Tjenesten benytter **ingen egen innloggings- eller e-postleverandør**: tilgang gis via en signert
+per-org invitasjonslenke, og autorisasjonen skjer i Altinn (systembruker-godkjenning med BankID).
+Markedsnettstedet (wenche-web) driftes separat av Vercel, men behandler **ingen** av
+personopplysningene denne avtalen gjelder, og er derfor ikke en underdatabehandler her.
 
 ## 7. Varighet og opphør
 Avtalen gjelder så lenge Kunden bruker tjenesten. Ved opphør beholdes ingen personopplysninger
