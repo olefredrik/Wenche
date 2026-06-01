@@ -341,7 +341,7 @@ function Innsending({ env }: { env?: string }) {
                 </div>
               ))}
             </div>
-            {utfall && <Resultatpanel utfall={utfall} />}
+            {utfall && <Resultatpanel utfall={utfall} env={env} org={o?.org} />}
           </div>
         </Kort>
       )}
@@ -513,7 +513,7 @@ function Liste({ tittel, items }: { tittel?: string; items: string[] }) {
   );
 }
 
-function Resultatpanel({ utfall }: { utfall: Utfall }) {
+function Resultatpanel({ utfall, env, org }: { utfall: Utfall; env?: string; org?: string }) {
   const { dryRun, data, feil } = utfall;
   if (feil) {
     return (
@@ -543,15 +543,35 @@ function Resultatpanel({ utfall }: { utfall: Utfall }) {
   }
 
   if (data.sendt) {
+    const lenkeKlasse =
+      "mt-3 inline-block font-medium text-spruce underline-offset-2 hover:underline";
+    // Årsregnskap: send_inn returnerer en signeringslenke (streng) — signering i Altinn
+    // med BankID kan ikke gjøres maskinelt.
+    const signeringsUrl = typeof data.resultat === "string" ? data.resultat : null;
+    if (signeringsUrl) {
+      return (
+        <Panel tone="ok" tittel="Sendt inn">
+          <p>Dokumentet er lastet opp og venter på din signatur i Altinn.</p>
+          <a href={signeringsUrl} target="_blank" rel="noopener noreferrer" className={lenkeKlasse}>
+            Signer i Altinn →
+          </a>
+        </Panel>
+      );
+    }
+    // Aksjonær (forsendelse-ID) / skattemelding (instans): kvittering + lenke til meldingsboks.
     const kvittering: Record<string, unknown> =
       data.resultat && typeof data.resultat === "object" ? data.resultat : {};
     const linjer: [string, unknown][] = Object.entries(kvittering).filter(
       ([, v]) => typeof v === "string" || typeof v === "number",
     );
     if (data.instans_id) linjer.unshift(["instans_id", data.instans_id]);
+    const altinnBase = env === "test" ? "https://tt02.altinn.no" : "https://af.altinn.no";
+    const meldingsboksUrl = org
+      ? `${altinnBase}/?party=urn%3Aaltinn%3Aorganization%3Aidentifier-no%3A${org}`
+      : null;
     return (
       <Panel tone="ok" tittel="Sendt inn">
-        <p>Innsendingen er levert. Kvittering finner du også i Altinn.</p>
+        <p>Innsendingen er levert. Kvittering og status finner du i Altinn.</p>
         {linjer.length > 0 && (
           <dl className="mt-3 space-y-1">
             {linjer.map(([k, v]) => (
@@ -561,6 +581,11 @@ function Resultatpanel({ utfall }: { utfall: Utfall }) {
               </div>
             ))}
           </dl>
+        )}
+        {meldingsboksUrl && (
+          <a href={meldingsboksUrl} target="_blank" rel="noopener noreferrer" className={lenkeKlasse}>
+            Åpne Altinn meldingsboks →
+          </a>
         )}
       </Panel>
     );
