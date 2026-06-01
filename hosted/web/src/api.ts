@@ -10,8 +10,13 @@ async function req(path: string, opts: RequestInit = {}): Promise<any> {
   const tekst = await res.text();
   const data = tekst ? JSON.parse(tekst) : null;
   if (!res.ok) {
-    const melding =
-      typeof data?.detail === "string" ? data.detail : `HTTP ${res.status}`;
+    const d = data?.detail;
+    let melding = `Feil (HTTP ${res.status})`;
+    if (typeof d === "string") melding = d;
+    else if (d && typeof d === "object") {
+      if (Array.isArray(d.feil)) melding = d.feil.join(" · ");
+      else if (d.validering) melding = String(d.validering);
+    }
     throw new Error(melding);
   }
   return data;

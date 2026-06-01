@@ -107,28 +107,47 @@ function Onboarding({ onApproved }: { onApproved: () => void }) {
   );
 }
 
+interface Utfall {
+  dryRun: boolean;
+  type: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data?: any;
+  feil?: string;
+}
+
+const KVITTERING_ETIKETT: Record<string, string> = {
+  forsendelseId: "Forsendelse-ID",
+  dialogId: "Dialog-ID",
+  instans_id: "Instans-ID",
+  oppgavegiversLeveranseReferanse: "Leveranse-referanse",
+};
+
 function Innsending() {
   const [lagret, setLagret] = useState(false);
-  const [resultat, setResultat] = useState<Record<string, unknown> | null>(null);
-  const [feil, setFeil] = useState<string | null>(null);
+  const [lagreFeil, setLagreFeil] = useState<string | null>(null);
+  const [aktiv, setAktiv] = useState<string | null>(null);
+  const [utfall, setUtfall] = useState<Utfall | null>(null);
 
   const lagre = async (config: unknown) => {
-    setFeil(null);
+    setLagreFeil(null);
     try {
       await api.putData(config);
       setLagret(true);
     } catch (e) {
-      setFeil((e as Error).message);
+      setLagreFeil((e as Error).message);
     }
   };
 
   const kjor = async (type: string, dryRun: boolean) => {
-    setFeil(null);
-    setResultat(null);
+    setAktiv(`${type}:${dryRun}`);
+    setUtfall(null);
     try {
-      setResultat(await api.innsending(type, dryRun));
+      const data = await api.innsending(type, dryRun);
+      setUtfall({ dryRun, type, data });
     } catch (e) {
-      setFeil((e as Error).message);
+      setUtfall({ dryRun, type, feil: (e as Error).message });
+    } finally {
+      setAktiv(null);
     }
   };
 
@@ -143,6 +162,7 @@ function Innsending() {
       <Kort>
         <DataSkjema onLagre={lagre} />
       </Kort>
+      {!lagret && lagreFeil && <p className="text-sm text-red-700">{lagreFeil}</p>}
 
       {lagret && (
         <Kort>
@@ -151,29 +171,127 @@ function Innsending() {
             Dataene er lagret i økten. Kjør en dry-run (sender ingenting), eller send inn til
             myndighetene.
           </p>
-          <div className="mt-6 space-y-4">
+          <div className="mt-6 space-y-3">
             {typer.map(([t, navn]) => (
               <div key={t} className="flex flex-wrap items-center gap-3">
                 <span className="w-40 text-sm">{navn}</span>
-                <button className={btnOutline} onClick={() => kjor(t, true)}>
-                  Dry-run
+                <button
+                  className={btnOutline}
+                  disabled={aktiv !== null}
+                  onClick={() => kjor(t, true)}
+                >
+                  {aktiv === `${t}:true` ? "Kjører…" : "Dry-run"}
                 </button>
-                <button className={btnPrimar} onClick={() => kjor(t, false)}>
-                  Send inn
+                <button
+                  className={btnPrimar}
+                  disabled={aktiv !== null}
+                  onClick={() => kjor(t, false)}
+                >
+                  {aktiv === `${t}:false` ? "Sender…" : "Send inn"}
                 </button>
               </div>
             ))}
           </div>
-          {resultat && (
-            <pre className="mt-6 overflow-auto rounded-sm border border-border bg-background p-4 font-mono text-xs">
-              {JSON.stringify(resultat, null, 2)}
-            </pre>
-          )}
-          {feil && <p className="mt-4 text-sm text-red-700">{feil}</p>}
+          {utfall && <Resultatpanel utfall={utfall} />}
         </Kort>
       )}
-      {!lagret && feil && <p className="text-sm text-red-700">{feil}</p>}
     </div>
+  );
+}
+
+function Panel({
+  tone,
+  tittel,
+  children,
+}: {
+  tone: "ok" | "advarsel" | "feil";
+  tittel: string;
+  children?: React.ReactNode;
+}) {
+  const toner: Record<string, string> = {
+    ok: "border-spruce/30 bg-spruce-soft text-spruce",
+    advarsel: "border-amber-300 bg-amber-50 text-amber-800",
+    feil: "border-red-300 bg-red-50 text-red-800",
+  };
+  return (
+    <div className={`mt-6 rounded-sm border p-5 ${toner[tone]}`}>
+      <p className="font-display text-lg">{tittel}</p>
+      <div className="mt-2 text-sm text-foreground/80">{children}</div>
+    </div>
+  );
+}
+
+function Liste({ tittel, items }: { tittel?: string; items: string[] }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div className="mt-2">
+      {tittel && <p className={`${monoLabel} mb-1`}>{tittel}</p>}
+      <ul className="list-disc space-y-1 pl-5">
+        {items.map((t, i) => (
+          <li key={i}>{t}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function Resultatpanel({ utfall }: { utfall: Utfall }) {
+  const { dryRun, data, feil } = utfall;
+  if (feil) {
+    return (
+      <Panel tone="feil" tittel="Noe gikk galt">
+        {feil}
+      </Panel>
+    );
+  }
+  if (!data) return null;
+
+  if (dryRun) {
+    const feilListe: string[] = data.feil ?? [];
+    const advarsler: string[] = data.advarsler ?? [];
+    if (data.ok && feilListe.length === 0) {
+      return (
+        <Panel tone="ok" tittel="Validering OK, klar til innsending">
+          <Liste tittel="Merknader" items={advarsler} />
+        </Panel>
+      );
+    }
+    return (
+      <Panel tone="advarsel" tittel="Avvik som må rettes">
+        <Liste items={feilListe} />
+        <Liste tittel="Merknader" items={advarsler} />
+      </Panel>
+    );
+  }
+
+  if (data.sendt) {
+    const kvittering: Record<string, unknown> =
+      data.resultat && typeof data.resultat === "object" ? data.resultat : {};
+    const linjer: [string, unknown][] = Object.entries(kvittering).filter(
+      ([, v]) => typeof v === "string" || typeof v === "number",
+    );
+    if (data.instans_id) linjer.unshift(["instans_id", data.instans_id]);
+    return (
+      <Panel tone="ok" tittel="Sendt inn">
+        <p>Innsendingen er levert. Kvittering finner du også i Altinn.</p>
+        {linjer.length > 0 && (
+          <dl className="mt-3 space-y-1">
+            {linjer.map(([k, v]) => (
+              <div key={k} className="flex gap-2 font-mono text-xs">
+                <dt className="text-muted-foreground">{KVITTERING_ETIKETT[k] ?? k}:</dt>
+                <dd className="break-all">{String(v)}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+      </Panel>
+    );
+  }
+
+  return (
+    <Panel tone="advarsel" tittel="Uventet svar">
+      {JSON.stringify(data)}
+    </Panel>
   );
 }
 
