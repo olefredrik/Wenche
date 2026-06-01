@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
+import { DataSkjema } from "./skjema";
 
 interface Me {
   invited: boolean;
@@ -107,23 +108,17 @@ function Onboarding({ onApproved }: { onApproved: () => void }) {
 }
 
 function Innsending() {
-  const [tekst, setTekst] = useState("");
   const [lagret, setLagret] = useState(false);
   const [resultat, setResultat] = useState<Record<string, unknown> | null>(null);
   const [feil, setFeil] = useState<string | null>(null);
 
-  const lagre = async () => {
+  const lagre = async (config: unknown) => {
     setFeil(null);
     try {
-      const config = JSON.parse(tekst);
       await api.putData(config);
       setLagret(true);
     } catch (e) {
-      setFeil(
-        (e as Error).message.startsWith("Unexpected")
-          ? "Ugyldig JSON."
-          : (e as Error).message,
-      );
+      setFeil((e as Error).message);
     }
   };
 
@@ -144,45 +139,41 @@ function Innsending() {
   ];
 
   return (
-    <Kort>
-      <p className={monoLabel}>Steg 2 · Tall og innsending</p>
-      <h2 className="mt-3 font-display text-2xl font-normal">Årets tall</h2>
-      <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-        Lim inn dataene (samme struktur som config.yaml, som JSON). De lagres kun i denne økten
-        og slettes når du logger ut.
-      </p>
-      <textarea
-        className={`${input} mt-5 h-44 font-mono text-xs`}
-        placeholder='{"selskap": {"org_nummer": "..."}, ...}'
-        value={tekst}
-        onChange={(e) => setTekst(e.target.value)}
-      />
-      <button className={`${btnPrimar} mt-4`} onClick={lagre} disabled={!tekst}>
-        Lagre data
-      </button>
+    <div className="space-y-6">
+      <Kort>
+        <DataSkjema onLagre={lagre} />
+      </Kort>
 
       {lagret && (
-        <div className="mt-8 space-y-4 border-t border-border pt-6">
-          {typer.map(([t, navn]) => (
-            <div key={t} className="flex flex-wrap items-center gap-3">
-              <span className="w-40 text-sm">{navn}</span>
-              <button className={btnOutline} onClick={() => kjor(t, true)}>
-                Dry-run
-              </button>
-              <button className={btnPrimar} onClick={() => kjor(t, false)}>
-                Send inn
-              </button>
-            </div>
-          ))}
-        </div>
+        <Kort>
+          <p className={monoLabel}>Steg 3 · Innsending</p>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Dataene er lagret i økten. Kjør en dry-run (sender ingenting), eller send inn til
+            myndighetene.
+          </p>
+          <div className="mt-6 space-y-4">
+            {typer.map(([t, navn]) => (
+              <div key={t} className="flex flex-wrap items-center gap-3">
+                <span className="w-40 text-sm">{navn}</span>
+                <button className={btnOutline} onClick={() => kjor(t, true)}>
+                  Dry-run
+                </button>
+                <button className={btnPrimar} onClick={() => kjor(t, false)}>
+                  Send inn
+                </button>
+              </div>
+            ))}
+          </div>
+          {resultat && (
+            <pre className="mt-6 overflow-auto rounded-sm border border-border bg-background p-4 font-mono text-xs">
+              {JSON.stringify(resultat, null, 2)}
+            </pre>
+          )}
+          {feil && <p className="mt-4 text-sm text-red-700">{feil}</p>}
+        </Kort>
       )}
-      {resultat && (
-        <pre className="mt-6 overflow-auto rounded-sm border border-border bg-background p-4 font-mono text-xs">
-          {JSON.stringify(resultat, null, 2)}
-        </pre>
-      )}
-      {feil && <p className="mt-4 text-sm text-red-700">{feil}</p>}
-    </Kort>
+      {!lagret && feil && <p className="text-sm text-red-700">{feil}</p>}
+    </div>
   );
 }
 
