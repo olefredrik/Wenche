@@ -79,9 +79,15 @@ krever én prosess). `Dockerfile` og `fly.toml` ligger i repo-roten. Engangsopps
    `fly.toml` `[env]`. Uten egne secrets nekter appen å starte i prod (fail-closed).
 4. **Første deploy:** `flyctl deploy`. Test på `https://<appnavn>.fly.dev` (helsesjekk: `/api/health`).
 
-### Automatisk deploy ved merge til main
-`.github/workflows/deploy-hosted.yml` deployer ved push til `main`. Oppsett én gang:
+### Deploy fremover
+Foreløpig deployer vi **manuelt**: `flyctl deploy --remote-only` fra repo-roten. Det er
+bevisst, så merge til `main` ikke auto-deployer.
+
+`.github/workflows/deploy-hosted.yml` finnes og kan kjøres **manuelt** (Actions →
+«Deploy hosted» → Run workflow / `workflow_dispatch`). For at den skal virke:
 - Lag en deploy-token: `flyctl tokens create deploy`, og legg den som **repo-secret**
   `FLY_API_TOKEN` (Settings → Secrets and variables → Actions).
-- Opprett et **`production`-environment** (Settings → Environments), gjerne låst til `main`
-  med påkrevd godkjenning. Fork-PR-er får hverken secret eller deploy.
+- Opprett et **`production`-environment** (Settings → Environments).
+
+Vil du senere ha auto-deploy ved merge til `main`, legg tilbake en `push:`-trigger i
+workflowen (fork-PR-er får uansett hverken secret eller deploy).

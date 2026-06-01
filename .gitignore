@@ -27,3 +27,4 @@ venv/
 /*.html
 /*.txt
 node_modules/
+.vite/

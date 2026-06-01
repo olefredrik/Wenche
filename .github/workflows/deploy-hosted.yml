@@ -1,26 +1,20 @@
 # Deployer den hostede Wenche-tjenesten til Fly.io.
 #
-# Sikkerhet (åpen kildekode): denne workflowen kjører KUN på push til DIN main (og manuelt),
-# aldri fra fork-PR-er, og GitHub eksponerer ikke secrets til fork-workflows. FLY_API_TOKEN
-# og prod-hemmelighetene bor i GitHub/Fly sine secret-stores, aldri i repoet.
+# MANUELL utløsing (workflow_dispatch) med vilje, så merge til main IKKE auto-deployer.
+# Vi deployer foreløpig manuelt med `flyctl deploy --remote-only` lokalt. Vil du senere ha
+# auto-deploy ved merge til main, legg tilbake en `push:`-trigger + sett FLY_API_TOKEN.
 #
-# Forutsetninger (gjøres én gang, se hosted/README.md → Deploy):
-#   1. `flyctl launch` har opprettet Fly-appen (oppdater app-navnet i fly.toml).
-#   2. Prod-secrets satt med `flyctl secrets set ...` (session/invite/vendor).
-#   3. GitHub: repo-secret FLY_API_TOKEN, og et "production"-environment (gjerne låst til main
-#      med påkrevd godkjenning) under Settings → Environments.
+# Sikkerhet (åpen kildekode): kjører aldri fra fork-PR-er, og GitHub eksponerer ikke secrets
+# til fork-workflows. FLY_API_TOKEN bor i GitHub-secret, aldri i repoet.
+#
+# Forutsetninger for å bruke denne (Settings → Actions, kjør manuelt):
+#   1. Fly-appen finnes (`flyctl launch`/`apps create`), app-navnet matcher fly.toml.
+#   2. Secrets satt med `flyctl secrets set ...` (session/invite/vendor).
+#   3. GitHub: repo-secret FLY_API_TOKEN + et "production"-environment.
 
 name: Deploy hosted
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "hosted/**"
-      - "wenche/**"
-      - "Dockerfile"
-      - "fly.toml"
-      - ".github/workflows/deploy-hosted.yml"
   workflow_dispatch: {}
 
 concurrency:

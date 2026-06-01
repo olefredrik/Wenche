@@ -29,6 +29,7 @@ theme:
 
 nav:
   - Hjem: index.md
+  - Hostet versjon: hostet.md
   - Kom i gang:
     - Installasjon: installasjon.md
     - Oppsett: oppsett.md

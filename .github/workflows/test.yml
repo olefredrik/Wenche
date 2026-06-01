@@ -20,6 +20,7 @@ jobs:
       - name: Installer avhengigheter
         run: |
           pip install -e ".[dev]"
+          pip install -r hosted/requirements.txt   # for tests/test_hosted_invite.py (FastAPI m.m.)
 
       - name: Kjør tester
         run: pytest tests/ -v
