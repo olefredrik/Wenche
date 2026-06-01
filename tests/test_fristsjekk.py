@@ -121,16 +121,56 @@ class TestSjekkSkattemelding:
 
         assert result.innfridd is False
         assert "klargjort" in result.beskrivelse.lower()
+        # Ingen rå HTTP-kode skal lekke til brukeren.
+        assert "HTTP" not in result.beskrivelse
+
+    @patch("wenche.fristsjekk.httpx.get")
+    def test_403_gir_vennlig_status_ikke_rå_kode(self, mock_get, prod_env):
+        """403 (året ikke åpnet ennå) → forklarende status, ikke "HTTP 403".
+
+        Når også fjoråret er utilgjengelig, beholder kortet den framoverskuende
+        statusen for det forespurte året.
+        """
+        with patch("wenche.auth.get_skd_skattemelding_maskinporten_token", return_value="t"):
+            mock_get.return_value = _mock_response(status_code=403)
+            result = sjekk_skattemelding("931808869", 2026)
+
+        assert result.innfridd is False
+        assert "HTTP 403" not in result.beskrivelse
+        assert "klargjort" in result.beskrivelse.lower()
+
+    @patch("wenche.fristsjekk.httpx.get")
+    def test_403_faller_tilbake_til_fjorårets_levering(self, mock_get, prod_env):
+        """Kommende år 403, men fjoråret er fastsatt → vis fjorårets levering.
+
+        Dette er tilstanden rett etter at fristen har passert: brukeren har
+        levert for 2025, men kortet spør om det ennå ikke åpnede 2026.
+        """
+        with patch("wenche.auth.get_skd_skattemelding_maskinporten_token", return_value="t"):
+            mock_get.side_effect = [
+                _mock_response(status_code=403),  # 2026 – ikke åpnet ennå
+                _mock_response(text=_wrapper_xml("skattemeldingUpersonligFastsatt")),  # 2025 – levert
+            ]
+            result = sjekk_skattemelding("931808869", 2026)
+
+        assert result.innfridd is True
+        # Bekreftelsen gjelder fjoråret som faktisk ble levert.
+        assert "2025" in result.brukertekst
+        assert "sendt inn og godkjent" in result.brukertekst
 
     @patch("wenche.fristsjekk.httpx.get")
     def test_http_feil_gir_beskrivelse(self, mock_get, prod_env):
-        """HTTP 500 fra Skatteetaten → innfridd=False med feilmelding."""
+        """HTTP 500 fra Skatteetaten → innfridd=False med feilmelding.
+
+        Transiente feil skal ikke trigge fallback til fjoråret — kun ett kall.
+        """
         with patch("wenche.auth.get_skd_skattemelding_maskinporten_token", return_value="t"):
             mock_get.return_value = _mock_response(status_code=500)
             result = sjekk_skattemelding("931808869", 2025)
 
         assert result.innfridd is False
         assert "HTTP 500" in result.beskrivelse
+        assert mock_get.call_count == 1
 
     @patch("wenche.fristsjekk.httpx.get")
     def test_ugyldig_xml_gir_beskrivelse(self, mock_get, prod_env):
