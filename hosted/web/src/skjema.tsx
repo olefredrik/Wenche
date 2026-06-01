@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import yaml from "js-yaml";
 
 // Skjema-drevet datainntasting. Feltstrukturen er data; én generisk renderer bygger
@@ -222,6 +222,8 @@ export function DataSkjema({ onLagre }: { onLagre: (config: unknown) => Promise<
   const [lagrer, setLagrer] = useState(false);
   const [visBodil, setVisBodil] = useState(false);
   const [importMelding, setImportMelding] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const filRef = useRef<HTMLInputElement>(null);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const oppdater = (key: string, val: any) => setConfig((c: any) => sett(c, key, val));
@@ -305,20 +307,72 @@ export function DataSkjema({ onLagre }: { onLagre: (config: unknown) => Promise<
               en <code className="font-mono">config.yaml</code> med årets tall. Last den opp her,
               så fyller vi inn regnskapet for deg. Du ser over alt og sender som vanlig.
             </p>
-            <label className="mt-5 block">
-              <span className="mb-1 block text-xs text-muted-foreground">
-                config.yaml fra Bodil
-              </span>
+            <div
+              role="button"
+              tabIndex={0}
+              className={`mt-5 flex flex-col items-center justify-center rounded-sm border-2 border-dashed px-6 py-8 text-center transition ${
+                dragOver
+                  ? "border-spruce bg-spruce-soft"
+                  : "border-border hover:border-spruce/60"
+              }`}
+              onClick={() => filRef.current?.click()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  filRef.current?.click();
+                }
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                const f = e.dataTransfer.files?.[0];
+                if (f) importerBodil(f);
+              }}
+            >
+              <svg
+                className="h-7 w-7 text-spruce"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 16V4m0 0L8 8m4-4 4 4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"
+                />
+              </svg>
+              <p className="mt-3 text-sm font-medium">
+                Dra og slipp <code className="font-mono">config.yaml</code> her
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">eller</p>
+              <button
+                type="button"
+                className={`${btnOutline} mt-2`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  filRef.current?.click();
+                }}
+              >
+                Velg fil
+              </button>
               <input
+                ref={filRef}
                 type="file"
                 accept=".yaml,.yml,.json"
-                className="block w-full text-sm"
+                className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (f) importerBodil(f);
                 }}
               />
-            </label>
+            </div>
             {importMelding && <p className="mt-3 text-sm text-red-700">{importMelding}</p>}
             <div className="mt-6 flex items-center justify-between">
               <a
