@@ -293,7 +293,7 @@ export function DataSkjema({ onLagre }: { onLagre: (config: unknown) => Promise<
 
       {visBodil && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4"
           onClick={() => setVisBodil(false)}
         >
           <div

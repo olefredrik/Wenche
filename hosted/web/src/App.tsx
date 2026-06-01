@@ -306,7 +306,7 @@ function BekreftModal({
   const klar = validering?.ok === true;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4"
       onClick={onAvbryt}
     >
       <div
@@ -362,7 +362,11 @@ function BekreftModal({
           <button className={btnOutline} onClick={onAvbryt} disabled={sender}>
             Avbryt
           </button>
-          <button className={btnPrimar} onClick={onBekreft} disabled={!klar || sender}>
+          <button
+            className={`${btnPrimar} min-w-52 text-center`}
+            onClick={onBekreft}
+            disabled={!klar || sender}
+          >
             {sender ? "Sender…" : "Bekreft og send inn"}
           </button>
         </div>
