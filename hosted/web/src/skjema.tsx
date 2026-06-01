@@ -10,12 +10,41 @@ interface Felt {
   label: string;
   type?: FeltType;
   help?: string;
+  valgfri?: boolean; // utelates fra config med mindre brukeren fyller den inn
 }
 interface Seksjon {
   id: string;
   tittel: string;
   felter: Felt[];
 }
+
+const RESULTAT_FELTER: Felt[] = [
+  { key: "resultatregnskap.driftsinntekter.salgsinntekter", label: "Salgsinntekter", type: "number" },
+  { key: "resultatregnskap.driftsinntekter.andre_driftsinntekter", label: "Andre driftsinntekter", type: "number" },
+  { key: "resultatregnskap.driftskostnader.loennskostnader", label: "Lønnskostnader", type: "number" },
+  { key: "resultatregnskap.driftskostnader.avskrivninger", label: "Avskrivninger", type: "number" },
+  { key: "resultatregnskap.driftskostnader.andre_driftskostnader", label: "Andre driftskostnader", type: "number" },
+  { key: "resultatregnskap.finansposter.utbytte_fra_datterselskap", label: "Utbytte fra datterselskap", type: "number" },
+  { key: "resultatregnskap.finansposter.andre_finansinntekter", label: "Andre finansinntekter", type: "number" },
+  { key: "resultatregnskap.finansposter.rentekostnader", label: "Rentekostnader", type: "number" },
+  { key: "resultatregnskap.finansposter.andre_finanskostnader", label: "Andre finanskostnader", type: "number" },
+];
+
+const BALANSE_FELTER: Felt[] = [
+  { key: "balanse.eiendeler.anleggsmidler.aksjer_i_datterselskap", label: "Aksjer i datterselskap", type: "number" },
+  { key: "balanse.eiendeler.anleggsmidler.andre_aksjer", label: "Andre aksjer", type: "number" },
+  { key: "balanse.eiendeler.anleggsmidler.langsiktige_fordringer", label: "Langsiktige fordringer", type: "number" },
+  { key: "balanse.eiendeler.omloepmidler.kortsiktige_fordringer", label: "Kortsiktige fordringer", type: "number" },
+  { key: "balanse.eiendeler.omloepmidler.bankinnskudd", label: "Bankinnskudd", type: "number" },
+  { key: "balanse.egenkapital_og_gjeld.egenkapital.aksjekapital", label: "Aksjekapital (EK)", type: "number" },
+  { key: "balanse.egenkapital_og_gjeld.egenkapital.overkursfond", label: "Overkursfond", type: "number" },
+  { key: "balanse.egenkapital_og_gjeld.egenkapital.annen_egenkapital", label: "Annen egenkapital", type: "number" },
+  { key: "balanse.egenkapital_og_gjeld.langsiktig_gjeld.laan_fra_aksjonaer", label: "Lån fra aksjonær", type: "number" },
+  { key: "balanse.egenkapital_og_gjeld.langsiktig_gjeld.andre_langsiktige_laan", label: "Andre langsiktige lån", type: "number" },
+  { key: "balanse.egenkapital_og_gjeld.kortsiktig_gjeld.leverandoergjeld", label: "Leverandørgjeld", type: "number" },
+  { key: "balanse.egenkapital_og_gjeld.kortsiktig_gjeld.skyldige_offentlige_avgifter", label: "Skyldige offentlige avgifter", type: "number" },
+  { key: "balanse.egenkapital_og_gjeld.kortsiktig_gjeld.annen_kortsiktig_gjeld", label: "Annen kortsiktig gjeld", type: "number" },
+];
 
 const SEKSJONER: Seksjon[] = [
   {
@@ -33,40 +62,8 @@ const SEKSJONER: Seksjon[] = [
       { key: "regnskapsaar", label: "Regnskapsår", type: "number" },
     ],
   },
-  {
-    id: "resultatregnskap",
-    tittel: "Resultatregnskap",
-    felter: [
-      { key: "resultatregnskap.driftsinntekter.salgsinntekter", label: "Salgsinntekter", type: "number" },
-      { key: "resultatregnskap.driftsinntekter.andre_driftsinntekter", label: "Andre driftsinntekter", type: "number" },
-      { key: "resultatregnskap.driftskostnader.loennskostnader", label: "Lønnskostnader", type: "number" },
-      { key: "resultatregnskap.driftskostnader.avskrivninger", label: "Avskrivninger", type: "number" },
-      { key: "resultatregnskap.driftskostnader.andre_driftskostnader", label: "Andre driftskostnader", type: "number" },
-      { key: "resultatregnskap.finansposter.utbytte_fra_datterselskap", label: "Utbytte fra datterselskap", type: "number" },
-      { key: "resultatregnskap.finansposter.andre_finansinntekter", label: "Andre finansinntekter", type: "number" },
-      { key: "resultatregnskap.finansposter.rentekostnader", label: "Rentekostnader", type: "number" },
-      { key: "resultatregnskap.finansposter.andre_finanskostnader", label: "Andre finanskostnader", type: "number" },
-    ],
-  },
-  {
-    id: "balanse",
-    tittel: "Balanse",
-    felter: [
-      { key: "balanse.eiendeler.anleggsmidler.aksjer_i_datterselskap", label: "Aksjer i datterselskap", type: "number" },
-      { key: "balanse.eiendeler.anleggsmidler.andre_aksjer", label: "Andre aksjer", type: "number" },
-      { key: "balanse.eiendeler.anleggsmidler.langsiktige_fordringer", label: "Langsiktige fordringer", type: "number" },
-      { key: "balanse.eiendeler.omloepmidler.kortsiktige_fordringer", label: "Kortsiktige fordringer", type: "number" },
-      { key: "balanse.eiendeler.omloepmidler.bankinnskudd", label: "Bankinnskudd", type: "number" },
-      { key: "balanse.egenkapital_og_gjeld.egenkapital.aksjekapital", label: "Aksjekapital (EK)", type: "number" },
-      { key: "balanse.egenkapital_og_gjeld.egenkapital.overkursfond", label: "Overkursfond", type: "number" },
-      { key: "balanse.egenkapital_og_gjeld.egenkapital.annen_egenkapital", label: "Annen egenkapital", type: "number" },
-      { key: "balanse.egenkapital_og_gjeld.langsiktig_gjeld.laan_fra_aksjonaer", label: "Lån fra aksjonær", type: "number" },
-      { key: "balanse.egenkapital_og_gjeld.langsiktig_gjeld.andre_langsiktige_laan", label: "Andre langsiktige lån", type: "number" },
-      { key: "balanse.egenkapital_og_gjeld.kortsiktig_gjeld.leverandoergjeld", label: "Leverandørgjeld", type: "number" },
-      { key: "balanse.egenkapital_og_gjeld.kortsiktig_gjeld.skyldige_offentlige_avgifter", label: "Skyldige offentlige avgifter", type: "number" },
-      { key: "balanse.egenkapital_og_gjeld.kortsiktig_gjeld.annen_kortsiktig_gjeld", label: "Annen kortsiktig gjeld", type: "number" },
-    ],
-  },
+  { id: "resultatregnskap", tittel: "Resultatregnskap", felter: RESULTAT_FELTER },
+  { id: "balanse", tittel: "Balanse", felter: BALANSE_FELTER },
   {
     id: "skattemelding",
     tittel: "Skattemelding",
@@ -75,16 +72,33 @@ const SEKSJONER: Seksjon[] = [
       { key: "skattemelding.formuesverdi_aksjer", label: "Formuesverdi aksjer", type: "number" },
       { key: "skattemelding.anvend_fritaksmetoden", label: "Anvend fritaksmetoden", type: "checkbox" },
       { key: "skattemelding.boersnotert", label: "Børsnotert", type: "checkbox" },
+      {
+        key: "skattemelding.eierandel_for_fritaksmetoden",
+        label: "Eierandel for fritaksmetoden (%)",
+        type: "number",
+        valgfri: true,
+        help: "Brukes når fritaksmetoden er valgt. Tom = 100 % (helt skattefritt)",
+      },
+      {
+        key: "skattemelding.samlet_verdi_bak_aksjene",
+        label: "Samlet verdi bak aksjene (kr)",
+        type: "number",
+        valgfri: true,
+        help: "Valgfri overstyring; ellers beregnes den fra formuesverdi + balanse",
+      },
     ],
   },
 ];
 
-const BALANSE_EIENDELER = SEKSJONER[2].felter
-  .filter((f) => f.key.includes(".eiendeler."))
-  .map((f) => f.key);
-const BALANSE_EK_GJELD = SEKSJONER[2].felter
-  .filter((f) => f.key.includes(".egenkapital_og_gjeld."))
-  .map((f) => f.key);
+// Fjorårets sammenligningstall: samme felter, prefikset foregaaende_aar, alle valgfrie.
+const FJORARET_FELTER: Felt[] = [...RESULTAT_FELTER, ...BALANSE_FELTER].map((f) => ({
+  ...f,
+  key: `foregaaende_aar.${f.key}`,
+  valgfri: true,
+}));
+
+const BALANSE_EIENDELER = BALANSE_FELTER.filter((f) => f.key.includes(".eiendeler.")).map((f) => f.key);
+const BALANSE_EK_GJELD = BALANSE_FELTER.filter((f) => f.key.includes(".egenkapital_og_gjeld.")).map((f) => f.key);
 
 interface Aksjonaer {
   navn: string;
@@ -129,7 +143,8 @@ function grunnConfig(): any {
   let c: any = {};
   for (const s of SEKSJONER)
     for (const f of s.felter)
-      c = sett(c, f.key, f.type === "checkbox" ? false : f.type === "text" ? "" : 0);
+      if (!f.valgfri)
+        c = sett(c, f.key, f.type === "checkbox" ? false : f.type === "text" ? "" : 0);
   c.aksjonaerer = [tomAksjonaer()];
   return c;
 }
@@ -214,6 +229,51 @@ export function oppsummer(config: any) {
     balansererOk: Math.abs(sumE - sumG) < 0.01,
     antallAksjonaerer: (config.aksjonaerer ?? []).length,
   };
+}
+
+function Feltrutenett({
+  felter,
+  config,
+  oppdater,
+}: {
+  felter: Felt[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  config: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  oppdater: (key: string, val: any) => void;
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {felter.map((f) =>
+        f.type === "checkbox" ? (
+          <label key={f.key} className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-[oklch(0.46_0.08_155)]"
+              checked={!!hent(config, f.key)}
+              onChange={(e) => oppdater(f.key, e.target.checked)}
+            />
+            {f.label}
+          </label>
+        ) : (
+          <label key={f.key} className="block">
+            <span className="mb-1 block text-xs text-muted-foreground">
+              {f.label}
+              {f.help ? ` (${f.help})` : ""}
+            </span>
+            <input
+              className={input}
+              type={f.type === "number" ? "number" : "text"}
+              value={hent(config, f.key) ?? ""}
+              onChange={(e) =>
+                oppdater(f.key, f.type === "number" ? Number(e.target.value) || 0 : e.target.value)
+              }
+            />
+          </label>
+        ),
+      )}
+    </div>
+  );
 }
 
 export function DataSkjema({ onLagre }: { onLagre: (config: unknown) => Promise<void> }) {
@@ -311,9 +371,7 @@ export function DataSkjema({ onLagre }: { onLagre: (config: unknown) => Promise<
               role="button"
               tabIndex={0}
               className={`mt-5 flex flex-col items-center justify-center rounded-sm border-2 border-dashed px-6 py-8 text-center transition ${
-                dragOver
-                  ? "border-spruce bg-spruce-soft"
-                  : "border-border hover:border-spruce/60"
+                dragOver ? "border-spruce bg-spruce-soft" : "border-border hover:border-spruce/60"
               }`}
               onClick={() => filRef.current?.click()}
               onKeyDown={(e) => {
@@ -394,43 +452,8 @@ export function DataSkjema({ onLagre }: { onLagre: (config: unknown) => Promise<
       {SEKSJONER.map((s) => (
         <section key={s.tittel} id={s.id} className="scroll-mt-32">
           <h3 className="mb-4 font-display text-xl font-normal">{s.tittel}</h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {s.felter.map((f) => (
-              <label key={f.key} className="block">
-                {f.type === "checkbox" ? (
-                  <span className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 accent-[oklch(0.46_0.08_155)]"
-                      checked={!!hent(config, f.key)}
-                      onChange={(e) => oppdater(f.key, e.target.checked)}
-                    />
-                    {f.label}
-                  </span>
-                ) : (
-                  <>
-                    <span className="mb-1 block text-xs text-muted-foreground">
-                      {f.label}
-                      {f.help ? ` (${f.help})` : ""}
-                    </span>
-                    <input
-                      className={input}
-                      type={f.type === "number" ? "number" : "text"}
-                      value={hent(config, f.key) ?? ""}
-                      onChange={(e) =>
-                        oppdater(
-                          f.key,
-                          f.type === "number" ? Number(e.target.value) || 0 : e.target.value,
-                        )
-                      }
-                    />
-                  </>
-                )}
-              </label>
-            ))}
-          </div>
-
-          {s.tittel === "Balanse" && (
+          <Feltrutenett felter={s.felter} config={config} oppdater={oppdater} />
+          {s.id === "balanse" && (
             <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
               <span className="text-muted-foreground">Sum eiendeler: {kr(sumEiendeler)}</span>
               <span className="text-muted-foreground">Sum EK + gjeld: {kr(sumEkGjeld)}</span>
@@ -441,6 +464,19 @@ export function DataSkjema({ onLagre }: { onLagre: (config: unknown) => Promise<
           )}
         </section>
       ))}
+
+      <details id="fjoraaret" className="scroll-mt-32 border-t border-border pt-6">
+        <summary className="cursor-pointer font-display text-xl font-normal">
+          Fjorårets tall (valgfritt)
+        </summary>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Sammenligningstall for fjoråret. Obligatorisk hvis selskapet ikke ble stiftet i
+          regnskapsåret. Importerer du fra Bodil, er disse allerede fylt inn.
+        </p>
+        <div className="mt-4">
+          <Feltrutenett felter={FJORARET_FELTER} config={config} oppdater={oppdater} />
+        </div>
+      </details>
 
       <section id="aksjonaerer" className="scroll-mt-32">
         <h3 className="mb-4 font-display text-xl font-normal">Aksjonærer</h3>
