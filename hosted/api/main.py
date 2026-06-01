@@ -10,8 +10,11 @@ Faser bygges inkrementelt (se docs/hosted/mvp-plan.md):
   Fase 4: systembruker-onboarding.
   Fase 5: innsendings-endepunkter + SPA.
 """
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from wenche import __version__ as WENCHE_VERSJON
@@ -56,3 +59,11 @@ def health() -> dict:
         "wenche": WENCHE_VERSJON,
         "vendor_konfigurert": s.vendor_credentials() is not None,
     }
+
+
+# Server den bygde SPA-en fra samme origin i prod (slipper CORS/cookie-kryssorigin).
+# Monteres SIST, så /api/*-rutene over matcher først; html=True gir index.html på "/".
+# I dev finnes ikke dist (Vite serverer SPA-en på 5173), så dette er en no-op da.
+_SPA_DIST = Path(__file__).resolve().parent.parent / "web" / "dist"
+if _SPA_DIST.is_dir():
+    app.mount("/", StaticFiles(directory=_SPA_DIST, html=True), name="spa")

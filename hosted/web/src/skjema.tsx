@@ -276,7 +276,13 @@ function Feltrutenett({
   );
 }
 
-export function DataSkjema({ onLagre }: { onLagre: (config: unknown) => Promise<void> }) {
+export function DataSkjema({
+  onLagre,
+  visEksempel = false,
+}: {
+  onLagre: (config: unknown) => Promise<void>;
+  visEksempel?: boolean;
+}) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [config, setConfig] = useState<any>(grunnConfig);
   const [lagrer, setLagrer] = useState(false);
@@ -342,12 +348,14 @@ export function DataSkjema({ onLagre }: { onLagre: (config: unknown) => Promise<
           >
             Hent tall fra Bodil
           </button>
-          <button
-            className="text-xs text-muted-foreground underline-offset-2 hover:text-spruce hover:underline"
-            onClick={() => setConfig(structuredClone(EKSEMPEL))}
-          >
-            Fyll inn eksempeldata (test)
-          </button>
+          {visEksempel && (
+            <button
+              className="text-xs text-muted-foreground underline-offset-2 hover:text-spruce hover:underline"
+              onClick={() => setConfig(structuredClone(EKSEMPEL))}
+            >
+              Fyll inn eksempeldata (test)
+            </button>
+          )}
         </div>
       </div>
 

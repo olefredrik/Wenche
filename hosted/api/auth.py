@@ -67,6 +67,7 @@ def me(request: Request) -> dict:
         "invited": True,
         "invite_org": request.session.get("invite_org"),
         "kunde_org": st.kunde_org if st else None,
+        "env": settings().env,
     }
 
 

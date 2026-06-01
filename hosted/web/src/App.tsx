@@ -6,6 +6,7 @@ interface Me {
   invited: boolean;
   invite_org?: string | null;
   kunde_org?: string | null;
+  env?: string;
 }
 
 const monoLabel = "font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground";
@@ -163,7 +164,7 @@ interface Validering {
   melding?: string;
 }
 
-function Innsending() {
+function Innsending({ env }: { env?: string }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [config, setConfig] = useState<any | null>(null);
   const [lagreFeil, setLagreFeil] = useState<string | null>(null);
@@ -234,7 +235,7 @@ function Innsending() {
     <div className="space-y-6">
       <SeksjonsNav visSend={o !== null} />
       <Kort>
-        <DataSkjema onLagre={lagre} />
+        <DataSkjema onLagre={lagre} visEksempel={env === "test"} />
       </Kort>
       {!o && lagreFeil && <p className="text-sm text-red-700">{lagreFeil}</p>}
 
@@ -496,7 +497,7 @@ function Hjem({ me, onChange }: { me: Me; onChange: () => void }) {
           Logg ut
         </button>
       </div>
-      {me.kunde_org ? <Innsending /> : <Onboarding org={me.invite_org} onApproved={onChange} />}
+      {me.kunde_org ? <Innsending env={me.env} /> : <Onboarding org={me.invite_org} onApproved={onChange} />}
     </div>
   );
 }
