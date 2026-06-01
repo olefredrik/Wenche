@@ -1,1 +1,36 @@
 @import "tailwindcss";
+
+/* Wenches designsystem, speilet fra wenche-web for en helhetlig tjeneste.
+   Palett i OKLCH (varm regnskaps-ro). Fontene lastes via index.html. */
+@theme {
+  --color-background: oklch(0.972 0.014 85);
+  --color-paper: oklch(0.948 0.018 85);
+  --color-foreground: oklch(0.265 0.014 165);
+  --color-spruce: oklch(0.46 0.08 155);
+  --color-spruce-soft: oklch(0.46 0.08 155 / 0.08);
+  --color-muted-foreground: oklch(0.265 0.014 165 / 0.6);
+  --color-border: oklch(0.265 0.014 165 / 0.12);
+  --color-ring: oklch(0.46 0.08 155);
+
+  --font-sans: "Inter Tight", system-ui, sans-serif;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: "Inter Tight", system-ui, sans-serif;
+}
+
+.font-display {
+  font-family: "Newsreader", Georgia, serif;
+  font-style: normal;
+  letter-spacing: -0.015em;
+}
+.font-mono {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+.font-signature {
+  font-family: "Caveat", cursive;
+  font-weight: 500;
+  letter-spacing: 0;
+}
