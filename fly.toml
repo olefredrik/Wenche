@@ -16,11 +16,15 @@ primary_region = "arn"         # Stockholm, EØS. Alternativ: "ams" (Amsterdam).
 [http_service]
   internal_port = 8080
   force_https = true
-  # ALLTID PÅ: in-memory-sesjonen krever én levende prosess. Ikke skru på auto-stop,
-  # og ikke skaler til flere maskiner (da ville sesjoner spostes mellom dem).
-  auto_stop_machines = false
-  auto_start_machines = false
-  min_machines_running = 1
+  # SCALE-TO-ZERO for minimal kostnad (invite-only test): maskinen sovner når ingen
+  # bruker den, og våkner automatisk på første request. SPA-en kjører en keep-alive-
+  # heartbeat (App.tsx) så den ikke sovner MIDT i en økt og mister in-memory-tilstanden.
+  # Ikke skaler til flere maskiner (da ville sesjoner spostes mellom dem).
+  # Tips: bytt "stop" -> "suspend" for å bevare minnet over dvale (raskere vekking +
+  # in-memory-tilstand overlever), hvis Fly-planen din støtter det.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
 
   [[http_service.checks]]
     method = "get"

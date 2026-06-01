@@ -524,6 +524,15 @@ export default function App() {
     }
   }, []);
 
+  // Keep-alive-heartbeat: holder Fly-maskinen våken mens appen er åpen, så scale-to-zero
+  // ikke sovner midt i en økt og mister in-memory-tilstanden. Lett GET mot /api/health.
+  useEffect(() => {
+    const id = setInterval(() => {
+      fetch("/api/health").catch(() => {});
+    }, 45000);
+    return () => clearInterval(id);
+  }, []);
+
   return (
     <Skall>
       {!me ? (
