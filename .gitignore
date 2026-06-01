@@ -20,10 +20,10 @@ venv/
 .claude/
 .nicegui/
 
-# Genererte filer
+# Genererte filer (CLI-output i repo-roten; ankret så de ikke fanger kildefiler i undermapper)
 /site/
-*.xml
-*.xbrl
-*.html
-*.txt
+/*.xml
+/*.xbrl
+/*.html
+/*.txt
 node_modules/

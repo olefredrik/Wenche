@@ -1,0 +1,5 @@
+# Hosted-appens avhengigheter (i tillegg til wenche-pakken selv).
+# Installer i samme venv som wenche: pip install -r hosted/requirements.txt
+fastapi>=0.115
+uvicorn[standard]>=0.30
+itsdangerous>=2.0
