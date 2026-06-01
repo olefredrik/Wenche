@@ -77,6 +77,11 @@ krever én prosess). `Dockerfile` og `fly.toml` ligger i repo-roten. Engangsopps
    ```
    Sett også `HOSTED_PUBLIC_URL` (app-URL-en, til invite-lenkene), enten som secret eller i
    `fly.toml` `[env]`. Uten egne secrets nekter appen å starte i prod (fail-closed).
+
+   > **NB om anførselstegn:** skriv inn de rene verdiene. Henter du `client_id`/`kid` fra en
+   > `.env`-fil med shell, pass på at omsluttende `'`/`"` ikke blir med (de stripper ikke seg
+   > selv slik python-dotenv gjør) — stray anførselstegn i `HOSTED_VENDOR_CLIENT_ID`/`_KID`
+   > gir `MP-100 «Invalid assertion»` fra Maskinporten.
 4. **Første deploy:** `flyctl deploy`. Test på `https://<appnavn>.fly.dev` (helsesjekk: `/api/health`).
 
 ### Deploy fremover

@@ -8,7 +8,14 @@ async function req(path: string, opts: RequestInit = {}): Promise<any> {
     ...opts,
   });
   const tekst = await res.text();
-  const data = tekst ? JSON.parse(tekst) : null;
+  // Tål ikke-JSON-svar (f.eks. en 500 «Internal Server Error» eller en proxy-feilside),
+  // ellers ville JSON.parse kastet en kryptisk «Unexpected identifier»-feil til brukeren.
+  let data: any = null;
+  try {
+    data = tekst ? JSON.parse(tekst) : null;
+  } catch {
+    data = null;
+  }
   if (!res.ok) {
     const d = data?.detail;
     let melding = `Feil (HTTP ${res.status})`;
