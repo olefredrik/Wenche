@@ -37,6 +37,15 @@ class Settings:
         # Demo-modus: viser en «dette er en demo mot tt02»-banner i SPA-en. Rent informativt,
         # endrer ikke funksjonalitet. Settes kun på demo-appen (aldri i prod).
         self.demo_mode: bool = os.getenv("HOSTED_DEMO_MODE", "").lower() in ("1", "true", "yes")
+        # Selvbetjent tilgang: når på, kan en som står som aktiv daglig leder eller
+        # styremedlem i Enhetsregisteret for et orgnr få tilgang umiddelbart, uten manuell
+        # invitasjon. Verifiseringen skjer mot åpne data og lagrer ingenting; den er bare
+        # støydemping (BankID-godkjenningen i Altinn er den reelle porten). Av som standard,
+        # skru på når testbetaen skal åpnes, og av igjen for å stenge selvbetjeningen.
+        self.selvbetjening: bool = os.getenv("HOSTED_SELVBETJENING", "").lower() in ("1", "true", "yes")
+        # Kontaktvei som vises når selvbetjent verifisering ikke gir treff (skjermet person,
+        # navneavvik, selskap uten registrert rolleinnehaver). mailto:- eller https-URL.
+        self.kontakt: str = os.getenv("HOSTED_KONTAKT", "mailto:hello@olefredrik.com")
         self.vendor_orgnr = os.getenv("HOSTED_VENDOR_ORGNR")
         self._vendor_client_id = os.getenv("HOSTED_VENDOR_CLIENT_ID")
         self._vendor_kid = os.getenv("HOSTED_VENDOR_KID")

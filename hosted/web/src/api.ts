@@ -6,6 +6,9 @@ export const api = {
   me: () => req("/api/auth/me"),
   invite: (token: string) =>
     req("/api/auth/invite", { method: "POST", body: JSON.stringify({ token }) }),
+  // Selvbetjent tilgang: navn + orgnr verifiseres mot Enhetsregisteret. Navnet lagres ikke.
+  beOmTilgang: (navn: string, org: string) =>
+    req("/api/auth/be-om-tilgang", { method: "POST", body: JSON.stringify({ navn, org }) }),
   logout: () => req("/api/auth/logout", { method: "POST" }),
   systembrukerRequest: () => req("/api/systembruker/request", { method: "POST" }),
   systembrukerStatus: () => req("/api/systembruker/status", { method: "POST" }),

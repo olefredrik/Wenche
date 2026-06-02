@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { api } from "./api";
 import { sporSidevisning, sporHendelse } from "./sporing";
 import {
@@ -27,6 +27,8 @@ interface Me {
   kunde_org?: string | null;
   env?: string;
   demo?: boolean;
+  selvbetjening?: boolean;
+  kontakt?: string | null;
 }
 
 function DemoBanner() {
@@ -70,15 +72,108 @@ const HOSTET_SAMTYKKE = (
   </span>
 );
 
-function KunInviterte() {
+// Vis en kontaktvei (mailto: eller https) som en klikkbar lenke, med lesbar tekst.
+function KontaktLenke({ kontakt }: { kontakt?: string | null }) {
+  if (!kontakt) return null;
+  const tekst = kontakt.startsWith("mailto:") ? kontakt.slice("mailto:".length) : kontakt.replace(/^https?:\/\//, "");
+  return (
+    <a
+      href={kontakt}
+      target={kontakt.startsWith("mailto:") ? undefined : "_blank"}
+      rel="noopener noreferrer"
+      className="text-spruce underline-offset-2 hover:underline"
+    >
+      {tekst}
+    </a>
+  );
+}
+
+const tilgangInput =
+  "w-full rounded-md border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-spruce";
+
+function KunInviterte({ me, onApproved }: { me: Me; onApproved: () => void }) {
+  const [navn, setNavn] = useState("");
+  const [org, setOrg] = useState("");
+  const [sender, setSender] = useState(false);
+  const [feil, setFeil] = useState<string | null>(null);
+
+  const send = async (e: FormEvent) => {
+    e.preventDefault();
+    setFeil(null);
+    setSender(true);
+    try {
+      const r = await api.beOmTilgang(navn, org);
+      if (r.invited) {
+        sporHendelse("tilgang-innvilget");
+        onApproved();
+      } else {
+        sporHendelse("tilgang-avvist");
+        setFeil(r.feil ?? "Kunne ikke gi tilgang.");
+      }
+    } catch (err) {
+      setFeil((err as Error).message);
+    } finally {
+      setSender(false);
+    }
+  };
+
   return (
     <Kort>
       <p className={monoLabel}>Tilgang</p>
-      <h1 className="mt-3 font-display text-3xl font-normal">Wenche er kun for inviterte</h1>
+      <h1 className="mt-3 font-display text-3xl font-normal">Wenche er foreløpig for inviterte</h1>
       <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-        Har du en invite-lenke, åpne den for å komme i gang. Ellers er tjenesten foreløpig
-        lukket.
+        Tjenesten er ennå i en lukket testfase mens jeg får den gjennomtestet og stabil.
       </p>
+
+      {me.selvbetjening ? (
+        <>
+          <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+            Vil du være testbruker? Skriv inn navnet ditt og organisasjonsnummeret til selskapet du
+            vil sende inn for. Står du som daglig leder eller styremedlem i Enhetsregisteret, får du
+            tilgang med en gang. Navnet ditt brukes bare til dette oppslaget og lagres ikke.
+          </p>
+          <form className="mt-6 space-y-4" onSubmit={send}>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-1 block text-xs text-muted-foreground">Fullt navn</span>
+                <input
+                  className={tilgangInput}
+                  autoComplete="name"
+                  value={navn}
+                  onChange={(e) => setNavn(e.target.value)}
+                  aria-invalid={!!feil}
+                  required
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs text-muted-foreground">Organisasjonsnummer</span>
+                <input
+                  className={tilgangInput}
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={org}
+                  onChange={(e) => setOrg(e.target.value)}
+                  aria-invalid={!!feil}
+                  required
+                />
+              </label>
+            </div>
+            <button className={`${btnPrimar} w-full sm:w-auto`} type="submit" disabled={sender}>
+              {sender ? "Sjekker…" : "Be om tilgang"}
+            </button>
+          </form>
+          {feil && (
+            <p role="alert" className="mt-4 text-sm leading-relaxed text-red-700">
+              {feil} Stemmer ikke dette, eller har du skjermet adresse, ta kontakt:{" "}
+              <KontaktLenke kontakt={me.kontakt} />.
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+          Vil du være testbruker? Ta kontakt: <KontaktLenke kontakt={me.kontakt} />.
+        </p>
+      )}
     </Kort>
   );
 }
@@ -476,7 +571,7 @@ export default function App() {
         {!me ? (
           <p className="text-sm text-muted-foreground">Laster…</p>
         ) : !me.invited ? (
-          <KunInviterte />
+          <KunInviterte me={me} onApproved={refresh} />
         ) : !me.kunde_org ? (
           // Port: før selskapet er koblet er dette den eneste skjermen (ingen steg).
           <HjemFane me={me} onChange={refresh} />

@@ -16,6 +16,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from wenche import systembruker as wsb
 
+from .config import settings
 from .deps import admin_token, krev_invite_org, krev_invitert, krev_vendor
 
 logger = logging.getLogger("wenche.hosted.systembruker")
@@ -33,6 +34,11 @@ def request_systembruker(request: Request) -> dict:
     Gjenkommende kunde: har org allerede en godkjent systembruker for vårt system,
     bindes kunde-org direkte (ingen ny BankID-godkjenning). Ny kunde: opprett
     forespørsel og returner godkjenningslenke.
+
+    Unntak for selvbetjente økter: AlreadyApproved-snarveien hopper over BankID, og
+    selvbetjent tilgang er bare et navneoppslag mot offentlige data (ikke identitetsbevis).
+    Å honorere snarveien der ville latt en som kjenner et offentlig styremedlemsnavn sende
+    inn for et alt-onboardet selskap. Slike krever derfor manuell invitasjon.
     """
     st = krev_invitert(request)
     org = krev_invite_org(request)
@@ -40,6 +46,12 @@ def request_systembruker(request: Request) -> dict:
     token = admin_token(creds)
     eksisterende = wsb.hent_systembrukere(token, vendor_orgnr)
     if any(b.get("reporteeOrgNo") == org for b in eksisterende):
+        if request.session.get("via_selvbetjening"):
+            raise HTTPException(
+                status_code=409,
+                detail="Dette selskapet er allerede satt opp i Wenche. Av sikkerhetsgrunner "
+                "kobles slike bare via en invitasjon. Ta kontakt: " + settings().kontakt + ".",
+            )
         st.kunde_org = org
         st.pending_org = None
         st.request_id = None
