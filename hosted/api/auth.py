@@ -63,11 +63,13 @@ def me(request: Request) -> dict:
         return {"invited": False}
     sid = request.session.get("sid")
     st = sesjon.hent(sid) if sid else None
+    s = settings()
     return {
         "invited": True,
         "invite_org": request.session.get("invite_org"),
         "kunde_org": st.kunde_org if st else None,
-        "env": settings().env,
+        "env": s.env,
+        "demo": s.demo_mode,
     }
 
 

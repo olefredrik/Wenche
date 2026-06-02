@@ -29,8 +29,10 @@ if [ -z "$ORG" ]; then
   exit 1
 fi
 
-# Rask vei: mynt lokalt med secret fra den untrackede env-fila.
-if [ -f "$ENV_FILE" ]; then
+# Rask vei: mynt lokalt med secret fra den untrackede env-fila. KUN for prod-appen — fila har
+# prod-secret + prod-URL, så for andre apper (f.eks. wenche-demo) ville den gitt feil lenke.
+# Andre apper går alltid via ssh, så secret/URL hentes fra den appens eget miljø.
+if [ "$APP" = "wenche-hosted" ] && [ -f "$ENV_FILE" ]; then
   set -a; . "$ENV_FILE"; set +a
   exec "$ROOT/.venv/bin/python" "$ROOT/hosted/mint_invite.py" "$ORG"
 fi

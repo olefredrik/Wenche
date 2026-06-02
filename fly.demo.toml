@@ -1,0 +1,41 @@
+# Fly.io-konfig for DEMO-utgaven av hostet Wenche (mot Skatteetatens testmiljø tt02).
+# Helt separat fra prod-appen (app.wenche.cloud / fly.toml): egne test-vendor-creds og
+# WENCHE_ENV=test, så en demo aldri kan røre ekte Altinn. Samme image/Dockerfile som prod.
+#
+# Deploy: `flyctl deploy -c fly.demo.toml`. Hemmeligheter settes med
+# `flyctl secrets set -a wenche-demo ...`, ALDRI her (denne fila er åpen kildekode).
+
+app = "wenche-demo"
+primary_region = "arn"         # Stockholm, EØS (samme som prod).
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  # TEST: peker mot tt02. Bruker test-vendor-creds (satt som secrets på wenche-demo).
+  WENCHE_ENV = "test"
+  # App-URL brukt i invite-lenkene (demo-lenken bak «Demo»-knappen på wenche-web).
+  HOSTED_PUBLIC_URL = "https://demo.wenche.cloud"
+  # Viser «dette er en demo mot tt02»-banner i SPA-en. Rent informativt.
+  HOSTED_DEMO_MODE = "1"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Scale-to-zero for minimal kostnad: maskinen sovner når ingen bruker den, og våkner
+  # automatisk på første request. SPA-ens keep-alive-heartbeat hindrer dvale midt i en økt.
+  # Kun én maskin (in-memory-sesjon må ikke spres mellom maskiner).
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    method = "get"
+    path = "/api/health"
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "10s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
