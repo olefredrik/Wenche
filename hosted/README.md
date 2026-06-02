@@ -9,6 +9,13 @@ Status: **live på https://app.wenche.cloud** (invite-only). Onboarding: en **pe
 invite-lenke** som invite-only-port, og Altinn systembruker-godkjenning (BankID) som selve
 autorisasjonen. Ingen e-post, passord eller database.
 
+Valgfritt kan **selvbetjent tilgang** skrus på (`HOSTED_SELVBETJENING=1`): en bruker som står
+som aktiv daglig leder eller styremedlem i Enhetsregisteret for et orgnr får da tilgang med en
+gang, uten manuell invitasjon. Navnet brukes kun transient til ett oppslag mot åpne
+registerdata og lagres ikke. Det er proporsjonal støydemping, ikke identitetsbevis, så
+AlreadyApproved-snarveien (binding uten BankID) gjelder ikke for selvbetjente økter; et
+alt-onboardet selskap krever fortsatt manuell invitasjon. Av som standard.
+
 ## Komponenter
 - `api/` — FastAPI JSON-API (importerer `wenche`).
 - `web/` — SPA (React + Vite + TypeScript + Tailwind 4). Tynn happy-path: innlogging →
@@ -36,6 +43,8 @@ Per-org invite-lenker lages med `./.venv/bin/python hosted/mint_invite.py <orgnr
 | `HOSTED_INVITE_SECRET` | Signerer invite-lenken. Roter for å ugyldiggjøre utdelte lenker. |
 | `HOSTED_CORS_ORIGINS` | Tillatte frontend-origins (default `http://localhost:5173`). |
 | `HOSTED_PUBLIC_URL` | App-origin som invite-lenken peker på (default `http://localhost:5173`). |
+| `HOSTED_SELVBETJENING` | (valgfri) `1`/`true` skrur på selvbetjent tilgang (navn + orgnr verifiseres mot Enhetsregisteret). Av som standard. |
+| `HOSTED_KONTAKT` | (valgfri) Kontaktvei som vises når selvbetjent verifisering ikke gir treff. `mailto:`- eller https-URL (default `mailto:hello@olefredrik.com`). |
 | `HOSTED_VENDOR_ORGNR` | Operatørens organisasjonsnummer (vendor). |
 | `HOSTED_VENDOR_CLIENT_ID` | Operatørens Maskinporten-klient-ID. |
 | `HOSTED_VENDOR_KID` | Operatørens nøkkel-ID (KID). |
