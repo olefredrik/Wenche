@@ -1,0 +1,64 @@
+name: Docker-bygg
+
+# Bygger den hostede containeren og kjører en rask helsesjekk, uten å deploye. Fanger brudd i
+# Dockerfile, npm-workspacet, pakkingen eller container-oppstarten FØR en manuell flyctl-deploy.
+# Kjører kun når noe som påvirker imaget endres, så doc-only-PR-er slipper.
+
+on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "pyproject.toml"
+      - "hosted/**"
+      - "packages/ui/**"
+      - "wenche/web/frontend/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/docker.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "pyproject.toml"
+      - "hosted/**"
+      - "packages/ui/**"
+      - "wenche/web/frontend/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/docker.yml"
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bygg hosted-image
+        run: docker build -t wenche-hosted:ci .
+
+      - name: Røyktest (oppstart + helsesjekk)
+        # Starter containeren i test-miljø med dummy-hemmeligheter (ekte prod-secrets trengs
+        # ikke for /api/health). Fanger oppstartsfeil: import-feil, fail-closed-feilkonfig,
+        # manglende bygd SPA m.m.
+        run: |
+          docker run -d --name wenche-ci -p 8080:8080 \
+            -e WENCHE_ENV=test \
+            -e HOSTED_SESSION_SECRET=ci-test \
+            -e HOSTED_INVITE_SECRET=ci-test \
+            wenche-hosted:ci
+          ok=
+          for i in $(seq 1 20); do
+            if curl -fs http://localhost:8080/api/health > /tmp/health.json; then ok=1; break; fi
+            sleep 2
+          done
+          echo "--- container-logg ---"
+          docker logs wenche-ci || true
+          docker rm -f wenche-ci > /dev/null 2>&1 || true
+          if [ -z "$ok" ]; then
+            echo "::error::Containeren svarte ikke på /api/health"
+            exit 1
+          fi
+          echo "Helsesjekk OK: $(cat /tmp/health.json)"
