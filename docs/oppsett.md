@@ -1,6 +1,6 @@
 # Oppsett
 
-Wenche bruker Maskinporten for å autentisere deg som konsument overfor Altinn og Skatteetaten — uten nettleserinnlogging. Oppsettet består av fem steg:
+Wenche bruker Maskinporten for å autentisere deg som konsument overfor Altinn og Skatteetaten, uten nettleserinnlogging. Oppsettet består av fem steg:
 
 1. Generer et RSA-nøkkelpar lokalt
 2. Registrer en Maskinporten-klient hos Digdir
@@ -12,7 +12,7 @@ Steg 1 og 2 må gjøres manuelt, de krever terminalkommandoer og registrering ho
 
 ---
 
-## Steg 1 — Generer RSA-nøkkelpar
+## Steg 1: Generer RSA-nøkkelpar
 
 Nøklene brukes til å identifisere deg overfor Maskinporten. Den private nøkkelen beholdes lokalt; den offentlige lastes opp til Digdir i steg 2.
 
@@ -30,12 +30,12 @@ Du skal nå ha to filer: `maskinporten_privat.pem` og `maskinporten_offentlig.pe
 
 ---
 
-## Steg 2 — Registrer Maskinporten-klient hos Digdir
+## Steg 2: Registrer Maskinporten-klient hos Digdir
 
 ### 2a. Registrer virksomheten hos Digdir (kun første gang)
 
 !!! info "Gjelder deg?"
-    Dette steget gjelder **kun virksomheter som ikke tidligere har brukt Maskinporten eller ID-porten** — typisk holdingselskaper og nyopprettede AS. Har virksomheten din allerede en aktiv Maskinporten-tilknytning, hopp rett til steg 2b.
+    Dette steget gjelder **kun virksomheter som ikke tidligere har brukt Maskinporten eller ID-porten**, typisk holdingselskaper og nyopprettede AS. Har virksomheten din allerede en aktiv Maskinporten-tilknytning, hopp rett til steg 2b.
 
     Prøver du å logge inn på selvbetjeningsportalen uten å ha gjort dette, vil du få feilmeldingen:
     > PRECONDITION_REQUIRED: Virksomheten har ikke signert de relevante bruksvilkårene.
@@ -52,7 +52,7 @@ Når bruksvilkårene er signert, fortsett til steg 2b.
 
 ### 2b. Søk om tilgang i selvbetjeningsportalen
 
-Gå til [sjolvbetjening.samarbeid.digdir.no](https://sjolvbetjening.samarbeid.digdir.no) og logg inn. Første gang du logger inn, vil du bli møtt av et skjema — **Be om tilgang**:
+Gå til [sjolvbetjening.samarbeid.digdir.no](https://sjolvbetjening.samarbeid.digdir.no) og logg inn. Første gang du logger inn, vil du bli møtt av et skjema, **Be om tilgang**:
 
 1. Fyll inn organisasjonsnummeret ditt
 2. Kryss av **Opprette og endre integrasjoner i ID-porten/Maskinporten Selvbetjening**
@@ -105,16 +105,16 @@ Følg stegene under:
 
         | Scope | Formål |
         |---|---|
-        | `skatteetaten:innrapporteringaksjonaerregisteroppgave` | Aksjonærregisteroppgave (RF-1086) — se steg 2f |
-        | `skatteetaten:formueinntekt/skattemelding` | Skattemelding for AS — se steg 2g |
+        | `skatteetaten:innrapporteringaksjonaerregisteroppgave` | Aksjonærregisteroppgave (RF-1086), se steg 2f |
+        | `skatteetaten:formueinntekt/skattemelding` | Skattemelding for AS, se steg 2g |
 
-4. Kopier **klient-ID** — du trenger den i steg 3
+4. Kopier **klient-ID**, du trenger den i steg 3
 
 ### 2e. Last opp offentlig nøkkel
 
 Under klienten, klikk **Legg til nøkkel** og lim inn innholdet i `maskinporten_offentlig.pem`. Lagre klienten.
 
-Nøkkelen vil vises i listen med en UUID (f.eks. `9bc5078c-...`). Kopier denne UUID-en — dette er din **KID**, som du trenger i steg 3.
+Nøkkelen vil vises i listen med en UUID (f.eks. `9bc5078c-...`). Kopier denne UUID-en, dette er din **KID**, som du trenger i steg 3.
 
 ### 2f. Søk om tilgang til SKDs API for aksjonærregisteroppgave
 
@@ -123,7 +123,7 @@ Nøkkelen vil vises i listen med en UUID (f.eks. `9bc5078c-...`). Kopier denne U
 
 Scopet `skatteetaten:innrapporteringaksjonaerregisteroppgave` søkes om i to omganger:
 
-**Del 1 — Søk om tilgang hos Skatteetaten**
+**Del 1, Søk om tilgang hos Skatteetaten**
 
 1. Gå til [SKDs brukerstøtteportal](https://eksternjira.sits.no/plugins/servlet/desk/site/global) og logg inn
 2. Opprett en ny sak under **Innrapportering → Aksjonærregisteret**, kategori **Teknisk**
@@ -133,7 +133,7 @@ Scopet `skatteetaten:innrapporteringaksjonaerregisteroppgave` søkes om i to omg
 
 SKD behandler vanligvis slike forespørsler innen noen virkedager.
 
-**Del 2 — Legg til scope i Digdirs selvbetjeningsportal**
+**Del 2, Legg til scope i Digdirs selvbetjeningsportal**
 
 Når SKD bekrefter at tilgangen er innvilget, logg inn i Digdirs selvbetjeningsportal (se steg 2d) og legg til scopet `skatteetaten:innrapporteringaksjonaerregisteroppgave` på Maskinporten-klienten din. Scopet vil nå være søkbart i portalen.
 
@@ -147,7 +147,7 @@ Når SKD bekrefter at tilgangen er innvilget, logg inn i Digdirs selvbetjeningsp
 
 Scopet `skatteetaten:formueinntekt/skattemelding` søkes om i to omganger:
 
-**Del 1 — Søk om tilgang hos Skatteetaten**
+**Del 1, Søk om tilgang hos Skatteetaten**
 
 1. Gå til [SKDs brukerstøtteportal](https://eksternjira.sits.no/plugins/servlet/desk/site/global) og logg inn
 2. Opprett en ny sak under **Innrapportering → Skattemelding**, kategori **Teknisk**
@@ -157,7 +157,7 @@ Scopet `skatteetaten:formueinntekt/skattemelding` søkes om i to omganger:
 
 SKD behandler vanligvis slike forespørsler innen noen virkedager.
 
-**Del 2 — Legg til scope i Digdirs selvbetjeningsportal**
+**Del 2, Legg til scope i Digdirs selvbetjeningsportal**
 
 Når SKD bekrefter at tilgangen er innvilget, logg inn i Digdirs selvbetjeningsportal (se steg 2d) og legg til scopet `skatteetaten:formueinntekt/skattemelding` på Maskinporten-klienten din. Scopet vil nå være søkbart i portalen.
 
@@ -166,7 +166,7 @@ Når SKD bekrefter at tilgangen er innvilget, logg inn i Digdirs selvbetjeningsp
 
 ---
 
-## Steg 3 — Fyll inn credentials
+## Steg 3: Fyll inn credentials
 
 Start Wenche:
 
@@ -174,40 +174,40 @@ Start Wenche:
 wenche
 ```
 
-Gå til **1. Oppsett**-fanen og fyll inn:
+Gå til **Oppsett**-fanen. Fyll inn Maskinporten-feltene i **Steg 1** og last opp nøkkelen i **Steg 2**:
 
-| Felt | Hva det er |
-|---|---|
-| Klient-ID | UUID fra Digdirs selvbetjeningsportal (steg 2d) |
-| Nøkkel-ID | UUID portalen tildelte den offentlige nøkkelen (steg 2e) |
-| Organisasjonsnummer | Ditt eget organisasjonsnummer (9 siffer) |
-| Privat nøkkel | Last opp `maskinporten_privat.pem` fra steg 1 |
+| Felt | Hva det er | Steg |
+|---|---|---|
+| Klient-ID | UUID fra Digdirs selvbetjeningsportal (steg 2d) | 1 |
+| Nøkkel-ID | UUID portalen tildelte den offentlige nøkkelen (steg 2e) | 1 |
+| Organisasjonsnummer | Ditt eget organisasjonsnummer (9 siffer) | 1 |
+| Privat nøkkel | Last opp `maskinporten_privat.pem` fra steg 1 | 2 |
 
-Klikk **Lagre konfigurasjon**. Wenche lagrer verdiene til `~/.wenche/.env` (Mac/Linux) eller `%USERPROFILE%\.wenche\.env` (Windows). Filen settes med rettigheter `0600` slik at den er lesbar kun for din bruker.
-
----
-
-## Steg 4 — Fyll inn selskapsinformasjon
-
-I Wenche, gå gjennom fanene **2. Selskap**, **3. Regnskap** og **4. Aksjonærer** og fyll inn selskapets opplysninger, regnskapstall og aksjonærdata. Alle beløp oppgis i hele kroner (NOK). Klikk **Lagre konfigurasjon** når du er ferdig, dataene lagres til `config.yaml` i den mappen du startet Wenche fra.
-
-!!! tip "Har du SAF-T fra regnskapssystemet ditt?"
-    Under fanen **Selskap** finner du knappen **Importer fra SAF-T Financial**. Last opp XML-filen og Wenche fyller inn regnskapstall automatisk. Du må fortsatt fylle inn daglig leder, styreleder og aksjonærdata manuelt.
+Klikk **Lagre konfigurasjon** i Steg 1. Wenche lagrer verdiene til `~/.wenche/.env` (Mac/Linux) eller `%USERPROFILE%\.wenche\.env` (Windows). Filen settes med rettigheter `0600` slik at den er lesbar kun for din bruker.
 
 ---
 
-## Steg 5 — Registrer systembruker i Altinn
+## Steg 4: Fyll inn selskapsinformasjon
+
+I Wenche, gå til fanen **Tall** og fyll inn selskapets opplysninger, regnskapstall, balanse, skattemelding-innstillinger og aksjonærdata, alt på én side. Alle beløp oppgis i hele kroner (NOK). Klikk **Lagre data** når du er ferdig, dataene lagres til `config.yaml` i den mappen du startet Wenche fra.
+
+!!! tip "Fører du regnskapet i Bodil, eller har du SAF-T?"
+    Under **Tall** finner du **Hent tall fra Bodil**, der du laster opp en `config.yaml` fra [Bodil](https://github.com/olefredrik/Bodil) og får regnskapstallene fylt inn. Har du i stedet en SAF-T-eksport fra regnskapssystemet, kan du generere `config.yaml` fra kommandolinjen med `wenche importer-saft` (se [Kommandolinje](avansert/cli.md)). Daglig leder, styreleder og aksjonærdata fyller du inn manuelt.
+
+---
+
+## Steg 5: Registrer systembruker i Altinn
 
 Altinn 3 krever at datasystemer som handler på vegne av virksomheter bruker **systemtilgang**, en mekanisme der systemet registreres i Altinns systemregister og virksomheten godkjenner tilgangen eksplisitt. Wenche er bygget rundt denne modellen fra starten av, og bruker ikke den eldre virksomhetsbruker-funksjonaliteten. Mottar du e-post fra Digitaliseringsdirektoratet om at systemer mot Altinn må tilpasses innen 31. mai 2026, trenger du ikke gjøre noe med Wenche, kravet er allerede oppfylt.
 
-Start `wenche` og gå til **1. Oppsett**-fanen. Kortet viser status for systembrukeren og har knapper for å sette den opp.
+Start `wenche` og gå til **Oppsett**-fanen. **Steg 3** viser status for systembrukeren og har knappene for å sette den opp.
 
 **For å opprette en ny systembruker:**
 
 1. Sørg for at Maskinporten-credentials og organisasjonsnummer er fylt inn (og lagret).
 2. Klikk **Opprett systembruker**. Wenche registrerer seg i Altinns systemregister automatisk hvis det ikke er gjort, oppretter en forespørsel, og viser en «Godkjenn i Altinn →»-lenke.
 3. Åpne lenken og logg inn med BankID som daglig leder eller styreleder.
-4. Tilbake i Wenche: klikk **Jeg har godkjent — sjekk status** ved siden av lenken. Status oppdateres til **Systembruker godkjent**.
+4. Tilbake i Wenche: klikk **Sjekk status**. Status oppdateres til **✓ Wenche er koblet til Altinn**.
 
 **Hvis status fortsatt sier «venter»:** Vent 10-20 sekunder og klikk knappen igjen, Altinn trenger noen sekunder på å registrere godkjenningen.
 

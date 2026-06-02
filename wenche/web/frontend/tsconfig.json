@@ -16,9 +16,9 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
     "paths": {
-      "@wenche/ui": ["../../packages/ui/src"],
-      "@wenche/ui/*": ["../../packages/ui/src/*"]
+      "@wenche/ui": ["../../../packages/ui/src"],
+      "@wenche/ui/*": ["../../../packages/ui/src/*"]
     }
   },
-  "include": ["src", "../../packages/ui/src"]
+  "include": ["src", "../../../packages/ui/src"]
 }

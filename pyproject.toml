@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "wenche"
-version = "0.25.0"
+version = "0.26.0"
 description = "Enkel innsending av årsregnskap, skattemelding og aksjonærregisteroppgave til Altinn for holdingselskaper"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -28,7 +28,8 @@ dependencies = [
     "pyyaml>=6.0",
     "python-dotenv>=1.0",
     "authlib>=1.3",
-    "nicegui>=2.0",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
 ]
 
 [project.optional-dependencies]
@@ -44,3 +45,10 @@ wenche = "wenche.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["wenche"]
+# Frontend-kilden (TS/Vite) hører ikke hjemme i wheelen — kun den bygde SPA-en serveres.
+exclude = ["wenche/web/frontend"]
+
+# Den bygde SPA-en ligger i wenche/web/static, som er git-ignorert (bygges ved release).
+# force-include tar den med i wheelen selv om den ikke er sporet av git.
+[tool.hatch.build.targets.wheel.force-include]
+"wenche/web/static" = "wenche/web/static"

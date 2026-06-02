@@ -80,6 +80,8 @@ wenche dev
 
 Krever egne credentials og syntetiske Tenor-orgnumre. Se [Testing mot tt02](https://olefredrik.github.io/Wenche/avansert/testing/) og [Kommandolinje](https://olefredrik.github.io/Wenche/avansert/cli/) i dokumentasjonen for fullstendig oppsett.
 
+Webgrensesnittet er bygd med FastAPI og en React/Tailwind-SPA, med et delt designsystem som også brukes av den hostede versjonen. Hvordan koden henger sammen og hvordan du kjører front-enden med hot reload, er beskrevet i [Utvikling](https://olefredrik.github.io/Wenche/avansert/utvikling/).
+
 ## Ansvar
 
 Wenche er et hjelpeverktøy for enkle holdingselskaper og er i aktiv utvikling. Det er ikke en erstatning for profesjonell regnskapsbistand. Kontroller alltid at genererte dokumenter er korrekte før innsending. Du er selv ansvarlig for at innsendte opplysninger er riktige.

@@ -28,3 +28,6 @@ venv/
 /*.txt
 node_modules/
 .vite/
+
+# Bygd self-hosted SPA (bygges ved release og force-includes i wheelen, ikke sjekket inn)
+wenche/web/static/
