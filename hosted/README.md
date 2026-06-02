@@ -106,7 +106,7 @@ Roter `HOSTED_INVITE_SECRET` for å ugyldiggjøre alle utdelte lenker på én ga
 
 ## Demo-miljø (demo.wenche.cloud, mot tt02)
 
-En **helt separat** Fly-app som lar hvem som helst prøve tjenesten mot Skatteetatens testmiljø
+En **helt separat** Fly-app som lar hvem som helst prøve tjenesten mot Altinns testmiljø (tt02)
 uten invitasjon, på syntetiske data. Den deler aldri prod-creds eller `env=prod`: egen app, egne
 **test**-vendor-creds, `WENCHE_ENV=test`. Konfig ligger i `fly.demo.toml`. Banneren i SPA-en
 styres av `HOSTED_DEMO_MODE=1` (rent informativt, endrer ikke funksjonalitet).

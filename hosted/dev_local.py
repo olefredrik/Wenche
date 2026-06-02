@@ -1,5 +1,5 @@
 """
-Lokal dev-kjøring av den hostede appen mot Skatteetatens testmiljø (tt02).
+Lokal dev-kjøring av den hostede appen mot Altinns testmiljø (tt02).
 IKKE for produksjon.
 
 Mapper Wenches eksisterende _TEST-credentials (fra ~/.wenche/.env og repoets .env) til

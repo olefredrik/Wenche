@@ -3,7 +3,7 @@
 !!! info "For utviklere og bidragsytere"
     Denne siden er for de som vil utvikle på Wenche eller tørrtrene innsending uten å sende ekte data til myndighetene. Vanlig bruk dekkes av webgrensesnittet, se [Bruk](../bruk.md).
 
-Wenche kan kjøres mot Skatteetatens testmiljø (tt02) i stedet for produksjon. Testmiljøet er et separat økosystem:
+Wenche kan kjøres mot Altinns testmiljø (tt02) i stedet for produksjon. Testmiljøet er et separat økosystem:
 
 - Egne Maskinporten-klienter i Digdirs test-portal
 - Egen systembruker i Altinn tt02
@@ -18,7 +18,7 @@ Wenche kan kjøres mot Skatteetatens testmiljø (tt02) i stedet for produksjon. 
 wenche dev
 ```
 
-UI starter på `http://localhost:8080` med en diskret `TEST`-tag i headeren. Alle innsendinger går til Skatteetatens tt02-API, ingen ekte innsending til myndighetene.
+UI starter på `http://localhost:8080` med en diskret `TEST`-tag i headeren. Alle innsendinger går til testmiljøet (Altinn tt02 og Skatteetatens test-API), ingen ekte innsending til myndighetene.
 
 `wenche` (uten args) starter alltid mot produksjon. `wenche dev` starter alltid mot test. De to modusene er låst og kan ikke veksles mellom uten å starte UI på nytt.
 

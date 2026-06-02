@@ -72,7 +72,7 @@ Fullstendig veiledning for installasjon, oppsett og bruk:
 
 ## For utviklere
 
-Wenche kan kjøres mot Skatteetatens testmiljø (tt02) for å tørrtrene innsending uten å sende ekte data til myndighetene:
+Wenche kan kjøres mot Altinns testmiljø (tt02) for å tørrtrene innsending uten å sende ekte data til myndighetene:
 
 ```bash
 wenche dev
