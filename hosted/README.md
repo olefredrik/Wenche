@@ -103,3 +103,40 @@ Scriptet velger metode automatisk: **lokalt** hvis `~/.wenche/hosted-prod.env` f
 (krever `flyctl ssh issue --agent` én gang), slik at secret-en kan bli værende kun på
 serveren. Del lenken via en privat kanal, den er knyttet til ett organisasjonsnummer.
 Roter `HOSTED_INVITE_SECRET` for å ugyldiggjøre alle utdelte lenker på én gang.
+
+## Demo-miljø (demo.wenche.cloud, mot tt02)
+
+En **helt separat** Fly-app som lar hvem som helst prøve tjenesten mot Altinns testmiljø (tt02)
+uten invitasjon, på syntetiske data. Den deler aldri prod-creds eller `env=prod`: egen app, egne
+**test**-vendor-creds, `WENCHE_ENV=test`. Konfig ligger i `fly.demo.toml`. Banneren i SPA-en
+styres av `HOSTED_DEMO_MODE=1` (rent informativt, endrer ikke funksjonalitet).
+
+Engangsoppsett:
+
+1. **Opprett appen:** `flyctl apps create wenche-demo`.
+2. **Sett test-hemmeligheter** (de samme test-vendor-creds `dev_local.py` bruker mot tt02):
+   ```sh
+   flyctl secrets set -a wenche-demo \
+     HOSTED_SESSION_SECRET="$(openssl rand -hex 32)" \
+     HOSTED_INVITE_SECRET="$(openssl rand -hex 32)" \
+     HOSTED_VENDOR_ORGNR="<test-orgnr>" \
+     HOSTED_VENDOR_CLIENT_ID="<maskinporten-klient-id, test>" \
+     HOSTED_VENDOR_KID="<kid, test>" \
+     HOSTED_VENDOR_KEY_PEM="$(cat maskinporten_privat.pem)"
+   ```
+3. **Deploy:** `flyctl deploy -c fly.demo.toml --ha=false`. `--ha=false` hindrer at Fly lager to
+   maskiner — appen MÅ kjøre på **én** maskin (in-memory-sesjon kan ikke spres mellom maskiner,
+   samme grunn som prod). Lagde du to: `flyctl scale count 1 -a wenche-demo`.
+4. **Domene:** `flyctl certs add demo.wenche.cloud -a wenche-demo`, legg deretter til DNS-postene
+   Fly oppgir hos domene.shop. Vent til `flyctl certs show demo.wenche.cloud -a wenche-demo` er grønt.
+5. **Forhåndsgodkjenn systembruker** for et syntetisk Tenor-demo-org (engang): åpne demo-appen via
+   en demo-invite (steg 6), klikk «Koble systembruker», godkjenn i tt02-Altinn. Etterpå får alle
+   demo-besøkende `AlreadyApproved` uten BankID.
+6. **Offentlig demo-lenke:** mynt en invite-lenke for demo-org-et mot demo-appen (secret/URL
+   hentes fra demo-appens eget miljø via ssh, så lenken peker på demo.wenche.cloud):
+   ```sh
+   WENCHE_HOSTED_APP=wenche-demo WENCHE_HOSTED_HEALTH=https://demo.wenche.cloud/api/health \
+     hosted/invite.sh <demo-orgnr>
+   ```
+   Legg den bak «Demo»-knappen på wenche-web. Roter `HOSTED_INVITE_SECRET` på demo-appen for å
+   ugyldiggjøre lenken. (Uten `WENCHE_HOSTED_APP`-overstyringen mynter scriptet for **prod**.)

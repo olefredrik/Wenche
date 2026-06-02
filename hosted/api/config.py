@@ -34,6 +34,9 @@ class Settings:
         ]
         # Brukes til å bygge invite-lenken (peker på app-en der invitten løses inn).
         self.public_url: str = os.getenv("HOSTED_PUBLIC_URL", "http://localhost:5173")
+        # Demo-modus: viser en «dette er en demo mot tt02»-banner i SPA-en. Rent informativt,
+        # endrer ikke funksjonalitet. Settes kun på demo-appen (aldri i prod).
+        self.demo_mode: bool = os.getenv("HOSTED_DEMO_MODE", "").lower() in ("1", "true", "yes")
         self.vendor_orgnr = os.getenv("HOSTED_VENDOR_ORGNR")
         self._vendor_client_id = os.getenv("HOSTED_VENDOR_CLIENT_ID")
         self._vendor_kid = os.getenv("HOSTED_VENDOR_KID")
