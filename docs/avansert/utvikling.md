@@ -21,7 +21,7 @@ hosted/
 
 Domenelaget i `wenche/` vet ingenting om grensesnittet. Det leser en config (fra fil eller dict), bygger XML og snakker med Altinn og Skatteetaten. Begge SPA-ene sender den samme config-strukturen som `config.yaml` til hvert sitt API.
 
-Frontend-koden er en npm-workspace (`package.json` i repo-roten). Det delte designsystemet i `packages/ui` (skjema, send-flyt, knapper, farger) konsumeres som kildekode av begge appene via et Vite-alias, så det finnes ingen separat byggesteg for pakken.
+Frontend-koden er en npm-workspace (`package.json` i repo-roten). Det delte designsystemet i `packages/ui` (skjema, send-flyt, dokument-nedlasting, noter, stegvis navigasjon, knapper, farger) konsumeres som kildekode av begge appene via et Vite-alias, så det finnes ingen separat byggesteg for pakken.
 
 ## Kjøre lokalt
 

@@ -3,13 +3,21 @@ import { api } from "./api";
 import {
   DataSkjema,
   SendSeksjon,
-  SeksjonsNav,
+  Dokumenter,
+  NoterSeksjon,
+  noterFraConfig,
+  StegNav,
+  GaaVidere,
   Kort,
+  Panel,
   oppsummer,
+  harMinimumsdata,
   btnPrimar,
   btnOutline,
   monoLabel,
+  type Fane,
   type InnsendingFn,
+  type NoterData,
 } from "@wenche/ui";
 
 interface Me {
@@ -18,6 +26,17 @@ interface Me {
   kunde_org?: string | null;
   env?: string;
 }
+
+type FaneId = "hjem" | "tall" | "dokumenter" | "send";
+
+// Færre steg enn self-hosted: Maskinporten-oppsettet er gjort av operatøren, så brukeren har
+// bare Hjem (tilkoblingsstatus) + tre arbeidssteg.
+const FANER: Fane[] = [
+  { id: "hjem", navn: "Hjem" },
+  { id: "tall", navn: "Tall", steg: 1 },
+  { id: "dokumenter", navn: "Dokumenter", steg: 2 },
+  { id: "send", navn: "Send", steg: 3 },
+];
 
 // Lenke til vilkårene (publisert på markedssiden wenche-web).
 const VILKAAR_URL = "https://www.wenche.cloud/vilkaar";
@@ -40,25 +59,6 @@ const HOSTET_SAMTYKKE = (
   </span>
 );
 
-function Skall({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-50 border-b border-border bg-background/85 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-2xl items-center justify-between px-6 py-4">
-          <span className="font-display text-2xl font-medium tracking-tight">Wenche</span>
-          <a
-            href="https://www.wenche.cloud"
-            className="text-xs text-muted-foreground transition hover:text-spruce"
-          >
-            ← wenche.cloud
-          </a>
-        </div>
-      </header>
-      <main className="mx-auto max-w-2xl px-6 py-12">{children}</main>
-    </div>
-  );
-}
-
 function KunInviterte() {
   return (
     <Kort>
@@ -72,11 +72,12 @@ function KunInviterte() {
   );
 }
 
+// Koble systembruker (BankID i Altinn). Vises på Hjem når selskapet ikke er koblet ennå.
 function Onboarding({ org, onApproved }: { org?: string | null; onApproved: () => void }) {
   const [confirmUrl, setConfirmUrl] = useState<string | null>(null);
   const [feil, setFeil] = useState<string | null>(null);
   const [kobler, setKobler] = useState(false);
-  const [venter, setVenter] = useState(false); // venter på godkjenning i Altinn
+  const [venter, setVenter] = useState(false);
 
   const koble = async () => {
     setFeil(null);
@@ -84,9 +85,8 @@ function Onboarding({ org, onApproved }: { org?: string | null; onApproved: () =
     setKobler(true);
     try {
       const r = await api.systembrukerRequest();
-      if (r.godkjent || r.status === "AlreadyApproved") {
-        onApproved();
-      } else {
+      if (r.godkjent || r.status === "AlreadyApproved") onApproved();
+      else {
         setConfirmUrl(r.confirm_url ?? null);
         setVenter(true);
       }
@@ -108,8 +108,8 @@ function Onboarding({ org, onApproved }: { org?: string | null; onApproved: () =
     }
   };
 
-  // Mens vi venter på godkjenning i Altinn: poll status, så UI-et går videre av seg selv
-  // når daglig leder/styreleder har godkjent (uten at brukeren må trykke noe).
+  // Poll status mens vi venter, så UI-et går videre av seg selv når daglig leder/styreleder
+  // har godkjent i Altinn.
   useEffect(() => {
     if (!venter) return;
     const id = setInterval(async () => {
@@ -124,13 +124,12 @@ function Onboarding({ org, onApproved }: { org?: string | null; onApproved: () =
       }
     }, 4000);
     return () => clearInterval(id);
-    // onApproved utelatt med vilje: den er funksjonelt stabil (frisker opp me).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [venter]);
 
   return (
     <Kort>
-      <p className={monoLabel}>Steg 1 · Koble selskap</p>
+      <p className={monoLabel}>Tilkobling</p>
       <h2 className="mt-3 font-display text-2xl font-normal">Koble til selskapet ditt</h2>
       {org ? (
         <>
@@ -171,9 +170,7 @@ function Onboarding({ org, onApproved }: { org?: string | null; onApproved: () =
             <button className={btnOutline} onClick={sjekkNaa}>
               Jeg har godkjent, sjekk nå
             </button>
-            {venter && (
-              <span className="text-xs text-muted-foreground">Venter på godkjenning…</span>
-            )}
+            {venter && <span className="text-xs text-muted-foreground">Venter på godkjenning…</span>}
           </div>
         </div>
       )}
@@ -182,19 +179,144 @@ function Onboarding({ org, onApproved }: { org?: string | null; onApproved: () =
   );
 }
 
-function Innsending({ env }: { env?: string }) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [config, setConfig] = useState<any | null>(null);
+// Hjem: tilkoblingsstatus. Koblet → bekreftelse + «sjekk tilkobling». Ikke koblet → onboarding.
+function HjemFane({ me, onChange }: { me: Me; onChange: () => void }) {
+  const [sjekker, setSjekker] = useState(false);
+  const [melding, setMelding] = useState<string | null>(null);
 
-  // Klienten er fasit: vi holder config lokalt og sender den med innsendings-requesten.
-  // Ingenting lagres server-side mellom kall (bedre personvern + tåler at serveren sover).
-  const lagre = async (c: unknown) => {
-    setConfig(c);
+  // Bekreft at en godkjent systembruker fortsatt finnes for selskapet. Bruker `request`
+  // (ikke `status`): en allerede godkjent kunde har ingen ventende forespørsel, så `status`
+  // ville svart «ingen aktiv forespørsel» selv om tilkoblingen er aktiv. `request` sjekker
+  // eksisterende systembrukere og returnerer «AlreadyApproved» uten å lage en ny forespørsel.
+  const sjekk = async () => {
+    setSjekker(true);
+    setMelding(null);
+    try {
+      const r = await api.systembrukerRequest();
+      if (r.godkjent || r.status === "AlreadyApproved") {
+        setMelding("✓ Tilkoblingen er aktiv.");
+      } else {
+        setMelding("Tilkoblingen er ikke lenger aktiv. Last siden på nytt for å koble på nytt.");
+      }
+    } catch (e) {
+      setMelding((e as Error).message);
+    } finally {
+      setSjekker(false);
+    }
   };
 
-  // Innsending med selvhelende systembruker-binding: en 409 betyr at bindingen gikk tapt
-  // (serveren sov/restartet). Den reises FØR noen innsending skjer, så det er trygt å
-  // rebinde (AlreadyApproved, ingen BankID) og prøve én gang til — ingen dobbeltinnsending.
+  if (!me.kunde_org) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="font-display text-2xl font-normal">Velkommen</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Koble selskapet ditt til Altinn for å komme i gang. Maskinporten-oppsettet er
+            allerede gjort for deg.
+          </p>
+        </div>
+        <Onboarding org={me.invite_org} onApproved={onChange} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="font-display text-2xl font-normal">Hjem</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Fyll inn tallene under «Tall», se over dokumentene, og send inn under «Send».
+        </p>
+      </div>
+      <Kort accent>
+        <p className={monoLabel}>Tilkobling</p>
+        <p className="mt-2 font-display text-lg text-spruce">
+          ✓ Selskapet ditt (org {me.kunde_org}) er koblet til Altinn
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Wenche kan sende inn på vegne av selskapet. Du kan når som helst kontrollere at
+          tilkoblingen fortsatt er aktiv.
+        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-4">
+          <button
+            className="font-mono text-[11px] uppercase tracking-[0.15em] text-spruce underline-offset-2 hover:underline disabled:opacity-40"
+            onClick={sjekk}
+            disabled={sjekker}
+          >
+            {sjekker ? "Sjekker…" : "Sjekk tilkobling"}
+          </button>
+          {melding && <span className="text-sm text-muted-foreground">{melding}</span>}
+        </div>
+      </Kort>
+    </div>
+  );
+}
+
+// Tall: skjema + noter. Klienten er fasit (ingen disk); lagring setter App-config-en.
+function TallFane({
+  config,
+  env,
+  org,
+  onLagret,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  config: any;
+  env?: string;
+  org?: string | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onLagret: (c: any) => void;
+}) {
+  const [noter, setNoter] = useState<NoterData>(() => noterFraConfig(config));
+  const [lagret, setLagret] = useState(false);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lagre = async (formConfig: any) => {
+    onLagret({ ...formConfig, noter });
+    setLagret(true);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="font-display text-2xl font-normal">Tall</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Fyll inn selskapsopplysninger, regnskap, balanse, skattemelding og aksjonærer. Trykk
+          «Lagre data», så kan du se over dokumentene og sende inn.
+        </p>
+      </div>
+      <Kort>
+        <DataSkjema
+          onLagre={lagre}
+          visEksempel={env === "test"}
+          initial={config ?? undefined}
+          laastOrg={org ?? undefined}
+          ekstraSeksjon={<NoterSeksjon noter={noter} setNoter={setNoter} />}
+        />
+      </Kort>
+      {lagret && <p className="text-sm text-spruce">✓ Lagret. Gå videre til «Dokumenter» eller «Send».</p>}
+    </div>
+  );
+}
+
+// Send: dry-run + bekreft + ekte innsending, med selvhelende 409-rebind.
+function SendFane({ config, me }: { config: any; me: Me }) {
+  if (!me.kunde_org) {
+    return (
+      <Panel tone="advarsel" tittel="Ikke koblet ennå">
+        Koble selskapet ditt til Altinn på «Hjem» før du sender inn.
+      </Panel>
+    );
+  }
+  if (!config) {
+    return (
+      <Panel tone="advarsel" tittel="Ingen data ennå">
+        Fyll inn og lagre tallene under «Tall» før du sender inn.
+      </Panel>
+    );
+  }
+
+  // Selvhelende systembruker-binding: en 409 betyr at bindingen gikk tapt (serveren sov/
+  // restartet). Den reises FØR innsending, så det er trygt å rebinde og prøve én gang til.
   const innsending: InnsendingFn = async (type, dryRun, cfg) => {
     try {
       return await api.innsending(type, dryRun, cfg);
@@ -207,56 +329,28 @@ function Innsending({ env }: { env?: string }) {
     }
   };
 
-  const o = config ? oppsummer(config) : null;
-
+  const o = oppsummer(config);
   return (
     <div className="space-y-6">
-      <SeksjonsNav
-        lenker={[
-          ["#selskap", "Selskap"],
-          ["#resultatregnskap", "Regnskap"],
-          ["#skattemelding", "Skattemelding"],
-          ["#aksjonaerer", "Aksjonærer"],
-          ...(o ? ([["#send", "Send"]] as [string, string][]) : []),
-        ]}
-      />
-      <Kort>
-        <DataSkjema onLagre={lagre} visEksempel={env === "test"} />
-      </Kort>
-      {o && (
-        <SendSeksjon
-          config={config}
-          innsending={innsending}
-          env={env}
-          org={o.org}
-          samtykke={HOSTET_SAMTYKKE}
-        />
-      )}
-    </div>
-  );
-}
-
-function Hjem({ me, onChange }: { me: Me; onChange: () => void }) {
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <span className={monoLabel}>
-          Innlogget{me.kunde_org ? ` · org ${me.kunde_org}` : ""}
-        </span>
-        <button
-          className="text-sm text-muted-foreground underline-offset-2 hover:text-spruce hover:underline"
-          onClick={() => api.logout().then(onChange)}
-        >
-          Logg ut
-        </button>
+      <div>
+        <h2 className="font-display text-2xl font-normal">Send inn</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Wenche kontrollerer tallene og viser en oppsummering før noe sendes til myndighetene.
+        </p>
       </div>
-      {me.kunde_org ? <Innsending env={me.env} /> : <Onboarding org={me.invite_org} onApproved={onChange} />}
+      <SendSeksjon
+        config={config}
+        innsending={innsending}
+        env={me.env}
+        org={o.org}
+        samtykke={HOSTET_SAMTYKKE}
+      />
     </div>
   );
 }
 
-// Manuell Umami-pageview (auto-track er av i index.html). Kalles FØRST etter at
-// invite-tokenet er fjernet fra URL-en, så tokenet aldri sendes til analytics.
+// Manuell Umami-pageview (auto-track er av i index.html). Kalles FØRST etter at invite-tokenet
+// er fjernet fra URL-en, så tokenet aldri sendes til analytics.
 function sporVisning() {
   const w = window as Window & { umami?: { track?: () => void } };
   const kjor = () => w.umami?.track?.();
@@ -266,9 +360,11 @@ function sporVisning() {
 
 export default function App() {
   const [me, setMe] = useState<Me | null>(null);
+  const [fane, setFane] = useState<FaneId>("hjem");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [config, setConfig] = useState<any | null>(null);
 
-  const refresh = () =>
-    api.me().then(setMe).catch(() => setMe({ invited: false }));
+  const refresh = () => api.me().then(setMe).catch(() => setMe({ invited: false }));
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -289,9 +385,8 @@ export default function App() {
   }, []);
 
   // Keep-alive-heartbeat: holder Fly-maskinen våken mens appen er i AKTIV bruk, så scale-to-zero
-  // ikke sovner midt i en økt. Pinger KUN når fanen er synlig OG brukeren har vært aktiv siste
-  // 10 min, så en glemt åpen fane lar maskinen sove (ingen løpsk kostnad). Trygt å la den sove
-  // takket være at klienten er fasit + selvhelende binding.
+  // ikke sovner midt i en økt. Pinger kun når fanen er synlig og brukeren har vært aktiv siste
+  // 10 min, så en glemt åpen fane lar maskinen sove.
   useEffect(() => {
     let sisteAktivitet = Date.now();
     const merkAktiv = () => {
@@ -310,15 +405,79 @@ export default function App() {
     };
   }, []);
 
+  const naviger = (id: string) => {
+    setFane(id as FaneId);
+    window.scrollTo({ top: 0 });
+  };
+
+  const invited = !!me?.invited;
+
   return (
-    <Skall>
-      {!me ? (
-        <p className="text-sm text-muted-foreground">Laster…</p>
-      ) : !me.invited ? (
-        <KunInviterte />
-      ) : (
-        <Hjem me={me} onChange={refresh} />
-      )}
-    </Skall>
+    <div className="min-h-screen">
+      <header className="sticky top-0 z-50 border-b border-border bg-background/85 backdrop-blur-sm">
+        <div className="mx-auto max-w-2xl px-6">
+          <div className="flex items-center justify-between py-4">
+            <div className="flex items-baseline gap-2">
+              <span className="font-display text-2xl font-medium tracking-tight">Wenche</span>
+              {me?.env === "test" && (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-amber-800">
+                  Test
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-4 text-xs">
+              {invited && (
+                <button
+                  className="text-muted-foreground transition hover:text-spruce"
+                  onClick={() => api.logout().then(refresh)}
+                >
+                  Logg ut
+                </button>
+              )}
+              <a
+                href="https://www.wenche.cloud"
+                className="text-muted-foreground transition hover:text-spruce"
+              >
+                ← wenche.cloud
+              </a>
+            </div>
+          </div>
+          {/* Steg-navet vises først når selskapet er koblet — før det er appen kun en
+              tilkoblingsskjerm, så man ikke kan ta i bruk løsningen uten systembruker. */}
+          {invited && me?.kunde_org && (
+            <nav className="pb-1">
+              <StegNav faner={FANER} aktiv={fane} onNaviger={naviger} />
+            </nav>
+          )}
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-2xl px-6 py-12">
+        {!me ? (
+          <p className="text-sm text-muted-foreground">Laster…</p>
+        ) : !me.invited ? (
+          <KunInviterte />
+        ) : !me.kunde_org ? (
+          // Port: før selskapet er koblet er dette den eneste skjermen (ingen steg).
+          <HjemFane me={me} onChange={refresh} />
+        ) : (
+          <>
+            {fane === "hjem" && <HjemFane me={me} onChange={refresh} />}
+            {fane === "tall" && (
+              <TallFane config={config} env={me.env} org={me.kunde_org} onLagret={setConfig} />
+            )}
+            {fane === "dokumenter" && <Dokumenter config={config} dokument={api.dokument} />}
+            {fane === "send" && <SendFane config={config} me={me} />}
+            <GaaVidere
+              faner={FANER}
+              aktiv={fane}
+              onNaviger={naviger}
+              disabled={fane === "tall" && !harMinimumsdata(config)}
+              disabledHint="Fyll inn selskapsnavn, daglig leder og styreleder, og trykk «Lagre data»."
+            />
+          </>
+        )}
+      </main>
+    </div>
   );
 }

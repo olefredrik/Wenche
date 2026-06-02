@@ -1,15 +1,33 @@
+// Delt dokument-nedlasting (hostet + self-hosted). Generer dokumentene for gjennomgang før
+// innsending; ingenting sendes inn her. Hver app injiserer sin `dokument`-binding.
 import { useState } from "react";
-import { Kort, Panel, monoLabel, btnOutlineLett } from "@wenche/ui";
-import { api, lastNed } from "./api";
+import { Kort, Panel } from "./komponenter";
+import { monoLabel, btnOutlineLett } from "./styles";
+import { lastNed, type NedlastFil } from "./nedlasting";
 
-const DOKUMENTER: { type: string; navn: string; beskrivelse: string }[] = [
+export type DokumentFn = (
+  type: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  config: any,
+) => Promise<{ filer: NedlastFil[] }>;
+
+const STANDARD_DOKUMENTER: { type: string; navn: string; beskrivelse: string }[] = [
   { type: "skattemelding", navn: "Skattemelding", beskrivelse: "Tekstsammendrag av skattemelding og næringsspesifikasjon." },
   { type: "aarsregnskap", navn: "Årsregnskap (XML)", beskrivelse: "Hoved- og underskjema slik de sendes til Brønnøysund." },
   { type: "aksjonaer", navn: "Aksjonærregister (XML)", beskrivelse: "RF-1086 hovedskjema + ett underskjema per aksjonær." },
-  { type: "noter", navn: "Noter", beskrivelse: "De obligatoriske notene til årsregnskapet (signeres av styret)." },
+  { type: "noter", navn: "Noter", beskrivelse: "De obligatoriske notene til årsregnskapet (signeres av styret, sendes ikke inn)." },
 ];
 
-export default function Dokumenter({ config }: { config: any }) {
+export function Dokumenter({
+  config,
+  dokument,
+  dokumenter = STANDARD_DOKUMENTER,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  config: any;
+  dokument: DokumentFn;
+  dokumenter?: { type: string; navn: string; beskrivelse: string }[];
+}) {
   const [feil, setFeil] = useState<string | null>(null);
   const [laster, setLaster] = useState<string | null>(null);
 
@@ -17,7 +35,7 @@ export default function Dokumenter({ config }: { config: any }) {
     setFeil(null);
     setLaster(type);
     try {
-      const r = await api.dokument(type, config);
+      const r = await dokument(type, config);
       lastNed(r.filer);
     } catch (e) {
       setFeil((e as Error).message);
@@ -29,7 +47,7 @@ export default function Dokumenter({ config }: { config: any }) {
   if (!config) {
     return (
       <Panel tone="advarsel" tittel="Ingen data ennå">
-        Fyll inn og lagre tallene under «Tall» før du genererer dokumenter.
+        Fyll inn tallene under «Tall» før du genererer dokumenter.
       </Panel>
     );
   }
@@ -48,7 +66,7 @@ export default function Dokumenter({ config }: { config: any }) {
         </Panel>
       )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {DOKUMENTER.map((d) => (
+        {dokumenter.map((d) => (
           <Kort key={d.type}>
             <p className={monoLabel}>Dokument</p>
             <h3 className="mt-2 font-display text-lg font-normal">{d.navn}</h3>

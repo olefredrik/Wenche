@@ -16,4 +16,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify(config),
     }),
+  // Genererer dokumenter for nedlasting/gjennomgang (ingenting sendes inn).
+  dokument: (type: string, config: unknown) =>
+    req(`/api/dokumenter/${type}`, { method: "POST", body: JSON.stringify(config) }),
 };
