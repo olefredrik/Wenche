@@ -28,13 +28,12 @@ Statussjekkene gjøres mot regnskapsåret som tilhører neste frist (f.eks. 31. 
 
 ## Oppsett-fanen
 
-Under **1. Oppsett** finner du:
+Under **Oppsett** finner du:
 
-- **Maskinporten-credentials:** Klient-ID og Nøkkel-ID fra Digdirs selvbetjeningsportal.
-- **Organisasjonsnummer:** Ditt eget organisasjonsnummer (9 siffer).
-- **Systembruker i Altinn:** Status oppdateres automatisk ved sidelasting. Statuskortet viser hva som mangler eller hva som er klart, og **Avansert**-ekspansjonen har knapper for å registrere system, opprette eller fornye systembruker, og oppdatere rettigheter.
-
-Under credentials-feltet ligger opplasting av privat nøkkel, en **Lagre konfigurasjon**-knapp, og en **Tilkoblingstest** som sjekker alle tre forutsetninger (Maskinporten, Altinn-veksling og systembruker) og oppsummerer «klar for innsending» eller hva som mangler.
+- **Maskinporten-credentials:** Klient-ID og Nøkkel-ID fra Digdirs selvbetjeningsportal, og ditt eget organisasjonsnummer (9 siffer). Klikk **Lagre konfigurasjon** for å skrive verdiene til `~/.wenche/.env`.
+- **Privat nøkkel:** Last opp RSA-nøkkelen (.pem) Wenche bruker mot Maskinporten. Den lagres lokalt og sendes aldri videre.
+- **Status og tilkoblingstest:** Et statuskort viser hva som mangler eller er klart, og knappen **Test tilkobling** sjekker Maskinporten, Altinn-veksling og systembruker under ett.
+- **Systembruker i Altinn:** Knapper for å registrere systemet, opprette systembruker, sjekke status og oppdatere rettigheter. Når du oppretter en systembruker, vises en godkjenningslenke du åpner og bekrefter i Altinn med BankID.
 
 ---
 
@@ -42,9 +41,9 @@ Under credentials-feltet ligger opplasting av privat nøkkel, en **Lagre konfigu
 
 Wenche fyller ut næringsspesifikasjonen og skattemeldingen og sender dem digitalt til Skatteetaten via Altinn. Du fullfører ved å signere med BankID i Altinn.
 
-Gå til fanen **Send til Altinn** og klikk **Send skattemelding til Skatteetaten**.
+Gå til fanen **Send** og klikk **Fortsett til innsending** ved siden av **Skattemelding**.
 
-Wenche validerer først skattemeldingen mot Skatteetaten. Er noe feil, stopper Wenche uten å sende noe og viser hva som må rettes. Når valideringen er OK, lastes skattemeldingen opp automatisk og Wenche viser en lenke til Altinn-innboksen. Åpne lenken og signer med BankID for å fullføre innsendingen.
+Wenche validerer først skattemeldingen mot Skatteetaten og viser en oppsummering. Er noe feil, stopper Wenche uten å sende noe og viser hva som må rettes. Når valideringen er OK, bekrefter du og skattemeldingen lastes opp. Wenche viser en lenke til Altinn-innboksen. Åpne lenken og signer med BankID for å fullføre innsendingen.
 
 !!! info "Automatisk validering før innsending"
     Webgrensesnittet kjører Skatteetatens valideringstjeneste som første steg. Blir innsendingen avvist (`validertMedFeil`), sendes ingenting inn og du får en tydelig feilmelding om hva som må rettes. Validering lagrer ikke data hos Skatteetaten.
@@ -53,7 +52,7 @@ Wenche validerer først skattemeldingen mot Skatteetaten. Er noe feil, stopper W
     Skatteetaten krever at en personlig bruker bekrefter skattemeldingen via ID-porten. Wenche laster opp innholdet med systembruker, men selve innsendingen fullføres først når du signerer med BankID i Altinn. Dette kan ikke gjøres maskinelt.
 
 !!! tip "Formuesverdi av aksjer (aksjeoppgaven RF-1088S)"
-    Eier selskapet aksjer i andre selskap, fyll inn **formuesverdien** fra aksjeoppgaven (RF-1088S, post 209) i feltet «Formuesverdi av aksjer selskapet eier» (Dokumenter-fanen, eller `formuesverdi_aksjer` i config.yaml). Wenche bruker den til å beregne formuesverdien bak selskapets egne aksjer, som er grunnlaget for eiernes formuesskatt. Uten den blir feltet stående tomt og Skatteetaten gir en merknad.
+    Eier selskapet aksjer i andre selskap, fyll inn **formuesverdien** fra aksjeoppgaven (RF-1088S, post 209) i feltet «Formuesverdi aksjer» (Tall-fanen → Skattemelding, eller `formuesverdi_aksjer` i config.yaml). Wenche bruker den til å beregne formuesverdien bak selskapets egne aksjer, som er grunnlaget for eiernes formuesskatt. Uten den blir feltet stående tomt og Skatteetaten gir en merknad.
 
 Sammendraget inneholder:
 
@@ -95,9 +94,9 @@ Teknisk dokumentasjon: [github.com/Skatteetaten/skattemeldingen](https://github.
 
 ## Årsregnskap (frist 31. juli)
 
-Gå til fanen **Send til Altinn** og klikk **Send årsregnskap**.
+Gå til fanen **Send** og klikk **Fortsett til innsending** ved siden av **Årsregnskap**, og bekreft.
 
-Når opplastingen er ferdig vises en knapp **Signer i Altinn**. Klikk den og signer med BankID for å fullføre innsendingen.
+Når opplastingen er ferdig vises en lenke **Signer i Altinn**. Klikk den og signer med BankID for å fullføre innsendingen.
 
 !!! note "Signering skjer i Altinn, ikke i Wenche"
     Wenche laster opp regnskapet og klargjør det for signering. Selve signeringen må gjøres av daglig leder eller styreleder i Altinn med BankID, dette er et juridisk krav og kan ikke gjøres maskinelt.
@@ -114,9 +113,9 @@ Wenche sender RF-1086 direkte til Skatteetatens eget REST-API, ikke via Altinn-i
 !!! note "Forutsetninger"
     - Maskinporten-klienten din må ha fått scopet `skatteetaten:innrapporteringaksjonaerregisteroppgave` innvilget. Se [steg 2f i oppsett](oppsett.md#2f-sk-om-tilgang-til-skds-api-for-aksjonrregisteroppgave).
     - Systembrukeren for din organisasjon må inkludere SKD-rettigheten. Denne settes opp automatisk når du oppretter systembruker fra Oppsett-fanen, se [steg 5 i oppsett](oppsett.md#steg-5-registrer-systembruker-i-altinn).
-    - `kontakt_epost` må være utfylt under `selskap` i `config.yaml` (eller i Wenche under **Selskap**).
+    - `kontakt_epost` må være utfylt under `selskap` i `config.yaml` (eller i Wenche under **Tall**).
 
-Gå til fanen **Send til Altinn** og klikk **Send aksjonærregister til Skatteetaten**.
+Gå til fanen **Send** og klikk **Fortsett til innsending** ved siden av **Aksjonærregister**, og bekreft.
 
 Forsendelse-ID vises i grensesnittet når innsendingen er fullført.
 
@@ -143,10 +142,10 @@ Notene sendes **ikke** inn digitalt til Brønnøysundregistrene. Skjemaet RR-000
 
 ### Hvordan bruke notene i Wenche?
 
-1. Gå til fanen **Dokumenter** og scroll ned til **Obligatoriske noter**
+1. Gå til fanen **Tall** og finn seksjonen **Obligatoriske noter**
 2. Fyll inn antall ansatte (typisk 0 for holdingselskaper)
-3. Fyll inn eventuelle lån til nærstående (aksjonærer, styremedlemmer)
-4. Klikk **Last ned noter**, du får en forhåndsvisning og en nedlastingsknapp for `noter_ÅÅÅÅ_ORGNR.txt`
+3. Fyll inn eventuelle lån til nærstående (aksjonærer, styremedlemmer), og klikk **Lagre data**
+4. Gå til fanen **Dokumenter** og klikk **Last ned** ved siden av **Noter**, du får filen `noter_ÅÅÅÅ_ORGNR.txt`
 5. Les gjennom teksten og tilpass om nødvendig
 6. Arkiver filen sammen med det signerte årsregnskapet
 

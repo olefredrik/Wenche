@@ -4,7 +4,7 @@ FastAPI-app for den hostede Wenche-tjenesten.
 Importerer `wenche` som bibliotek og gjenbruker domene-, auth- og klientlaget. Server-side
 ephemeral sesjon, ingen database. Onboarding: per-org invite-lenke + Altinn systembruker-
 godkjenning (BankID). Serverer også den bygde SPA-en (web/dist) på samme origin i prod.
-Self-hosted NiceGUI-appen (`wenche/ui.py`) er upåvirket. Se hosted/README.md.
+Self-hosted-appen (`wenche.web`) er upåvirket. Se hosted/README.md.
 """
 import os
 from pathlib import Path

@@ -2,4 +2,4 @@
 @import "@wenche/ui/theme.css";
 
 /* Skann den delte UI-pakken så Tailwind ikke stripper klassene den bruker. */
-@source "../../../packages/ui/src";
+@source "../../../../packages/ui/src";

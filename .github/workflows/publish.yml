@@ -19,6 +19,17 @@ jobs:
         with:
           python-version: "3.12"
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Bygg self-hosted SPA
+        # Den bygde SPA-en (wenche/web/static) force-includes i wheelen (pip-brukere har
+        # ikke Node). Må bygges før `python -m build`.
+        run: |
+          npm ci
+          npm run build --workspace wenche/web/frontend
+
       - name: Bygg pakke
         run: |
           pip install build

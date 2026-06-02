@@ -112,7 +112,7 @@ foregaaende_aar:
 |---|---|---|---|
 | `underskudd_til_fremfoering` | heltall | nei | Fremførbart underskudd fra tidligere år (NOK). Finnes i fjorårets skattemelding. Standard: `0` |
 | `anvend_fritaksmetoden` | boolsk | nei | `true` for holdingselskaper som eier aksjer i datterselskaper (sktl. § 2-38). Standard: `false` |
-| `eierandel_for_fritaksmetoden` | heltall | nei | Eierandel i selskapet som deler ut utbytte, i prosent (0–100). Brukes bare når `anvend_fritaksmetoden` er `true`. ≥ 90 %: hele utbyttet fritatt. < 90 %: 3 % skattepliktig (sjablonregelen, sktl. § 2-38 sjette ledd). Standard: `100` |
+| `eierandel_for_fritaksmetoden` | heltall | nei | Eierandel i selskapet som deler ut utbytte, i prosent (0-100). Brukes bare når `anvend_fritaksmetoden` er `true`. ≥ 90 %: hele utbyttet fritatt. < 90 %: 3 % skattepliktig (sjablonregelen, sktl. § 2-38 sjette ledd). Standard: `100` |
 | `boersnotert` | boolsk | nei | `true` hvis selskapet er børsnotert. Standard: `false` |
 | `formuesverdi_aksjer` | heltall | nei | Formuesverdi av aksjer selskapet eier i andre selskap, fra aksjeoppgaven (RF-1088S, post 209). Brukes til å beregne netto formuesverdi bak selskapets egne aksjer. Standard: `0` |
 | `samlet_verdi_bak_aksjene` | heltall | nei | Overstyrer den beregnede netto formuesverdien bak aksjene direkte. Utelat for å la Wenche beregne den fra `formuesverdi_aksjer` og balansen |

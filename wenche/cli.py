@@ -32,15 +32,15 @@ def main(ctx: click.Context):
     """
     if ctx.invoked_subcommand is not None:
         return
-    from wenche.ui import run_app
-    run_app(env="prod")
+    from wenche.web.backend import kjor
+    kjor(env="prod")
 
 
 @main.command()
 def dev():
     """Start webgrensesnittet mot testmiljøet (tt02) for tørrtrening."""
-    from wenche.ui import run_app
-    run_app(env="test")
+    from wenche.web.backend import kjor
+    kjor(env="test")
 
 
 @main.command()

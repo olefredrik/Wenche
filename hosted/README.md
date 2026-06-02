@@ -1,7 +1,7 @@
 # Wenche hosted
 
 Separat, hostet multi-tenant-variant av Wenche. Importerer `wenche`-pakken som bibliotek og
-gjenbruker domene-, auth- og klientlaget. Self-hosted NiceGUI-appen (`wenche` / `wenche dev`)
+gjenbruker domene-, auth- og klientlaget. Self-hosted-appen (`wenche` / `wenche dev`, `wenche.web`)
 er **upåvirket** av alt her, og denne mappen er ikke en del av `wenche`-wheelen som publiseres
 til PyPI.
 

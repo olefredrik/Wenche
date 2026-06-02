@@ -18,7 +18,7 @@ Wenche kan kjøres mot Skatteetatens testmiljø (tt02) i stedet for produksjon. 
 wenche dev
 ```
 
-UI starter på `http://localhost:8080` med en diskret `TEST`-tag i header og "Wenche [TEST]" som browser-tittel. Alle innsendinger går til Skatteetatens tt02-API, ingen ekte innsending til myndighetene.
+UI starter på `http://localhost:8080` med en diskret `TEST`-tag i headeren. Alle innsendinger går til Skatteetatens tt02-API, ingen ekte innsending til myndighetene.
 
 `wenche` (uten args) starter alltid mot produksjon. `wenche dev` starter alltid mot test. De to modusene er låst og kan ikke veksles mellom uten å starte UI på nytt.
 
@@ -26,7 +26,7 @@ UI starter på `http://localhost:8080` med en diskret `TEST`-tag i header og "We
 
 `wenche` leser og skriver `config.yaml` med dine virkelige selskapsdata. `wenche dev` leser og skriver `config.dev.yaml` med Tenor-testdata. Filene er fullstendig adskilt, slik at testdata ikke kan overskrive dine ekte tall ved et uhell.
 
-Første gang du kjører `wenche dev` er `config.dev.yaml` tom. Fyll inn syntetiske data fra Tenor i fanene **Selskap**, **Regnskap** og **Aksjonærer**, og klikk **Lagre konfigurasjon**.
+Første gang du kjører `wenche dev` er `config.dev.yaml` tom. Fyll inn syntetiske data fra Tenor i fanen **Tall**, og klikk **Lagre data**. (I testmodus kan du også klikke **Fyll inn eksempeldata (test)** for et raskt utgangspunkt.)
 
 Begge filer er listet i `.gitignore` og skal aldri legges i git.
 

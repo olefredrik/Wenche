@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import yaml from "js-yaml";
+import { monoLabel, input, btnPrimar, btnOutlineLett as btnOutline } from "./styles";
+import { Inn } from "./komponenter";
 
 // Skjema-drevet datainntasting. Feltstrukturen er data; én generisk renderer bygger
-// config-objektet (samme form som config.yaml) som sendes til /api/data.
+// config-objektet (samme form som config.yaml) som sendes til backenden.
 
 type FeltType = "number" | "text" | "checkbox";
 interface Felt {
@@ -205,14 +207,6 @@ const EKSEMPEL: any = {
   ],
 };
 
-const monoLabel = "font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground";
-const input =
-  "w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-spruce";
-const btnPrimar =
-  "rounded-full bg-spruce px-5 py-2.5 text-sm font-medium text-background transition hover:brightness-110 disabled:opacity-40";
-const btnOutline =
-  "rounded-full border border-border px-4 py-2 text-sm transition hover:border-foreground";
-
 export function kr(n: number): string {
   return (Number(n) || 0).toLocaleString("nb-NO") + " kr";
 }
@@ -279,12 +273,18 @@ function Feltrutenett({
 export function DataSkjema({
   onLagre,
   visEksempel = false,
+  initial,
+  lagreEtikett = "Lagre data",
 }: {
   onLagre: (config: unknown) => Promise<void>;
   visEksempel?: boolean;
+  // Startverdi (self-hosted laster eksisterende config.yaml fra disk; hostet starter tomt).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  initial?: any;
+  lagreEtikett?: string;
 }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [config, setConfig] = useState<any>(grunnConfig);
+  const [config, setConfig] = useState<any>(() => initial ?? grunnConfig());
   const [lagrer, setLagrer] = useState(false);
   const [visBodil, setVisBodil] = useState(false);
   const [importMelding, setImportMelding] = useState<string | null>(null);
@@ -293,7 +293,8 @@ export function DataSkjema({
 
   // Advar mot å forlate siden (logo-/tilbake-klikk, nettleser-tilbake, lukke fane) hvis
   // skjemaet har ulagret innhold, så en bruker ikke mister utfyllingen ved et uhell.
-  const pristine = useRef(JSON.stringify(grunnConfig()));
+  // Baseline er startverdien (lastet config regnes ikke som «ulagret»).
+  const pristine = useRef(JSON.stringify(initial ?? grunnConfig()));
   const configRef = useRef(config);
   configRef.current = config;
   useEffect(() => {
@@ -329,6 +330,8 @@ export function DataSkjema({
     setLagrer(true);
     try {
       await onLagre(config);
+      // Etter vellykket lagring er gjeldende innhold den nye baselinen.
+      pristine.current = JSON.stringify(configRef.current);
     } finally {
       setLagrer(false);
     }
@@ -538,32 +541,8 @@ export function DataSkjema({
       </section>
 
       <button className={btnPrimar} onClick={lagre} disabled={lagrer}>
-        {lagrer ? "Lagrer…" : "Lagre data"}
+        {lagrer ? "Lagrer…" : lagreEtikett}
       </button>
     </div>
-  );
-}
-
-function Inn({
-  label,
-  value,
-  onChange,
-  type = "text",
-}: {
-  label: string;
-  value: string | number;
-  onChange: (v: string) => void;
-  type?: "text" | "number";
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-xs text-muted-foreground">{label}</span>
-      <input
-        className={input}
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </label>
   );
 }
