@@ -26,6 +26,13 @@ export const api = {
   dokument: (type: string, config: unknown) =>
     req(`/api/dokumenter/${type}`, { method: "POST", body: JSON.stringify(config) }),
 
+  importerSaft: (file: File, foregaaende: boolean) =>
+    req(`/api/saft/import?foregaaende=${foregaaende}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/xml" },
+      body: file,
+    }),
+
   innsending: (type: string, dryRun: boolean, config: unknown) =>
     req(`/api/innsending/${type}?dry_run=${dryRun}`, {
       method: "POST",

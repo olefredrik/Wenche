@@ -175,4 +175,4 @@ Følgende felt fylles inn automatisk så langt det lar seg gjøre fra SAF-T, men
 - `skattemelding.underskudd_til_fremfoering` estimeres fra åpningssaldoen på konto 2080 (udekket tap). Verdien er regnskapsmessig og kan avvike fra det skattemessige fremførbare underskuddet; verifiser mot fjorårets skattemelding hvis selskapet har ikke-fradragsberettigede kostnader
 
 !!! tip "I webgrensesnittet"
-    SAF-T-import gjøres fra kommandolinjen (`wenche importer-saft`). I `wenche`-webgrensesnittet (fanen **Tall**) finner du i stedet **Hent tall fra Bodil**, som laster opp en ferdig `config.yaml`.
+    Denne kommandoen er for skripting og avansert bruk. I `wenche`-webgrensesnittet (fanen **Tall**) finner du **Importer fra SAF-T**, som gjør det samme uten kommandolinjen, og i tillegg lar deg laste opp en egen SAF-T for fjoråret for å fylle inn sammenligningstallene.

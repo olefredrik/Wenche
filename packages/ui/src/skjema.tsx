@@ -293,6 +293,8 @@ export function DataSkjema({
   lagreEtikett = "Lagre data",
   ekstraSeksjon,
   laastOrg,
+  importerSaft,
+  saftMerknad,
 }: {
   onLagre: (config: unknown) => Promise<void>;
   visEksempel?: boolean;
@@ -306,6 +308,13 @@ export function DataSkjema({
   // Hostet kjenner selskapet fra invitasjonen: org.nr forhåndsutfylles, låses i feltet, og
   // tvinges tilbake ved import/eksempeldata (innsending krever at config-org == kunde-org).
   laastOrg?: string;
+  // Valgfri SAF-T-import: parser en opplastet SAF-T Financial-fil til config-form. Hver app
+  // injiserer sin binding (self-hosted/hostet backend). Uten denne vises ikke SAF-T-knappen.
+  // foregaaende=true => kun fjorårets sammenligningstall hentes (egen fil for fjoråret).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  importerSaft?: (file: File, foregaaende: boolean) => Promise<any>;
+  // Valgfri merknad i SAF-T-modalen (hostet bruker den til personvern-info om EØS/ingen lagring).
+  saftMerknad?: React.ReactNode;
 }) {
   const laasteFelter = laastOrg ? ["selskap.org_nummer"] : [];
   // Tving org til det låste selskapet (brukes ved start, Bodil-import og eksempeldata).
@@ -321,6 +330,13 @@ export function DataSkjema({
   const [importMelding, setImportMelding] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const filRef = useRef<HTMLInputElement>(null);
+  const [visSaft, setVisSaft] = useState(false);
+  const [saftMelding, setSaftMelding] = useState<string | null>(null);
+  const [saftFeil, setSaftFeil] = useState(false);
+  const [saftLaster, setSaftLaster] = useState(false);
+  const [saftDrag, setSaftDrag] = useState<string | null>(null);
+  const saftRef = useRef<HTMLInputElement>(null);
+  const saftFjorRef = useRef<HTMLInputElement>(null);
 
   // Advar mot å forlate siden (logo-/tilbake-klikk, nettleser-tilbake, lukke fane) hvis
   // skjemaet har ulagret innhold, så en bruker ikke mister utfyllingen ved et uhell.
@@ -384,6 +400,50 @@ export function DataSkjema({
     }
   };
 
+  // SAF-T mangler styringsdata (daglig leder, styreleder, stiftelsesår, aksjonærer). Behold
+  // det brukeren allerede har fylt inn (eller hentet fra Bodil) i stedet for å blanke det.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const flettStyring = (saft: any, eks: any): any => {
+    const s = eks?.selskap ?? {};
+    return {
+      ...saft,
+      selskap: {
+        ...saft.selskap,
+        daglig_leder: saft.selskap?.daglig_leder || s.daglig_leder || "",
+        styreleder: saft.selskap?.styreleder || s.styreleder || "",
+        stiftelsesaar: saft.selskap?.stiftelsesaar || s.stiftelsesaar || 0,
+        kontakt_epost: saft.selskap?.kontakt_epost || s.kontakt_epost || "",
+      },
+      aksjonaerer: saft.aksjonaerer?.length ? saft.aksjonaerer : (eks?.aksjonaerer ?? []),
+    };
+  };
+
+  const importerSaftFil = async (file: File, foregaaende: boolean) => {
+    if (!importerSaft) return;
+    setSaftMelding(null);
+    setSaftFeil(false);
+    setSaftLaster(true);
+    try {
+      const data = await importerSaft(file, foregaaende);
+      const aar = data?.regnskapsaar ? ` ${data.regnskapsaar}` : "";
+      if (foregaaende) {
+        // Kun fjorårets sammenligningstall: merge inn i gjeldende config, rør ikke resten.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setConfig((c: any) => ({ ...c, foregaaende_aar: data.foregaaende_aar }));
+        setSaftMelding(`Sammenligningstall for fjoråret importert fra SAF-T${aar}.`);
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setConfig((c: any) => medLaastOrg(flettStyring(data, c)));
+        setSaftMelding(`Tall importert fra SAF-T${aar}. Se over og lagre.`);
+      }
+    } catch (e) {
+      setSaftFeil(true);
+      setSaftMelding("Kunne ikke importere SAF-T: " + (e as Error).message);
+    } finally {
+      setSaftLaster(false);
+    }
+  };
+
   return (
     <div className="space-y-10">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -398,6 +458,18 @@ export function DataSkjema({
           >
             Hent tall fra Bodil
           </button>
+          {importerSaft && (
+            <button
+              className="text-xs font-medium text-spruce underline-offset-2 hover:underline"
+              onClick={() => {
+                setSaftMelding(null);
+                setSaftFeil(false);
+                setVisSaft(true);
+              }}
+            >
+              Importer fra SAF-T
+            </button>
+          )}
           {visEksempel && (
             <button
               className="text-xs text-muted-foreground underline-offset-2 hover:text-spruce hover:underline"
@@ -500,6 +572,103 @@ export function DataSkjema({
                 Hva er Bodil?
               </a>
               <button className={btnOutline} onClick={() => setVisBodil(false)}>
+                Lukk
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {visSaft && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4"
+          onClick={() => setVisSaft(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-sm border border-border bg-background p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className={monoLabel}>Importer fra SAF-T</p>
+            <h3 className="mt-2 font-display text-xl font-normal">Hent tall fra regnskapssystemet</h3>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              Eksporter en SAF-T Financial-fil fra regnskapssystemet ditt (Fiken, Tripletex,
+              Visma, PowerOffice m.fl.), så fyller jeg inn regnskap og balanse for deg. Du ser
+              over alt og sender som vanlig.
+            </p>
+
+            {[
+              {
+                id: "naa",
+                ref: saftRef,
+                foregaaende: false,
+                tittel: "Inneværende år",
+                beskrivelse: "Fyller selskap, resultat og balanse for regnskapsåret.",
+              },
+              {
+                id: "fjor",
+                ref: saftFjorRef,
+                foregaaende: true,
+                tittel: "Foregående år (valgfritt)",
+                beskrivelse:
+                  "Egen SAF-T for fjoråret. Fyller kun sammenligningstallene (fjorårets resultatregnskap finnes ikke i årets fil).",
+              },
+            ].map((sone) => (
+              <div key={sone.id} className="mt-5">
+                <p className="text-sm font-medium">{sone.tittel}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{sone.beskrivelse}</p>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  className={`mt-2 flex flex-col items-center justify-center rounded-sm border-2 border-dashed px-6 py-6 text-center transition ${
+                    saftDrag === sone.id ? "border-spruce bg-spruce-soft" : "border-border hover:border-spruce/60"
+                  } ${saftLaster ? "pointer-events-none opacity-60" : ""}`}
+                  onClick={() => sone.ref.current?.click()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      sone.ref.current?.click();
+                    }
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setSaftDrag(sone.id);
+                  }}
+                  onDragLeave={() => setSaftDrag(null)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setSaftDrag(null);
+                    const f = e.dataTransfer.files?.[0];
+                    if (f) importerSaftFil(f, sone.foregaaende);
+                  }}
+                >
+                  <p className="text-sm">
+                    Dra og slipp <code className="font-mono">.xml</code> her, eller{" "}
+                    <span className="text-spruce underline-offset-2 hover:underline">velg fil</span>
+                  </p>
+                  <input
+                    ref={sone.ref}
+                    type="file"
+                    accept=".xml,text/xml,application/xml"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) importerSaftFil(f, sone.foregaaende);
+                      e.target.value = "";
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+
+            {saftLaster && <p className="mt-3 text-sm text-muted-foreground">Importerer…</p>}
+            {saftMelding && (
+              <p className={`mt-3 text-sm ${saftFeil ? "text-red-700" : "text-spruce"}`}>{saftMelding}</p>
+            )}
+            {saftMerknad && (
+              <p className="mt-4 text-xs leading-relaxed text-muted-foreground">{saftMerknad}</p>
+            )}
+            <div className="mt-6 flex justify-end">
+              <button className={btnOutline} onClick={() => setVisSaft(false)}>
                 Lukk
               </button>
             </div>

@@ -19,4 +19,11 @@ export const api = {
   // Genererer dokumenter for nedlasting/gjennomgang (ingenting sendes inn).
   dokument: (type: string, config: unknown) =>
     req(`/api/dokumenter/${type}`, { method: "POST", body: JSON.stringify(config) }),
+  // Parser en opplastet SAF-T i minnet (lagres ikke) og returnerer config for forhåndsfylling.
+  importerSaft: (file: File, foregaaende: boolean) =>
+    req(`/api/saft/import?foregaaende=${foregaaende}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/xml" },
+      body: file,
+    }),
 };
