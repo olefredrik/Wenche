@@ -17,6 +17,11 @@ Den hostede tjenesten er for deg som heller vil slippe det tekniske oppsettet. D
 nøyaktig samme åpne kildekode under panseret, så du kan når som helst velge å kjøre
 self-hosted i stedet.
 
+Du følger en enkel stegvis flyt: koble selskapet til Altinn (én gang, med BankID), fylle inn
+tallene, eventuelt laste ned dokumentene (skattemelding, årsregnskap, aksjonæroppgave og noter)
+for gjennomgang, og så sende inn. Noter sendes ikke inn digitalt, men kan lastes ned for
+signering og arkivering hos selskapet.
+
 !!! note "For operatører"
     Drifts- og deploy-dokumentasjon (Docker, Fly.io, secrets) ligger i `hosted/README.md`
     i kodebasen, ikke her. Denne siden er kun ment for sluttbrukere.

@@ -17,6 +17,7 @@ data-org == godkjent systembruker-org (kunde_org), så vi aldri sender på vegne
 import logging
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, Body, HTTPException, Request
 
 from wenche import auth as wauth
@@ -47,6 +48,46 @@ def _sjekk_org(cfg: dict, kunde_org: str) -> None:
         )
 
 
+def _tolk_http_feil(e: httpx.HTTPStatusError) -> HTTPException:
+    """Gjør en rå HTTP-feil fra Altinn/Skatteetaten om til en lesbar 502 (unngår 500 + stacktrace)."""
+    kode = e.response.status_code
+    if kode == 403:
+        melding = (
+            "Altinn avslo tilgangen (HTTP 403). Vanligste årsak: systembrukeren er ikke lenger "
+            "godkjent for selskapet, eller tjenesten mangler nødvendig rettighet."
+        )
+    elif kode == 401:
+        melding = "Altinn avviste tokenet (HTTP 401). Prøv igjen, eller koble systembrukeren på nytt."
+    elif kode >= 500:
+        melding = (
+            f"Altinn/Skatteetaten svarte med en serverfeil (HTTP {kode}). Dette er som regel "
+            "midlertidig hos myndighetene. Ingenting er sendt inn. Prøv igjen om litt."
+        )
+    else:
+        detalj = (e.response.text or "").strip()[:200]
+        melding = f"Altinn/Skatteetaten svarte med HTTP {kode}." + (f" {detalj}" if detalj else "")
+    return HTTPException(status_code=502, detail=melding)
+
+
+def _utfor(fn):
+    """
+    Kjør en innsending og gjør alle feil om til lesbare HTTP-svar, aldri en rå 500.
+
+    Domeneklientene melder feil på to måter: rå `httpx.HTTPStatusError` (Altinn) og
+    `RuntimeError` med ferdig melding (SKD-klienten). Valideringsfeil gir 422; alt annet 502.
+    """
+    try:
+        return fn()
+    except InnsendingValideringsfeil as e:
+        raise HTTPException(status_code=422, detail={"feil": e.feil})
+    except SkattemeldingValideringsfeil as e:  # subklasse av RuntimeError — fanges først
+        raise HTTPException(status_code=422, detail={"validering": str(e)})
+    except httpx.HTTPStatusError as e:
+        raise _tolk_http_feil(e)
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
 @router.post("/innsending/aarsregnskap")
 def innsending_aarsregnskap(
     request: Request, config: dict[str, Any] = Body(...), dry_run: bool = False
@@ -59,11 +100,12 @@ def innsending_aarsregnskap(
     _sjekk_org(config, org)
     s = settings()
     altinn_token = wauth.hent_tokens_for(creds, org, SCOPES, veksle_altinn=True)["altinn_token"]
-    try:
+
+    def _send():
         with AltinnClient(altinn_token, env=s.env) as klient:
             return tjeneste.send_aarsregnskap(config, klient)
-    except InnsendingValideringsfeil as e:
-        raise HTTPException(status_code=422, detail={"feil": e.feil})
+
+    return _utfor(_send)
 
 
 @router.post("/innsending/aksjonaer")
@@ -78,8 +120,12 @@ def innsending_aksjonaer(
     _sjekk_org(config, org)
     s = settings()
     token = wauth.hent_tokens_for(creds, org, SKD_AKSJONAER_SCOPE)["maskinporten_token"]
-    with SkdAksjonaerClient(token, env=s.env) as klient:
-        return tjeneste.send_aksjonaer(config, klient)
+
+    def _send():
+        with SkdAksjonaerClient(token, env=s.env) as klient:
+            return tjeneste.send_aksjonaer(config, klient)
+
+    return _utfor(_send)
 
 
 @router.post("/innsending/skattemelding")
@@ -94,10 +140,9 @@ def innsending_skattemelding(
     _sjekk_org(config, org)
     s = settings()
     tokens = wauth.hent_tokens_for(creds, org, SKD_SKATTEMELDING_SCOPE, veksle_altinn=True)
-    try:
+
+    def _send():
         with SkdSkattemeldingClient(tokens["maskinporten_token"], env=s.env) as skd:
-            return tjeneste.send_skattemelding(
-                config, skd, tokens["altinn_token"], orgnr=org
-            )
-    except SkattemeldingValideringsfeil as e:
-        raise HTTPException(status_code=422, detail={"validering": str(e)})
+            return tjeneste.send_skattemelding(config, skd, tokens["altinn_token"], orgnr=org)
+
+    return _utfor(_send)

@@ -225,21 +225,35 @@ export function oppsummer(config: any) {
   };
 }
 
+// Sann når de grunnleggende selskapsopplysningene er fylt inn. Brukes til å gate «Gå videre»
+// fra Tall-steget, så man ikke havner på en tom Dokumenter-/Send-side.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function harMinimumsdata(config: any): boolean {
+  if (!config) return false;
+  const s = config.selskap ?? {};
+  return ["navn", "org_nummer", "daglig_leder", "styreleder"].every(
+    (k) => String(s[k] ?? "").trim() !== "",
+  );
+}
+
 function Feltrutenett({
   felter,
   config,
   oppdater,
+  laasteFelter = [],
 }: {
   felter: Felt[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   config: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   oppdater: (key: string, val: any) => void;
+  laasteFelter?: string[];
 }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      {felter.map((f) =>
-        f.type === "checkbox" ? (
+      {felter.map((f) => {
+        const laast = laasteFelter.includes(f.key);
+        return f.type === "checkbox" ? (
           <label key={f.key} className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -256,16 +270,18 @@ function Feltrutenett({
               {f.help ? ` (${f.help})` : ""}
             </span>
             <input
-              className={input}
+              className={`${input} ${laast ? "cursor-not-allowed opacity-60" : ""}`}
               type={f.type === "number" ? "number" : "text"}
               value={hent(config, f.key) ?? ""}
+              disabled={laast}
+              title={laast ? "Låst til selskapet i invitasjonen" : undefined}
               onChange={(e) =>
                 oppdater(f.key, f.type === "number" ? Number(e.target.value) || 0 : e.target.value)
               }
             />
           </label>
-        ),
-      )}
+        );
+      })}
     </div>
   );
 }
@@ -275,6 +291,8 @@ export function DataSkjema({
   visEksempel = false,
   initial,
   lagreEtikett = "Lagre data",
+  ekstraSeksjon,
+  laastOrg,
 }: {
   onLagre: (config: unknown) => Promise<void>;
   visEksempel?: boolean;
@@ -282,9 +300,22 @@ export function DataSkjema({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   initial?: any;
   lagreEtikett?: string;
+  // Valgfri tilleggsseksjon (f.eks. noter) som vises sist, rett før «Lagre data», slik at
+  // den lagres sammen med resten av skjemaet i ett trykk.
+  ekstraSeksjon?: React.ReactNode;
+  // Hostet kjenner selskapet fra invitasjonen: org.nr forhåndsutfylles, låses i feltet, og
+  // tvinges tilbake ved import/eksempeldata (innsending krever at config-org == kunde-org).
+  laastOrg?: string;
 }) {
+  const laasteFelter = laastOrg ? ["selskap.org_nummer"] : [];
+  // Tving org til det låste selskapet (brukes ved start, Bodil-import og eksempeldata).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [config, setConfig] = useState<any>(() => initial ?? grunnConfig());
+  const medLaastOrg = (c: any): any =>
+    laastOrg ? { ...c, selskap: { ...(c?.selskap ?? {}), org_nummer: laastOrg } } : c;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const startConfig = (): any => medLaastOrg(initial ?? grunnConfig());
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [config, setConfig] = useState<any>(startConfig);
   const [lagrer, setLagrer] = useState(false);
   const [visBodil, setVisBodil] = useState(false);
   const [importMelding, setImportMelding] = useState<string | null>(null);
@@ -294,7 +325,7 @@ export function DataSkjema({
   // Advar mot å forlate siden (logo-/tilbake-klikk, nettleser-tilbake, lukke fane) hvis
   // skjemaet har ulagret innhold, så en bruker ikke mister utfyllingen ved et uhell.
   // Baseline er startverdien (lastet config regnes ikke som «ulagret»).
-  const pristine = useRef(JSON.stringify(initial ?? grunnConfig()));
+  const pristine = useRef(JSON.stringify(startConfig()));
   const configRef = useRef(config);
   configRef.current = config;
   useEffect(() => {
@@ -346,7 +377,7 @@ export function DataSkjema({
         setImportMelding("Dette ser ikke ut som en Wenche/Bodil config.yaml.");
         return;
       }
-      setConfig(parsed);
+      setConfig(medLaastOrg(parsed));
       setVisBodil(false);
     } catch (e) {
       setImportMelding("Kunne ikke lese filen: " + (e as Error).message);
@@ -370,7 +401,7 @@ export function DataSkjema({
           {visEksempel && (
             <button
               className="text-xs text-muted-foreground underline-offset-2 hover:text-spruce hover:underline"
-              onClick={() => setConfig(structuredClone(EKSEMPEL))}
+              onClick={() => setConfig(medLaastOrg(structuredClone(EKSEMPEL)))}
             >
               Fyll inn eksempeldata (test)
             </button>
@@ -479,7 +510,7 @@ export function DataSkjema({
       {SEKSJONER.map((s) => (
         <section key={s.tittel} id={s.id} className="scroll-mt-32">
           <h3 className="mb-4 font-display text-xl font-normal">{s.tittel}</h3>
-          <Feltrutenett felter={s.felter} config={config} oppdater={oppdater} />
+          <Feltrutenett felter={s.felter} config={config} oppdater={oppdater} laasteFelter={laasteFelter} />
           {s.id === "balanse" && (
             <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
               <span className="text-muted-foreground">Sum eiendeler: {kr(sumEiendeler)}</span>
@@ -539,6 +570,8 @@ export function DataSkjema({
           + Legg til aksjonær
         </button>
       </section>
+
+      {ekstraSeksjon}
 
       <button className={btnPrimar} onClick={lagre} disabled={lagrer}>
         {lagrer ? "Lagrer…" : lagreEtikett}

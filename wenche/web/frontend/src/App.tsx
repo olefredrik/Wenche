@@ -1,17 +1,16 @@
 import { useEffect, useState } from "react";
-import { btnPrimar } from "@wenche/ui";
+import { StegNav, GaaVidere, Dokumenter, harMinimumsdata, type Fane } from "@wenche/ui";
 import { api } from "./api";
 import Hjem from "./Hjem";
 import Oppsett from "./Oppsett";
 import Tall from "./Tall";
-import Dokumenter from "./Dokumenter";
 import Send from "./Send";
 
-type Fane = "hjem" | "oppsett" | "tall" | "dokumenter" | "send";
+type FaneId = "hjem" | "oppsett" | "tall" | "dokumenter" | "send";
 
-// Hjem er dashboardet (oversikt/frister); de fire arbeidsstegene nummereres 1–4 for å vise
+// Hjem er dashboardet (oversikt/frister); de fire arbeidsstegene nummereres 1-4 for å vise
 // at de gjennomgås i sekvens.
-const FANER: { id: Fane; navn: string; steg?: number }[] = [
+const FANER: Fane[] = [
   { id: "hjem", navn: "Hjem" },
   { id: "oppsett", navn: "Oppsett", steg: 1 },
   { id: "tall", navn: "Tall", steg: 2 },
@@ -39,7 +38,7 @@ function Oppdateringsbanner({ info }: { info: UpdateInfo }) {
 export default function App() {
   const [env, setEnv] = useState<string>("prod");
   const [versjon, setVersjon] = useState<string>("");
-  const [fane, setFane] = useState<Fane>("hjem");
+  const [fane, setFane] = useState<FaneId>("hjem");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [config, setConfig] = useState<any | null>(null);
   const [oppdatering, setOppdatering] = useState<UpdateInfo | null>(null);
@@ -54,8 +53,8 @@ export default function App() {
   }, []);
 
   // Bytt fane og rull til toppen, så brukeren alltid starter øverst i det nye steget.
-  const naviger = (f: Fane) => {
-    setFane(f);
+  const naviger = (id: string) => {
+    setFane(id as FaneId);
     window.scrollTo({ top: 0 });
   };
 
@@ -75,38 +74,7 @@ export default function App() {
             </div>
             {versjon && <span className="font-mono text-[11px] text-muted-foreground">v{versjon}</span>}
           </div>
-          <nav className="flex flex-wrap gap-x-5 gap-y-1">
-            {FANER.map(({ id, navn, steg }) => {
-              const aktiv = fane === id;
-              return (
-                <button
-                  key={id}
-                  onClick={() => naviger(id)}
-                  aria-current={aktiv ? "page" : undefined}
-                  className={`group -mb-px flex items-center gap-2 border-b-2 pb-3 pt-1 transition ${
-                    aktiv ? "border-spruce" : "border-transparent"
-                  }`}
-                >
-                  {steg !== undefined && (
-                    <span
-                      className={`flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-medium transition ${
-                        aktiv ? "bg-spruce text-background" : "bg-border text-muted-foreground group-hover:text-foreground"
-                      }`}
-                    >
-                      {steg}
-                    </span>
-                  )}
-                  <span
-                    className={`font-mono text-[11px] uppercase tracking-[0.15em] transition ${
-                      aktiv ? "font-medium text-spruce" : "text-muted-foreground group-hover:text-foreground"
-                    }`}
-                  >
-                    {navn}
-                  </span>
-                </button>
-              );
-            })}
-          </nav>
+          <StegNav faner={FANER} aktiv={fane} onNaviger={naviger} />
         </div>
       </header>
 
@@ -114,27 +82,17 @@ export default function App() {
         {fane === "hjem" && <Hjem />}
         {fane === "oppsett" && <Oppsett env={env} />}
         {fane === "tall" && <Tall config={config} env={env} onLagret={setConfig} />}
-        {fane === "dokumenter" && <Dokumenter config={config} />}
+        {fane === "dokumenter" && <Dokumenter config={config} dokument={api.dokument} />}
         {fane === "send" && <Send config={config} env={env} />}
 
-        <GaaVidere fane={fane} naviger={naviger} />
+        <GaaVidere
+          faner={FANER}
+          aktiv={fane}
+          onNaviger={naviger}
+          disabled={fane === "tall" && !harMinimumsdata(config)}
+          disabledHint="Fyll inn selskapsnavn, org.nr., daglig leder og styreleder, og trykk «Lagre data»."
+        />
       </main>
-    </div>
-  );
-}
-
-// «Gå videre»-knapp som tar brukeren til neste steg, så tab-menyen ikke er eneste vei
-// gjennom flyten. Vises på alle faner unntatt den siste (Send er sluttsteget).
-function GaaVidere({ fane, naviger }: { fane: Fane; naviger: (f: Fane) => void }) {
-  const idx = FANER.findIndex((f) => f.id === fane);
-  const neste = FANER[idx + 1];
-  if (!neste) return null;
-  return (
-    <div className="mt-12 flex justify-end border-t border-border pt-6">
-      <button className={btnPrimar} onClick={() => naviger(neste.id)}>
-        {fane === "hjem" ? "Kom i gang" : "Gå videre"}: {neste.steg ? `${neste.steg}. ` : ""}
-        {neste.navn} →
-      </button>
     </div>
   );
 }

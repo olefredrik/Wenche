@@ -19,6 +19,7 @@ from wenche import __version__ as WENCHE_VERSJON
 
 from .auth import router as auth_router
 from .config import settings
+from .dokumenter import router as dokumenter_router
 from .innsending import router as innsending_router
 from .systembruker import router as systembruker_router
 
@@ -46,6 +47,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(systembruker_router)
 app.include_router(innsending_router)
+app.include_router(dokumenter_router)
 
 
 @app.get("/api/health")
