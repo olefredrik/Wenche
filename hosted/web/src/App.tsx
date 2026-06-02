@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
+import { sporSidevisning, sporHendelse } from "./sporing";
 import {
   DataSkjema,
   SendSeksjon,
@@ -328,12 +329,17 @@ function SendFane({ config, me }: { config: any; me: Me }) {
   // Selvhelende systembruker-binding: en 409 betyr at bindingen gikk tapt (serveren sov/
   // restartet). Den reises FØR innsending, så det er trygt å rebinde og prøve én gang til.
   const innsending: InnsendingFn = async (type, dryRun, cfg) => {
+    if (dryRun) sporHendelse("send-start", { type });
     try {
-      return await api.innsending(type, dryRun, cfg);
+      const data = await api.innsending(type, dryRun, cfg);
+      if (!dryRun) sporHendelse("send-ok", { type });
+      return data;
     } catch (e) {
       if (!dryRun && (e as { status?: number }).status === 409) {
         await api.systembrukerRequest();
-        return await api.innsending(type, dryRun, cfg);
+        const data = await api.innsending(type, dryRun, cfg);
+        sporHendelse("send-ok", { type });
+        return data;
       }
       throw e;
     }
@@ -418,6 +424,7 @@ export default function App() {
   const naviger = (id: string) => {
     setFane(id as FaneId);
     window.scrollTo({ top: 0 });
+    sporSidevisning(`/${id}`); // virtuell pageview (URL-en endres ikke i SPA-en)
   };
 
   const invited = !!me?.invited;
@@ -477,7 +484,17 @@ export default function App() {
             {fane === "tall" && (
               <TallFane config={config} env={me.env} org={me.kunde_org} onLagret={setConfig} />
             )}
-            {fane === "dokumenter" && <Dokumenter config={config} dokument={api.dokument} />}
+            {fane === "dokumenter" && (
+              <Dokumenter
+                config={config}
+                dokument={(type, cfg) =>
+                  api.dokument(type, cfg).then((r) => {
+                    sporHendelse("dokument-last-ned", { type });
+                    return r;
+                  })
+                }
+              />
+            )}
             {fane === "send" && <SendFane config={config} me={me} />}
             <GaaVidere
               faner={FANER}
