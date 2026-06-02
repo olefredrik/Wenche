@@ -45,10 +45,9 @@ wenche = "wenche.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["wenche"]
-# Frontend-kilden (TS/Vite) hører ikke hjemme i wheelen — kun den bygde SPA-en serveres.
+# Frontend-kilden (TS/Vite) hører ikke hjemme i wheelen, kun den bygde SPA-en serveres.
 exclude = ["wenche/web/frontend"]
-
 # Den bygde SPA-en ligger i wenche/web/static, som er git-ignorert (bygges ved release).
-# force-include tar den med i wheelen selv om den ikke er sporet av git.
-[tool.hatch.build.targets.wheel.force-include]
-"wenche/web/static" = "wenche/web/static"
+# `artifacts` tar den med i wheelen når den finnes, men feiler ikke når den mangler (CI,
+# editable-install, bidragsytere som ikke har bygd front-enden) — i motsetning til force-include.
+artifacts = ["wenche/web/static/**"]

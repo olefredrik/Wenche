@@ -27,6 +27,7 @@ from .ruter_innsending import router as innsending_router
 from .ruter_oppsett import router as oppsett_router
 
 _STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+_INDEX_HTML = _STATIC_DIR / "index.html"
 
 
 def lag_app(env: str = "prod", serve_spa: bool = True) -> FastAPI:
@@ -55,10 +56,11 @@ def lag_app(env: str = "prod", serve_spa: bool = True) -> FastAPI:
             "fra_git": kjorer_fra_git_klone(),
         }
 
-    # Server den bygde SPA-en fra samme origin. I dev (serve_spa=False) serverer Vite SPA-en
-    # med hot reload, og denne appen er ren API — slik at de to ikke kolliderer.
-    if serve_spa and _STATIC_DIR.is_dir():
-        _index_html = (_STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    # Server den bygde SPA-en fra samme origin. Vi sjekker på index.html (ikke bare mappen),
+    # så en ubygd/tom static-mappe (CI, editable-install) ikke krasjer oppstarten. I dev
+    # (serve_spa=False) serverer Vite SPA-en med hot reload, og denne appen er ren API.
+    if serve_spa and _INDEX_HTML.is_file():
+        _index_html = _INDEX_HTML.read_text(encoding="utf-8")
 
         @app.get("/", response_class=HTMLResponse, include_in_schema=False)
         def spa_index() -> HTMLResponse:
@@ -76,7 +78,7 @@ def kjor(env: str = "prod", port: int = 8080) -> None:
 
     app = lag_app(env)
     url = f"http://127.0.0.1:{port}"
-    if _STATIC_DIR.is_dir():
+    if _INDEX_HTML.is_file():
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
     else:
         print(
