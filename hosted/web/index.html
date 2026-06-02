@@ -11,9 +11,63 @@
       rel="stylesheet"
     />
     <title>Wenche</title>
+    <!-- Oppstartsskjerm: vises i samme øyeblikk dokumentet når nettleseren, slik at en
+         kaldstartet demo-maskin ikke etterlater en blank, hvit side mens JS-bundlen lastes
+         og React monterer. Helt selvstående (inline, egen palett i OKLCH som matcher
+         theme.css), så den ikke avhenger av app-CSS-en som ennå ikke er lastet.
+         createRoot() rydder #root ved første render, så skjermen forsvinner når appen er klar. -->
+    <style>
+      .wenche-oppstart {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.25rem;
+        background: oklch(0.972 0.014 85);
+        color: oklch(0.265 0.014 165);
+      }
+      .wenche-oppstart__merke {
+        font-family: "Newsreader", Georgia, serif;
+        font-size: 2rem;
+        font-weight: 500;
+        letter-spacing: -0.015em;
+      }
+      .wenche-oppstart__spinner {
+        width: 2rem;
+        height: 2rem;
+        border-radius: 9999px;
+        border: 3px solid oklch(0.265 0.014 165 / 0.12);
+        border-top-color: oklch(0.46 0.08 155);
+        animation: wenche-snurr 0.8s linear infinite;
+      }
+      .wenche-oppstart__tekst {
+        margin: 0;
+        font-family: "Inter Tight", system-ui, sans-serif;
+        font-size: 0.875rem;
+        color: oklch(0.265 0.014 165 / 0.6);
+      }
+      @keyframes wenche-snurr {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .wenche-oppstart__spinner {
+          animation-duration: 2.4s;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="wenche-oppstart" role="status" aria-live="polite">
+        <div class="wenche-oppstart__merke">Wenche</div>
+        <div class="wenche-oppstart__spinner" aria-hidden="true"></div>
+        <p class="wenche-oppstart__tekst">Starter Wenche…</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
