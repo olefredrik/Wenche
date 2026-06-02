@@ -22,6 +22,10 @@ tallene, eventuelt laste ned dokumentene (skattemelding, årsregnskap, aksjonær
 for gjennomgang, og så sende inn. Noter sendes ikke inn digitalt, men kan lastes ned for
 signering og arkivering hos selskapet.
 
+Under **Tall** kan du fylle inn manuelt, hente tallene fra [Bodil](https://github.com/olefredrik/Bodil),
+eller **importere fra SAF-T**. Laster du opp en SAF-T-fil, behandles den i minnet i EØS
+(Stockholm) for å fylle inn skjemaet, og forkastes umiddelbart, den lagres ikke.
+
 !!! note "For operatører"
     Drifts- og deploy-dokumentasjon (Docker, Fly.io, secrets) ligger i `hosted/README.md`
     i kodebasen, ikke her. Denne siden er kun ment for sluttbrukere.

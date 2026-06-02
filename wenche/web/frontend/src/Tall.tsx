@@ -39,6 +39,8 @@ export default function Tall({
           onLagre={lagre}
           visEksempel={env === "test"}
           initial={config ?? undefined}
+          importerSaft={api.importerSaft}
+          saftMerknad="SAF-T-filen behandles lokalt på din egen maskin og lagres ikke."
           ekstraSeksjon={<NoterSeksjon noter={noter} setNoter={setNoter} />}
         />
       </Kort>

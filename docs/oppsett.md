@@ -192,7 +192,7 @@ Klikk **Lagre konfigurasjon** i Steg 1. Wenche lagrer verdiene til `~/.wenche/.e
 I Wenche, gå til fanen **Tall** og fyll inn selskapets opplysninger, regnskapstall, balanse, skattemelding-innstillinger og aksjonærdata, alt på én side. Alle beløp oppgis i hele kroner (NOK). Klikk **Lagre data** når du er ferdig, dataene lagres til `config.yaml` i den mappen du startet Wenche fra.
 
 !!! tip "Fører du regnskapet i Bodil, eller har du SAF-T?"
-    Under **Tall** finner du **Hent tall fra Bodil**, der du laster opp en `config.yaml` fra [Bodil](https://github.com/olefredrik/Bodil) og får regnskapstallene fylt inn. Har du i stedet en SAF-T-eksport fra regnskapssystemet, kan du generere `config.yaml` fra kommandolinjen med `wenche importer-saft` (se [Kommandolinje](avansert/cli.md)). Daglig leder, styreleder og aksjonærdata fyller du inn manuelt.
+    Under **Tall** finner du to importknapper. **Hent tall fra Bodil** laster opp en `config.yaml` fra [Bodil](https://github.com/olefredrik/Bodil). **Importer fra SAF-T** lar deg laste opp en SAF-T Financial-fil eksportert fra regnskapssystemet (Fiken, Tripletex, Visma, PowerOffice m.fl.), så fylles resultat og balanse inn for deg, både for inneværende år og, via en egen fil for fjoråret, sammenligningstallene. Begge forhåndsfyller bare skjemaet, du ser over alt og lagrer selv. Daglig leder, styreleder og aksjonærdata finnes ikke i SAF-T og fylles inn manuelt. (SAF-T-import finnes også på kommandolinjen, se [Kommandolinje](avansert/cli.md).)
 
 ---
 

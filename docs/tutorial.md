@@ -75,8 +75,8 @@ Wenche viser fortløpende om balansen går opp, sum eiendeler skal være lik sum
 
 Klikk **Lagre data** nederst for å skrive til `config.yaml`.
 
-!!! tip "Fører du regnskapet i Bodil?"
-    Klikk **Hent tall fra Bodil** øverst i skjemaet og last opp `config.yaml` fra [Bodil](https://github.com/olefredrik/Bodil), så fylles regnskapstallene inn for deg. Har du en SAF-T-eksport fra regnskapssystemet i stedet, kan du generere `config.yaml` fra kommandolinjen med `wenche importer-saft`, se [Kommandolinje](avansert/cli.md).
+!!! tip "Fører du regnskapet i Bodil, eller har du SAF-T?"
+    Klikk **Hent tall fra Bodil** øverst i skjemaet og last opp `config.yaml` fra [Bodil](https://github.com/olefredrik/Bodil), så fylles regnskapstallene inn for deg. Har du en SAF-T-eksport fra regnskapssystemet i stedet, klikk **Importer fra SAF-T** og last opp filen. Begge forhåndsfyller skjemaet, du ser over og lagrer selv. (SAF-T finnes også på kommandolinjen med `wenche importer-saft`, se [Kommandolinje](avansert/cli.md).)
 
 ---
 

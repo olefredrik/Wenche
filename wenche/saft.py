@@ -244,8 +244,20 @@ def importer(saft_fil: str | Path) -> dict:
     RF-1028 hvis det er aktuelt.
     """
     tree = ET.parse(str(saft_fil))
-    root = tree.getroot()
+    return _fra_root(tree.getroot())
 
+
+def importer_bytes(data: bytes) -> dict:
+    """
+    Som importer(), men leser SAF-T fra rå bytes i minnet i stedet for en
+    diskfil. Brukt av web-UI-ene (hostet + self-hosted) slik at en opplastet
+    SAF-T-fil aldri skrives til disk: den parses i minnet og forkastes.
+    """
+    return _fra_root(ET.fromstring(data))
+
+
+def _fra_root(root: ET.Element) -> dict:
+    """Felles kjerne: bygg config-dict fra et parset SAF-T-rotelement."""
     header = root.find(_tag("Header"))
     if header is None:
         raise ValueError("Finner ingen Header i SAF-T-filen.")

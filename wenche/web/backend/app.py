@@ -25,6 +25,7 @@ from .ruter_dokumenter import router as dokumenter_router
 from .ruter_frister import router as frister_router
 from .ruter_innsending import router as innsending_router
 from .ruter_oppsett import router as oppsett_router
+from .ruter_saft import router as saft_router
 
 _STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 _INDEX_HTML = _STATIC_DIR / "index.html"
@@ -39,6 +40,7 @@ def lag_app(env: str = "prod", serve_spa: bool = True) -> FastAPI:
     app.include_router(frister_router)
     app.include_router(dokumenter_router)
     app.include_router(innsending_router)
+    app.include_router(saft_router)
 
     @app.get("/api/health")
     def health() -> dict:
