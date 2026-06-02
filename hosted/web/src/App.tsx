@@ -120,17 +120,18 @@ function KunInviterte({ me, onApproved }: { me: Me; onApproved: () => void }) {
   return (
     <Kort>
       <p className={monoLabel}>Tilgang</p>
-      <h1 className="mt-3 font-display text-3xl font-normal">Wenche er foreløpig for inviterte</h1>
+      <h1 className="mt-3 font-display text-3xl font-normal">Wenche er i en tidlig testfase</h1>
       <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-        Tjenesten er ennå i en lukket testfase mens jeg får den gjennomtestet og stabil.
+        Jeg holder fortsatt på å teste tjenesten og gjøre den stabil.
       </p>
 
       {me.selvbetjening ? (
         <>
           <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-            Vil du være testbruker? Skriv inn navnet ditt og organisasjonsnummeret til selskapet du
-            vil sende inn for. Står du som daglig leder eller styremedlem i Enhetsregisteret, får du
-            tilgang med en gang. Navnet ditt brukes bare til dette oppslaget og lagres ikke.
+            Vil du prøve den for ditt eget selskap? Skriv inn navnet ditt og organisasjonsnummeret
+            til selskapet du vil bruke Wenche for. Står du som daglig leder eller styremedlem i
+            Enhetsregisteret, slipper du inn med en gang og kobler selskapet med BankID i neste
+            steg. Navnet brukes bare til oppslaget og lagres ikke.
           </p>
           <form className="mt-6 space-y-4" onSubmit={send}>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -171,7 +172,7 @@ function KunInviterte({ me, onApproved }: { me: Me; onApproved: () => void }) {
         </>
       ) : (
         <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-          Vil du være testbruker? Ta kontakt: <KontaktLenke kontakt={me.kontakt} />.
+          Vil du prøve den? Ta kontakt: <KontaktLenke kontakt={me.kontakt} />.
         </p>
       )}
     </Kort>
