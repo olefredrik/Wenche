@@ -55,6 +55,15 @@ class Settings:
         self._vendor_key_path = os.getenv("HOSTED_VENDOR_KEY_PATH")
         self._fail_closed_i_prod()
 
+    @property
+    def kontakt_tekst(self) -> str:
+        """Kontaktverdien uten URL-skjema, for innfelling i ren tekst. `kontakt` lagres med
+        skjema (mailto:/https://) fordi den brukes som href; skjemaet skal ikke leses av en
+        bruker. Speiler KontaktLenke i frontend."""
+        if self.kontakt.startswith("mailto:"):
+            return self.kontakt[len("mailto:") :]
+        return self.kontakt.removeprefix("https://").removeprefix("http://")
+
     def _fail_closed_i_prod(self) -> None:
         """Nekt oppstart i prod hvis hemmelighetene ikke er overstyrt fra dev-standardene."""
         if self.env != "prod":
