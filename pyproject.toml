@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "wenche"
-version = "0.31.0"
+version = "0.31.1"
 description = "Enkel innsending av årsregnskap, skattemelding og aksjonærregisteroppgave til Altinn for holdingselskaper"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -43,11 +43,16 @@ Issues = "https://github.com/olefredrik/wenche/issues"
 [project.scripts]
 wenche = "wenche.cli:main"
 
+# Den bygde SPA-en (wenche/web/static) er git-ignorert (bygges ved release).
+# `artifacts` ligger på topp-nivå så den gjelder BÅDE sdist og wheel. Det er kritisk:
+# `python -m build` (uten flagg) bygger sdist først og bygger så wheelen FRA sdist-en, så
+# hvis static bare var deklarert under wheel-target ville den falle ut av sdist-en og dermed
+# mangle i wheel-bygget-fra-sdist (issue #121). `artifacts` (i motsetning til force-include)
+# feiler heller ikke når mappen mangler (editable-install, bidragsytere uten bygd frontend).
+[tool.hatch.build]
+artifacts = ["wenche/web/static/**"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["wenche"]
 # Frontend-kilden (TS/Vite) hører ikke hjemme i wheelen, kun den bygde SPA-en serveres.
 exclude = ["wenche/web/frontend"]
-# Den bygde SPA-en ligger i wenche/web/static, som er git-ignorert (bygges ved release).
-# `artifacts` tar den med i wheelen når den finnes, men feiler ikke når den mangler (CI,
-# editable-install, bidragsytere som ikke har bygd front-enden) — i motsetning til force-include.
-artifacts = ["wenche/web/static/**"]
