@@ -19,7 +19,6 @@ porten. Navnet brukes kun transient til matching mot åpne registerdata og lagre
 
 Ingen e-post, ingen passord, ingen database.
 """
-import secrets
 import time
 from collections import defaultdict, deque
 
@@ -28,7 +27,6 @@ from fastapi import APIRouter, Request
 from itsdangerous import BadSignature, URLSafeSerializer
 from pydantic import BaseModel
 
-from . import session as sesjon
 from .config import settings
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -167,8 +165,6 @@ def _grant(request: Request, orgnr: str, *, via_selvbetjening: bool) -> None:
     request.session["invited"] = True
     request.session["invite_org"] = orgnr
     request.session["via_selvbetjening"] = via_selvbetjening
-    if not request.session.get("sid"):
-        request.session["sid"] = secrets.token_urlsafe(16)
 
 
 @router.post("/be-om-tilgang")
@@ -221,12 +217,10 @@ def me(request: Request) -> dict:
         # Gatesiden trenger å vite om den skal vise selvbetjeningsskjemaet og hvor man ellers
         # tar kontakt. Begge er ikke-sensitiv config.
         return {"invited": False, "selvbetjening": s.selvbetjening, "kontakt": s.kontakt}
-    sid = request.session.get("sid")
-    st = sesjon.hent(sid) if sid else None
     return {
         "invited": True,
         "invite_org": request.session.get("invite_org"),
-        "kunde_org": st.kunde_org if st else None,
+        "kunde_org": request.session.get("kunde_org"),
         "env": s.env,
         "demo": s.demo_mode,
     }
@@ -234,9 +228,6 @@ def me(request: Request) -> dict:
 
 @router.post("/logout")
 def logout(request: Request) -> dict:
-    """Logg ut: slett ephemeral sesjonsdata og tøm cookien."""
-    sid = request.session.get("sid")
-    if sid:
-        sesjon.slett(sid)
+    """Logg ut: tøm sesjonscookien (ingen server-side tilstand å rydde)."""
     request.session.clear()
     return {"ok": True}

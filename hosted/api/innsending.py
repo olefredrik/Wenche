@@ -92,11 +92,11 @@ def _utfor(fn):
 def innsending_aarsregnskap(
     request: Request, config: dict[str, Any] = Body(...), dry_run: bool = False
 ) -> dict:
-    st = krev_invitert(request)
+    krev_invitert(request)
     if dry_run:
         return {"dry_run": True, **tjeneste.valider_aarsregnskap(config)}
     creds, _ = krev_vendor()
-    org = krev_kunde_org(st)
+    org = krev_kunde_org(request)
     _sjekk_org(config, org)
     s = settings()
     altinn_token = wauth.hent_tokens_for(creds, org, SCOPES, veksle_altinn=True)["altinn_token"]
@@ -112,11 +112,11 @@ def innsending_aarsregnskap(
 def innsending_aksjonaer(
     request: Request, config: dict[str, Any] = Body(...), dry_run: bool = False
 ) -> dict:
-    st = krev_invitert(request)
+    krev_invitert(request)
     if dry_run:
         return {"dry_run": True, **tjeneste.valider_aksjonaer(config)}
     creds, _ = krev_vendor()
-    org = krev_kunde_org(st)
+    org = krev_kunde_org(request)
     _sjekk_org(config, org)
     s = settings()
     token = wauth.hent_tokens_for(creds, org, SKD_AKSJONAER_SCOPE)["maskinporten_token"]
@@ -132,11 +132,11 @@ def innsending_aksjonaer(
 def innsending_skattemelding(
     request: Request, config: dict[str, Any] = Body(...), dry_run: bool = False
 ) -> dict:
-    st = krev_invitert(request)
+    krev_invitert(request)
     if dry_run:
         return {"dry_run": True, **tjeneste.valider_skattemelding(config)}
     creds, _ = krev_vendor()
-    org = krev_kunde_org(st)
+    org = krev_kunde_org(request)
     _sjekk_org(config, org)
     s = settings()
     tokens = wauth.hent_tokens_for(creds, org, SKD_SKATTEMELDING_SCOPE, veksle_altinn=True)
