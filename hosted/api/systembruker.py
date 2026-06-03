@@ -50,7 +50,7 @@ def request_systembruker(request: Request) -> dict:
             raise HTTPException(
                 status_code=409,
                 detail="Dette selskapet er allerede satt opp i Wenche. Av sikkerhetsgrunner "
-                "kobles slike bare via en invitasjon. Ta kontakt: " + settings().kontakt + ".",
+                "kobles slike bare via en invitasjon. Ta kontakt: " + settings().kontakt_tekst + ".",
             )
         st.kunde_org = org
         st.pending_org = None

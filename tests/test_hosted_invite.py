@@ -294,6 +294,10 @@ def test_selvbetjening_nektes_already_approved_snarvei(klient_selvbetjening, mon
     # Snarveien nektes; kunde-org blir aldri bundet uten manuell invitasjon.
     r = klient_selvbetjening.post("/api/systembruker/request")
     assert r.status_code == 409
+    # Kontaktvei vises uten URL-skjema (ingen «mailto:» lekker inn i lesbar tekst).
+    detail = r.json()["detail"]
+    assert "test@wenche.cloud" in detail
+    assert "mailto:" not in detail
     assert klient_selvbetjening.get("/api/auth/me").json()["kunde_org"] is None
 
 
