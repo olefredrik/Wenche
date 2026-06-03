@@ -24,8 +24,8 @@ jobs:
           node-version: "20"
 
       - name: Bygg self-hosted SPA
-        # Den bygde SPA-en (wenche/web/static) force-includes i wheelen (pip-brukere har
-        # ikke Node). Må bygges før `python -m build`.
+        # Den bygde SPA-en (wenche/web/static) tas med i sdist og wheel via `artifacts` i
+        # pyproject.toml (pip-brukere har ikke Node). Må bygges før `python -m build`.
         run: |
           npm ci
           npm run build --workspace wenche/web/frontend
@@ -34,6 +34,13 @@ jobs:
         run: |
           pip install build
           python -m build
+
+      - name: Verifiser at SPA-en er med i wheelen
+        # Vakt mot regresjon av issue #121: en wheel uten den bygde SPA-en gir 404 på `/`
+        # for pip-brukere. Feil høylytt her heller enn å publisere en ødelagt wheel.
+        run: |
+          unzip -l dist/*.whl | grep -q "wenche/web/static/index.html" \
+            || { echo "ERROR: SPA (wenche/web/static) mangler i wheelen"; exit 1; }
 
       - name: Last opp til PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
