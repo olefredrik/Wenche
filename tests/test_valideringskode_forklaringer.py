@@ -31,7 +31,7 @@ def test_forklarer_kjent_veiledningskode():
     )
     ut = formater_valideringsresultat(res)
     assert "Hva betyr dette?" in ut
-    assert "passive holdingselskaper" in ut
+    assert "passivt holdingselskap" in ut
     assert "utenfor" in ut
     assert "skatteetaten.no" in ut
 
@@ -58,4 +58,4 @@ def test_duplikate_koder_forklares_kun_en_gang():
         veiledning=[{"veiledningstype": kode, "hjelpetekst": "x"}],
     )
     ut = formater_valideringsresultat(res)
-    assert ut.count("passive holdingselskaper") == 1
+    assert ut.count("passivt holdingselskap") == 1

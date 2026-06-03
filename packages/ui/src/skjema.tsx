@@ -154,8 +154,8 @@ function grunnConfig(): any {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const EKSEMPEL: any = {
   selskap: {
-    navn: "KORREKT FRISK TIGER AS",
-    org_nummer: "314273818",
+    navn: "MOTSTANDSDYKTIG ENTUSIASTISK TIGER AS",
+    org_nummer: "310137715",
     daglig_leder: "Daglig Leder",
     styreleder: "Daglig Leder",
     forretningsadresse: "Bergveien 23, 1890 RAKKESTAD",
@@ -163,7 +163,7 @@ const EKSEMPEL: any = {
     aksjekapital: 30000,
     kontakt_epost: "test@example.no",
   },
-  regnskapsaar: 2024,
+  regnskapsaar: 2025,
   resultatregnskap: {
     driftsinntekter: { salgsinntekter: 0, andre_driftsinntekter: 0 },
     driftskostnader: { loennskostnader: 0, avskrivninger: 0, andre_driftskostnader: 0 },
@@ -176,11 +176,11 @@ const EKSEMPEL: any = {
   },
   balanse: {
     eiendeler: {
-      anleggsmidler: { aksjer_i_datterselskap: 0, andre_aksjer: 0, langsiktige_fordringer: 0 },
+      anleggsmidler: { aksjer_i_datterselskap: 100000, andre_aksjer: 0, langsiktige_fordringer: 0 },
       omloepmidler: { kortsiktige_fordringer: 0, bankinnskudd: 30000 },
     },
     egenkapital_og_gjeld: {
-      egenkapital: { aksjekapital: 30000, overkursfond: 0, annen_egenkapital: 0 },
+      egenkapital: { aksjekapital: 30000, overkursfond: 0, annen_egenkapital: 100000 },
       langsiktig_gjeld: { laan_fra_aksjonaer: 0, andre_langsiktige_laan: 0 },
       kortsiktig_gjeld: {
         leverandoergjeld: 0,
@@ -189,11 +189,44 @@ const EKSEMPEL: any = {
       },
     },
   },
+  // Fjorårets balanse er identisk (passivt holding uten bevegelse i året), så
+  // egenkapitalavstemmingen går i null mot årsresultat 0. Uten foregående år
+  // ville hele utgående EK telt som «årets overskudd» og gitt avvik mot SKD.
+  foregaaende_aar: {
+    resultatregnskap: {
+      driftsinntekter: { salgsinntekter: 0, andre_driftsinntekter: 0 },
+      driftskostnader: { loennskostnader: 0, avskrivninger: 0, andre_driftskostnader: 0 },
+      finansposter: {
+        utbytte_fra_datterselskap: 0,
+        andre_finansinntekter: 0,
+        rentekostnader: 0,
+        andre_finanskostnader: 0,
+      },
+    },
+    balanse: {
+      eiendeler: {
+        anleggsmidler: { aksjer_i_datterselskap: 100000, andre_aksjer: 0, langsiktige_fordringer: 0 },
+        omloepmidler: { kortsiktige_fordringer: 0, bankinnskudd: 30000 },
+      },
+      egenkapital_og_gjeld: {
+        egenkapital: { aksjekapital: 30000, overkursfond: 0, annen_egenkapital: 100000 },
+        langsiktig_gjeld: { laan_fra_aksjonaer: 0, andre_langsiktige_laan: 0 },
+        kortsiktig_gjeld: {
+          leverandoergjeld: 0,
+          skyldige_offentlige_avgifter: 0,
+          annen_kortsiktig_gjeld: 0,
+        },
+      },
+    },
+  },
   skattemelding: {
     underskudd_til_fremfoering: 0,
-    anvend_fritaksmetoden: false,
+    anvend_fritaksmetoden: true,
     boersnotert: false,
-    formuesverdi_aksjer: 0,
+    // Formuesverdi av aksjene i datterselskapet (RF-1088S), erstatter bokført
+    // verdi i formuesgrunnlaget. Gir skattemeldingen formue-innhold så den ikke
+    // er «tom» mot næringsspesifikasjonen (UP_HAR_NÆRINGSSPESIFIKASJON_MANGLER_SKATTEMELDING).
+    formuesverdi_aksjer: 1200000,
   },
   aksjonaerer: [
     {
