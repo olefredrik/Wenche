@@ -170,14 +170,39 @@ def test_innsending_avviser_feil_org(klient, monkeypatch):
 
 
 def test_innsending_uten_binding_gir_409(klient, monkeypatch):
-    """Mistet binding (f.eks. serveren sov/restartet) → 409, som frontenden selvheler på."""
+    """Aldri fullført onboarding (ingen systembruker/request) → 409, som frontenden selvheler på."""
     import hosted.api.innsending as ins
 
     monkeypatch.setattr(ins, "krev_vendor", lambda: (SimpleNamespace(client_id="x"), "999999999"))
     klient.post("/api/auth/invite", json={"token": lag_invite_token("314273818")})
-    # Ingen systembruker/request → kunde_org ikke bundet i serverminnet.
+    # Ingen systembruker/request → kunde_org aldri bundet i cookien.
     r = klient.post("/api/innsending/aarsregnskap?dry_run=false", json=_gyldig_config())
     assert r.status_code == 409
+
+
+def test_binding_overlever_restart(klient, monkeypatch):
+    """
+    Regresjonsvern for utlåsingsfeilen: bindingen (kunde_org) ligger i den signerte cookien,
+    ikke i serverminnet, så en sovende/restartende maskin (Fly scale-to-zero, deploy) mister
+    den ikke. Tidligere lå kunde_org i en in-memory dict og forsvant ved restart, og en
+    selvbetjent bruker ble da permanent låst ute av AlreadyApproved-nekten.
+    """
+    _stub_vendor(monkeypatch)
+    monkeypatch.setattr(
+        sb.wsb, "hent_systembrukere", lambda tok, vendor: [{"reporteeOrgNo": "314273818"}]
+    )
+    klient.post("/api/auth/invite", json={"token": lag_invite_token("314273818")})
+    klient.post("/api/systembruker/request")  # binder kunde_org i cookien
+    assert klient.get("/api/auth/me").json()["kunde_org"] == "314273818"
+
+    # Simuler full prosess-restart: nytt app-objekt med tomt minne, men brukerens cookie består.
+    # Samme HOSTED_SESSION_SECRET (satt i fixturen) gjør at den reloadede appen validerer cookien.
+    from hosted.api import main as main_mod
+
+    importlib.reload(main_mod)
+    with TestClient(main_mod.app, cookies=klient.cookies) as ny_klient:
+        # Ingen ny BankID, ingen ny invite: bindingen overlever restarten.
+        assert ny_klient.get("/api/auth/me").json()["kunde_org"] == "314273818"
 
 
 @pytest.fixture

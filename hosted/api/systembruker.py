@@ -7,8 +7,9 @@ Operatøren (vendor) registrerer sluttbrukersystemet i Altinn én gang. Per kund
   3. POST /api/systembruker/status         -> sjekk status; ved 'Accepted' bindes
                                               sesjonens kunde-org.
 
-Gjenbruker `wenche.systembruker` (samme kode som self-hosted). Request-id holdes i
-sesjonen, ikke i filer.
+Gjenbruker `wenche.systembruker` (samme kode som self-hosted). Forespørsels-id og binding
+holdes i den signerte session-cookien, ikke i serverminnet eller filer, så en sovende/
+restartende maskin ikke mister en alt etablert tilkobling.
 """
 import logging
 
@@ -40,7 +41,7 @@ def request_systembruker(request: Request) -> dict:
     Å honorere snarveien der ville latt en som kjenner et offentlig styremedlemsnavn sende
     inn for et alt-onboardet selskap. Slike krever derfor manuell invitasjon.
     """
-    st = krev_invitert(request)
+    krev_invitert(request)
     org = krev_invite_org(request)
     creds, vendor_orgnr = krev_vendor()
     token = admin_token(creds)
@@ -52,17 +53,17 @@ def request_systembruker(request: Request) -> dict:
                 detail="Dette selskapet er allerede satt opp i Wenche. Av sikkerhetsgrunner "
                 "kobles slike bare via en invitasjon. Ta kontakt: " + settings().kontakt_tekst + ".",
             )
-        st.kunde_org = org
-        st.pending_org = None
-        st.request_id = None
+        request.session["kunde_org"] = org
+        request.session.pop("pending_org", None)
+        request.session.pop("request_id", None)
         return {"status": "AlreadyApproved", "godkjent": True, "kunde_org": org}
     # Ny kunde: sikre at systemet er registrert (idempotent), så opprett forespørselen.
     wsb.registrer_system(token, vendor_orgnr, creds.client_id)
     svar = wsb.opprett_forespørsel(token, vendor_orgnr, org)
-    st.request_id = svar.get("id")
-    st.pending_org = org
+    request.session["request_id"] = svar.get("id")
+    request.session["pending_org"] = org
     return {
-        "request_id": st.request_id,
+        "request_id": svar.get("id"),
         "status": svar.get("status"),
         "confirm_url": svar.get("confirmUrl"),
     }
@@ -71,14 +72,15 @@ def request_systembruker(request: Request) -> dict:
 @router.post("/status")
 def status_systembruker(request: Request) -> dict:
     """Sjekk status; ved 'Accepted' bindes kunde-org til sesjonen."""
-    st = krev_invitert(request)
+    krev_invitert(request)
     creds, _ = krev_vendor()
-    if not st.request_id:
+    request_id = request.session.get("request_id")
+    if not request_id:
         raise HTTPException(status_code=400, detail="Ingen aktiv systembruker-forespørsel.")
     token = admin_token(creds)
-    svar = wsb.hent_forespørsel_status(token, st.request_id)
+    svar = wsb.hent_forespørsel_status(token, request_id)
     status = svar.get("status")
     godkjent = status == "Accepted"
-    if godkjent and st.pending_org:
-        st.kunde_org = st.pending_org
-    return {"status": status, "godkjent": godkjent, "kunde_org": st.kunde_org}
+    if godkjent and request.session.get("pending_org"):
+        request.session["kunde_org"] = request.session["pending_org"]
+    return {"status": status, "godkjent": godkjent, "kunde_org": request.session.get("kunde_org")}
