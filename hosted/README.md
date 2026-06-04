@@ -16,6 +16,13 @@ registerdata og lagres ikke. Det er proporsjonal støydemping, ikke identitetsbe
 AlreadyApproved-snarveien (binding uten BankID) gjelder ikke for selvbetjente økter; et
 alt-onboardet selskap krever fortsatt manuell invitasjon. Av som standard.
 
+**Fortsett på en annen enhet:** sesjonen lever per nettleser (signert cookie, ingen DB), så et
+andre apparat står i utgangspunktet uten tilkobling. En alt koblet økt kan derfor lage en
+kortvarig overføringslenke (vist som QR + lenke på Hjem), som den nye enheten åpner for å arve
+samme binding, uten ny BankID. Lenken er forankret i en alt verifisert økt (bundet `kunde_org`),
+ikke i offentlig registerkunnskap, og er ferskvare (5 min), så den omgår ikke selvbetjenings-
+sperren over.
+
 ## Komponenter
 - `api/` — FastAPI JSON-API (importerer `wenche`).
 - `web/` — SPA (React + Vite + TypeScript + Tailwind 4). Tynn happy-path: innlogging →

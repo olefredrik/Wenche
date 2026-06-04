@@ -17,14 +17,21 @@ en festning: den hindrer at noen trigger en Altinn-systembruker-forespørsel mot
 selskap de ikke har noe med å gjøre, mens BankID-godkjenningen i Altinn forblir den reelle
 porten. Navnet brukes kun transient til matching mot åpne registerdata og lagres aldri.
 
+Fortsett på en annen enhet (handoff): sesjonen lever per nettleser (signert cookie, ingen DB),
+så en ny enhet har ingen binding. En alt fullført økt (bundet kunde_org, altså en enhet som
+har vært gjennom invite/BankID) kan lage en kortvarig, signert overføringslenke som den nye
+enheten åpner for å arve samme binding. Tilliten er forankret i en eksisterende, verifisert
+økt, ikke i offentlig registerkunnskap, så den er uavhengig av selvbetjeningssperren i
+systembruker.request_systembruker. Lenken er ferskvare (HANDOFF_MAKS_ALDER), ikke engangsbruk.
+
 Ingen e-post, ingen passord, ingen database.
 """
 import time
 from collections import defaultdict, deque
 
 import httpx
-from fastapi import APIRouter, Request
-from itsdangerous import BadSignature, URLSafeSerializer
+from fastapi import APIRouter, HTTPException, Request
+from itsdangerous import BadSignature, SignatureExpired, URLSafeSerializer, URLSafeTimedSerializer
 from pydantic import BaseModel
 
 from .config import settings
@@ -32,6 +39,10 @@ from .config import settings
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 _SALT = "invite"
+_HANDOFF_SALT = "handoff"
+# Overføringslenken er ferskvare: kort nok til at den i praksis må brukes med en gang (skann
+# QR-en på den andre enheten), så et avlyttet/etterlatt token ikke kan løses inn senere.
+_HANDOFF_MAKS_ALDER = 300  # sekunder
 
 # Enhetsregisterets åpne rolle-endepunkt (gratis, ingen auth). Gir navn på daglig leder og
 # styre som offentlig data, slik at vi kan bekrefte at forespørgeren plausibelt hører til
@@ -50,6 +61,13 @@ _MOD11_VEKTER = (3, 2, 7, 6, 5, 4, 3, 2)
 
 def _serializer() -> URLSafeSerializer:
     return URLSafeSerializer(settings().invite_secret, salt=_SALT)
+
+
+def _handoff_serializer() -> URLSafeTimedSerializer:
+    # Egen salt på sesjons-secret-en: overføringslenken er en sesjonsforlengelse, ikke en
+    # operatør-utdelt invitasjon, og kan dermed ikke forveksles med (eller forfalskes fra)
+    # invite-tokens eller selve cookien.
+    return URLSafeTimedSerializer(settings().session_secret, salt=_HANDOFF_SALT)
 
 
 def lag_invite_token(org: str) -> str:
@@ -207,6 +225,53 @@ def be_om_tilgang(body: TilgangBody, request: Request) -> dict:
 
     _grant(request, orgnr, via_selvbetjening=True)
     return {"invited": True, "invite_org": orgnr}
+
+
+class HandoffBody(BaseModel):
+    token: str
+
+
+@router.post("/handoff/create")
+def lag_handoff(request: Request) -> dict:
+    """
+    Lag en kortvarig overføringslenke for å fortsette på en annen enhet.
+
+    Krever en alt fullført økt: kunde_org er kun satt etter en innløst invitasjon mot et
+    onboardet selskap eller en gjennomført BankID-godkjenning, så bare en enhet som er
+    forbi den reelle porten kan lage lenken. Den nye enheten arver nøyaktig samme binding.
+    """
+    org = request.session.get("kunde_org")
+    if not org:
+        raise HTTPException(
+            status_code=409,
+            detail="Koble selskapet på denne enheten først, så kan du fortsette på en annen.",
+        )
+    token = _handoff_serializer().dumps({"org": str(org)})
+    return {
+        "lenke": f"{settings().public_url}/?handoff={token}",
+        "gyldig_sekunder": _HANDOFF_MAKS_ALDER,
+    }
+
+
+@router.post("/handoff/use")
+def bruk_handoff(body: HandoffBody, request: Request) -> dict:
+    """Løs inn en overføringslenke på en ny enhet og arv selskapsbindingen direkte."""
+    try:
+        payload = _handoff_serializer().loads(body.token, max_age=_HANDOFF_MAKS_ALDER)
+    except SignatureExpired:
+        return {"invited": False, "feil": "Overføringslenken er utløpt. Lag en ny på den andre enheten."}
+    except BadSignature:
+        return {"invited": False, "feil": "Ugyldig overføringslenke."}
+    org = payload.get("org") if isinstance(payload, dict) else None
+    if not org:
+        return {"invited": False, "feil": "Ugyldig overføringslenke."}
+    org = str(org).strip()
+    # Forankret i en alt verifisert økt, så bindingen arves uten ny BankID. via_selvbetjening
+    # er irrelevant her (kunde_org er alt satt), men False markerer at dette ikke er en svak
+    # navneoppslag-økt.
+    _grant(request, org, via_selvbetjening=False)
+    request.session["kunde_org"] = org
+    return {"invited": True, "invite_org": org, "kunde_org": org}
 
 
 @router.get("/me")

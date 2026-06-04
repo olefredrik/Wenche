@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import QRCode from "qrcode";
 import { api } from "./api";
 import { sporSidevisning, sporHendelse } from "./sporing";
 import {
@@ -286,6 +287,89 @@ function Onboarding({ org, onApproved }: { org?: string | null; onApproved: () =
   );
 }
 
+// Fortsett på en annen enhet: en koblet økt lager en kortvarig overføringslenke (QR + lenke)
+// som en ny enhet løser inn for å arve samme binding, uten ny BankID. Løser at sesjonen ellers
+// lever per nettleser (signert cookie, ingen DB), så et andre apparat står uten tilkobling.
+function FortsettAnnenEnhet() {
+  const [aapen, setAapen] = useState(false);
+  const [lenke, setLenke] = useState<string | null>(null);
+  const [qr, setQr] = useState<string | null>(null);
+  const [gyldigMin, setGyldigMin] = useState<number | null>(null);
+  const [lager, setLager] = useState(false);
+  const [kopiert, setKopiert] = useState(false);
+  const [feil, setFeil] = useState<string | null>(null);
+
+  const lag = async () => {
+    setFeil(null);
+    setKopiert(false);
+    setLager(true);
+    try {
+      const r = await api.handoffCreate();
+      setLenke(r.lenke);
+      setGyldigMin(r.gyldig_sekunder ? Math.round(r.gyldig_sekunder / 60) : null);
+      // QR genereres i nettleseren; lenken (med tokenet) forlater aldri enheten her.
+      setQr(await QRCode.toDataURL(r.lenke, { margin: 1, width: 320 }));
+      setAapen(true);
+      sporHendelse("handoff-laget");
+    } catch (e) {
+      setFeil((e as Error).message);
+    } finally {
+      setLager(false);
+    }
+  };
+
+  const kopier = async () => {
+    if (!lenke) return;
+    try {
+      await navigator.clipboard.writeText(lenke);
+      setKopiert(true);
+    } catch {
+      /* clipboard blokkert (f.eks. ikke-https): lenken vises uansett for manuell kopiering */
+    }
+  };
+
+  if (!aapen) {
+    return (
+      <button className={btnOutline} onClick={lag} disabled={lager}>
+        {lager ? "Lager lenke…" : "Fortsett på en annen enhet"}
+      </button>
+    );
+  }
+
+  return (
+    <div className="rounded-sm border border-border bg-background p-4">
+      <p className="text-sm leading-relaxed text-muted-foreground">
+        Skann QR-koden med den andre enheten, eller åpne lenken der. Da kobles den til samme
+        selskap uten ny BankID-godkjenning. Lenken er ferskvare
+        {gyldigMin ? ` (gyldig i ${gyldigMin} minutter)` : ""} og bør bare deles med deg selv.
+      </p>
+      {qr && (
+        <img
+          src={qr}
+          alt="QR-kode for å fortsette på en annen enhet"
+          className="mt-4 rounded bg-white p-2"
+          width={180}
+          height={180}
+        />
+      )}
+      {lenke && (
+        <div className="mt-4">
+          <a className="block break-all text-sm text-spruce underline-offset-2 hover:underline" href={lenke}>
+            {lenke}
+          </a>
+          <div className="mt-3 flex items-center gap-3">
+            <button className={btnOutline} onClick={kopier}>
+              Kopier lenke
+            </button>
+            {kopiert && <span className="text-xs text-spruce">✓ Kopiert</span>}
+          </div>
+        </div>
+      )}
+      {feil && <p className="mt-3 text-sm text-red-700">{feil}</p>}
+    </div>
+  );
+}
+
 // Hjem: tilkoblingsstatus. Koblet → bekreftelse + «sjekk tilkobling». Ikke koblet → onboarding.
 function HjemFane({ me, onChange }: { me: Me; onChange: () => void }) {
   const [sjekker, setSjekker] = useState(false);
@@ -353,6 +437,16 @@ function HjemFane({ me, onChange }: { me: Me; onChange: () => void }) {
             {sjekker ? "Sjekker…" : "Sjekk tilkobling"}
           </button>
           {melding && <span className="text-sm text-muted-foreground">{melding}</span>}
+        </div>
+      </Kort>
+      <Kort>
+        <p className={monoLabel}>Flere enheter</p>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Vil du fortsette på telefonen eller en annen maskin? Lag en lenke her, så slipper du
+          å koble selskapet på nytt der.
+        </p>
+        <div className="mt-4">
+          <FortsettAnnenEnhet />
         </div>
       </Kort>
     </div>
@@ -482,10 +576,17 @@ export default function App() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get("invite");
-    if (token) {
-      api
-        .invite(token)
+    const invite = params.get("invite");
+    const handoff = params.get("handoff");
+    // En invite-lenke åpner porten; en handoff-lenke (fra en alt koblet enhet) arver bindingen
+    // direkte. Begge løses inn FØR URL-en ryddes og analytics kjører, så tokenet aldri lekker.
+    const losInn = invite
+      ? api.invite(invite)
+      : handoff
+        ? api.handoffUse(handoff)
+        : null;
+    if (losInn) {
+      losInn
         .catch(() => {})
         .finally(() => {
           window.history.replaceState({}, "", window.location.pathname);

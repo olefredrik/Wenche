@@ -9,6 +9,11 @@ export const api = {
   // Selvbetjent tilgang: navn + orgnr verifiseres mot Enhetsregisteret. Navnet lagres ikke.
   beOmTilgang: (navn: string, org: string) =>
     req("/api/auth/be-om-tilgang", { method: "POST", body: JSON.stringify({ navn, org }) }),
+  // Fortsett på en annen enhet: en koblet økt lager en kortvarig overføringslenke (QR),
+  // den nye enheten løser den inn og arver bindingen.
+  handoffCreate: () => req("/api/auth/handoff/create", { method: "POST" }),
+  handoffUse: (token: string) =>
+    req("/api/auth/handoff/use", { method: "POST", body: JSON.stringify({ token }) }),
   logout: () => req("/api/auth/logout", { method: "POST" }),
   systembrukerRequest: () => req("/api/systembruker/request", { method: "POST" }),
   systembrukerStatus: () => req("/api/systembruker/status", { method: "POST" }),
