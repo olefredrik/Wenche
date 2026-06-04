@@ -39,7 +39,8 @@ def request_systembruker(request: Request) -> dict:
     Unntak for selvbetjente økter: AlreadyApproved-snarveien hopper over BankID, og
     selvbetjent tilgang er bare et navneoppslag mot offentlige data (ikke identitetsbevis).
     Å honorere snarveien der ville latt en som kjenner et offentlig styremedlemsnavn sende
-    inn for et alt-onboardet selskap. Slike krever derfor manuell invitasjon.
+    inn for et alt-onboardet selskap. Slike kobles derfor enten via en manuell invitasjon
+    eller en handoff-lenke fra en alt koblet enhet (auth.py), aldri via selvbetjent snarvei.
     """
     krev_invitert(request)
     org = krev_invite_org(request)
@@ -50,8 +51,9 @@ def request_systembruker(request: Request) -> dict:
         if request.session.get("via_selvbetjening"):
             raise HTTPException(
                 status_code=409,
-                detail="Dette selskapet er allerede satt opp i Wenche. Av sikkerhetsgrunner "
-                "kobles slike bare via en invitasjon. Ta kontakt: " + settings().kontakt_tekst + ".",
+                detail="Dette selskapet er alt satt opp i Wenche. Har du alt koblet det på en "
+                "annen enhet, åpne Wenche der og velg «Fortsett på en annen enhet» for å koble "
+                "denne. Ellers, ta kontakt for en invitasjon: " + settings().kontakt_tekst + ".",
             )
         request.session["kunde_org"] = org
         request.session.pop("pending_org", None)
