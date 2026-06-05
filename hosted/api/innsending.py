@@ -107,8 +107,8 @@ def _utfor(fn, kunde_org: str | None = None):
             status_code=502,
             detail=(
                 "Fikk ikke fullført forespørselen mot Altinn/Skatteetaten (nettverksfeil eller "
-                "tidsavbrudd). Det er som regel midlertidig. Sjekk Altinn-innboksen din før du "
-                "prøver på nytt, i tilfelle forespørselen likevel gikk gjennom."
+                "tidsavbrudd). Det er som regel midlertidig. Sjekk i Altinn eller hos Skatteetaten "
+                "før du prøver på nytt, i tilfelle forespørselen likevel gikk gjennom."
             ),
         )
     except RuntimeError as e:
