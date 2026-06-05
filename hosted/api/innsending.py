@@ -98,7 +98,10 @@ def _utfor(fn, kunde_org: str | None = None):
         # Tidsavbrudd/tilkoblingsfeil (ikke et HTTP-svar). Søsken av HTTPStatusError, så den
         # må fanges eksplisitt — ellers blir den en naken 500. Skattemelding gjør flere
         # oppstrøms-kall enn aksjonær og er derfor mer utsatt for et forbigående avbrudd.
-        url = e.request.url if e.request else "?"
+        try:
+            url = str(e.request.url)  # httpx' .request kaster RuntimeError hvis den ikke er satt
+        except RuntimeError:
+            url = "ukjent URL"
         logger.warning("Innsending feilet for org %s: nettverksfeil mot %s: %s", kunde_org, url, e)
         raise HTTPException(
             status_code=502,

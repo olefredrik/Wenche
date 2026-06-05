@@ -1,8 +1,10 @@
 """
 Feilhåndtering i hostet innsending: Altinn/SKD-feil skal aldri bli en rå 500 til brukeren.
 
-`_utfor` pakker innsendingen og gjør de tre feilklassene domeneklientene melder om til lesbare
-HTTP-svar: valideringsfeil → 422, rå httpx-feil (Altinn) og RuntimeError (SKD-klienten) → 502.
+`_utfor` pakker innsendingen og gjør feilene domeneklientene melder om til lesbare HTTP-svar:
+valideringsfeil → 422; HTTP-feil (Altinn), nettverksfeil/tidsavbrudd (httpx.RequestError) og
+RuntimeError (SKD-klienten / token-henting) → 502; bevisst reist HTTPException slipper gjennom
+uendret; alt annet → kontrollert 500 med melding (aldri en naken stacktrace).
 """
 import httpx
 import pytest
@@ -57,3 +59,38 @@ def test_skattemelding_valideringsfeil_blir_422():
         _utfor(_hev(SkattemeldingValideringsfeil(resultat)))
     assert ei.value.status_code == 422
     assert "validering" in ei.value.detail
+
+
+def test_nettverksfeil_timeout_blir_502_ikke_500():
+    # httpx.RequestError (tidsavbrudd) er søsken av HTTPStatusError, ikke en undertype, og
+    # ble tidligere en naken 500. Den ledende forklaringen på skattemelding-500-en.
+    req = httpx.Request("POST", "https://skatt.skatteetaten.no/api/skattemelding/v2/valider")
+    feil = httpx.ConnectTimeout("timed out", request=req)
+    with pytest.raises(HTTPException) as ei:
+        _utfor(_hev(feil))
+    assert ei.value.status_code == 502
+    assert "tidsavbrudd" in str(ei.value.detail).lower()
+
+
+def test_nettverksfeil_uten_request_kaster_ikke_i_handteringen():
+    # httpx' .request kaster RuntimeError hvis den ikke er satt — håndteringen må ikke selv
+    # kaste når den logger URL-en.
+    with pytest.raises(HTTPException) as ei:
+        _utfor(_hev(httpx.ConnectError("ingen request satt")))
+    assert ei.value.status_code == 502
+
+
+def test_uventet_feiltype_blir_kontrollert_500():
+    # Siste skanse: en uventet feiltype skal bli en ren 500 med melding, ikke en stacktrace.
+    with pytest.raises(HTTPException) as ei:
+        _utfor(_hev(ValueError("noe uventet")))
+    assert ei.value.status_code == 500
+    assert "uventet" in str(ei.value.detail).lower()
+
+
+def test_bevisst_httpexception_slipper_gjennom_uendret():
+    # F.eks. _sjekk_org sin 409 skal ikke pakkes om til 502/500.
+    with pytest.raises(HTTPException) as ei:
+        _utfor(_hev(HTTPException(status_code=409, detail="org matcher ikke")))
+    assert ei.value.status_code == 409
+    assert ei.value.detail == "org matcher ikke"
