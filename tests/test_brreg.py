@@ -66,6 +66,26 @@ def test_parse_stiftelsesaar():
     assert brreg.parse_stiftelsesaar({"stiftelsesdato": "xx"}) == 0
 
 
+def test_parse_enhet_navn_adresse_og_stiftelsesaar():
+    data = {
+        "navn": "OFL HOLDING AS",
+        "stiftelsesdato": "2018-12-11",
+        "forretningsadresse": {
+            "adresse": ["c/o Ole Fredrik Lie", "Kong Carls gate 29"],
+            "postnummer": "4010",
+            "poststed": "STAVANGER",
+        },
+    }
+    e = brreg.parse_enhet(data)
+    assert e["navn"] == "OFL HOLDING AS"
+    assert e["forretningsadresse"] == "c/o Ole Fredrik Lie, Kong Carls gate 29, 4010 STAVANGER"
+    assert e["stiftelsesaar"] == 2018
+
+
+def test_parse_enhet_tomt_svar():
+    assert brreg.parse_enhet({}) == {"navn": "", "forretningsadresse": "", "stiftelsesaar": 0}
+
+
 def _resp(status_code: int = 200, json_data: dict | None = None):
     resp = MagicMock(spec=httpx.Response)
     resp.status_code = status_code
@@ -95,12 +115,14 @@ def test_hent_roller_nettverksfeil_failsoft(mock_get):
 
 
 @patch("wenche.brreg.httpx.get")
-def test_hent_stiftelsesaar_ok(mock_get):
-    mock_get.return_value = _resp(json_data={"stiftelsesdato": "2020-01-02"})
-    assert brreg.hent_stiftelsesaar("999999999") == 2020
+def test_hent_enhet_ok(mock_get):
+    mock_get.return_value = _resp(json_data={"navn": "TEST AS", "stiftelsesdato": "2020-01-02"})
+    e = brreg.hent_enhet("999999999")
+    assert e["navn"] == "TEST AS"
+    assert e["stiftelsesaar"] == 2020
 
 
 @patch("wenche.brreg.httpx.get")
-def test_hent_stiftelsesaar_5xx_failsoft(mock_get):
+def test_hent_enhet_5xx_failsoft(mock_get):
     mock_get.return_value = _resp(status_code=503)
-    assert brreg.hent_stiftelsesaar("999999999") == 0
+    assert brreg.hent_enhet("999999999") == {"navn": "", "forretningsadresse": "", "stiftelsesaar": 0}

@@ -411,6 +411,9 @@ export function DataSkjema({
             ...c,
             selskap: {
               ...s,
+              navn: String(s.navn ?? "").trim() || d.navn || "",
+              forretningsadresse:
+                String(s.forretningsadresse ?? "").trim() || d.forretningsadresse || "",
               daglig_leder: String(s.daglig_leder ?? "").trim() || d.daglig_leder || "",
               styreleder: String(s.styreleder ?? "").trim() || d.styreleder || "",
               stiftelsesaar: Number(s.stiftelsesaar) || d.stiftelsesaar || 0,

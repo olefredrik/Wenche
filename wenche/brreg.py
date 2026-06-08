@@ -62,6 +62,25 @@ def parse_stiftelsesaar(data: dict) -> int:
         return 0
 
 
+def _format_adresse(adr: dict) -> str:
+    """Sett sammen brregs strukturerte forretningsadresse til én linje, f.eks.
+    «Kong Carls gate 29, 4010 STAVANGER». Tom streng om adressen mangler."""
+    if not adr:
+        return ""
+    gate = ", ".join(linje for linje in (adr.get("adresse") or []) if linje)
+    poststed = " ".join(d for d in (adr.get("postnummer"), adr.get("poststed")) if d)
+    return ", ".join(d for d in (gate, poststed) if d)
+
+
+def parse_enhet(data: dict) -> dict:
+    """Navn, forretningsadresse og stiftelsesår fra et enhets-svar. Tomme verdier der noe mangler."""
+    return {
+        "navn": data.get("navn") or "",
+        "forretningsadresse": _format_adresse(data.get("forretningsadresse") or {}),
+        "stiftelsesaar": parse_stiftelsesaar(data),
+    }
+
+
 def _hent_json(url: str, timeout: float) -> dict | None:
     try:
         resp = httpx.get(url, headers={"Accept": "application/json"}, timeout=timeout)
@@ -81,7 +100,7 @@ def hent_roller(orgnr: str, *, timeout: float = 5.0) -> dict:
     return parse_roller(data) if data else {"daglig_leder": "", "styreleder": "", "alle": []}
 
 
-def hent_stiftelsesaar(orgnr: str, *, timeout: float = 5.0) -> int:
-    """Stiftelsesår for orgnr fra Enhetsregisteret. Fail-soft (0 ved feil eller ukjent org)."""
+def hent_enhet(orgnr: str, *, timeout: float = 5.0) -> dict:
+    """Navn, forretningsadresse og stiftelsesår for orgnr fra Enhetsregisteret. Fail-soft (tomt ved feil)."""
     data = _hent_json(f"{_BASE}/{orgnr}", timeout)
-    return parse_stiftelsesaar(data) if data else 0
+    return parse_enhet(data) if data else {"navn": "", "forretningsadresse": "", "stiftelsesaar": 0}

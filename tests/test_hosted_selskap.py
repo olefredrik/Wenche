@@ -41,7 +41,11 @@ def test_selskap_forhandsfyller_fra_brreg(klient, monkeypatch):
         brreg, "hent_roller",
         lambda org, **k: {"daglig_leder": "Kari Nordmann", "styreleder": "Ola Lie", "alle": []},
     )
-    monkeypatch.setattr(brreg, "hent_stiftelsesaar", lambda org, **k: 2018)
+    monkeypatch.setattr(
+        brreg, "hent_enhet",
+        lambda org, **k: {"navn": "Test AS", "forretningsadresse": "Vei 1, 0001 OSLO",
+                          "stiftelsesaar": 2018},
+    )
 
     token = lag_invite_token("314273818")
     assert klient.post("/api/auth/invite", json={"token": token}).json()["invited"] is True
@@ -49,6 +53,8 @@ def test_selskap_forhandsfyller_fra_brreg(klient, monkeypatch):
     data = klient.get("/api/selskap").json()
     # Org kommer fra den signerte invite-bindingen, ikke fra brukerinput.
     assert data["org_nummer"] == "314273818"
+    assert data["navn"] == "Test AS"
+    assert data["forretningsadresse"] == "Vei 1, 0001 OSLO"
     assert data["daglig_leder"] == "Kari Nordmann"
     assert data["styreleder"] == "Ola Lie"
     assert data["stiftelsesaar"] == 2018

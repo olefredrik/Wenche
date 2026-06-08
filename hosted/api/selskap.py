@@ -26,9 +26,12 @@ def hent_selskap(request: Request) -> dict:
         raise HTTPException(status_code=409, detail="Ingen koblet org å hente opplysninger for.")
     org = str(org).strip()
     roller = brreg.hent_roller(org)
+    enhet = brreg.hent_enhet(org)
     return {
         "org_nummer": org,
+        "navn": enhet["navn"],
+        "forretningsadresse": enhet["forretningsadresse"],
         "daglig_leder": roller["daglig_leder"],
         "styreleder": roller["styreleder"],
-        "stiftelsesaar": brreg.hent_stiftelsesaar(org),
+        "stiftelsesaar": enhet["stiftelsesaar"],
     }
