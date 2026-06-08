@@ -48,6 +48,9 @@ def _bygg_noter(config: dict) -> Noter:
 @router.post("/skattemelding")
 def dok_skattemelding(request: Request, config: dict[str, Any] = Body(...)) -> dict:
     krev_invitert(request)
+    feil = sm.valider_selskap(config)
+    if feil:
+        raise HTTPException(status_code=422, detail={"feil": feil})
     regnskap, konfig = sm.les_config(config)
     tekst = sm.generer(regnskap, konfig)
     navn = f"skattemelding_{regnskap.regnskapsaar}_{regnskap.selskap.org_nummer}.txt"

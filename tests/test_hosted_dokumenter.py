@@ -90,3 +90,16 @@ def test_aarsregnskap_uten_balanse_gir_422(klient):
     r = klient.post("/api/dokumenter/aarsregnskap", json=cfg)
     assert r.status_code == 422
     assert "feil" in r.json()["detail"]
+
+
+@pytest.mark.parametrize("verdi", ["", None])
+def test_skattemelding_tomt_stiftelsesaar_gir_422_ikke_500(klient, verdi):
+    # Regresjon: en tom stiftelsesår/aksjekapital (typisk etter SAF-T-import, issue #130) ble
+    # før en naken int('')/float('')-500. Nå er det et rettbart avvik med lesbar melding.
+    _inviter(klient)
+    cfg = _gyldig_config()
+    cfg["selskap"]["stiftelsesaar"] = verdi
+    r = klient.post("/api/dokumenter/skattemelding", json=cfg)
+    assert r.status_code == 422, r.text
+    feil = r.json()["detail"]["feil"]
+    assert any("Stiftelsesår" in f for f in feil)
