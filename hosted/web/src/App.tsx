@@ -516,7 +516,7 @@ function TallFane({
           initial={config ?? undefined}
           laastOrg={org ?? undefined}
           importerSaft={api.importerSaft}
-          saftMerknad="SAF-T-filen behandles i minnet i EØS (Stockholm) og lagres ikke."
+          saftMerknad="SAF-T-filen behandles i minnet i EØS og lagres ikke."
           ekstraSeksjon={<NoterSeksjon noter={noter} setNoter={setNoter} />}
         />
       </Kort>

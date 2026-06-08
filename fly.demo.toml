@@ -6,7 +6,7 @@
 # `flyctl secrets set -a wenche-demo ...`, ALDRI her (denne fila er åpen kildekode).
 
 app = "wenche-demo"
-primary_region = "arn"         # Stockholm, EØS (samme som prod).
+primary_region = "ams"         # Amsterdam, EØS (samme som prod). Flyttet fra "arn" 2026-06-08 (arn-kapasitet).
 
 [build]
   dockerfile = "Dockerfile"

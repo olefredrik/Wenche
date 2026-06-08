@@ -3,7 +3,7 @@
 # Hemmeligheter settes med `flyctl secrets set ...`, ALDRI her (denne fila er åpen kildekode).
 
 app = "wenche-hosted"          # bytt til ditt faktiske Fly-appnavn (settes av `flyctl launch`)
-primary_region = "arn"         # Stockholm, EØS. Alternativ: "ams" (Amsterdam).
+primary_region = "ams"         # Amsterdam, EØS. Flyttet fra "arn" (Stockholm) 2026-06-08 da arn manglet vert-kapasitet.
 
 [build]
   dockerfile = "Dockerfile"
