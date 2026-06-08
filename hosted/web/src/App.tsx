@@ -725,7 +725,7 @@ export default function App() {
               aktiv={fane}
               onNaviger={naviger}
               disabled={fane === "tall" && !harMinimumsdata(config)}
-              disabledHint="Fyll inn selskapsnavn og minst daglig leder eller styreleder, og trykk «Lagre data»."
+              disabledHint="Trykk «Lagre data» for å gå videre. (Krever selskapsnavn og minst daglig leder eller styreleder.)"
             />
           </>
         )}
