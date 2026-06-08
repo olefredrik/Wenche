@@ -264,9 +264,10 @@ export function oppsummer(config: any) {
 export function harMinimumsdata(config: any): boolean {
   if (!config) return false;
   const s = config.selskap ?? {};
-  return ["navn", "org_nummer", "daglig_leder", "styreleder"].every(
-    (k) => String(s[k] ?? "").trim() !== "",
-  );
+  const utfylt = (k: string) => String(s[k] ?? "").trim() !== "";
+  // Navn + org alltid; daglig leder ELLER styreleder. Passive holdingselskaper har ofte ingen
+  // daglig leder, og da står styrelederen som bekreftende representant i årsregnskapet.
+  return utfylt("navn") && utfylt("org_nummer") && (utfylt("daglig_leder") || utfylt("styreleder"));
 }
 
 function Feltrutenett({
