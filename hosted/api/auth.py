@@ -34,6 +34,8 @@ from fastapi import APIRouter, HTTPException, Request
 from itsdangerous import BadSignature, SignatureExpired, URLSafeSerializer, URLSafeTimedSerializer
 from pydantic import BaseModel
 
+from wenche import brreg
+
 from .config import settings
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -113,7 +115,12 @@ def _navn_matcher(innsendt: str, kandidater: list[str]) -> bool:
 
 
 def _hent_rolleinnehavere(orgnr: str) -> list[str]:
-    """Navn på aktive daglig leder/styre fra Enhetsregisteret. Tom liste om selskapet/rollen mangler."""
+    """
+    Navn på aktive daglig leder/styre fra Enhetsregisteret, til navnematch i selvbetjeningen.
+    Beholder en streng feilkontrakt med vilje: 404 gir tom liste, men nettverks- og serverfeil
+    propageres (raise_for_status), så be-om-tilgang kan skille «fant ikke navnet» fra «fikk ikke
+    kontakt med registeret». Selve parsingen deles med wenche.brreg (forhåndsfyll-stien).
+    """
     resp = httpx.get(
         _BRREG_ROLLER_URL.format(org=orgnr),
         headers={"Accept": "application/json"},
@@ -122,19 +129,7 @@ def _hent_rolleinnehavere(orgnr: str) -> list[str]:
     if resp.status_code == 404:
         return []
     resp.raise_for_status()
-    navn: list[str] = []
-    for gruppe in resp.json().get("rollegrupper", []):
-        for rolle in gruppe.get("roller", []):
-            if rolle.get("fratraadt") or rolle.get("avregistrert"):
-                continue
-            person = rolle.get("person") or {}
-            if person.get("erDoed"):
-                continue
-            n = person.get("navn") or {}
-            fullt = " ".join(d for d in (n.get("fornavn"), n.get("mellomnavn"), n.get("etternavn")) if d)
-            if fullt:
-                navn.append(fullt)
-    return navn
+    return brreg.parse_roller(resp.json())["alle"]
 
 
 def _rate_ok(nokkel: str) -> bool:

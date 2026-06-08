@@ -17,6 +17,10 @@ export const api = {
   logout: () => req("/api/auth/logout", { method: "POST" }),
   systembrukerRequest: () => req("/api/systembruker/request", { method: "POST" }),
   systembrukerStatus: () => req("/api/systembruker/status", { method: "POST" }),
+  // Forhåndsfyll: daglig leder, styreleder og stiftelsesår fra Enhetsregisteret for den koblede
+  // orgen (offentlige data, lagres ikke). SAF-T bærer ikke disse feltene, så uten dette må de
+  // skrives manuelt etter import.
+  selskap: () => req("/api/selskap"),
   // Config sendes i body (klienten er fasit), så en sovende/restartende server ikke kan
   // miste utfyllingen. Ingen server-side datalagring mellom kall.
   innsending: (type: string, dryRun: boolean, config: unknown) =>
