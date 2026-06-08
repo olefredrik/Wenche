@@ -132,7 +132,7 @@ def innsending_aarsregnskap(
 ) -> dict:
     krev_invitert(request)
     if dry_run:
-        return {"dry_run": True, **tjeneste.valider_aarsregnskap(config)}
+        return _utfor(lambda: {"dry_run": True, **tjeneste.valider_aarsregnskap(config)})
     creds, _ = krev_vendor()
     org = krev_kunde_org(request)
     _sjekk_org(config, org)
@@ -152,7 +152,7 @@ def innsending_aksjonaer(
 ) -> dict:
     krev_invitert(request)
     if dry_run:
-        return {"dry_run": True, **tjeneste.valider_aksjonaer(config)}
+        return _utfor(lambda: {"dry_run": True, **tjeneste.valider_aksjonaer(config)})
     creds, _ = krev_vendor()
     org = krev_kunde_org(request)
     _sjekk_org(config, org)
@@ -172,7 +172,7 @@ def innsending_skattemelding(
 ) -> dict:
     krev_invitert(request)
     if dry_run:
-        return {"dry_run": True, **tjeneste.valider_skattemelding(config)}
+        return _utfor(lambda: {"dry_run": True, **tjeneste.valider_skattemelding(config)})
     creds, _ = krev_vendor()
     org = krev_kunde_org(request)
     _sjekk_org(config, org)

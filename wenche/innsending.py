@@ -49,8 +49,13 @@ def valider_aksjonaer(config: Config) -> dict:
 
 def valider_skattemelding(config: Config) -> dict:
     # Lokal bygging uten nettverk/partsnummer. SKD-validering skjer ved ekte innsending.
+    # Sjekk de påkrevde selskapsfeltene først: et ufullstendig selskap (typisk etter SAF-T-import)
+    # skal bli et rettbart avvik i bekreft-modalen, ikke en naken int('')/float('')-500.
+    feil = _sm.valider_selskap(config)
+    if feil:
+        return {"ok": False, "feil": feil}
     regnskap, _konfig = _sm.les_config(config)
-    return {"ok": True, "regnskapsaar": regnskap.regnskapsaar}
+    return {"ok": True, "feil": [], "regnskapsaar": regnskap.regnskapsaar}
 
 
 # ---------------------------------------------------------------------------

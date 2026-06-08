@@ -34,13 +34,69 @@ from wenche.models import (
 SKATTESATS = 0.22  # 22 % selskapsskatt
 
 
+# Selskapsfelt skattemeldingen krever (org-nr utledes på annet vis ved innsending). I motsetning
+# til årsregnskapet konverterer skattemeldingen stiftelsesår og aksjekapital til tall, så en tom
+# verdi måtte før bli en naken int('')/float('')-500. En SAF-T-import bærer ikke disse feltene
+# (issue #130), derfor er en tom verdi et reelt og vanlig tilfelle, ikke en kantsak.
+PAAKREVDE_SELSKAPSFELT: list[tuple[str, str]] = [
+    ("navn", "Selskapsnavn"),
+    ("org_nummer", "Organisasjonsnummer"),
+    ("daglig_leder", "Daglig leder"),
+    ("styreleder", "Styreleder"),
+    ("forretningsadresse", "Forretningsadresse"),
+    ("stiftelsesaar", "Stiftelsesår"),
+    ("aksjekapital", "Aksjekapital"),
+]
+_NUMERISKE_SELSKAPSFELT = {"stiftelsesaar", "aksjekapital"}
+
+
+def _raw(config_fil: str | dict) -> dict:
+    """Leser config som dict (allerede parset) eller fra YAML-fil."""
+    if isinstance(config_fil, dict):
+        return config_fil
+    with open(config_fil, encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def _er_tom(verdi) -> bool:
+    return verdi is None or (isinstance(verdi, str) and not verdi.strip())
+
+
+def _tall(verdi, etikett: str, konverter):
+    """Konverterer et påkrevd tallfelt med lesbar feil, aldri en rå int('')/float('')-ValueError."""
+    if _er_tom(verdi):
+        raise ValueError(f"{etikett} mangler i selskapsopplysningene.")
+    try:
+        return konverter(verdi)
+    except (TypeError, ValueError):
+        raise ValueError(f"{etikett} må være et tall (fikk {verdi!r}).")
+
+
+def valider_selskap(config_fil: str | dict) -> list[str]:
+    """
+    Returnerer lesbare meldinger for selskapsfelt skattemeldingen krever, men som mangler, er
+    tomme eller (for tallfeltene) ikke er tall. Tom liste betyr OK.
+
+    Kjøres lokalt før bygging, så et ufullstendig selskap (typisk rett etter en SAF-T-import som
+    ikke bærer disse feltene) blir et avvik brukeren kan rette, ikke en naken HTTP 500.
+    """
+    s = (_raw(config_fil).get("selskap")) or {}
+    feil: list[str] = []
+    for key, etikett in PAAKREVDE_SELSKAPSFELT:
+        verdi = s.get(key)
+        if _er_tom(verdi):
+            feil.append(f"{etikett} mangler. Fyll inn under selskapsopplysninger.")
+        elif key in _NUMERISKE_SELSKAPSFELT:
+            try:
+                float(verdi)
+            except (TypeError, ValueError):
+                feil.append(f"{etikett} må være et tall.")
+    return feil
+
+
 def les_config(config_fil: str | dict) -> tuple[Aarsregnskap, SkattemeldingKonfig]:
     """Leser config (filsti eller allerede parset dict) og returnerer (Aarsregnskap, SkattemeldingKonfig)."""
-    if isinstance(config_fil, dict):
-        raw = config_fil
-    else:
-        with open(config_fil, encoding="utf-8") as f:
-            raw = yaml.safe_load(f)
+    raw = _raw(config_fil)
 
     s = raw["selskap"]
     selskap = Selskap(
@@ -49,8 +105,8 @@ def les_config(config_fil: str | dict) -> tuple[Aarsregnskap, SkattemeldingKonfi
         daglig_leder=s["daglig_leder"],
         styreleder=s["styreleder"],
         forretningsadresse=s["forretningsadresse"],
-        stiftelsesaar=int(s["stiftelsesaar"]),
-        aksjekapital=float(s["aksjekapital"]),
+        stiftelsesaar=_tall(s.get("stiftelsesaar"), "Stiftelsesår", int),
+        aksjekapital=_tall(s.get("aksjekapital"), "Aksjekapital", float),
     )
 
     resultatregnskap = _les_resultat(raw["resultatregnskap"])
