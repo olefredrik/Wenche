@@ -264,9 +264,10 @@ export function oppsummer(config: any) {
 export function harMinimumsdata(config: any): boolean {
   if (!config) return false;
   const s = config.selskap ?? {};
-  return ["navn", "org_nummer", "daglig_leder", "styreleder"].every(
-    (k) => String(s[k] ?? "").trim() !== "",
-  );
+  const utfylt = (k: string) => String(s[k] ?? "").trim() !== "";
+  // Navn + org alltid; daglig leder ELLER styreleder. Passive holdingselskaper har ofte ingen
+  // daglig leder, og da står styrelederen som bekreftende representant i årsregnskapet.
+  return utfylt("navn") && utfylt("org_nummer") && (utfylt("daglig_leder") || utfylt("styreleder"));
 }
 
 function Feltrutenett({
@@ -328,6 +329,7 @@ export function DataSkjema({
   laastOrg,
   importerSaft,
   saftMerknad,
+  prefillSelskap,
 }: {
   onLagre: (config: unknown) => Promise<void>;
   visEksempel?: boolean;
@@ -348,6 +350,10 @@ export function DataSkjema({
   importerSaft?: (file: File, foregaaende: boolean) => Promise<any>;
   // Valgfri merknad i SAF-T-modalen (hostet bruker den til personvern-info om EØS/ingen lagring).
   saftMerknad?: React.ReactNode;
+  // Valgfri forhåndsfylling av styringsdata SAF-T ikke bærer (daglig leder, styreleder,
+  // stiftelsesår) fra Enhetsregisteret. Hostet injiserer henteren; self-hosted lar den være.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  prefillSelskap?: () => Promise<any>;
 }) {
   const laasteFelter = laastOrg ? ["selskap.org_nummer"] : [];
   // Tving org til det låste selskapet (brukes ved start, Bodil-import og eksempeldata).
@@ -386,6 +392,43 @@ export function DataSkjema({
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
+  }, []);
+
+  // Forhåndsfyll styringsdata SAF-T ikke bærer (daglig leder, styreleder, stiftelsesår) fra
+  // Enhetsregisteret ved kobling, kun der feltet står tomt, så det ikke overskriver noe brukeren
+  // (eller en importert config) alt har fylt. Fail-soft: feiler oppslaget, forblir skjemaet tomt.
+  // Forhåndsfyll teller ikke som ulagret endring (oppdaterer pristine), men må fortsatt lagres.
+  useEffect(() => {
+    if (!prefillSelskap) return;
+    let avbrutt = false;
+    prefillSelskap()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .then((d: any) => {
+        if (avbrutt || !d) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setConfig((c: any) => {
+          const s = c.selskap ?? {};
+          const oppdatert = {
+            ...c,
+            selskap: {
+              ...s,
+              navn: String(s.navn ?? "").trim() || d.navn || "",
+              forretningsadresse:
+                String(s.forretningsadresse ?? "").trim() || d.forretningsadresse || "",
+              daglig_leder: String(s.daglig_leder ?? "").trim() || d.daglig_leder || "",
+              styreleder: String(s.styreleder ?? "").trim() || d.styreleder || "",
+              stiftelsesaar: Number(s.stiftelsesaar) || d.stiftelsesaar || 0,
+            },
+          };
+          pristine.current = JSON.stringify(oppdatert);
+          return oppdatert;
+        });
+      })
+      .catch(() => {});
+    return () => {
+      avbrutt = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

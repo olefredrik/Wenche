@@ -4,6 +4,7 @@ and base64 decoding of forhåndsutfylt skattemelding.
 """
 
 import base64
+import dataclasses
 import xml.etree.ElementTree as ET
 
 import pytest
@@ -288,6 +289,28 @@ def test_note_maskinell_behandling_is_10(regnskap_med_alle_poster):
     note = root.find(f".//{{{NS_H}}}noteMaskinellBehandling")
     assert note is not None
     assert note.text == "10"
+
+
+def _bekreftende(root: ET.Element) -> str | None:
+    el = root.find(f".//{{{NS_H}}}bekreftendeSelskapsrepresentant")
+    return el.text if el is not None else None
+
+
+def test_signatar_bruker_daglig_leder_naar_satt(regnskap_med_alle_poster):
+    selskap = dataclasses.replace(
+        regnskap_med_alle_poster.selskap, daglig_leder="Per Daglig", styreleder="Kari Styreleder"
+    )
+    regnskap = dataclasses.replace(regnskap_med_alle_poster, selskap=selskap, signatar=None)
+    assert _bekreftende(_parse(generer_hovedskjema(regnskap))) == "Per Daglig"
+
+
+def test_signatar_faller_tilbake_paa_styreleder_uten_daglig_leder(regnskap_med_alle_poster):
+    # Passivt holding uten daglig leder: styrelederen skal stå som bekreftende representant.
+    selskap = dataclasses.replace(
+        regnskap_med_alle_poster.selskap, daglig_leder="", styreleder="Kari Styreleder"
+    )
+    regnskap = dataclasses.replace(regnskap_med_alle_poster, selskap=selskap, signatar=None)
+    assert _bekreftende(_parse(generer_hovedskjema(regnskap))) == "Kari Styreleder"
 
 
 # ---------------------------------------------------------------------------

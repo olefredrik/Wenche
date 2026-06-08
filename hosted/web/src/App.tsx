@@ -516,6 +516,7 @@ function TallFane({
           initial={config ?? undefined}
           laastOrg={org ?? undefined}
           importerSaft={api.importerSaft}
+          prefillSelskap={api.selskap}
           saftMerknad="SAF-T-filen behandles i minnet i EØS og lagres ikke."
           ekstraSeksjon={<NoterSeksjon noter={noter} setNoter={setNoter} />}
         />
@@ -724,7 +725,7 @@ export default function App() {
               aktiv={fane}
               onNaviger={naviger}
               disabled={fane === "tall" && !harMinimumsdata(config)}
-              disabledHint="Fyll inn selskapsnavn, daglig leder og styreleder, og trykk «Lagre data»."
+              disabledHint="Trykk «Lagre data» for å gå videre. (Krever selskapsnavn og minst daglig leder eller styreleder.)"
             />
           </>
         )}

@@ -75,7 +75,7 @@ export function GaaVidere({
   return (
     <div className="mt-12 flex flex-wrap items-center justify-end gap-x-4 gap-y-2 border-t border-border pt-6">
       {disabled && disabledHint && (
-        <span className="text-xs text-muted-foreground">{disabledHint}</span>
+        <span className="mr-auto text-sm font-medium text-foreground">{disabledHint}</span>
       )}
       <button
         className={btnPrimar}

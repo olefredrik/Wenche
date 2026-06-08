@@ -99,7 +99,10 @@ def generer_hovedskjema(regnskap: Aarsregnskap) -> bytes:
     s = regnskap.selskap
     aar = regnskap.regnskapsaar
     fastsettelsesdato = regnskap.fastsettelsesdato or date.today()
-    signatar = regnskap.signatar or s.daglig_leder
+    # Bekreftende selskapsrepresentant som fastsetter regnskapet: daglig leder om den finnes,
+    # ellers styrelederen. Passive holdingselskaper har ofte ingen daglig leder (aksjeloven
+    # krever det ikke for små AS), og da er det styret som fastsetter.
+    signatar = regnskap.signatar or s.daglig_leder or s.styreleder
     revideres = "nei" if not regnskap.revideres else "ja"
     ikke_revideres = "ja" if not regnskap.revideres else "nei"
     morselskap = "ja" if regnskap.balanse.eiendeler.anleggsmidler.aksjer_i_datterselskap > 0 else "nei"

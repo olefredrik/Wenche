@@ -5,7 +5,7 @@ Tar imot en opplastet SAF-T XML som rå request-body, parser den i minnet (wench
 returnerer en config-dict som klienten forhåndsfyller skjemaet med. Krever gyldig invite, ikke
 vendor/kunde-org, siden ingenting sendes inn. Personvern: bytene leses inn i minnet, parses og
 forkastes. Ingenting skrives til disk eller lagres (sesjonen er fasit). Behandlingen skjer i
-EØS (Fly arn/Stockholm). Org-låsen i klienten gjør at SAF-T-ens org ikke endrer kundeidentitet.
+EØS. Org-låsen i klienten gjør at SAF-T-ens org ikke endrer kundeidentitet.
 """
 from fastapi import APIRouter, HTTPException, Query, Request
 
