@@ -62,3 +62,12 @@ jobs:
             exit 1
           fi
           echo "Helsesjekk OK: $(cat /tmp/health.json)"
+
+      - name: Røyktest (kjører som ikke-root)
+        run: |
+          bruker=$(docker run --rm wenche-hosted:ci id -un)
+          echo "Container-bruker: $bruker"
+          if [ "$bruker" = "root" ]; then
+            echo "::error::Containeren kjører som root"
+            exit 1
+          fi
