@@ -340,3 +340,12 @@ def test_api_dokumentasjon_er_slaatt_av(klient):
     """/docs, /redoc og /openapi.json skal ikke eksponere API-skjemaet offentlig."""
     for sti in ("/docs", "/redoc", "/openapi.json"):
         assert klient.get(sti).status_code == 404, sti
+
+
+def test_sikkerhetsheadere_settes_paa_alle_svar(klient):
+    r = klient.get("/api/health")
+    assert r.headers.get("x-frame-options") == "DENY"
+    assert r.headers.get("x-content-type-options") == "nosniff"
+    assert r.headers.get("referrer-policy") == "strict-origin-when-cross-origin"
+    # HSTS settes kun i prod; klient-fixturen kjører med WENCHE_ENV=test.
+    assert "strict-transport-security" not in r.headers

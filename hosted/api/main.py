@@ -14,6 +14,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from wenche import __version__ as WENCHE_VERSJON
@@ -49,6 +50,23 @@ app.add_middleware(
     https_only=(s.env == "prod"),
     same_site="lax",
 )
+
+# Standard sikkerhetsheadere på alle svar. CSP er bevisst utelatt: den krever kartlegging av
+# SPA-ens inline styles og den env-styrte Umami-hosten, og en gal CSP knekker appen stille.
+class _SikkerhetsHeaders(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        respons = await call_next(request)
+        respons.headers["X-Frame-Options"] = "DENY"
+        respons.headers["X-Content-Type-Options"] = "nosniff"
+        respons.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        respons.headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()"
+        if s.env == "prod":
+            # Fly tvinger allerede HTTPS på edge (force_https); HSTS lar nettleseren huske det.
+            respons.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+        return respons
+
+
+app.add_middleware(_SikkerhetsHeaders)
 
 # CORS for SPA-frontenden (egen origin under utvikling).
 app.add_middleware(
