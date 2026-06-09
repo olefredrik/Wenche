@@ -251,8 +251,11 @@ def _les_nokkel(nokkel_sti: str) -> bytes:
     try:
         return Path(nokkel_sti).read_bytes()
     except FileNotFoundError:
+        # Ikke ta med filstien i meldingen: den propagerer til API-klienter via web-backendens
+        # 502-svar, og plasseringen av den private nøkkelen er ikke noe en klient skal se.
         raise RuntimeError(
-            f"Finner ikke privat nøkkel: {nokkel_sti}\n"
+            "Finner ikke privat nøkkel for Maskinporten. "
+            "Sjekk at MASKINPORTEN_PRIVAT_NOKKEL i .env peker på riktig fil.\n"
             "Generer nøkkelpar med:\n"
             "  openssl genrsa -out maskinporten_privat.pem 2048\n"
             "  openssl rsa -in maskinporten_privat.pem -pubout -out maskinporten_offentlig.pem"

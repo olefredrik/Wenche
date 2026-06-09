@@ -31,6 +31,11 @@ def hent_config() -> dict:
 def lagre_config(config: dict[str, Any] = Body(...)) -> dict:
     """Skriv config til aktiv config-fil (config.yaml i prod, config.dev.yaml i test)."""
     fil = miljo.config_fil()
+    # Config-fila kan inneholde fødselsnummer (aksjonærer): hold den lesbar kun for eier,
+    # samme regel som token-cachen. touch setter rettighetene FØR innholdet skrives, og
+    # chmod strammer også filer som ble opprettet med videre rettigheter tidligere.
+    fil.touch(mode=0o600)
+    fil.chmod(0o600)
     fil.write_text(
         yaml.dump(config, allow_unicode=True, sort_keys=False),
         encoding="utf-8",
