@@ -302,6 +302,45 @@ def _les_miljo_env(
     return default
 
 
+def _les_cli_credentials(env: str) -> VendorCredentials:
+    """
+    Les Maskinporten-credentials (klient-ID, nøkkel-ID, privat nøkkel) fra .env for gitt miljø.
+
+    Felles for alle self-hosted innloggingsfunksjonene; hostet bygger i stedet
+    VendorCredentials eksplisitt fra server-config (se hent_tokens_for).
+    """
+    client_id = _les_miljo_env(
+        "MASKINPORTEN_CLIENT_ID", env,
+        "Kopier .env.example til .env og fyll inn din klient-ID fra Digdirs selvbetjeningsportal.",
+    )
+    kid = _les_miljo_env(
+        "MASKINPORTEN_KID", env,
+        "Finn nøkkel-ID (UUID) i Digdirs selvbetjeningsportal under klientens nøkler og legg den i .env.",
+    )
+    nokkel_sti = _les_miljo_env(
+        "MASKINPORTEN_PRIVAT_NOKKEL", env, paakrevd=False, default="maskinporten_privat.pem",
+    )
+    return VendorCredentials(
+        client_id=client_id, kid=kid, private_key_pem=_les_nokkel(nokkel_sti)
+    )
+
+
+def _les_systembruker_org(env: str) -> str:
+    """
+    Org-en systembruker-claimet skal gjelde.
+
+    I testmiljø skal Maskinporten-JWT-en hevde at vi handler på vegne av den
+    syntetiske Tenor-orgen (kunden i test), ikke vår egen leverandør-org.
+    Systembrukeren i tt02-Altinn er knyttet til Tenor-orgen, så uten denne
+    mappingen får vi 403 på instance-opprettelse selv om credentials er ok.
+    """
+    vendor_orgnr = _les_påkrevd_env(
+        "ORG_NUMMER",
+        "Legg til ORG_NUMMER=<ditt organisasjonsnummer> i .env.",
+    )
+    return os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr) if env == "test" else vendor_orgnr
+
+
 def login(lagre_token: bool = True) -> dict:
     """
     Autentiserer mot Maskinporten med systembruker-token og veksler mot Altinn-token.
@@ -313,33 +352,12 @@ def login(lagre_token: bool = True) -> dict:
     eller forstyrre annen miljø-konfigurasjon.
     """
     env = os.getenv("WENCHE_ENV", "prod")
-    client_id = _les_miljo_env(
-        "MASKINPORTEN_CLIENT_ID", env,
-        "Kopier .env.example til .env og fyll inn din klient-ID fra Digdirs selvbetjeningsportal.",
-    )
-    kid = _les_miljo_env(
-        "MASKINPORTEN_KID", env,
-        "Finn nøkkel-ID (UUID) i Digdirs selvbetjeningsportal under klientens nøkler og legg den i .env.",
-    )
-    vendor_orgnr = _les_påkrevd_env(
-        "ORG_NUMMER",
-        "Legg til ORG_NUMMER=<ditt organisasjonsnummer> i .env.",
-    )
-    # I testmiljø skal Maskinporten-JWT-en hevde at vi handler på vegne av
-    # den syntetiske Tenor-orgen (kunden i test), ikke vår egen leverandør-org.
-    # Systembrukeren i tt02-Altinn er knyttet til Tenor-orgen, så uten denne
-    # mappingen får vi 403 på instance-opprettelse selv om credentials er ok.
-    org_nummer = (
-        os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr) if env == "test" else vendor_orgnr
-    )
-    nokkel_sti = _les_miljo_env(
-        "MASKINPORTEN_PRIVAT_NOKKEL", env, paakrevd=False, default="maskinporten_privat.pem",
-    )
-    private_key_pem = _les_nokkel(nokkel_sti)
+    creds = _les_cli_credentials(env)
+    org_nummer = _les_systembruker_org(env)
 
     print("Autentiserer mot Maskinporten (systembruker)...")
     maskinporten_token = _hent_maskinporten_token(
-        client_id, private_key_pem, kid, org_nummer=org_nummer
+        creds.client_id, creds.private_key_pem, creds.kid, org_nummer=org_nummer
     )
 
     print("Maskinporten-token mottatt. Henter Altinn-token...")
@@ -370,20 +388,10 @@ def login_admin() -> str:
     Returnerer rått Maskinporten access token (ikke vekslet mot Altinn).
     """
     env = os.getenv("WENCHE_ENV", "prod")
-    client_id = _les_miljo_env(
-        "MASKINPORTEN_CLIENT_ID", env,
-        "Kopier .env.example til .env og fyll inn din klient-ID fra Digdirs selvbetjeningsportal.",
+    creds = _les_cli_credentials(env)
+    return _hent_maskinporten_token(
+        creds.client_id, creds.private_key_pem, creds.kid, scopes=ADMIN_SCOPES
     )
-    kid = _les_miljo_env(
-        "MASKINPORTEN_KID", env,
-        "Finn nøkkel-ID (UUID) i Digdirs selvbetjeningsportal under klientens nøkler og legg den i .env.",
-    )
-    nokkel_sti = _les_miljo_env(
-        "MASKINPORTEN_PRIVAT_NOKKEL", env, paakrevd=False, default="maskinporten_privat.pem",
-    )
-    private_key_pem = _les_nokkel(nokkel_sti)
-
-    return _hent_maskinporten_token(client_id, private_key_pem, kid, scopes=ADMIN_SCOPES)
 
 
 def get_altinn_token() -> str:
@@ -415,27 +423,11 @@ def get_skd_aksjonaer_token() -> str:
     er innvilget av Skatteetaten for klienten.
     """
     env = os.getenv("WENCHE_ENV", "prod")
-    client_id = _les_miljo_env(
-        "MASKINPORTEN_CLIENT_ID", env,
-        "Kopier .env.example til .env og fyll inn din klient-ID fra Digdirs selvbetjeningsportal.",
-    )
-    kid = _les_miljo_env(
-        "MASKINPORTEN_KID", env,
-        "Finn nøkkel-ID (UUID) i Digdirs selvbetjeningsportal under klientens nøkler og legg den i .env.",
-    )
-    vendor_orgnr = _les_påkrevd_env(
-        "ORG_NUMMER",
-        "Legg til ORG_NUMMER=<ditt organisasjonsnummer> i .env.",
-    )
-    # I SKDs testmiljø må systembrukeren tilhøre et syntetisk Tenor-org, ikke produksjonsorg.
-    org_nummer = os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr) if env == "test" else vendor_orgnr
-    nokkel_sti = _les_miljo_env(
-        "MASKINPORTEN_PRIVAT_NOKKEL", env, paakrevd=False, default="maskinporten_privat.pem",
-    )
-    private_key_pem = _les_nokkel(nokkel_sti)
-
+    creds = _les_cli_credentials(env)
+    org_nummer = _les_systembruker_org(env)
     return _hent_maskinporten_token(
-        client_id, private_key_pem, kid, scopes=SKD_AKSJONAER_SCOPE, org_nummer=org_nummer
+        creds.client_id, creds.private_key_pem, creds.kid,
+        scopes=SKD_AKSJONAER_SCOPE, org_nummer=org_nummer,
     )
 
 
@@ -451,26 +443,10 @@ def get_skd_skattemelding_maskinporten_token(env: str | None = None) -> str:
     """
     if env is None:
         env = os.getenv("WENCHE_ENV", "prod")
-    client_id = _les_miljo_env(
-        "MASKINPORTEN_CLIENT_ID", env,
-        "Kopier .env.example til .env og fyll inn din klient-ID fra Digdirs selvbetjeningsportal.",
-    )
-    kid = _les_miljo_env(
-        "MASKINPORTEN_KID", env,
-        "Finn nøkkel-ID (UUID) i Digdirs selvbetjeningsportal under klientens nøkler og legg den i .env.",
-    )
-    vendor_orgnr = _les_påkrevd_env(
-        "ORG_NUMMER",
-        "Legg til ORG_NUMMER=<ditt organisasjonsnummer> i .env.",
-    )
-    org_nummer = os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr) if env == "test" else vendor_orgnr
-    nokkel_sti = _les_miljo_env(
-        "MASKINPORTEN_PRIVAT_NOKKEL", env, paakrevd=False, default="maskinporten_privat.pem",
-    )
-    private_key_pem = _les_nokkel(nokkel_sti)
-
+    creds = _les_cli_credentials(env)
+    org_nummer = _les_systembruker_org(env)
     return _hent_maskinporten_token(
-        client_id, private_key_pem, kid,
+        creds.client_id, creds.private_key_pem, creds.kid,
         scopes=SKD_SKATTEMELDING_LESE_SCOPE,
         org_nummer=org_nummer,
         env=env,
@@ -488,26 +464,11 @@ def get_skd_skattemelding_tokens() -> dict:
     I testmiljø brukes SKD_TEST_ORG_NUMMER som systembruker-org.
     """
     env = os.getenv("WENCHE_ENV", "prod")
-    client_id = _les_miljo_env(
-        "MASKINPORTEN_CLIENT_ID", env,
-        "Kopier .env.example til .env og fyll inn din klient-ID fra Digdirs selvbetjeningsportal.",
-    )
-    kid = _les_miljo_env(
-        "MASKINPORTEN_KID", env,
-        "Finn nøkkel-ID (UUID) i Digdirs selvbetjeningsportal under klientens nøkler og legg den i .env.",
-    )
-    vendor_orgnr = _les_påkrevd_env(
-        "ORG_NUMMER",
-        "Legg til ORG_NUMMER=<ditt organisasjonsnummer> i .env.",
-    )
-    org_nummer = os.getenv("SKD_TEST_ORG_NUMMER", vendor_orgnr) if env == "test" else vendor_orgnr
-    nokkel_sti = _les_miljo_env(
-        "MASKINPORTEN_PRIVAT_NOKKEL", env, paakrevd=False, default="maskinporten_privat.pem",
-    )
-    private_key_pem = _les_nokkel(nokkel_sti)
+    creds = _les_cli_credentials(env)
+    org_nummer = _les_systembruker_org(env)
 
     maskinporten_token = _hent_maskinporten_token(
-        client_id, private_key_pem, kid,
+        creds.client_id, creds.private_key_pem, creds.kid,
         scopes=SKD_SKATTEMELDING_SCOPE,
         org_nummer=org_nummer,
     )

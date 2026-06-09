@@ -122,3 +122,47 @@ class TestRuntimeEnvUrls:
         finally:
             if opprinnelig is not None:
                 os.environ["WENCHE_ENV"] = opprinnelig
+
+
+class TestLesCliCredentials:
+    """Felles credential-lasting for self-hosted innloggingsfunksjonene."""
+
+    def test_leser_miljospesifikke_credentials_og_nokkel(self, tmp_path, monkeypatch):
+        from wenche.auth import _les_cli_credentials
+
+        nokkel = tmp_path / "nokkel.pem"
+        nokkel.write_bytes(b"-----BEGIN PRIVATE KEY-----\nx\n-----END PRIVATE KEY-----\n")
+        monkeypatch.setenv("MASKINPORTEN_CLIENT_ID_TEST", "klient-test")
+        monkeypatch.setenv("MASKINPORTEN_KID_TEST", "kid-test")
+        monkeypatch.setenv("MASKINPORTEN_PRIVAT_NOKKEL", str(nokkel))
+        creds = _les_cli_credentials("test")
+        assert creds.client_id == "klient-test"
+        assert creds.kid == "kid-test"
+        assert creds.private_key_pem == nokkel.read_bytes()
+
+    def test_manglende_client_id_kaster_med_hjelpetekst(self, monkeypatch):
+        import pytest
+
+        from wenche.auth import _les_cli_credentials
+
+        monkeypatch.delenv("MASKINPORTEN_CLIENT_ID", raising=False)
+        monkeypatch.delenv("MASKINPORTEN_CLIENT_ID_TEST", raising=False)
+        with pytest.raises(RuntimeError, match="MASKINPORTEN_CLIENT_ID"):
+            _les_cli_credentials("test")
+
+
+class TestLesSystembrukerOrg:
+    def test_test_miljo_bruker_tenor_org(self, monkeypatch):
+        from wenche.auth import _les_systembruker_org
+
+        monkeypatch.setenv("ORG_NUMMER", "922020523")
+        monkeypatch.setenv("SKD_TEST_ORG_NUMMER", "310137715")
+        assert _les_systembruker_org("test") == "310137715"
+        assert _les_systembruker_org("prod") == "922020523"
+
+    def test_test_miljo_uten_tenor_faller_tilbake_til_eget(self, monkeypatch):
+        from wenche.auth import _les_systembruker_org
+
+        monkeypatch.setenv("ORG_NUMMER", "922020523")
+        monkeypatch.delenv("SKD_TEST_ORG_NUMMER", raising=False)
+        assert _les_systembruker_org("test") == "922020523"
