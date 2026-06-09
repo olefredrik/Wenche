@@ -64,8 +64,12 @@ def _tolk_http_feil(e: httpx.HTTPStatusError) -> HTTPException:
             "midlertidig hos myndighetene. Ingenting er sendt inn. Prøv igjen om litt."
         )
     else:
-        detalj = (e.response.text or "").strip()[:200]
-        melding = f"Altinn/Skatteetaten svarte med HTTP {kode}." + (f" {detalj}" if detalj else "")
+        # Rå feilkropp fra oppstrøms-API-ene sendes ikke til klienten (kan inneholde interne
+        # detaljer); den logges server-side i _utfor slik at operatøren kan feilsøke.
+        melding = (
+            f"Altinn/Skatteetaten avviste forespørselen (HTTP {kode}). Ingenting er sendt inn. "
+            "Detaljene er logget; prøv igjen eller ta kontakt."
+        )
     return HTTPException(status_code=502, detail=melding)
 
 
@@ -90,8 +94,9 @@ def _utfor(fn, kunde_org: str | None = None):
         raise HTTPException(status_code=422, detail={"validering": str(e)})
     except httpx.HTTPStatusError as e:
         logger.warning(
-            "Innsending feilet for org %s: HTTP %s fra %s",
+            "Innsending feilet for org %s: HTTP %s fra %s: %s",
             kunde_org, e.response.status_code, e.request.url,
+            (e.response.text or "").strip()[:500] or "(tom feilkropp)",
         )
         raise _tolk_http_feil(e)
     except httpx.RequestError as e:

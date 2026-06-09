@@ -29,6 +29,13 @@ if [ -z "$ORG" ]; then
   exit 1
 fi
 
+# Ni siffer, ingenting annet: stopper skrivefeil (og usynlige tegn fra copy-paste) foer
+# orgnummeret interpoleres inn i en fjernkommando via ssh.
+if ! [[ "$ORG" =~ ^[0-9]{9}$ ]]; then
+  echo "Ugyldig organisasjonsnummer: '$ORG' (maa vaere noeyaktig 9 siffer)" >&2
+  exit 1
+fi
+
 # Rask vei: mynt lokalt med secret fra den untrackede env-fila. KUN for prod-appen — fila har
 # prod-secret + prod-URL, så for andre apper (f.eks. wenche-demo) ville den gitt feil lenke.
 # Andre apper går alltid via ssh, så secret/URL hentes fra den appens eget miljø.
@@ -40,4 +47,4 @@ fi
 # Fallback: kjoer mint_invite.py inne paa Fly-maskinen (secret forlater aldri serveren).
 # Maskinen er scale-to-zero; vekk den foerst saa ssh har noe aa koble til.
 curl -fsS "$HEALTH_URL" >/dev/null 2>&1 || true
-exec flyctl ssh console --app "$APP" -C "python /app/hosted/mint_invite.py $ORG"
+exec flyctl ssh console --app "$APP" -C "python /app/hosted/mint_invite.py '$ORG'"

@@ -6,6 +6,7 @@ ephemeral sesjon, ingen database. Onboarding: per-org invite-lenke + Altinn syst
 godkjenning (BankID). Serverer også den bygde SPA-en (web/dist) på samme origin i prod.
 Self-hosted-appen (`wenche.web`) er upåvirket. Se hosted/README.md.
 """
+import html
 import os
 from pathlib import Path
 
@@ -27,12 +28,24 @@ from .systembruker import router as systembruker_router
 
 s = settings()
 
-app = FastAPI(title="Wenche hosted", version=WENCHE_VERSJON)
+# API-dokumentasjonen (/docs, /redoc, /openapi.json) er slått av: tjenesten har én kjent
+# klient (SPA-en på samme origin), og et åpent skjema gjør rekognosering unødvendig lett.
+app = FastAPI(
+    title="Wenche hosted",
+    version=WENCHE_VERSJON,
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
 
 # Signert sesjonscookie for identitet (e-post, kunde-org). Holder IKKE finansdata.
+# max_age er Starlette-defaulten (14 dager), satt eksplisitt som et bevisst valg: verktøyet
+# brukes i korte økter rundt årsoppgjøret, og kortere levetid ville tvinge ny invite-lenke
+# eller handoff oftere uten reell sikkerhetsgevinst (cookien holder kun identitet).
 app.add_middleware(
     SessionMiddleware,
     secret_key=s.session_secret,
+    max_age=14 * 24 * 3600,
     https_only=(s.env == "prod"),
     same_site="lax",
 )
@@ -76,8 +89,11 @@ if _SPA_DIST.is_dir():
     _umami_src = os.getenv("HOSTED_UMAMI_SRC")
     _umami_id = os.getenv("HOSTED_UMAMI_WEBSITE_ID")
     if _umami_src and _umami_id:
+        # html.escape som defense-in-depth: verdiene er operatørstyrte env-vars, men de skal
+        # uansett aldri kunne bryte ut av attributtene de interpoleres inn i.
         _tag = (
-            f'<script defer src="{_umami_src}" data-website-id="{_umami_id}" '
+            f'<script defer src="{html.escape(_umami_src, quote=True)}" '
+            f'data-website-id="{html.escape(_umami_id, quote=True)}" '
             'data-auto-track="false"></script>'
         )
         _index_html = _index_html.replace("</head>", _tag + "</head>")
