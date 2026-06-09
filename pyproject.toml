@@ -33,7 +33,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "mkdocs-material>=9.5", "lxml>=5.0"]
+dev = ["pytest>=8.0", "mkdocs-material>=9.5"]
 
 [project.urls]
 Homepage = "https://github.com/olefredrik/wenche"
@@ -56,3 +56,7 @@ artifacts = ["wenche/web/static/**"]
 packages = ["wenche"]
 # Frontend-kilden (TS/Vite) hører ikke hjemme i wheelen, kun den bygde SPA-en serveres.
 exclude = ["wenche/web/frontend"]
+
+[tool.pytest.ini_options]
+# Gjør at `pytest` finner suiten uansett hvor i repoet den kjøres fra.
+testpaths = ["tests"]

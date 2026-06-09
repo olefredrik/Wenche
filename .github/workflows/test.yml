@@ -2,7 +2,7 @@ name: Tester
 
 on:
   push:
-    branches: ["main", "feature/**", "fix/**", "bump/**", "docs/**"]
+    branches: ["main", "feature/**", "feat/**", "fix/**", "bump/**", "docs/**", "refactor/**", "chore/**", "security/**", "test/**"]
   pull_request:
     branches: ["main"]
 
@@ -24,3 +24,11 @@ jobs:
 
       - name: Kjør tester
         run: pytest tests/ -v
+
+      # Synliggjør kjente CVE-er i avhengighetene uten å blokkere urelaterte PR-er.
+      # Strammes til blokkerende når vi har sett at den er stabil.
+      - name: Sjekk avhengigheter for kjente sårbarheter
+        continue-on-error: true
+        run: |
+          pip install pip-audit
+          pip-audit --skip-editable
