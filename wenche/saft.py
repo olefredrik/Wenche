@@ -15,6 +15,12 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+# Parse-inngangene går via defusedxml: SAF-T-filer kommer fra brukeropplasting, og stdlib-ET
+# er sårbar for entitetsekspansjon (billion laughs). defusedxml returnerer vanlige
+# stdlib-Element-objekter, så resten av modulen (ET.Element-typehints m.m.) er uendret.
+from defusedxml.ElementTree import fromstring as _safe_fromstring
+from defusedxml.ElementTree import parse as _safe_parse
+
 _NS = "urn:StandardAuditFile-Taxation-Financial:NO"
 _T = f"{{{_NS}}}"
 
@@ -243,7 +249,7 @@ def importer(saft_fil: str | Path) -> dict:
     underskudd avvike fra det skattemessige; verifiser mot fjorårets
     RF-1028 hvis det er aktuelt.
     """
-    tree = ET.parse(str(saft_fil))
+    tree = _safe_parse(str(saft_fil))
     return _fra_root(tree.getroot())
 
 
@@ -253,7 +259,7 @@ def importer_bytes(data: bytes) -> dict:
     diskfil. Brukt av web-UI-ene (hostet + self-hosted) slik at en opplastet
     SAF-T-fil aldri skrives til disk: den parses i minnet og forkastes.
     """
-    return _fra_root(ET.fromstring(data))
+    return _fra_root(_safe_fromstring(data))
 
 
 def _fra_root(root: ET.Element) -> dict:
