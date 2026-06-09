@@ -13,8 +13,8 @@ med et selvgenerert RSA-nøkkelpar, ingen virksomhetssertifikat eller BankID.
 
 Repoet inneholder tre ting som henger sammen via et npm-workspace + en Python-pakke:
 
-- **`wenche/`** — Python-kjernen og CLI-en (`wenche` → `wenche.cli:main`). Bygger XBRL/XML
-  for hvert skjema (`*_xml.py`, `xbrl.py`, `brg_xml.py`), autentiserer (`auth.py`,
+- **`wenche/`** — Python-kjernen og CLI-en (`wenche` → `wenche.cli:main`). Bygger XML
+  for hvert skjema (`*_xml.py`, `brg_xml.py`), autentiserer (`auth.py`,
   `systembruker.py`) og sender inn (`altinn_client.py`, `skd_client.py`, `innsending.py`).
   Forretningslogikken bor her; alt annet er presentasjon.
 - **`wenche/web/frontend`** — self-hosted SPA (React + Tailwind). Bygges til
