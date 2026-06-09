@@ -44,7 +44,8 @@ def valider_aarsregnskap(config: Config) -> dict:
 
 def valider_aksjonaer(config: Config) -> dict:
     oppgave = _akr.les_config(config)
-    return {"ok": True, "antall_aksjonaerer": len(oppgave.aksjonaerer)}
+    feil = _akr.valider(oppgave)
+    return {"ok": not feil, "feil": feil, "antall_aksjonaerer": len(oppgave.aksjonaerer)}
 
 
 def valider_skattemelding(config: Config) -> dict:
@@ -75,6 +76,11 @@ def send_aarsregnskap(config: Config, altinn_klient: AltinnClient) -> dict:
 def send_aksjonaer(config: Config, skd_klient: SkdAksjonaerClient) -> dict:
     """Send aksjonærregisteroppgave (RF-1086) til Skatteetaten."""
     oppgave = _akr.les_config(config)
+    # Pre-valider her slik at web-flytene får en strukturert feilliste (422). Uten dette
+    # treffer valideringen i `_akr.send_inn`, som er CLI-rettet og gjør print + SystemExit.
+    feil = _akr.valider(oppgave)
+    if feil:
+        raise InnsendingValideringsfeil(feil)
     svar = _akr.send_inn(oppgave, skd_klient)
     return {"sendt": True, "resultat": svar}
 
