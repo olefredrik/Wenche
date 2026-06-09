@@ -63,6 +63,18 @@ def _utfor(fn):
         raise HTTPException(status_code=422, detail={"validering": str(e)})
     except httpx.HTTPStatusError as e:
         raise _tolk_http_feil(e)
+    except httpx.RequestError:
+        # Tidsavbrudd/tilkoblingsfeil (ikke et HTTP-svar). Søsken av HTTPStatusError, så den
+        # må fanges eksplisitt — ellers blir den en naken 500. Samme hull som hostet tettet
+        # i PR #131.
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Fikk ikke fullført forespørselen mot Altinn/Skatteetaten (nettverksfeil eller "
+                "tidsavbrudd). Det er som regel midlertidig. Sjekk i Altinn eller hos Skatteetaten "
+                "før du prøver på nytt, i tilfelle forespørselen likevel gikk gjennom."
+            ),
+        )
     except RuntimeError as e:
         raise HTTPException(status_code=502, detail=str(e))
 
