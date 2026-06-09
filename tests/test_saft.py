@@ -150,3 +150,18 @@ def test_manglende_header_gir_feil():
     xml = f'<?xml version="1.0"?><AuditFile xmlns="{_NS}"></AuditFile>'.encode("utf-8")
     with pytest.raises(ValueError, match="Header"):
         importer_bytes(xml)
+
+
+def test_xml_med_entitetsdefinisjoner_avvises():
+    """
+    Opplastet XML med entitetsdefinisjoner (billion laughs / XXE) skal avvises av
+    defusedxml før ekspansjon, ikke parses med stdlib-ET. Feilen er en ValueError-
+    subklasse, så web-flytenes eksisterende feilhåndtering (rettbart avvik) gjelder.
+    """
+    ondsinnet = (
+        '<?xml version="1.0"?>'
+        '<!DOCTYPE AuditFile [<!ENTITY a "x"><!ENTITY b "&a;&a;&a;&a;&a;&a;&a;&a;">]>'
+        f'<AuditFile xmlns="{_NS}"><Header>&b;</Header></AuditFile>'
+    ).encode("utf-8")
+    with pytest.raises(ValueError):
+        importer_bytes(ondsinnet)
