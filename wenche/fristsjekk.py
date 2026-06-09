@@ -18,7 +18,6 @@ Kilde: https://github.com/Skatteetaten/skattemeldingen/blob/master/src/resources
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -89,25 +88,17 @@ def sjekk_skattemelding(orgnr: str, aar: int) -> FristStatus:
 
     Hjem-fanen viser alltid reell innsendingsstatus mot prod, uavhengig av
     WENCHE_ENV. Test-API-et kjenner uansett kun syntetiske Tenor-orgnumre.
-    Vi setter WENCHE_ENV midlertidig til 'prod' rundt auth-flyten slik at
-    prod-Maskinporten og prod-credentials brukes selv om global WENCHE_ENV
-    er noe annet.
+    Miljøet sendes som eksplisitt parameter til auth-laget i stedet for å
+    mutere WENCHE_ENV midlertidig: i en flertrådet server kunne et samtidig
+    kall ellers lese 'prod' mens vinduet sto åpent.
     """
-    opprinnelig_env = os.environ.get("WENCHE_ENV")
-    os.environ["WENCHE_ENV"] = "prod"
     try:
-        try:
-            from wenche.auth import get_skd_skattemelding_maskinporten_token
+        from wenche.auth import get_skd_skattemelding_maskinporten_token
 
-            token = get_skd_skattemelding_maskinporten_token()
-        except RuntimeError:
-            return FristStatus(beskrivelse="Maskinporten ikke konfigurert for prod")
-        return _utfør_skattemelding_sjekk(token, orgnr, aar)
-    finally:
-        if opprinnelig_env is None:
-            os.environ.pop("WENCHE_ENV", None)
-        else:
-            os.environ["WENCHE_ENV"] = opprinnelig_env
+        token = get_skd_skattemelding_maskinporten_token(env="prod")
+    except RuntimeError:
+        return FristStatus(beskrivelse="Maskinporten ikke konfigurert for prod")
+    return _utfør_skattemelding_sjekk(token, orgnr, aar)
 
 
 def _utfør_skattemelding_sjekk(token: str, orgnr: str, aar: int) -> FristStatus:

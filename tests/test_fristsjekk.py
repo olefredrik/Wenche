@@ -403,3 +403,46 @@ class TestNesteFrist:
     def test_frist_passert_ruller_til_neste_aar(self):
         with patch("wenche.fristsjekk.date", _freeze_today(date(2026, 5, 18))):
             assert neste_frist(1, 31) == date(2027, 1, 31)
+
+
+# ---------------------------------------------------------------------------
+# Miljøhåndtering: fristsjekken skal aldri mutere prosessens WENCHE_ENV
+# ---------------------------------------------------------------------------
+
+def test_sjekk_skattemelding_muterer_ikke_environ(monkeypatch):
+    """
+    Tidligere satte sjekk_skattemelding WENCHE_ENV='prod' midlertidig rundt
+    auth-kallet; i en flertrådet server kunne et samtidig kall lese feil miljø.
+    Nå skal miljøet gå som eksplisitt parameter og environ være urørt.
+    """
+    import os
+
+    from wenche import auth as auth_mod
+    from wenche import fristsjekk
+
+    monkeypatch.setenv("WENCHE_ENV", "test")
+    sett_env = {}
+
+    def fake_token(env=None):
+        sett_env["env"] = env
+        sett_env["environ_under_kall"] = os.environ.get("WENCHE_ENV")
+        raise RuntimeError("ikke konfigurert")  # stopper før nettverkskall
+
+    monkeypatch.setattr(auth_mod, "get_skd_skattemelding_maskinporten_token", fake_token)
+    status = fristsjekk.sjekk_skattemelding("123456789", 2024)
+
+    assert sett_env["env"] == "prod"  # prod etterspørres eksplisitt
+    assert sett_env["environ_under_kall"] == "test"  # environ ble ikke mutert under kallet
+    assert os.environ.get("WENCHE_ENV") == "test"  # og er uendret etterpå
+    assert "prod" in status.beskrivelse
+
+
+def test_token_hjelpere_respekterer_eksplisitt_env(monkeypatch):
+    """env-parameteren skal vinne over WENCHE_ENV hele veien ned til URL/audience."""
+    from wenche import auth as auth_mod
+
+    monkeypatch.setenv("WENCHE_ENV", "test")
+    assert auth_mod._maskinporten_token_url("prod") == "https://maskinporten.no/token"
+    assert auth_mod._maskinporten_aud("prod") == "https://maskinporten.no/"
+    # Uten eksplisitt env gjelder fortsatt WENCHE_ENV.
+    assert auth_mod._maskinporten_token_url() == "https://test.maskinporten.no/token"

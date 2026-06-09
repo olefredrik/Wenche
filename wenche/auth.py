@@ -38,18 +38,18 @@ def _gjeldende_env() -> str:
     return os.getenv("WENCHE_ENV", "prod")
 
 
-def _maskinporten_token_url() -> str:
+def _maskinporten_token_url(env: str | None = None) -> str:
     return (
         "https://test.maskinporten.no/token"
-        if _gjeldende_env() == "test"
+        if (env or _gjeldende_env()) == "test"
         else "https://maskinporten.no/token"
     )
 
 
-def _maskinporten_aud() -> str:
+def _maskinporten_aud(env: str | None = None) -> str:
     return (
         "https://test.maskinporten.no/"
-        if _gjeldende_env() == "test"
+        if (env or _gjeldende_env()) == "test"
         else "https://maskinporten.no/"
     )
 
@@ -153,18 +153,20 @@ def _lag_jwt(
     kid: str,
     scopes: str = SCOPES,
     org_nummer: str | None = None,
+    env: str | None = None,
 ) -> str:
     """
     Lager et signert JWT for Maskinporten JWT grant-flyten.
 
     Hvis org_nummer er oppgitt, legges authorization_details til i JWT-et
-    for å hente et systembruker-token.
+    for å hente et systembruker-token. `env` overstyrer WENCHE_ENV for
+    kall som eksplisitt skal treffe et bestemt miljø (se fristsjekk).
     """
     now = int(time.time())
     claims = {
         "iss": client_id,
         "sub": client_id,
-        "aud": _maskinporten_aud(),
+        "aud": _maskinporten_aud(env),
         "scope": scopes,
         "iat": now,
         "exp": now + 119,  # Maskinporten tillater maks 120 sekunder
@@ -191,11 +193,14 @@ def _hent_maskinporten_token(
     kid: str,
     scopes: str = SCOPES,
     org_nummer: str | None = None,
+    env: str | None = None,
 ) -> str:
-    """Henter et Maskinporten access token."""
-    assertion = _lag_jwt(client_id, private_key_pem, kid, scopes=scopes, org_nummer=org_nummer)
+    """Henter et Maskinporten access token. `env` overstyrer WENCHE_ENV (default: les den)."""
+    assertion = _lag_jwt(
+        client_id, private_key_pem, kid, scopes=scopes, org_nummer=org_nummer, env=env
+    )
     resp = httpx.post(
-        _maskinporten_token_url(),
+        _maskinporten_token_url(env),
         data={
             "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
             "assertion": assertion,
@@ -434,14 +439,18 @@ def get_skd_aksjonaer_token() -> str:
     )
 
 
-def get_skd_skattemelding_maskinporten_token() -> str:
+def get_skd_skattemelding_maskinporten_token(env: str | None = None) -> str:
     """
     Henter et Maskinporten-token med skattemelding-scope (kun lesestatus).
 
     Brukes for read-only sjekk av fastsettingsstatus mot SKDs API.
     Ingen Altinn-veksling — krever ikke at brukeren har Altinn-rettigheter.
+
+    `env` overstyrer WENCHE_ENV for kall som eksplisitt skal treffe et bestemt
+    miljø (fristsjekk spør alltid prod), uten å mutere prosessens miljø.
     """
-    env = os.getenv("WENCHE_ENV", "prod")
+    if env is None:
+        env = os.getenv("WENCHE_ENV", "prod")
     client_id = _les_miljo_env(
         "MASKINPORTEN_CLIENT_ID", env,
         "Kopier .env.example til .env og fyll inn din klient-ID fra Digdirs selvbetjeningsportal.",
@@ -464,6 +473,7 @@ def get_skd_skattemelding_maskinporten_token() -> str:
         client_id, private_key_pem, kid,
         scopes=SKD_SKATTEMELDING_LESE_SCOPE,
         org_nummer=org_nummer,
+        env=env,
     )
 
 
