@@ -39,6 +39,13 @@ RUN pip install -r hosted/requirements.txt
 COPY hosted/ ./hosted/
 COPY --from=web /repo/hosted/web/dist ./hosted/web/dist
 
+# Kjør som ikke-root (laveste privilegium). Appen skriver ikke til disk i drift (session-only),
+# og operatørskriptet mint_invite.py (via fly ssh console) leser kun env, så ingen rettigheter
+# utover lesetilgang til /app trengs.
+RUN adduser --disabled-password --gecos "" wenche \
+    && chown -R wenche:wenche /app
+USER wenche
+
 EXPOSE 8080
 # ÉN worker med vilje: in-memory-sesjonen forutsetter én prosess.
 CMD ["uvicorn", "hosted.api.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]
