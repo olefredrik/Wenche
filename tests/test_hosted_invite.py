@@ -334,3 +334,9 @@ def test_prod_uten_secrets_nekter_oppstart(monkeypatch):
 
     with pytest.raises(RuntimeError, match="prod uten egne hemmeligheter"):
         Settings()
+
+
+def test_api_dokumentasjon_er_slaatt_av(klient):
+    """/docs, /redoc og /openapi.json skal ikke eksponere API-skjemaet offentlig."""
+    for sti in ("/docs", "/redoc", "/openapi.json"):
+        assert klient.get(sti).status_code == 404, sti

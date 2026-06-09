@@ -94,3 +94,15 @@ def test_bevisst_httpexception_slipper_gjennom_uendret():
         _utfor(_hev(HTTPException(status_code=409, detail="org matcher ikke")))
     assert ei.value.status_code == 409
     assert ei.value.detail == "org matcher ikke"
+
+
+def test_upstream_feilkropp_lekker_ikke_til_klient():
+    """Rå feilkropp fra Altinn/SKD skal logges server-side, aldri sendes til nettleseren."""
+    req = httpx.Request("POST", "https://skatt.skatteetaten.no/api/skattemelding/v2")
+    svar = httpx.Response(400, text="intern-altinn-detalj-xyz stacktrace", request=req)
+    feil = httpx.HTTPStatusError("400", request=req, response=svar)
+    with pytest.raises(HTTPException) as ei:
+        _utfor(_hev(feil))
+    assert ei.value.status_code == 502
+    assert "intern-altinn-detalj-xyz" not in str(ei.value.detail)
+    assert "400" in str(ei.value.detail)  # statuskoden er fortsatt synlig for brukeren
