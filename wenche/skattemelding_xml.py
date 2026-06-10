@@ -114,7 +114,12 @@ def generer_skattemelding_upersonlig(
         if aarets_underskudd > 0:
             # fremfoerbartUnderskuddIInntekt = årets + fremført fra tidligere år.
             # Står sist i UnderskuddTilFremfoering-sekvensen.
-            _overstyrt_heltall(
+            # Emitteres UTEN erOverstyrt: feltet er erAvledet, og når påstanden
+            # er lik SKDs utkast er overstyring et falskt signal til
+            # interessentoppfølgingen (jf. SSV-5187). Å echo-e selve summen
+            # (uten flagget) holder avviks-detektoren ren, samme grep som
+            # samletVerdiBakAksjeneISelskapet nedenfor.
+            _heltall_med_beloep(
                 utf,
                 "fremfoerbartUnderskuddIInntekt",
                 aarets_underskudd + fremfoert_underskudd,
@@ -131,7 +136,8 @@ def generer_skattemelding_upersonlig(
                 "inntektFoerFradragForEventueltAvgittKonsernbidrag",
                 -aarets_underskudd,
             )
-            _overstyrt_heltall(iou, "samletUnderskudd", aarets_underskudd)
+            # UTEN erOverstyrt, samme begrunnelse som fremfoerbartUnderskuddIInntekt.
+            _heltall_med_beloep(iou, "samletUnderskudd", aarets_underskudd)
 
     # formueOgGjeld: formuesgrunnlaget bak aksjene. Skatteetaten utleder
     # samletVerdiBakAksjeneISelskapet = samletVerdiFoerVerdsettingsrabatt -

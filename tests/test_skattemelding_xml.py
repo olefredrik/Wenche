@@ -108,11 +108,13 @@ class TestAaretsUnderskudd:
         )
         assert ifu is not None and ifu.text == "-5000"
 
-        # samletUnderskudd (overstyrt) = årets underskudd
-        sum_u = iou.find(
-            f"{{{_NS}}}samletUnderskudd/{{{_NS}}}beloep/{{{_NS}}}beloepSomHeltall"
-        )
+        # samletUnderskudd = årets underskudd. Emitteres UTEN erOverstyrt:
+        # feltet er erAvledet, og når påstanden er lik SKDs utkast er
+        # overstyring et falskt signal til interessentoppfølgingen (SSV-5187).
+        sum_u_el = iou.find(f"{{{_NS}}}samletUnderskudd")
+        sum_u = sum_u_el.find(f"{{{_NS}}}beloep/{{{_NS}}}beloepSomHeltall")
         assert sum_u is not None and sum_u.text == "5000"
+        assert sum_u_el.find(f"{{{_NS}}}erOverstyrt") is None
 
     def test_fremfoerbart_er_summen_av_aarets_og_fremfoert(self):
         # Fremført fra tidligere år 1500 + årets underskudd 5000 = 6500
@@ -129,10 +131,13 @@ class TestAaretsUnderskudd:
         )
         assert fra_tidligere is not None and fra_tidligere.text == "1500"
 
-        fremfoerbart = utf.find(
-            f"{{{_NS}}}fremfoerbartUnderskuddIInntekt/{{{_NS}}}beloep/{{{_NS}}}beloepSomHeltall"
+        fremfoerbart_el = utf.find(f"{{{_NS}}}fremfoerbartUnderskuddIInntekt")
+        fremfoerbart = fremfoerbart_el.find(
+            f"{{{_NS}}}beloep/{{{_NS}}}beloepSomHeltall"
         )
         assert fremfoerbart is not None and fremfoerbart.text == "6500"
+        # UTEN erOverstyrt, jf. SSV-5187.
+        assert fremfoerbart_el.find(f"{{{_NS}}}erOverstyrt") is None
 
     def test_aarets_underskudd_uten_fremfoert_genererer_underskuddTilFremfoering(self):
         root = _parse(generer_skattemelding_upersonlig(
