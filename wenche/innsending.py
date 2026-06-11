@@ -106,7 +106,20 @@ def send_skattemelding(
         forhåndsutfylt, gjeldende_dokument_id = skd_klient.hent_forhåndsutfylt_med_id(
             regnskap.regnskapsaar, orgnr
         )
-        partsnummer = hent_partsnummer(forhåndsutfylt)
+        # hent_partsnummer kaster ValueError (eller en XML-parse-/decode-feil) hvis svaret fra
+        # SKDs visnings-API ikke bærer et partsnummer. Det er en upstream-/tilgjengelighets-
+        # tilstand (skattemeldingen for orgen/året er kanskje ikke klargjort hos Skatteetaten),
+        # ikke en feil i tallene. Gjør den om til en lesbar RuntimeError, ellers slipper en
+        # uventet exception-type forbi 502-fellen i hostet `_utfor` og blir en naken 500.
+        try:
+            partsnummer = hent_partsnummer(forhåndsutfylt)
+        except Exception as e:
+            raise RuntimeError(
+                f"Skatteetaten ga ikke en brukbar forhåndsutfylt skattemelding for {orgnr} "
+                f"(inntektsår {regnskap.regnskapsaar}); fant ikke partsnummer. Ingenting er "
+                "sendt inn. Skattemeldingen for dette året er kanskje ikke klargjort hos "
+                "Skatteetaten ennå. Prøv igjen senere, eller ta kontakt."
+            ) from e
     skattemelding_xml = generer_skattemelding_fra_konfig(regnskap, konfig, partsnummer)
     naeringsspesifikasjon_xml = generer_naeringsspesifikasjon(regnskap, partsnummer)
     instans_id = skd_klient.send(
