@@ -28,6 +28,42 @@ def _fil(filnavn: str, innhold: bytes, mime: str) -> dict:
     return {"filnavn": filnavn, "mime": mime, "base64": base64.b64encode(innhold).decode("ascii")}
 
 
+# Lesbare navn på config-seksjonene les_config slår opp direkte. Et ufullstendig Tall-steg
+# (typisk tomt resultatregnskap eller balanse) får les_config til å kaste KeyError på det
+# manglende nøkkeloppslaget; uten _les_eller_422 ble det en naken HTTP 500. Aksjonærregisteret
+# rører ikke resultatregnskap/balanse, så det er det eneste dokumentet som lar seg generere før
+# tallene er fylt inn, derav den forvirrende delvise feilen.
+_SEKSJON_TEKST = {
+    "resultatregnskap": "Resultatregnskapet",
+    "balanse": "Balansen",
+    "regnskapsaar": "Regnskapsåret",
+    "selskap": "Selskapsopplysningene",
+    "aksjonaerer": "Aksjonærene",
+}
+
+
+def _les_eller_422(les, config: dict):
+    """Kjør en les_config og gjør en manglende config-seksjon om til en forklarende 422.
+
+    Samme ånd som skattemelding.valider_selskap: en påregnelig, ufullstendig brukertilstand skal
+    bli et avvik brukeren kan rette, ikke en uhåndtert serverfeil.
+    """
+    try:
+        return les(config)
+    except KeyError as e:
+        felt = str(e.args[0]) if e.args else ""
+        navn = _SEKSJON_TEKST.get(felt, f"Feltet «{felt}»" if felt else "Et påkrevd felt")
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "feil": [
+                    f"{navn} mangler. Fyll inn opplysningene i Tall-steget før du genererer "
+                    "dette dokumentet."
+                ]
+            },
+        ) from e
+
+
 def _bygg_noter(config: dict) -> Noter:
     noter_cfg = config.get("noter") or {}
     return Noter(
@@ -51,7 +87,7 @@ def dok_skattemelding(request: Request, config: dict[str, Any] = Body(...)) -> d
     feil = sm.valider_selskap(config)
     if feil:
         raise HTTPException(status_code=422, detail={"feil": feil})
-    regnskap, konfig = sm.les_config(config)
+    regnskap, konfig = _les_eller_422(sm.les_config, config)
     tekst = sm.generer(regnskap, konfig)
     navn = f"skattemelding_{regnskap.regnskapsaar}_{regnskap.selskap.org_nummer}.txt"
     return {"filer": [_fil(navn, tekst.encode("utf-8"), "text/plain; charset=utf-8")]}
@@ -60,7 +96,7 @@ def dok_skattemelding(request: Request, config: dict[str, Any] = Body(...)) -> d
 @router.post("/aarsregnskap")
 def dok_aarsregnskap(request: Request, config: dict[str, Any] = Body(...)) -> dict:
     krev_invitert(request)
-    regnskap = ar.les_config(config)
+    regnskap = _les_eller_422(ar.les_config, config)
     feil = ar.valider(regnskap)
     if feil:
         raise HTTPException(status_code=422, detail={"feil": feil})
@@ -76,7 +112,7 @@ def dok_aarsregnskap(request: Request, config: dict[str, Any] = Body(...)) -> di
 @router.post("/aksjonaer")
 def dok_aksjonaer(request: Request, config: dict[str, Any] = Body(...)) -> dict:
     krev_invitert(request)
-    oppgave = akr.les_config(config)
+    oppgave = _les_eller_422(akr.les_config, config)
     feil = akr.valider(oppgave)
     if feil:
         raise HTTPException(status_code=422, detail={"feil": feil})
@@ -96,7 +132,7 @@ def dok_aksjonaer(request: Request, config: dict[str, Any] = Body(...)) -> dict:
 @router.post("/noter")
 def dok_noter(request: Request, config: dict[str, Any] = Body(...)) -> dict:
     krev_invitert(request)
-    regnskap = ar.les_config(config)
+    regnskap = _les_eller_422(ar.les_config, config)
     tekst = noter_modul.generer(regnskap, _bygg_noter(config))
     navn = f"noter_{regnskap.regnskapsaar}_{regnskap.selskap.org_nummer}.txt"
     return {"filer": [_fil(navn, tekst.encode("utf-8"), "text/plain; charset=utf-8")]}
