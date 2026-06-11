@@ -12,7 +12,7 @@ from xml.etree.ElementTree import fromstring
 
 import pytest
 
-from wenche.skattemelding_xml import generer_skattemelding_upersonlig
+from wenche.skattemelding_xml import generer_skattemelding_upersonlig, hent_partsnummer
 
 _NS = (
     "urn:no:skatteetaten:fastsetting:formueinntekt:"
@@ -205,3 +205,37 @@ class TestVerdsettingAvAksje:
         # Ingen formue-input → ingen verdsettingAvAksje-blokk
         root = _parse(generer_skattemelding_upersonlig(12345678, 2024))
         assert root.find(f"{{{_NS}}}verdsettingAvAksje") is None
+
+
+class TestHentPartsnummer:
+    """Partsnummer hentes uavhengig av skjemaversjon på den forhåndsutfylte.
+
+    Skatteetaten serverer forhåndsutfylt i versjonen som gjelder for inntektsåret: 2024 kom
+    i v4-namespacet, 2025 i v5. hent_partsnummer låste før til v5 og kastet en feilaktig
+    «mangler partsnummer» for v4 (WiNo / inntektsår 2024), som ble en naken 500 ved innsending.
+    """
+
+    def _forhandsutfylt(self, ekstern_versjon: str) -> bytes:
+        ns = (
+            "urn:no:skatteetaten:fastsetting:formueinntekt:"
+            f"skattemelding:upersonlig:ekstern:{ekstern_versjon}"
+        )
+        return (
+            f'<skattemelding xmlns="{ns}"><partsnummer>826662392</partsnummer>'
+            "<inntektsaar>2024</inntektsaar></skattemelding>"
+        ).encode("utf-8")
+
+    def test_v5(self):
+        assert hent_partsnummer(self._forhandsutfylt("v5")) == 826662392
+
+    def test_v4(self):
+        # Regresjon: 2024-forhåndsutfylt er v4.
+        assert hent_partsnummer(self._forhandsutfylt("v4")) == 826662392
+
+    def test_manglende_partsnummer_kaster(self):
+        uten = (
+            '<skattemelding xmlns="urn:no:skatteetaten:fastsetting:formueinntekt:'
+            'skattemelding:upersonlig:ekstern:v4"><inntektsaar>2024</inntektsaar></skattemelding>'
+        ).encode("utf-8")
+        with pytest.raises(ValueError):
+            hent_partsnummer(uten)
