@@ -9,7 +9,7 @@ Denne veiledningen tar deg gjennom en komplett innsending fra start til slutt. V
 
 ## Selskapet vi bruker som eksempel
 
-**Eksempel Holding AS** er et enkelt holdingselskap med følgende situasjon for regnskapsåret 2024:
+**Eksempel Holding AS** er et enkelt holdingselskap med følgende situasjon for regnskapsåret 2025:
 
 - Eier 100 % av Fjordheim Teknologi AS
 - Mottok **250 000 kr** i utbytte fra datterselskapet
@@ -46,7 +46,7 @@ Gå til fanen **Tall**. Her fyller du ut alt på én side: selskapsopplysninger,
 - **Forretningsadresse:** Eksempelveien 1, 0001 Oslo
 - **Stiftelsesår:** 2020
 - **Aksjekapital:** 30 000
-- **Regnskapsår:** 2024
+- **Regnskapsår:** 2025
 
 **Resultatregnskap:**
 

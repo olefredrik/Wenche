@@ -41,6 +41,9 @@ Under **Oppsett** finner du:
 
 Wenche fyller ut næringsspesifikasjonen og skattemeldingen og sender dem digitalt til Skatteetaten via Altinn. Du fullfører ved å signere med BankID i Altinn.
 
+!!! note "Inntektsår og skjemaversjon"
+    Wenche leverer skattemelding etter Skatteetatens gjeldende skjema (for tiden v5) og støtter inneværende og nylige inntektsår. Eldre år som Skatteetaten kun tar imot i et tidligere skjema (for eksempel inntektsår 2024 i v4), kan ikke sendes via Wenche. Årsregnskap og aksjonærregisteroppgave er ikke berørt av dette.
+
 Gå til fanen **Send** og klikk **Fortsett til innsending** ved siden av **Skattemelding**.
 
 Wenche validerer først skattemeldingen mot Skatteetaten og viser en oppsummering. Er noe feil, stopper Wenche uten å sende noe og viser hva som må rettes. Når valideringen er OK, bekrefter du og skattemeldingen lastes opp. Wenche viser en lenke til Altinn-innboksen. Åpne lenken og signer med BankID for å fullføre innsendingen.
