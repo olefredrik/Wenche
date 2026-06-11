@@ -1,5 +1,5 @@
 """
-Lese-only diagnose: hent SKDs forhåndsutfylte skattemelding for ett orgnr/år og rapporter hva
+Skrivebeskyttet diagnose: hent SKDs forhåndsutfylte skattemelding for ett orgnr/år og rapporter hva
 visnings-API-et faktisk gir tilbake. Operatør-verktøy, kjøres lokalt med de samme
 HOSTED_VENDOR_*-creds som prod-appen (samme som list_systembrukere.py), så svaret er
 autoritativt for den kjørende tjenesten.
@@ -14,7 +14,7 @@ det (utkast/fastsatt), eller er året ikke klargjort (403/404)?
   HOSTED_VENDOR_KEY_PEM="$(cat vendor.pem)" \
       ./.venv/bin/python hosted/diagnose_forhandsutfylt.py <orgnr> <aar> [--valider]
 
-Read-only: henter kun, sender ingenting inn. Skriver ikke ut tall-/persondata fra den
+Skrivebeskyttet: henter kun, sender ingenting inn. Skriver ikke ut tall-/persondata fra den
 forhåndsutfylte, kun struktur (tag-navn), partsnummer (SKDs interne id) og HTTP-status.
 
 --valider: i tillegg, bygg en MINIMAL, GENERISK (ikke kundens) v5-skattemelding for orgnr/året
