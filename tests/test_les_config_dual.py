@@ -4,6 +4,8 @@ Den delte grensen mellom standalone (CLI/NiceGUI) og den hostede appen:
 dict (hosted sender config i request-body), og gi IDENTISK resultat. Brekker noen denne
 ekvivalensen, brekker enten standalone eller webapp i stillhet, derav disse regresjonsvaktene.
 """
+import copy
+
 import yaml
 
 from wenche import aarsregnskap as ar
@@ -78,3 +80,37 @@ def test_skattemelding_dict_og_fil_gir_likt(tmp_path):
 
 def test_aksjonaer_dict_og_fil_gir_likt(tmp_path):
     assert akr.les_config(dict(_CFG)) == akr.les_config(_fil(tmp_path))
+
+
+def test_delvis_fjoraar_uten_underseksjoner_kraesjer_ikke():
+    # Regresjon: skjemaet utelater urørte (valgfrie) felt, så et delvis utfylt fjorår mangler
+    # hele underseksjoner (her driftsinntekter). Før kastet _les_resultat KeyError på det direkte
+    # oppslaget -> «Uventet feil under innsending» (HTTP 500). Nå leses de manglende som 0.
+    cfg = copy.deepcopy(_CFG)
+    cfg["foregaaende_aar"] = {
+        "resultatregnskap": {"driftskostnader": {"andre_driftskostnader": 5.5},
+                             "finansposter": {"rentekostnader": 70086}},
+        "balanse": {"eiendeler": {"anleggsmidler": {"andre_aksjer": 2271521.28}}},
+    }
+    regnskap = ar.les_config(cfg)
+    assert regnskap.foregaaende_aar_resultat.driftsinntekter.salgsinntekter == 0
+    assert regnskap.foregaaende_aar_resultat.driftskostnader.andre_driftskostnader == 5.5
+    assert regnskap.foregaaende_aar_balanse.eiendeler.anleggsmidler.andre_aksjer == 2271521.28
+    # skattemelding deler de samme leserne
+    sm.les_config(cfg)
+
+
+def test_tomme_strenger_i_tallfelt_tolkes_som_null():
+    # Regresjon: et blankt tallfelt sendes som "" fra skjemaet. Før ble float("")/int("") en
+    # naken 500; nå tolkes tomt som 0 (og tom eierandel som 100 %, tom samlet_verdi som None).
+    cfg = copy.deepcopy(_CFG)
+    cfg["balanse"]["eiendeler"]["omloepmidler"]["bankinnskudd"] = ""
+    cfg["skattemelding"]["underskudd_til_fremfoering"] = ""
+    cfg["skattemelding"]["eierandel_for_fritaksmetoden"] = ""
+    cfg["skattemelding"]["samlet_verdi_bak_aksjene"] = ""
+    regnskap = ar.les_config(cfg)
+    assert regnskap.balanse.eiendeler.omloepmidler.bankinnskudd == 0
+    _, konfig = sm.les_config(cfg)
+    assert konfig.underskudd_til_fremfoering == 0
+    assert konfig.eierandel_for_fritaksmetoden == 100
+    assert konfig.samlet_verdi_bak_aksjene is None
