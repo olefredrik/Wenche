@@ -24,53 +24,77 @@ from wenche.models import (
 from wenche.brg_xml import generer_aksjenote_vedlegg, generer_hovedskjema, generer_underskjema
 
 
+def _tall(verdi) -> float:
+    """Tolererer tomme og manglende tallfelt (None, "", whitespace) som 0.0, ellers float().
+
+    Skjemaet utelater urørte (valgfrie) felt og sender tom streng for blanke. Et passivt
+    holdingselskap har legitimt mange slike, særlig i fjorårstallene. Uten dette havnet en ""
+    eller None i modellen og fikk summeringen til å kaste TypeError -> naken HTTP 500.
+    """
+    if verdi is None or (isinstance(verdi, str) and not verdi.strip()):
+        return 0.0
+    return float(verdi)
+
+
 def _les_resultat(r: dict) -> Resultatregnskap:
+    # .get(..., {}) på hver underseksjon: et delvis utfylt år (typisk fjoråret) utelater hele
+    # seksjoner brukeren ikke rørte, så et direkte oppslag ville kastet KeyError -> 500.
+    di = r.get("driftsinntekter", {})
+    dk = r.get("driftskostnader", {})
+    fp = r.get("finansposter", {})
     return Resultatregnskap(
         driftsinntekter=Driftsinntekter(
-            salgsinntekter=r["driftsinntekter"].get("salgsinntekter", 0),
-            andre_driftsinntekter=r["driftsinntekter"].get("andre_driftsinntekter", 0),
+            salgsinntekter=_tall(di.get("salgsinntekter")),
+            andre_driftsinntekter=_tall(di.get("andre_driftsinntekter")),
         ),
         driftskostnader=Driftskostnader(
-            loennskostnader=r["driftskostnader"].get("loennskostnader", 0),
-            avskrivninger=r["driftskostnader"].get("avskrivninger", 0),
-            andre_driftskostnader=r["driftskostnader"].get("andre_driftskostnader", 0),
+            loennskostnader=_tall(dk.get("loennskostnader")),
+            avskrivninger=_tall(dk.get("avskrivninger")),
+            andre_driftskostnader=_tall(dk.get("andre_driftskostnader")),
         ),
         finansposter=Finansposter(
-            utbytte_fra_datterselskap=r["finansposter"].get("utbytte_fra_datterselskap", 0),
-            andre_finansinntekter=r["finansposter"].get("andre_finansinntekter", 0),
-            rentekostnader=r["finansposter"].get("rentekostnader", 0),
-            andre_finanskostnader=r["finansposter"].get("andre_finanskostnader", 0),
+            utbytte_fra_datterselskap=_tall(fp.get("utbytte_fra_datterselskap")),
+            andre_finansinntekter=_tall(fp.get("andre_finansinntekter")),
+            rentekostnader=_tall(fp.get("rentekostnader")),
+            andre_finanskostnader=_tall(fp.get("andre_finanskostnader")),
         ),
     )
 
 
 def _les_balanse(b: dict) -> Balanse:
+    eiendeler = b.get("eiendeler", {})
+    am = eiendeler.get("anleggsmidler", {})
+    om = eiendeler.get("omloepmidler", {})
+    ekg = b.get("egenkapital_og_gjeld", {})
+    ek = ekg.get("egenkapital", {})
+    lg = ekg.get("langsiktig_gjeld", {})
+    kg = ekg.get("kortsiktig_gjeld", {})
     return Balanse(
         eiendeler=Eiendeler(
             anleggsmidler=Anleggsmidler(
-                aksjer_i_datterselskap=b["eiendeler"]["anleggsmidler"].get("aksjer_i_datterselskap", 0),
-                andre_aksjer=b["eiendeler"]["anleggsmidler"].get("andre_aksjer", 0),
-                langsiktige_fordringer=b["eiendeler"]["anleggsmidler"].get("langsiktige_fordringer", 0),
+                aksjer_i_datterselskap=_tall(am.get("aksjer_i_datterselskap")),
+                andre_aksjer=_tall(am.get("andre_aksjer")),
+                langsiktige_fordringer=_tall(am.get("langsiktige_fordringer")),
             ),
             omloepmidler=Omloepmidler(
-                kortsiktige_fordringer=b["eiendeler"]["omloepmidler"].get("kortsiktige_fordringer", 0),
-                bankinnskudd=b["eiendeler"]["omloepmidler"].get("bankinnskudd", 0),
+                kortsiktige_fordringer=_tall(om.get("kortsiktige_fordringer")),
+                bankinnskudd=_tall(om.get("bankinnskudd")),
             ),
         ),
         egenkapital_og_gjeld=EgenkapitalOgGjeld(
             egenkapital=Egenkapital(
-                aksjekapital=b["egenkapital_og_gjeld"]["egenkapital"].get("aksjekapital", 0),
-                overkursfond=b["egenkapital_og_gjeld"]["egenkapital"].get("overkursfond", 0),
-                annen_egenkapital=b["egenkapital_og_gjeld"]["egenkapital"].get("annen_egenkapital", 0),
+                aksjekapital=_tall(ek.get("aksjekapital")),
+                overkursfond=_tall(ek.get("overkursfond")),
+                annen_egenkapital=_tall(ek.get("annen_egenkapital")),
             ),
             langsiktig_gjeld=LangsiktigGjeld(
-                laan_fra_aksjonaer=b["egenkapital_og_gjeld"]["langsiktig_gjeld"].get("laan_fra_aksjonaer", 0),
-                andre_langsiktige_laan=b["egenkapital_og_gjeld"]["langsiktig_gjeld"].get("andre_langsiktige_laan", 0),
+                laan_fra_aksjonaer=_tall(lg.get("laan_fra_aksjonaer")),
+                andre_langsiktige_laan=_tall(lg.get("andre_langsiktige_laan")),
             ),
             kortsiktig_gjeld=KortsiktigGjeld(
-                leverandoergjeld=b["egenkapital_og_gjeld"]["kortsiktig_gjeld"].get("leverandoergjeld", 0),
-                skyldige_offentlige_avgifter=b["egenkapital_og_gjeld"]["kortsiktig_gjeld"].get("skyldige_offentlige_avgifter", 0),
-                annen_kortsiktig_gjeld=b["egenkapital_og_gjeld"]["kortsiktig_gjeld"].get("annen_kortsiktig_gjeld", 0),
+                leverandoergjeld=_tall(kg.get("leverandoergjeld")),
+                skyldige_offentlige_avgifter=_tall(kg.get("skyldige_offentlige_avgifter")),
+                annen_kortsiktig_gjeld=_tall(kg.get("annen_kortsiktig_gjeld")),
             ),
         ),
     )

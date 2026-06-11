@@ -267,10 +267,15 @@ def hent_partsnummer(skattemelding_xml: bytes) -> int:
         ValueError: hvis partsnummer ikke finnes i XML-en.
     """
     root = fromstring(skattemelding_xml.decode("utf-8"))
+    # Skatteetaten serverer forhåndsutfylt i skjemaversjonen som gjelder for inntektsåret
+    # (2024 = v4, 2025 = v5), mens denne modulen ellers genererer v5. Partsnummer er likt på
+    # tvers av versjonene, så finn det namespace-agnostisk i stedet for å låse til v5 (det ga
+    # en feilaktig «mangler partsnummer» når den forhåndsutfylte var v4).
     element = root.find(f"{{{_NS}}}partsnummer")
+    if element is None:
+        element = root.find(".//{*}partsnummer")
     if element is None or not element.text:
         raise ValueError(
-            "Fant ikke <partsnummer> i skattemelding-XML-en. "
-            "Kontroller at XML-en er en gyldig skattemeldingUpersonlig v5."
+            "Fant ikke <partsnummer> i forhåndsutfylt skattemelding fra Skatteetaten."
         )
     return int(element.text)

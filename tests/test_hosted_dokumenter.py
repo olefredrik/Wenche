@@ -103,3 +103,31 @@ def test_skattemelding_tomt_stiftelsesaar_gir_422_ikke_500(klient, verdi):
     assert r.status_code == 422, r.text
     feil = r.json()["detail"]["feil"]
     assert any("Stiftelsesår" in f for f in feil)
+
+
+@pytest.mark.parametrize("type_", ["skattemelding", "aarsregnskap", "noter"])
+@pytest.mark.parametrize("seksjon,navn", [("resultatregnskap", "Resultatregnskapet"), ("balanse", "Balansen")])
+def test_manglende_tall_gir_422_ikke_500(klient, type_, seksjon, navn):
+    # Regresjon: et ufullstendig Tall-steg (manglende resultatregnskap eller balanse) fikk
+    # les_config til å kaste KeyError -> naken HTTP 500. Nå er det et rettbart avvik som peker
+    # brukeren til Tall-steget.
+    _inviter(klient)
+    cfg = _gyldig_config()
+    del cfg[seksjon]
+    r = klient.post(f"/api/dokumenter/{type_}", json=cfg)
+    assert r.status_code == 422, r.text
+    feil = r.json()["detail"]["feil"]
+    assert any(navn in f and "Tall-steget" in f for f in feil), feil
+
+
+def test_aksjonaer_genereres_uten_tall(klient):
+    # Aksjonærregisteret leser ikke resultatregnskap/balanse, så det skal generere selv når
+    # tallene mangler. Dette er asymmetrien som gjorde at bare aksjonær virket før tallene var
+    # fylt inn.
+    _inviter(klient)
+    cfg = _gyldig_config()
+    del cfg["resultatregnskap"]
+    del cfg["balanse"]
+    r = klient.post("/api/dokumenter/aksjonaer", json=cfg)
+    assert r.status_code == 200, r.text
+    assert r.json()["filer"]

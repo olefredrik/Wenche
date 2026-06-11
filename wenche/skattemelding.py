@@ -12,7 +12,7 @@ import math
 
 import yaml
 
-from wenche.aarsregnskap import _les_resultat, _les_balanse
+from wenche.aarsregnskap import _les_resultat, _les_balanse, _tall as _belop
 from wenche.models import (
     Aarsregnskap,
     Balanse,
@@ -130,17 +130,19 @@ def les_config(config_fil: str | dict) -> tuple[Aarsregnskap, SkattemeldingKonfi
         utbytte_utbetalt=utbytte_utbetalt,
     )
 
+    # Blanke tallfelt sendes som "" fra skjemaet, så vi tolererer dem (som leserne over) i
+    # stedet for å la float("")/int("") bli en naken 500. Tomt eierandel = 100 % (helt
+    # skattefritt), tom samlet_verdi = ingen overstyring.
     sm_raw = raw.get("skattemelding", {})
+    _eierandel = sm_raw.get("eierandel_for_fritaksmetoden")
     _verdi_override = sm_raw.get("samlet_verdi_bak_aksjene")
     konfig = SkattemeldingKonfig(
-        underskudd_til_fremfoering=float(sm_raw.get("underskudd_til_fremfoering", 0)),
+        underskudd_til_fremfoering=_belop(sm_raw.get("underskudd_til_fremfoering")),
         anvend_fritaksmetoden=bool(sm_raw.get("anvend_fritaksmetoden", True)),
-        eierandel_for_fritaksmetoden=int(sm_raw.get("eierandel_for_fritaksmetoden", 100)),
+        eierandel_for_fritaksmetoden=100 if _er_tom(_eierandel) else int(float(_eierandel)),
         boersnotert=bool(sm_raw.get("boersnotert", False)),
-        formuesverdi_aksjer=float(sm_raw.get("formuesverdi_aksjer", 0)),
-        samlet_verdi_bak_aksjene=(
-            float(_verdi_override) if _verdi_override is not None else None
-        ),
+        formuesverdi_aksjer=_belop(sm_raw.get("formuesverdi_aksjer")),
+        samlet_verdi_bak_aksjene=None if _er_tom(_verdi_override) else float(_verdi_override),
     )
 
     return regnskap, konfig

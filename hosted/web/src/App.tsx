@@ -596,6 +596,9 @@ export default function App() {
   const [fane, setFane] = useState<FaneId>("hjem");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [config, setConfig] = useState<any | null>(null);
+  // Feil ved innløsning av en invite-/handoff-lenke. Vises som banner så en avvist lenke ikke
+  // svelges stille (se useEffect under).
+  const [lenkeFeil, setLenkeFeil] = useState<string | null>(null);
 
   const refresh = () => api.me().then(setMe).catch(() => setMe({ invited: false }));
 
@@ -612,7 +615,13 @@ export default function App() {
         : null;
     if (losInn) {
       losInn
-        .catch(() => {})
+        .then((r) => {
+          // En avvist eller utløpt lenke svarer 200 med {invited:false, feil}. Uten dette ville
+          // brukeren havnet stille på gateskjermen (eller en gammel økt fra et tidligere forsøk,
+          // som viser samme tilkoblingsskjerm) uten å skjønne at lenken var ugyldig. Vis feilen.
+          if (r && !r.invited) setLenkeFeil(r.feil ?? "Ugyldig invitasjonslenke.");
+        })
+        .catch(() => setLenkeFeil("Kunne ikke lese invitasjonslenken. Prøv igjen, eller be om en ny."))
         .finally(() => {
           window.history.replaceState({}, "", window.location.pathname);
           refresh();
@@ -695,6 +704,29 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-2xl px-6 py-12">
+        {lenkeFeil && (
+          <div
+            role="alert"
+            className="mb-8 flex items-start justify-between gap-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm leading-relaxed text-red-700"
+          >
+            <span>
+              {lenkeFeil}
+              {me?.kontakt && (
+                <>
+                  {" "}
+                  Be om en ny lenke: <KontaktLenke kontakt={me.kontakt} />.
+                </>
+              )}
+            </span>
+            <button
+              className="shrink-0 text-red-700/70 transition hover:text-red-700"
+              onClick={() => setLenkeFeil(null)}
+              aria-label="Lukk"
+            >
+              ✕
+            </button>
+          </div>
+        )}
         {!me ? (
           <p className="text-sm text-muted-foreground">Laster…</p>
         ) : !me.invited ? (
