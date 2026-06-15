@@ -240,8 +240,9 @@ function VelgOrg({ me, onValgt }: { me: Me; onValgt: () => void }) {
           {!laster && (
             <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
               {listeFeil ??
-                "Skriv inn organisasjonsnummeret til selskapet du vil sende inn for. Jeg " +
-                  "bekrefter at du står som daglig leder eller styreleder i Enhetsregisteret."}
+                "Wenche må vite hvilket organisasjonsnummer hun skal ordne papirene for. Husk " +
+                  "at du må være daglig leder eller styreleder for å kunne gi henne fullmakt til " +
+                  "å sende inn på dine vegne."}
             </p>
           )}
           <form className="mt-6 space-y-4" onSubmit={velgManuelt}>
