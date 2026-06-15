@@ -558,22 +558,28 @@ function HjemFane({ me, onChange }: { me: Me; onChange: () => void }) {
           {melding && <span className="text-sm text-muted-foreground">{melding}</span>}
         </div>
       </Kort>
-      <Kort>
-        <p className={monoLabel}>Flere enheter</p>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Tilkoblingen gjelder denne nettleseren.
-        </p>
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-          Vil du bruke Wenche på telefonen eller en annen maskin, lag en lenke her og åpne den
-          der, så kobles den enheten til i tillegg, uten ny godkjenning. Begge forblir koblet.
-        </p>
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-          En enhet du ikke vil bruke lenger, logger du ut med «Logg ut».
-        </p>
-        <div className="mt-4">
-          <FortsettAnnenEnhet />
-        </div>
-      </Kort>
+      {/* Handoff er bare relevant for invite-baserte økter (f.eks. demo, eller fallback-brukere
+          uten ID-porten-rolletreff): de kan ikke logge inn på nytt på en ny enhet uten lenken.
+          ID-porten-brukere logger bare inn på nytt på enhet to (og treffer AlreadyApproved), så
+          handoff er overflødig for dem. Skjules derfor for ID-porten-økter. */}
+      {!me.via_idporten && (
+        <Kort>
+          <p className={monoLabel}>Flere enheter</p>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            Tilkoblingen gjelder denne nettleseren.
+          </p>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            Vil du bruke Wenche på telefonen eller en annen maskin, lag en lenke her og åpne den
+            der, så kobles den enheten til i tillegg, uten ny godkjenning. Begge forblir koblet.
+          </p>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            En enhet du ikke vil bruke lenger, logger du ut med «Logg ut».
+          </p>
+          <div className="mt-4">
+            <FortsettAnnenEnhet />
+          </div>
+        </Kort>
+      )}
     </div>
   );
 }
