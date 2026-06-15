@@ -202,8 +202,8 @@ def velg_org(body: TilgangBody, request: Request) -> dict:
     if not _navn_matcher(navn, rolleinnehavere):
         return {
             "ok": False,
-            "feil": "Jeg fant deg ikke som registrert daglig leder eller styremedlem for dette "
-            "selskapet.",
+            "feil": "Wenche kunne ikke finne deg som registrert daglig leder eller styreleder for "
+            "dette selskapet.",
             "kontakt": s.kontakt,
         }
 

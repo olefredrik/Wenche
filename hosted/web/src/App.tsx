@@ -275,7 +275,7 @@ function VelgOrg({ me, onValgt }: { me: Me; onValgt: () => void }) {
 
       {handlingsFeil && (
         <p role="alert" className="mt-4 text-sm leading-relaxed text-red-700">
-          {handlingsFeil} Ta kontakt: <KontaktLenke kontakt={me.kontakt} />.
+          {handlingsFeil}
         </p>
       )}
     </Kort>
