@@ -30,8 +30,8 @@ _META = {
 }
 
 
-@pytest.fixture
-def klient(monkeypatch):
+def _bygg_klient(monkeypatch, *, reportees: bool):
+    """Felles oppsett for ID-porten-test-klienten. reportees styrer altinn:reportees-scopet."""
     monkeypatch.setenv("WENCHE_ENV", "test")
     monkeypatch.setenv("HOSTED_SESSION_SECRET", "test-session-secret")
     monkeypatch.setenv("HOSTED_INVITE_SECRET", "test-invite-secret")
@@ -42,6 +42,10 @@ def klient(monkeypatch):
         "HOSTED_IDPORTEN_REDIRECT_URI", "http://127.0.0.1:5173/api/auth/idporten/callback"
     )
     monkeypatch.setenv("HOSTED_KONTAKT", "mailto:test@wenche.cloud")
+    if reportees:
+        monkeypatch.setenv("HOSTED_IDPORTEN_REPORTEES", "1")
+    else:
+        monkeypatch.delenv("HOSTED_IDPORTEN_REPORTEES", raising=False)
     from hosted.api import config
 
     config.settings.cache_clear()
@@ -54,12 +58,32 @@ def klient(monkeypatch):
     # Well-known og client-assertion mockes; ingen nett, ingen ekte nøkkel brukes.
     monkeypatch.setattr(idp, "_metadata", lambda env: _META)
     monkeypatch.setattr(idp, "_client_assertion", lambda aud: "fake-assertion")
+    return main_mod
+
+
+@pytest.fixture
+def klient(monkeypatch):
+    """ID-porten PÅ med altinn:reportees-scopet (selskapslista hentes fra Altinn)."""
+    from hosted.api import config
+
+    main_mod = _bygg_klient(monkeypatch, reportees=True)
     with TestClient(main_mod.app) as klient:
         yield klient
     config.settings.cache_clear()
 
 
-def _login(klient) -> str:
+@pytest.fixture
+def klient_uten_reportees(monkeypatch):
+    """ID-porten PÅ men UTEN altinn:reportees (scopet ikke tildelt): manuell orgnr-inntasting."""
+    from hosted.api import config
+
+    main_mod = _bygg_klient(monkeypatch, reportees=False)
+    with TestClient(main_mod.app) as klient:
+        yield klient
+    config.settings.cache_clear()
+
+
+def _login(klient, *, scope: str = "openid profile altinn:reportees") -> str:
     """Start innlogging og returner state-en (uten å følge redirecten til ID-porten)."""
     r = klient.get("/api/auth/idporten/login", follow_redirects=False)
     assert r.status_code in (302, 307)
@@ -67,8 +91,7 @@ def _login(klient) -> str:
     assert r.headers["location"].startswith(_META["authorization_endpoint"])
     assert q["client_id"] == ["test-client"]
     assert q["code_challenge_method"] == ["S256"]
-    # altinn:reportees kreves for at Altinn skal godta token-vekslingen og for parter-kallet.
-    assert q["scope"] == ["openid profile altinn:reportees"]
+    assert q["scope"] == [scope]
     return q["state"][0]
 
 
@@ -131,6 +154,58 @@ def test_me_eksponerer_idporten(klient):
 
 def test_login_bygger_pkce_redirect(klient):
     _login(klient)  # assertene ligger i hjelperen
+
+
+def test_login_uten_reportees_ber_kun_om_openid_profile(klient_uten_reportees):
+    """
+    Uten altinn:reportees-scopet (ikke tildelt klienten) ber innloggingen kun om openid+profile,
+    så ID-porten ikke avviser autorisasjonsforespørselen (invalid_scope). Regresjonsvern: scopet
+    skal aldri snike seg inn i forespørselen før operatøren har skrudd det på.
+    """
+    state = _login(klient_uten_reportees, scope="openid profile")
+    assert state
+
+
+def test_me_reportees_av_naar_scope_ikke_satt(klient_uten_reportees, monkeypatch):
+    """/me melder reportees=False så SPA-en hopper over Altinn-lista og viser manuell inntasting."""
+    state = _login(klient_uten_reportees, scope="openid profile")
+    monkeypatch.setattr(
+        idp, "_valider_id_token", lambda id_token, md, nonce: {"name": "Ole Fredrik Lie"}
+    )
+    monkeypatch.setattr(
+        idp.httpx, "post",
+        lambda *a, **k: SimpleNamespace(
+            raise_for_status=lambda: None, json=lambda: {"id_token": "x", "access_token": "t"}
+        ),
+    )
+    klient_uten_reportees.get(
+        f"/api/auth/idporten/callback?code=abc&state={state}", follow_redirects=False
+    )
+    assert klient_uten_reportees.get("/api/auth/me").json()["reportees"] is False
+
+
+def test_organisasjoner_uten_reportees_gir_tom_liste_uten_altinn_kall(klient_uten_reportees, monkeypatch):
+    """Uten scopet skal /organisasjoner returnere tom liste UTEN å kalle Altinn (SPA går manuelt)."""
+    state = _login(klient_uten_reportees, scope="openid profile")
+    monkeypatch.setattr(
+        idp, "_valider_id_token", lambda id_token, md, nonce: {"name": "Ole Fredrik Lie"}
+    )
+    monkeypatch.setattr(
+        idp.httpx, "post",
+        lambda *a, **k: SimpleNamespace(
+            raise_for_status=lambda: None, json=lambda: {"id_token": "x", "access_token": "t"}
+        ),
+    )
+
+    def feil(*a, **k):
+        raise AssertionError("skal ikke kalle Altinn når reportees-scopet er av")
+
+    monkeypatch.setattr(idp.httpx, "get", feil)
+    klient_uten_reportees.get(
+        f"/api/auth/idporten/callback?code=abc&state={state}", follow_redirects=False
+    )
+    r = klient_uten_reportees.get("/api/auth/idporten/organisasjoner").json()
+    assert r == {"organisasjoner": []}
 
 
 def test_callback_binder_verifisert_navn(klient, monkeypatch):

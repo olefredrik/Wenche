@@ -267,6 +267,9 @@ def me(request: Request) -> dict:
     return {
         "invited": True,
         "via_idporten": request.session.get("via_idporten", False),
+        # reportees styrer om SPA-en henter selskapslista fra Altinn (krever altinn:reportees-scopet)
+        # eller går rett til manuell orgnr-inntasting.
+        "reportees": s.idporten_reportees,
         "navn": request.session.get("idporten_navn"),
         "invite_org": request.session.get("invite_org"),
         "kunde_org": request.session.get("kunde_org"),

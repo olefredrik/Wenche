@@ -43,11 +43,20 @@ _log = logging.getLogger("wenche.idporten")
 
 # Tillatt klokkeskjev ved id_token-validering.
 _LEEWAY = 60
-# `altinn:reportees` («se hvem du kan representere») kreves for å (a) la Altinn godta
-# token-vekslingen (exchange/id-porten avviser tokens uten en altinn:-scope, AUTH-koden
-# HasAltinnScope) og (b) hente autoriserte parter. Scopet må også være tildelt ID-porten-
-# klienten i Samarbeidsportalen, ellers nekter ID-porten å utstede tokenet.
-_SCOPE = "openid profile altinn:reportees"
+
+
+def _scope() -> str:
+    """
+    OIDC-scope for innloggingen.
+
+    `altinn:reportees` («se hvem du kan representere») kreves for å (a) la Altinn godta
+    token-vekslingen (exchange/id-porten avviser tokens uten en altinn:-scope, jf. Altinns
+    HasAltinnScope) og (b) hente autoriserte parter. Men scopet må være tildelt klienten i
+    Samarbeidsportalen, ellers avviser ID-porten HELE innloggingen (invalid_scope). Derfor ber
+    vi om det kun når operatøren har skrudd på flagget; ellers logger man inn med bare
+    openid+profile og velger selskap manuelt.
+    """
+    return "openid profile altinn:reportees" if settings().idporten_reportees else "openid profile"
 
 # Well-known-metadata og JWKS per miljø (test/prod), cachet i minnet.
 _metadata_cache: dict[str, dict] = {}
@@ -196,7 +205,7 @@ def login(request: Request) -> RedirectResponse:
         "response_type": "code",
         "client_id": s.idporten_client_id,
         "redirect_uri": s.idporten_redirect_uri,
-        "scope": _SCOPE,
+        "scope": _scope(),
         "state": state,
         "nonce": nonce,
         "code_challenge": challenge,
@@ -295,6 +304,11 @@ def hent_organisasjoner(request: Request) -> dict:
     _krev_aktivert()
     if not request.session.get("via_idporten"):
         raise HTTPException(status_code=401, detail="Logg inn med ID-porten først.")
+    s = settings()
+    if not s.idporten_reportees:
+        # Scopet altinn:reportees er ikke tildelt, så vi har ikke tilgang til parter-lista.
+        # Tom liste uten feil: SPA-en viser manuell orgnr-inntasting (som den skal når flagget er av).
+        return {"organisasjoner": []}
     access_token = request.session.get("idporten_access_token", "")
     if not access_token:
         return {
@@ -302,7 +316,6 @@ def hent_organisasjoner(request: Request) -> dict:
             "feil": "Sesjonen er utløpt. Logg inn med ID-porten på nytt.",
         }
 
-    s = settings()
     try:
         altinn_token = _veksle_til_altinn_token(access_token, s.env)
         parter = _hent_altinn_parter(altinn_token, s.env)

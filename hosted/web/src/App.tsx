@@ -31,6 +31,7 @@ interface Me {
   env?: string;
   demo?: boolean;
   idporten?: boolean; // er ID-porten-innlogging tilgjengelig (prod) – styrer gateskjermen
+  reportees?: boolean; // har altinn:reportees-scopet (henter selskapslista fra Altinn) – ellers manuell orgnr
   kontakt?: string | null;
 }
 
@@ -133,10 +134,12 @@ interface OrgItem {
   navn: string;
 }
 
-// Etter ID-porten-innlogging: velg selskap fra listen over orger brukeren kan handle for i Altinn.
-// Henter listen automatisk; faller tilbake til manuell orgnr-input hvis listen er tom eller feiler.
+// Etter ID-porten-innlogging: velg selskap. Når altinn:reportees-scopet er tildelt (me.reportees),
+// hentes listen over orger brukeren kan representere fra Altinn automatisk. Ellers (eller ved feil)
+// faller steget tilbake til manuell orgnr-inntasting med brreg-navnematch.
 function VelgOrg({ me, onValgt }: { me: Me; onValgt: () => void }) {
-  const [orger, setOrger] = useState<OrgItem[] | null>(null);
+  // Uten reportees-scopet finnes ingen Altinn-liste å hente: start rett i manuell modus.
+  const [orger, setOrger] = useState<OrgItem[] | null>(me.reportees ? null : []);
   const [listeFeil, setListeFeil] = useState<string | null>(null);
   const [visManuel, setVisManuel] = useState(false);
   const [manueltOrgnr, setManueltOrgnr] = useState("");
@@ -144,6 +147,7 @@ function VelgOrg({ me, onValgt }: { me: Me; onValgt: () => void }) {
   const [handlingsFeil, setHandlingsFeil] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!me.reportees) return; // ingen Altinn-liste uten scopet; manuell inntasting vises
     api
       .hentOrganisasjoner()
       .then((r) => {
@@ -154,7 +158,7 @@ function VelgOrg({ me, onValgt }: { me: Me; onValgt: () => void }) {
         setOrger([]);
         setListeFeil("Kunne ikke hente selskapslisten. Skriv inn organisasjonsnummeret manuelt.");
       });
-  }, []);
+  }, [me.reportees]);
 
   const velgFraListe = async (orgnr: string) => {
     setHandlingsFeil(null);
