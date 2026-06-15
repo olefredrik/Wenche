@@ -45,7 +45,12 @@ os.environ["HOSTED_VENDOR_KEY_PATH"] = next((str(p) for p in _cands if p.exists(
 os.environ["WENCHE_ENV"] = "test"
 os.environ.setdefault("HOSTED_INVITE_SECRET", "dev-invite-secret-bytt-i-prod")
 os.environ.setdefault("HOSTED_SESSION_SECRET", "dev-local-secret")
-os.environ.setdefault("HOSTED_PUBLIC_URL", "http://localhost:5173")
+# 127.0.0.1 (ikke localhost) for å matche ID-porten-redirect-URI-en og holde cookien på samme
+# vert hele veien (ID-porten anbefaler loopback-IP). Åpne SPA-en på http://127.0.0.1:5173.
+os.environ.setdefault("HOSTED_PUBLIC_URL", "http://127.0.0.1:5173")
+# ID-porten-innlogging er av lokalt med mindre HOSTED_IDPORTEN_* er satt (i .env). For å teste
+# OIDC-flyten mot test.idporten.no: sett HOSTED_IDPORTEN_CLIENT_ID/_KID/_KEY_PATH/_REDIRECT_URI
+# (=http://127.0.0.1:5173/api/auth/idporten/callback). Uten dem kjører dev på invite-flyten.
 # Hosted bruker org fra dataene/sesjonen (som i prod), ikke self-hosted sin globale
 # test-override. Sett tomme (ikke pop, da ville wenche.auth sin load_dotenv re-lese
 # repoets .env) så aksjonær/skattemelding bruker config-orgen = kunde-org.

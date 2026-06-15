@@ -6,9 +6,17 @@ export const api = {
   me: () => req("/api/auth/me"),
   invite: (token: string) =>
     req("/api/auth/invite", { method: "POST", body: JSON.stringify({ token }) }),
-  // Selvbetjent tilgang: navn + orgnr verifiseres mot Enhetsregisteret. Navnet lagres ikke.
-  beOmTilgang: (navn: string, org: string) =>
-    req("/api/auth/be-om-tilgang", { method: "POST", body: JSON.stringify({ navn, org }) }),
+  // ID-porten + Altinn: hent liste over orger brukeren kan handle for (bruker access_token
+  // fra sesjonen til å veksle mot Altinn og hente autoriserte parter). Returnerer alltid
+  // {organisasjoner, feil?} – tom liste ved feil, så SPA-en kan falle tilbake til manuell input.
+  hentOrganisasjoner: () => req("/api/auth/idporten/organisasjoner"),
+  // Bind sesjonen til org valgt fra Altinn-listen (re-verifiserer mot Altinn, ingen brreg-sjekk).
+  velgOrgAltinn: (org: string) =>
+    req("/api/auth/idporten/velg-org", { method: "POST", body: JSON.stringify({ org }) }),
+  // ID-porten-rollesjekk (manuell fallback): etter BankID-innlogging bekreftes det verifiserte
+  // navnet (fra sesjonen) mot orgnr i Enhetsregisteret. Navnet sendes ikke fra klienten, bare orgnr.
+  velgOrg: (org: string) =>
+    req("/api/auth/velg-org", { method: "POST", body: JSON.stringify({ org }) }),
   // Fortsett på en annen enhet: en koblet økt lager en kortvarig overføringslenke (QR),
   // den nye enheten løser den inn og arver bindingen.
   handoffCreate: () => req("/api/auth/handoff/create", { method: "POST" }),

@@ -22,6 +22,7 @@ from wenche import __version__ as WENCHE_VERSJON
 from .auth import router as auth_router
 from .config import settings
 from .dokumenter import router as dokumenter_router
+from .idporten import router as idporten_router
 from .innsending import router as innsending_router
 from .saft import router as saft_router
 from .selskap import router as selskap_router
@@ -78,6 +79,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(idporten_router)
 app.include_router(systembruker_router)
 app.include_router(innsending_router)
 app.include_router(dokumenter_router)

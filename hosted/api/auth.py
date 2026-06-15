@@ -1,30 +1,28 @@
 """
-Invite-only-port + sesjonsstatus for hostet Wenche.
+Onboarding-porter + sesjonsstatus for hostet Wenche.
 
-Onboarding-modellen (besluttet): per-org invite-lenke + BankID.
-- Invite-lenke: en signert token som bærer ETT bestemt organisasjonsnummer, du deler den
-  ut manuelt til en kjent, verifisert person. Gyldig token setter 'invited' og binder
-  sesjonen til org-en i tokenet. Org er altså ikke fritt brukerinput. Roteres ved å bytte
-  HOSTED_INVITE_SECRET (ugyldiggjør alle utdelte lenker).
-- Selve autentiseringen/autorisasjonen er Altinn systembruker-godkjenning (BankID), se
-  systembruker.py. En lekket invite-lenke er avgrenset til det ene selskapet i tokenet
-  (og kan tilbakekalles ved rotasjon), ikke evnen til å sende inn for en vilkårlig org.
+To porter binder en økt til et selskap. Begge setter 'invited' (gate passert) og til slutt
+'invite_org' (org bundet til økten); navnene er historiske, men dekker nå begge portene:
 
-Selvbetjent tilgang (be_om_tilgang): når operatøren har skrudd på HOSTED_SELVBETJENING kan en
-som står som aktiv daglig leder eller styremedlem i Enhetsregisteret for et orgnr få tilgang
-med en gang, uten manuell utdeling. Verifiseringen er en proporsjonal støydempingssjekk, ikke
-en festning: den hindrer at noen trigger en Altinn-systembruker-forespørsel mot et vilkårlig
-selskap de ikke har noe med å gjøre, mens BankID-godkjenningen i Altinn forblir den reelle
-porten. Navnet brukes kun transient til matching mot åpne registerdata og lagres aldri.
+- ID-porten-innlogging (primær i prod, se idporten.py): brukeren logger inn med BankID, vi får
+  et VERIFISERT navn, og velg_org bekrefter at navnet står som aktiv daglig leder/styreleder for
+  det oppgitte orgnr i Enhetsregisteret før økten bindes. Det verifiserte navnet erstatter det
+  tidligere fritt innskrevne, så onboardingen ikke lenger hviler på et upåvist navn.
+- Invite-lenke (operatør-fallback): en signert token som bærer ETT orgnr, delt ut manuelt til en
+  kjent, verifisert person. Org er ikke brukerinput. Brukes når ID-porten-rollesjekken ikke kan
+  treffe (skjermet person, selskap uten registrert rolleinnehaver). Roteres via HOSTED_INVITE_SECRET.
+
+Den reelle fullmakten til å sende inn er uansett Altinn systembruker-godkjenning (BankID), se
+systembruker.py. Portene her er forporten som hindrer at noen trigger en systembruker-forespørsel
+mot et vilkårlig selskap; ID-porten gjør den forporten sterk (verifisert identitet).
 
 Fortsett på en annen enhet (handoff): sesjonen lever per nettleser (signert cookie, ingen DB),
-så en ny enhet har ingen binding. En alt fullført økt (bundet kunde_org, altså en enhet som
-har vært gjennom invite/BankID) kan lage en kortvarig, signert overføringslenke som den nye
-enheten åpner for å arve samme binding. Tilliten er forankret i en eksisterende, verifisert
-økt, ikke i offentlig registerkunnskap, så den er uavhengig av selvbetjeningssperren i
-systembruker.request_systembruker. Lenken er ferskvare (HANDOFF_MAKS_ALDER), ikke engangsbruk.
+så en ny enhet har ingen binding. En alt fullført økt (bundet kunde_org) kan lage en kortvarig,
+signert overføringslenke som den nye enheten åpner for å arve samme binding, uten ny BankID.
+Lenken er ferskvare (HANDOFF_MAKS_ALDER), ikke engangsbruk.
 
-Ingen e-post, ingen passord, ingen database.
+ID-porten gir oss et transient fødselsnummer (`pid`) ved innlogging; det lagres aldri. Ellers:
+ingen e-post, ingen passord, ingen database.
 """
 import time
 from collections import defaultdict, deque
@@ -47,12 +45,12 @@ _HANDOFF_SALT = "handoff"
 _HANDOFF_MAKS_ALDER = 300  # sekunder
 
 # Enhetsregisterets åpne rolle-endepunkt (gratis, ingen auth). Gir navn på daglig leder og
-# styre som offentlig data, slik at vi kan bekrefte at forespørgeren plausibelt hører til
-# orgnummeret uten å samle inn eller lagre noe.
+# styre som offentlig data, slik at vi kan bekrefte at den ID-porten-verifiserte personen
+# står som rolleinnehaver for orgnummeret uten å samle inn eller lagre noe.
 _BRREG_ROLLER_URL = "https://data.brreg.no/enhetsregisteret/api/enheter/{org}/roller"
 
 # Lett, in-memory rate-limit (én worker med vilje, så et dict holder). Demper enumerering av
-# registeret via tilgangsskjemaet; nullstilles ved restart, helt greit for formålet.
+# registeret via velg-org-steget; nullstilles ved restart, helt greit for formålet.
 _RATE: dict[str, deque] = defaultdict(deque)
 _RATE_VINDU = 600.0  # sekunder
 _RATE_MAKS = 20
@@ -116,9 +114,9 @@ def _navn_matcher(innsendt: str, kandidater: list[str]) -> bool:
 
 def _hent_rolleinnehavere(orgnr: str) -> list[str]:
     """
-    Navn på aktive daglig leder/styre fra Enhetsregisteret, til navnematch i selvbetjeningen.
+    Navn på aktive daglig leder/styre fra Enhetsregisteret, til navnematch i velg_org.
     Beholder en streng feilkontrakt med vilje: 404 gir tom liste, men nettverks- og serverfeil
-    propageres (raise_for_status), så be-om-tilgang kan skille «fant ikke navnet» fra «fikk ikke
+    propageres (raise_for_status), så velg_org kan skille «fant ikke navnet» fra «fikk ikke
     kontakt med registeret». Selve parsingen deles med wenche.brreg (forhåndsfyll-stien).
     """
     resp = httpx.get(
@@ -148,7 +146,6 @@ class InviteBody(BaseModel):
 
 
 class TilgangBody(BaseModel):
-    navn: str
     org: str
 
 
@@ -162,64 +159,56 @@ def bruk_invite(body: InviteBody, request: Request) -> dict:
     org = payload.get("org") if isinstance(payload, dict) else None
     if not org:
         return {"invited": False, "feil": "Ugyldig invite-lenke."}
-    _grant(request, str(org).strip(), via_selvbetjening=False)
+    _grant(request, str(org).strip())
     return {"invited": True, "invite_org": str(org).strip()}
 
 
-def _grant(request: Request, orgnr: str, *, via_selvbetjening: bool) -> None:
-    """
-    Bind sesjonen til orgnr, samme effekt som en innløst invite-lenke.
-
-    via_selvbetjening skiller tillitsanker: en operatør-myntet invite-lenke (False) er en
-    manuell, verifisert utdeling, mens selvbetjening (True) bare er et navneoppslag mot
-    offentlige data. Skillet brukes til å nekte AlreadyApproved-snarveien for selvbetjente
-    økter (se systembruker.request_systembruker), så BankID forblir reell port der.
-    """
+def _grant(request: Request, orgnr: str) -> None:
+    """Bind sesjonen til orgnr: marker gate passert ('invited') og sett bundet org ('invite_org')."""
     request.session["invited"] = True
     request.session["invite_org"] = orgnr
-    request.session["via_selvbetjening"] = via_selvbetjening
 
 
-@router.post("/be-om-tilgang")
-def be_om_tilgang(body: TilgangBody, request: Request) -> dict:
+@router.post("/velg-org")
+def velg_org(body: TilgangBody, request: Request) -> dict:
     """
-    Selvbetjent tilgang: bekreft at navnet står som aktiv daglig leder/styremedlem for orgnr
-    i Enhetsregisteret, og gi i så fall tilgang med en gang (ingen e-post, ingenting lagret).
-    Ved bom returneres en kontaktvei for manuelle tilfeller.
+    ID-porten-rollesjekk: bekreft at den innloggede personens VERIFISERTE navn (fra ID-porten,
+    i sesjonen) står som aktiv daglig leder/styremedlem for orgnr i Enhetsregisteret, og bind i
+    så fall økten. Navnet kommer fra innloggingen, ikke fra request-body, så det er bevist.
+    Ved bom returneres en kontaktvei for manuelle tilfeller (skjermet person, manglende rolle).
     """
     s = settings()
-    if not s.selvbetjening:
-        return {"invited": False, "feil": "Selvbetjent tilgang er ikke åpen ennå.", "kontakt": s.kontakt}
+    navn = request.session.get("idporten_navn")
+    if not request.session.get("via_idporten") or not navn:
+        raise HTTPException(status_code=401, detail="Logg inn med ID-porten først.")
 
     klient_ip = request.headers.get("fly-client-ip") or (request.client.host if request.client else "ukjent")
     if not _rate_ok(klient_ip):
-        return {"invited": False, "feil": "For mange forsøk. Vent litt og prøv igjen.", "kontakt": s.kontakt}
+        return {"ok": False, "feil": "For mange forsøk. Vent litt og prøv igjen.", "kontakt": s.kontakt}
 
     orgnr = _normaliser_orgnr(body.org)
     if not _gyldig_orgnr(orgnr):
-        return {"invited": False, "feil": "Ugyldig organisasjonsnummer.", "kontakt": s.kontakt}
-    if len(_tokens(body.navn)) < 2:
-        return {"invited": False, "feil": "Skriv inn fullt navn (fornavn og etternavn).", "kontakt": s.kontakt}
+        return {"ok": False, "feil": "Ugyldig organisasjonsnummer.", "kontakt": s.kontakt}
 
     try:
         rolleinnehavere = _hent_rolleinnehavere(orgnr)
     except httpx.HTTPError:
         return {
-            "invited": False,
+            "ok": False,
             "feil": "Fikk ikke kontakt med Enhetsregisteret. Prøv igjen om litt.",
             "kontakt": s.kontakt,
         }
 
-    if not _navn_matcher(body.navn, rolleinnehavere):
+    if not _navn_matcher(navn, rolleinnehavere):
         return {
-            "invited": False,
-            "feil": "Jeg fant ikke navnet ditt som registrert daglig leder eller styremedlem "
-            "for dette selskapet.",
+            "ok": False,
+            "feil": "Wenche kunne ikke finne deg som registrert daglig leder eller styreleder for "
+            "dette selskapet.",
             "kontakt": s.kontakt,
         }
 
-    _grant(request, orgnr, via_selvbetjening=True)
-    return {"invited": True, "invite_org": orgnr}
+    _grant(request, orgnr)
+    return {"ok": True, "invite_org": orgnr}
 
 
 class HandoffBody(BaseModel):
@@ -261,28 +250,32 @@ def bruk_handoff(body: HandoffBody, request: Request) -> dict:
     if not org:
         return {"invited": False, "feil": "Ugyldig overføringslenke."}
     org = str(org).strip()
-    # Forankret i en alt verifisert økt, så bindingen arves uten ny BankID. via_selvbetjening
-    # er irrelevant her (kunde_org er alt satt), men False markerer at dette ikke er en svak
-    # navneoppslag-økt.
-    _grant(request, org, via_selvbetjening=False)
+    # Forankret i en alt verifisert økt, så bindingen arves uten ny BankID.
+    _grant(request, org)
     request.session["kunde_org"] = org
     return {"invited": True, "invite_org": org, "kunde_org": org}
 
 
 @router.get("/me")
 def me(request: Request) -> dict:
-    """Sesjonsstatus: invitert?, hvilket selskap invitasjonen gjelder, og evt. bundet kunde-org."""
+    """Sesjonsstatus: gate passert?, bundet org, evt. kunde-org, og hvilken port som er åpen."""
     s = settings()
     if not request.session.get("invited"):
-        # Gatesiden trenger å vite om den skal vise selvbetjeningsskjemaet og hvor man ellers
-        # tar kontakt. Begge er ikke-sensitiv config.
-        return {"invited": False, "selvbetjening": s.selvbetjening, "kontakt": s.kontakt}
+        # Gatesiden trenger å vite om ID-porten-innlogging er tilgjengelig (prod) eller om den
+        # skal vise invite/kontakt-fallback (demo). Begge er ikke-sensitiv config.
+        return {"invited": False, "idporten": s.idporten_aktivert, "kontakt": s.kontakt}
     return {
         "invited": True,
+        "via_idporten": request.session.get("via_idporten", False),
+        # reportees styrer om SPA-en henter selskapslista fra Altinn (krever altinn:reportees-scopet)
+        # eller går rett til manuell orgnr-inntasting.
+        "reportees": s.idporten_reportees,
+        "navn": request.session.get("idporten_navn"),
         "invite_org": request.session.get("invite_org"),
         "kunde_org": request.session.get("kunde_org"),
         "env": s.env,
         "demo": s.demo_mode,
+        "kontakt": s.kontakt,
     }
 
 
