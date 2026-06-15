@@ -102,13 +102,13 @@ function Gate({ me }: { me: Me }) {
   return (
     <Kort>
       <p className={monoLabel}>Tilgang</p>
-      <h1 className="mt-3 font-display text-3xl font-normal">Logg inn i Wenche</h1>
+      <h1 className="mt-3 font-display text-3xl font-normal">Logg inn</h1>
       {me.idporten ? (
         <>
           <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-            Logg inn med ID-porten (BankID). Jeg henter navnet ditt og bekrefter at du står som
-            daglig leder eller styreleder for selskapet du vil sende inn for. Fødselsnummeret
-            ditt lagres ikke.
+            Wenche er ikke kravstor. Men hun må vite hvem hun jobber for. Logg inn med ID-porten,
+            velg BankID og gå videre. Ditt fødselsnummer benyttes kun for autentisering og lagres
+            ikke.
           </p>
           {/* Full-page navigasjon: backenden redirecter videre til ID-porten. */}
           <a
@@ -116,7 +116,7 @@ function Gate({ me }: { me: Me }) {
             href="/api/auth/idporten/login"
             onClick={() => sporHendelse("idporten-start")}
           >
-            Logg inn med ID-porten
+            Logg inn med BankID
           </a>
         </>
       ) : (
