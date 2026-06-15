@@ -316,13 +316,15 @@ def _parse_valideringsrespons(raw: bytes) -> dict:
 _KODE_FORKLARINGER = {
     "UP_HAR_NÆRINGSSPESIFIKASJON_MANGLER_SKATTEMELDING": (
         "Skattemeldingen inneholder ingen skattepliktige poster, mens "
-        "næringsspesifikasjonen har innhold. For et passivt holdingselskap "
-        "betyr det som regel at formuesgrunnlaget mangler: fyll inn "
-        "«Formuesverdi aksjer» (formuesverdien av aksjene i datterselskapet), "
-        "så får skattemeldingen et formuesgrunnlag bak aksjene. Har selskapet "
-        "derimot ordinær drift med skattepliktig over- eller underskudd, er det "
-        "utenfor Wenches støtteområde og må leveres via skatteetaten.no eller et "
-        "regnskapsprogram."
+        "næringsspesifikasjonen har innhold. Eier selskapet aksjer i andre "
+        "selskaper (et passivt holdingselskap), mangler det som regel bare "
+        "formuesgrunnlaget: fyll inn «Formuesverdi aksjer» (formuesverdien av "
+        "aksjene selskapet eier), så får skattemeldingen et formuesgrunnlag bak "
+        "aksjene. Eier selskapet derimot ingen aksjer, eller har ordinær drift, "
+        "faller det utenfor det Wenche dekker. Wenche er laget for passive "
+        "holdingselskaper som eier aksjer i andre selskaper, ikke for hvilende "
+        "selskaper uten aksjer eller for selskaper med drift. Slike må leveres "
+        "via skatteetaten.no eller et regnskapsprogram."
     ),
     "innkommendeForespoerselManglerReferanseTilGjeldendeSkattemelding": (
         "Innsendingen mangler referanse til den forhåndsutfylte skattemeldingen. "
