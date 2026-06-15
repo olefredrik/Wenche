@@ -26,7 +26,9 @@ andre apparat står i utgangspunktet uten tilkobling. En alt koblet økt kan der
 kortvarig lenke (vist som QR + lenke på Hjem), som den nye enheten åpner for å arve samme
 binding, uten ny BankID. Tilkoblingen **kopieres** (den flyttes ikke): begge enheter forblir
 koblet, og hver enhet logges ut for seg. Lenken er forankret i en alt verifisert økt (bundet
-`kunde_org`) og er ferskvare (5 min).
+`kunde_org`) og er ferskvare (5 min). Vises kun for **invite-baserte økter** (demo + fallback);
+en ID-porten-bruker logger bare inn på nytt på den nye enheten (treffer AlreadyApproved), så
+handoff er overflødig for dem og skjules.
 
 ## Komponenter
 - `api/` — FastAPI JSON-API (importerer `wenche`).

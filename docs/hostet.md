@@ -16,10 +16,11 @@ Den hostede tjenesten er for deg som heller vil slippe det tekniske oppsettet. D
 nøyaktig samme åpne kildekode under panseret, så du kan når som helst velge å kjøre
 self-hosted i stedet.
 
-Du logger inn med **ID-porten** (BankID). Etter innlogging henter jeg automatisk listen over
-selskaper du kan handle for i Altinn, og du velger fra listen. Fødselsnummeret ditt lagres ikke.
-(Er du i en situasjon der du ikke dukker opp i listen, for eksempel skjermet adresse eller selskap
-som mangler registrert rolleinnehaver, ta kontakt, så ordner jeg en invitasjonslenke manuelt.)
+Du logger inn med **ID-porten** (BankID) og oppgir organisasjonsnummeret til selskapet du vil
+sende inn for. Jeg bekrefter at du står registrert som daglig leder eller styreleder for selskapet
+i Enhetsregisteret før du kobles til. Fødselsnummeret ditt lagres ikke. (Står du ikke oppført slik,
+for eksempel ved skjermet adresse eller selskap uten registrert rolleinnehaver, ta kontakt, så
+ordner jeg en invitasjonslenke manuelt.)
 
 Deretter følger du en enkel stegvis flyt: koble selskapet til Altinn (én gang, med BankID), fylle inn
 tallene, eventuelt laste ned dokumentene (skattemelding, årsregnskap, aksjonæroppgave og noter)
