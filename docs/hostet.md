@@ -1,23 +1,27 @@
-# Hostet versjon (invite-only)
+# Hostet versjon
 
 Du kan kjøre Wenche selv (se [Installasjon](installasjon.md) og [Oppsett](oppsett.md)),
-eller bruke den hostede, invite-only versjonen på
-**[wenche.cloud](https://wenche.cloud)**.
+eller bruke den hostede versjonen på **[wenche.cloud](https://wenche.cloud)**.
 
 ## Forskjellen
 
 | | Self-hosted (resten av denne dokumentasjonen) | Hostet ([wenche.cloud](https://wenche.cloud)) |
 |---|---|---|
 | Oppsett | Du genererer RSA-nøkkel og registrerer en Maskinporten-klient | Gjort én gang av operatøren |
-| Innlogging | Kjører lokalt på din maskin | Invitasjonslenke + godkjenning i Altinn med BankID |
+| Innlogging | Kjører lokalt på din maskin | Logg inn med ID-porten (BankID), så godkjenning i Altinn |
 | Data | Blir på din maskin | Behandles kun i økten, ingenting lagres i database |
-| Tilgang | Åpen kildekode, gratis | Foreløpig kun for inviterte testere |
+| Tilgang | Åpen kildekode, gratis | Foreløpig en tidlig testfase |
 
 Den hostede tjenesten er for deg som heller vil slippe det tekniske oppsettet. Det er
 nøyaktig samme åpne kildekode under panseret, så du kan når som helst velge å kjøre
 self-hosted i stedet.
 
-Du følger en enkel stegvis flyt: koble selskapet til Altinn (én gang, med BankID), fylle inn
+Du logger inn med **ID-porten** (BankID). Etter innlogging henter jeg automatisk listen over
+selskaper du kan handle for i Altinn, og du velger fra listen. Fødselsnummeret ditt lagres ikke.
+(Er du i en situasjon der du ikke dukker opp i listen, for eksempel skjermet adresse eller selskap
+som mangler registrert rolleinnehaver, ta kontakt, så ordner jeg en invitasjonslenke manuelt.)
+
+Deretter følger du en enkel stegvis flyt: koble selskapet til Altinn (én gang, med BankID), fylle inn
 tallene, eventuelt laste ned dokumentene (skattemelding, årsregnskap, aksjonæroppgave og noter)
 for gjennomgang, og så sende inn. Noter sendes ikke inn digitalt, men kan lastes ned for
 signering og arkivering hos selskapet.

@@ -5,24 +5,28 @@ gjenbruker domene-, auth- og klientlaget. Self-hosted-appen (`wenche` / `wenche 
 er **upåvirket** av alt her, og denne mappen er ikke en del av `wenche`-wheelen som publiseres
 til PyPI.
 
-Status: **live på https://app.wenche.cloud** (invite-only). Onboarding: en **per-org
-invite-lenke** som invite-only-port, og Altinn systembruker-godkjenning (BankID) som selve
-autorisasjonen. Ingen e-post, passord eller database.
+Status: **live på https://app.wenche.cloud**. Onboarding har to porter, og Altinn
+systembruker-godkjenning (BankID) er uansett selve autorisasjonen til å sende inn. Ingen e-post,
+passord eller database.
 
-Valgfritt kan **selvbetjent tilgang** skrus på (`HOSTED_SELVBETJENING=1`): en bruker som står
-som aktiv daglig leder eller styremedlem i Enhetsregisteret for et orgnr får da tilgang med en
-gang, uten manuell invitasjon. Navnet brukes kun transient til ett oppslag mot åpne
-registerdata og lagres ikke. Det er proporsjonal støydemping, ikke identitetsbevis, så
-AlreadyApproved-snarveien (binding uten BankID) gjelder ikke for selvbetjente økter; et
-alt-onboardet selskap krever fortsatt manuell invitasjon. Av som standard.
+- **ID-porten-innlogging** (primær port i prod, se `api/idporten.py`): brukeren logger inn med
+  BankID, vi får et **verifisert** navn, og `velg_org` bekrefter at navnet står som aktiv daglig
+  leder/styreleder for det oppgitte orgnr i Enhetsregisteret før økten bindes. Fødselsnummeret
+  (`pid`) er transient og lagres aldri. Skrus på ved å sette `HOSTED_IDPORTEN_*` (se under); uten
+  dem er ID-porten av og invite er eneste port (slik demo kjører).
+- **Per-org invite-lenke** (operatør-fallback): en signert token som bærer ETT orgnr, delt ut
+  manuelt. Brukes når ID-porten-rollesjekken ikke kan treffe (skjermet person, selskap uten
+  registrert rolleinnehaver). Org er ikke brukerinput.
+
+Begge porter er sterke (invite er operatør-attestert, ID-porten er BankID-verifisert), så
+AlreadyApproved-snarveien (binding til en alt godkjent systembruker uten ny BankID) gjelder begge.
 
 **Fortsett på en annen enhet:** sesjonen lever per nettleser (signert cookie, ingen DB), så et
 andre apparat står i utgangspunktet uten tilkobling. En alt koblet økt kan derfor lage en
 kortvarig lenke (vist som QR + lenke på Hjem), som den nye enheten åpner for å arve samme
 binding, uten ny BankID. Tilkoblingen **kopieres** (den flyttes ikke): begge enheter forblir
 koblet, og hver enhet logges ut for seg. Lenken er forankret i en alt verifisert økt (bundet
-`kunde_org`), ikke i offentlig registerkunnskap, og er ferskvare (5 min), så den omgår ikke
-selvbetjeningssperren over.
+`kunde_org`) og er ferskvare (5 min).
 
 ## Komponenter
 - `api/` — FastAPI JSON-API (importerer `wenche`).
@@ -50,9 +54,13 @@ Per-org invite-lenker lages med `./.venv/bin/python hosted/mint_invite.py <orgnr
 | `HOSTED_SESSION_SECRET` | Nøkkel for signerte sesjonscookies. |
 | `HOSTED_INVITE_SECRET` | Signerer invite-lenken. Roter for å ugyldiggjøre utdelte lenker. |
 | `HOSTED_CORS_ORIGINS` | Tillatte frontend-origins (default `http://localhost:5173`). |
-| `HOSTED_PUBLIC_URL` | App-origin som invite-lenken peker på (default `http://localhost:5173`). |
-| `HOSTED_SELVBETJENING` | (valgfri) `1`/`true` skrur på selvbetjent tilgang (navn + orgnr verifiseres mot Enhetsregisteret). Av som standard. |
-| `HOSTED_KONTAKT` | (valgfri) Kontaktvei som vises når selvbetjent verifisering ikke gir treff. `mailto:`- eller https-URL (default `mailto:hello@olefredrik.com`). |
+| `HOSTED_PUBLIC_URL` | App-origin (invite-lenker + ID-porten-callbacken redirecter hit). Default `http://localhost:5173`. |
+| `HOSTED_KONTAKT` | (valgfri) Kontaktvei som vises når ID-porten-rollesjekken ikke gir treff (skjermet person o.l.). `mailto:`- eller https-URL (default `mailto:hello@olefredrik.com`). |
+| `HOSTED_IDPORTEN_CLIENT_ID` | (valgfri) ID-porten OIDC-klient-ID. Settes alle fire `HOSTED_IDPORTEN_*` skrus ID-porten-innlogging på; utelates de, er invite eneste port. |
+| `HOSTED_IDPORTEN_KID` | (valgfri) Nøkkel-ID for ID-porten-klientens registrerte offentlige nøkkel. |
+| `HOSTED_IDPORTEN_KEY_PEM` | (valgfri) PEM-innhold for ID-porten-klientens private nøkkel (egen, *ikke* vendor-nøkkelen). Foretrukket i prod (Fly-secret). |
+| `HOSTED_IDPORTEN_KEY_PATH` | (valgfri) Sti til ID-porten-privatnøkkelen (PEM). Brukes i dev; `_PEM` har forrang. |
+| `HOSTED_IDPORTEN_REDIRECT_URI` | (valgfri) Callback-URL registrert på klienten (HTTPS i prod, `http://127.0.0.1:5173/...` i dev). |
 | `HOSTED_VENDOR_ORGNR` | Operatørens organisasjonsnummer (vendor). |
 | `HOSTED_VENDOR_CLIENT_ID` | Operatørens Maskinporten-klient-ID. |
 | `HOSTED_VENDOR_KID` | Operatørens nøkkel-ID (KID). |
@@ -60,6 +68,32 @@ Per-org invite-lenker lages med `./.venv/bin/python hosted/mint_invite.py <orgnr
 | `HOSTED_VENDOR_KEY_PEM` | Selve PEM-innholdet til nøkkelen. Foretrukket i prod/container (holder nøkkelen unna disk); settes som Fly-secret. Har forrang over `_PATH`. |
 | `HOSTED_UMAMI_SRC` | (valgfri) URL til Umami-script. Injiseres i `index.html` ved servering. Tom = ingen analytics. (Self-host i EØS for region-garanti; cloud.umami.is sin region er ikke bekreftet.) |
 | `HOSTED_UMAMI_WEBSITE_ID` | (valgfri) Umami website-id. Sammen med `_SRC` skrur det på anonymisert sporing (auto-track av; SPA-en sporer manuelt etter at invite-tokenet er fjernet fra URL-en). |
+
+## ID-porten-innlogging (oppsett)
+
+ID-porten er primær onboarding-port i prod. Vil du kjøre din egen hostede Wenche med
+ID-porten-innlogging, gjør dette én gang per miljø (test og prod hver for seg):
+
+1. **Opprett en ID-porten-klient** i [Digdir Selvbetjening](https://docs.digdir.no) (tjeneste
+   «ID-porten & API-Klient»):
+   - Applikasjonstype **web**, autentiseringsmetode **private_key_jwt**.
+   - Grant **authorization_code** (ikke refresh), PKCE **S256**.
+   - Eksterne scope **Nei** (`openid` + `profile` holder; fødselsnummer kommer som `pid`-claim).
+   - **Redirect URI** = `https://<din-app>/api/auth/idporten/callback` (prod, HTTPS) eller
+     `http://127.0.0.1:5173/api/auth/idporten/callback` (dev; loopback-IP, ikke `localhost`).
+2. **Generer et eget RSA-nøkkelpar** (ikke gjenbruk vendor/Maskinporten-nøkkelen) og registrer
+   den **offentlige** nøkkelen på klienten (lim inn PEM under «Nøkler»):
+   ```sh
+   openssl genrsa -out idporten_prod_privat.pem 2048
+   openssl rsa -in idporten_prod_privat.pem -pubout -out idporten_prod_offentlig.pem
+   ```
+   Noter `kid`-en Digdir tildeler nøkkelen.
+3. **Sett miljøvariablene** (`HOSTED_IDPORTEN_CLIENT_ID/_KID/_KEY_PEM/_REDIRECT_URI`). Settes
+   alle fire, slås ID-porten på; utelates de (som på demo), kjører appen invite-only. Delvis
+   config i prod gir fail-closed ved oppstart (alt eller intet).
+
+Endepunkter og JWKS hentes fra ID-portens well-known-dokument ved kjøretid
+(`test.idporten.no` / `idporten.no` etter `WENCHE_ENV`), så ingen URL-er hardkodes.
 
 ## Deploy (Fly.io)
 
@@ -85,10 +119,16 @@ krever én prosess). `Dockerfile` og `fly.toml` ligger i repo-roten. Engangsopps
      HOSTED_VENDOR_ORGNR="<operatørens orgnr>" \
      HOSTED_VENDOR_CLIENT_ID="<maskinporten-klient-id, prod>" \
      HOSTED_VENDOR_KID="<kid, prod>" \
-     HOSTED_VENDOR_KEY_PEM="$(cat operatør_prod.pem)"
+     HOSTED_VENDOR_KEY_PEM="$(cat operatør_prod.pem)" \
+     HOSTED_IDPORTEN_CLIENT_ID="<id-porten-klient-id, prod>" \
+     HOSTED_IDPORTEN_KID="<id-porten kid, prod>" \
+     HOSTED_IDPORTEN_KEY_PEM="$(cat idporten_prod_privat.pem)" \
+     HOSTED_IDPORTEN_REDIRECT_URI="https://<din-app>/api/auth/idporten/callback"
    ```
-   Sett også `HOSTED_PUBLIC_URL` (app-URL-en, til invite-lenkene), enten som secret eller i
-   `fly.toml` `[env]`. Uten egne secrets nekter appen å starte i prod (fail-closed).
+   Sett også `HOSTED_PUBLIC_URL` (app-URL-en, til invite-lenker og ID-porten-callbacken), enten
+   som secret eller i `fly.toml` `[env]`. Uten egne secrets nekter appen å starte i prod
+   (fail-closed); delvis ID-porten-config gjør det samme. Vil du kjøre prod invite-only, utelat
+   alle `HOSTED_IDPORTEN_*`.
 
    > **NB om anførselstegn:** skriv inn de rene verdiene. Henter du `client_id`/`kid` fra en
    > `.env`-fil med shell, pass på at omsluttende `'`/`"` ikke blir med (de stripper ikke seg
@@ -125,7 +165,9 @@ Roter `HOSTED_INVITE_SECRET` for å ugyldiggjøre alle utdelte lenker på én ga
 
 En **helt separat** Fly-app som lar hvem som helst prøve tjenesten mot Altinns testmiljø (tt02)
 uten invitasjon, på syntetiske data. Den deler aldri prod-creds eller `env=prod`: egen app, egne
-**test**-vendor-creds, `WENCHE_ENV=test`. Konfig ligger i `fly.demo.toml`. Banneren i SPA-en
+**test**-vendor-creds, `WENCHE_ENV=test`. ID-porten holdes **av** på demo (ingen
+`HOSTED_IDPORTEN_*`), så demo kjører på invite-flyten uten BankID-dansen med syntetiske brukere.
+Konfig ligger i `fly.demo.toml`. Banneren i SPA-en
 styres av `HOSTED_DEMO_MODE=1` (rent informativt, endrer ikke funksjonalitet).
 
 Engangsoppsett:
