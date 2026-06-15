@@ -34,6 +34,10 @@ def test_forklarer_kjent_veiledningskode():
     assert "passivt holdingselskap" in ut
     assert "utenfor" in ut
     assert "skatteetaten.no" in ut
+    # Forklaringen skal dekke selskap uten aksjer (hvilende), ikke bare anta at
+    # det eier aksjer og mangler formuesgrunnlag (jf. issue #138).
+    assert "ingen aksjer" in ut
+    assert "hvilende" in ut
 
 
 def test_forklarer_kjent_aarsakskode():
