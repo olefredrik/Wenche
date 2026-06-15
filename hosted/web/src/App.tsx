@@ -23,12 +23,14 @@ import {
 } from "@wenche/ui";
 
 interface Me {
-  invited: boolean;
-  invite_org?: string | null;
+  invited: boolean; // gate passert (ID-porten-innlogging eller invite-lenke)
+  via_idporten?: boolean; // logget inn via ID-porten (mangler bundet org til velg-org er gjort)
+  navn?: string | null; // verifisert navn fra ID-porten
+  invite_org?: string | null; // org bundet til økten (invite-token eller velg-org)
   kunde_org?: string | null;
   env?: string;
   demo?: boolean;
-  selvbetjening?: boolean;
+  idporten?: boolean; // er ID-porten-innlogging tilgjengelig (prod) – styrer gateskjermen
   kontakt?: string | null;
 }
 
@@ -92,88 +94,183 @@ function KontaktLenke({ kontakt }: { kontakt?: string | null }) {
 const tilgangInput =
   "w-full rounded-md border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-spruce";
 
-function KunInviterte({ me, onApproved }: { me: Me; onApproved: () => void }) {
-  const [navn, setNavn] = useState("");
-  const [org, setOrg] = useState("");
-  const [sender, setSender] = useState(false);
-  const [feil, setFeil] = useState<string | null>(null);
+// Gateskjerm. I prod (ID-porten konfigurert): logg inn med BankID. På demo (ID-porten av):
+// invite-lenke (løses inn via URL-parameter) er porten, ellers en kontaktvei. Den frie
+// navnematchen er fjernet; med ID-porten er navnet verifisert, ikke innskrevet.
+function Gate({ me }: { me: Me }) {
+  return (
+    <Kort>
+      <p className={monoLabel}>Tilgang</p>
+      <h1 className="mt-3 font-display text-3xl font-normal">Logg inn i Wenche</h1>
+      {me.idporten ? (
+        <>
+          <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+            Logg inn med ID-porten (BankID). Jeg henter navnet ditt og bekrefter at du står som
+            daglig leder eller styreleder for selskapet du vil sende inn for. Fødselsnummeret
+            ditt lagres ikke.
+          </p>
+          {/* Full-page navigasjon: backenden redirecter videre til ID-porten. */}
+          <a
+            className={`${btnPrimar} mt-6 inline-block`}
+            href="/api/auth/idporten/login"
+            onClick={() => sporHendelse("idporten-start")}
+          >
+            Logg inn med ID-porten
+          </a>
+        </>
+      ) : (
+        <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+          Wenche er i en tidlig testfase. Vil du prøve den? Ta kontakt:{" "}
+          <KontaktLenke kontakt={me.kontakt} />.
+        </p>
+      )}
+    </Kort>
+  );
+}
 
-  const send = async (e: FormEvent) => {
-    e.preventDefault();
-    setFeil(null);
+interface OrgItem {
+  orgnr: string;
+  navn: string;
+}
+
+// Etter ID-porten-innlogging: velg selskap fra listen over orger brukeren kan handle for i Altinn.
+// Henter listen automatisk; faller tilbake til manuell orgnr-input hvis listen er tom eller feiler.
+function VelgOrg({ me, onValgt }: { me: Me; onValgt: () => void }) {
+  const [orger, setOrger] = useState<OrgItem[] | null>(null);
+  const [listeFeil, setListeFeil] = useState<string | null>(null);
+  const [visManuel, setVisManuel] = useState(false);
+  const [manueltOrgnr, setManueltOrgnr] = useState("");
+  const [sender, setSender] = useState(false);
+  const [handlingsFeil, setHandlingsFeil] = useState<string | null>(null);
+
+  useEffect(() => {
+    api
+      .hentOrganisasjoner()
+      .then((r) => {
+        setOrger(r.organisasjoner ?? []);
+        if (r.feil) setListeFeil(r.feil);
+      })
+      .catch(() => {
+        setOrger([]);
+        setListeFeil("Kunne ikke hente selskapslisten. Skriv inn organisasjonsnummeret manuelt.");
+      });
+  }, []);
+
+  const velgFraListe = async (orgnr: string) => {
+    setHandlingsFeil(null);
     setSender(true);
     try {
-      const r = await api.beOmTilgang(navn, org);
-      if (r.invited) {
-        sporHendelse("tilgang-innvilget");
-        onApproved();
+      const r = await api.velgOrgAltinn(orgnr);
+      if (r.ok) {
+        sporHendelse("velg-org-altinn-ok");
+        onValgt();
       } else {
-        sporHendelse("tilgang-avvist");
-        setFeil(r.feil ?? "Kunne ikke gi tilgang.");
+        setHandlingsFeil(r.feil ?? "Kunne ikke gi tilgang.");
       }
     } catch (err) {
-      setFeil((err as Error).message);
+      setHandlingsFeil((err as Error).message);
     } finally {
       setSender(false);
     }
   };
 
+  const velgManuelt = async (e: FormEvent) => {
+    e.preventDefault();
+    setHandlingsFeil(null);
+    setSender(true);
+    try {
+      const r = await api.velgOrg(manueltOrgnr);
+      if (r.ok) {
+        sporHendelse("velg-org-manuell-ok");
+        onValgt();
+      } else {
+        sporHendelse("velg-org-avvist");
+        setHandlingsFeil(r.feil ?? "Kunne ikke gi tilgang.");
+      }
+    } catch (err) {
+      setHandlingsFeil((err as Error).message);
+    } finally {
+      setSender(false);
+    }
+  };
+
+  const laster = orger === null;
+  const visListe = !laster && (orger?.length ?? 0) > 0 && !visManuel;
+
   return (
     <Kort>
-      <p className={monoLabel}>Tilgang</p>
-      <h1 className="mt-3 font-display text-3xl font-normal">Wenche er i en tidlig testfase</h1>
-      <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-        Jeg holder fortsatt på å teste tjenesten og gjøre den stabil.
-      </p>
+      <p className={monoLabel}>Velg selskap</p>
+      <h1 className="mt-3 font-display text-3xl font-normal">
+        Hei{me.navn ? `, ${me.navn}` : ""}
+      </h1>
 
-      {me.selvbetjening ? (
+      {laster ? (
+        <p className="mt-4 text-sm text-muted-foreground">Henter selskapslisten...</p>
+      ) : visListe ? (
         <>
           <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-            Vil du prøve den for ditt eget selskap? Skriv inn navnet ditt og organisasjonsnummeret
-            til selskapet du vil bruke Wenche for. Står du som daglig leder eller styremedlem i
-            Enhetsregisteret, slipper du inn med en gang og kobler selskapet med BankID i neste
-            steg. Navnet brukes bare til oppslaget og lagres ikke.
+            Velg selskapet du vil sende inn for.
           </p>
-          <form className="mt-6 space-y-4" onSubmit={send}>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <label className="block">
-                <span className="mb-1 block text-xs text-muted-foreground">Fullt navn</span>
-                <input
-                  className={tilgangInput}
-                  autoComplete="name"
-                  value={navn}
-                  onChange={(e) => setNavn(e.target.value)}
-                  aria-invalid={!!feil}
-                  required
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-xs text-muted-foreground">Organisasjonsnummer</span>
-                <input
-                  className={tilgangInput}
-                  inputMode="numeric"
-                  autoComplete="off"
-                  value={org}
-                  onChange={(e) => setOrg(e.target.value)}
-                  aria-invalid={!!feil}
-                  required
-                />
-              </label>
-            </div>
-            <button className={`${btnPrimar} w-full sm:w-auto`} type="submit" disabled={sender}>
-              {sender ? "Sjekker…" : "Be om tilgang"}
-            </button>
-          </form>
-          {feil && (
-            <p role="alert" className="mt-4 text-sm leading-relaxed text-red-700">
-              {feil} Stemmer ikke dette, eller har du skjermet adresse, ta kontakt:{" "}
-              <KontaktLenke kontakt={me.kontakt} />.
-            </p>
-          )}
+          <div className="mt-6 space-y-3">
+            {orger!.map((org) => (
+              <button
+                key={org.orgnr}
+                className={`${btnOutline} w-full text-left`}
+                disabled={sender}
+                onClick={() => velgFraListe(org.orgnr)}
+              >
+                <span className="block font-medium">{org.navn}</span>
+                <span className="block text-xs text-muted-foreground">{org.orgnr}</span>
+              </button>
+            ))}
+          </div>
+          <button
+            className="mt-4 text-xs text-muted-foreground underline-offset-2 hover:underline"
+            onClick={() => setVisManuel(true)}
+          >
+            Ikke i listen?
+          </button>
         </>
       ) : (
-        <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-          Vil du prøve den? Ta kontakt: <KontaktLenke kontakt={me.kontakt} />.
+        <>
+          {!laster && (
+            <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+              {listeFeil ??
+                "Skriv inn organisasjonsnummeret til selskapet du vil sende inn for. Jeg " +
+                  "bekrefter at du står som daglig leder eller styreleder i Enhetsregisteret."}
+            </p>
+          )}
+          <form className="mt-6 space-y-4" onSubmit={velgManuelt}>
+            <label className="block">
+              <span className="mb-1 block text-xs text-muted-foreground">Organisasjonsnummer</span>
+              <input
+                className={tilgangInput}
+                inputMode="numeric"
+                autoComplete="off"
+                value={manueltOrgnr}
+                onChange={(e) => setManueltOrgnr(e.target.value)}
+                aria-invalid={!!handlingsFeil}
+                required
+              />
+            </label>
+            <button className={`${btnPrimar} w-full sm:w-auto`} type="submit" disabled={sender}>
+              {sender ? "Sjekker…" : "Fortsett"}
+            </button>
+          </form>
+          {visManuel && (
+            <button
+              className="mt-4 text-xs text-muted-foreground underline-offset-2 hover:underline"
+              onClick={() => setVisManuel(false)}
+            >
+              Tilbake til listen
+            </button>
+          )}
+        </>
+      )}
+
+      {handlingsFeil && (
+        <p role="alert" className="mt-4 text-sm leading-relaxed text-red-700">
+          {handlingsFeil} Ta kontakt: <KontaktLenke kontakt={me.kontakt} />.
         </p>
       )}
     </Kort>
@@ -606,6 +703,9 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     const invite = params.get("invite");
     const handoff = params.get("handoff");
+    // ID-porten-callbacken redirecter tilbake hit, ev. med en lesbar feil (avbrutt innlogging,
+    // teknisk svikt). Vis den som banner, og rydd den ut av URL-en som med invite/handoff.
+    const idpFeil = params.get("idp_feil");
     // En invite-lenke åpner porten; en handoff-lenke (fra en alt koblet enhet) arver bindingen
     // direkte. Begge løses inn FØR URL-en ryddes og analytics kjører, så tokenet aldri lekker.
     const losInn = invite
@@ -628,6 +728,10 @@ export default function App() {
           sporVisning();
         });
     } else {
+      if (idpFeil) {
+        setLenkeFeil(idpFeil);
+        window.history.replaceState({}, "", window.location.pathname);
+      }
       refresh();
       sporVisning();
     }
@@ -730,7 +834,10 @@ export default function App() {
         {!me ? (
           <p className="text-sm text-muted-foreground">Laster…</p>
         ) : !me.invited ? (
-          <KunInviterte me={me} onApproved={refresh} />
+          <Gate me={me} />
+        ) : me.via_idporten && !me.invite_org ? (
+          // Logget inn med ID-porten, men ingen org bundet ennå: velg selskap.
+          <VelgOrg me={me} onValgt={refresh} />
         ) : !me.kunde_org ? (
           // Port: før selskapet er koblet er dette den eneste skjermen (ingen steg).
           <HjemFane me={me} onChange={refresh} />

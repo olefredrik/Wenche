@@ -13,6 +13,10 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { "@wenche/ui": wencheUi } },
   server: {
+    // Bind til IPv4-loopbacken eksplisitt. Default «localhost» kan bli IPv6 (::1) på macOS, og
+    // da feiler ID-porten-callbacken som alltid går til http://127.0.0.1:5173 (registrert
+    // redirect-URI). Bruk 127.0.0.1 konsekvent i nettleseren så sesjonscookien følger med.
+    host: "127.0.0.1",
     port: 5173,
     proxy: {
       "/api": {
