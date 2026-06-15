@@ -95,9 +95,12 @@ def _login(klient, *, scope: str = "openid profile altinn:reportees") -> str:
     return q["state"][0]
 
 
-def _logg_inn(klient, monkeypatch, navn="Ole Fredrik Lie", access_token="fake-access-token"):
+def _logg_inn(
+    klient, monkeypatch, navn="Ole Fredrik Lie", access_token="fake-access-token",
+    scope="openid profile altinn:reportees",
+):
     """Fullfør login + callback med mocket token og id_token-validering."""
-    state = _login(klient)
+    state = _login(klient, scope=scope)
     monkeypatch.setattr(
         idp, "_valider_id_token", lambda id_token, md, nonce: {"name": navn, "pid": "12345678901"}
     )
@@ -113,6 +116,39 @@ def _logg_inn(klient, monkeypatch, navn="Ole Fredrik Lie", access_token="fake-ac
     )
     assert r.status_code in (302, 307)
     return r
+
+
+def _sesjon(klient) -> dict:
+    """Dekod Starlettes signerte sesjonscookie så vi kan inspisere hva som faktisk lagres."""
+    import base64 as _b64
+    import json as _json
+
+    from itsdangerous import TimestampSigner
+
+    raw = klient.cookies.get("session")
+    if raw is None:
+        return {}
+    data = TimestampSigner("test-session-secret").unsign(raw)
+    return _json.loads(_b64.b64decode(data))
+
+
+def test_callback_lagrer_access_token_naar_reportees_paa(klient, monkeypatch):
+    """Med reportees på lagres access_token i sesjonen (skal veksles mot Altinn-token siden)."""
+    _logg_inn(klient, monkeypatch, access_token="hemmelig-token")
+    assert _sesjon(klient).get("idporten_access_token") == "hemmelig-token"
+
+
+def test_callback_lagrer_ikke_access_token_uten_reportees(klient_uten_reportees, monkeypatch):
+    """
+    Uten reportees har tokenet ingen funksjon, så det skal IKKE lagres i sesjonscookien
+    (datasparsommelighet; cookien er signert men ikke kryptert). Kun navnet beholdes.
+    """
+    _logg_inn(
+        klient_uten_reportees, monkeypatch, access_token="hemmelig-token", scope="openid profile"
+    )
+    s = _sesjon(klient_uten_reportees)
+    assert "idporten_access_token" not in s
+    assert s.get("idporten_navn") == "Ole Fredrik Lie"
 
 
 def _brreg_rollesvar(*navn):

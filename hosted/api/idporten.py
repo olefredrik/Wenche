@@ -277,12 +277,14 @@ def callback(
     request.session["via_idporten"] = True
     request.session["idporten_navn"] = navn
 
-    # access_token lagres midlertidig for å hente Altinn-autoriserte parter i org-listen.
-    # Slettes etter at org er valgt (se velg_org nedenfor). Tokenet lever i den signerte
-    # sesjonscookien (ikke i databasen) og utløper med ID-portens token-levetid (~10-15 min).
-    access_token = token_resp.json().get("access_token", "")
-    if access_token:
-        request.session["idporten_access_token"] = access_token
+    # access_token lagres KUN når selskapslista fra Altinn er på (reportees): da skal det veksles
+    # mot et Altinn-token for å hente autoriserte parter, og slettes straks selskap er valgt. Er
+    # lista av, har tokenet ingen funksjon, så vi lagrer det ikke (datasparsommelighet, og
+    # sesjonscookien er signert men ikke kryptert). Fødselsnummeret lagres uansett aldri.
+    if s.idporten_reportees:
+        access_token = token_resp.json().get("access_token", "")
+        if access_token:
+            request.session["idporten_access_token"] = access_token
 
     return _tilbake()
 
