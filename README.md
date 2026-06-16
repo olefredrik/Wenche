@@ -11,7 +11,7 @@ Wenche er et verktøy for holdingselskaper og småaksjeselskaper som må levere 
 
 Etter installasjon kjører du `wenche` for å åpne et grafisk webgrensesnitt i nettleseren der du fyller ut og sender inn alt.
 
-Autentisering skjer via Maskinporten med et selvgenerert RSA-nøkkelpar, ingen virksomhetssertifikat eller BankID-innlogging nødvendig.
+Wenche autentiserer seg mot API-ene via Maskinporten med et selvgenerert RSA-nøkkelpar, så du slipper virksomhetssertifikat. Du logger fortsatt inn med BankID i Altinn for å koble til selskapet (én gang) og for å signere innsendingene, det er lovpålagt og kan ikke gjøres maskinelt.
 
 ## Hva er støttet?
 

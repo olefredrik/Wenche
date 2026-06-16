@@ -6,8 +6,9 @@ og rekkverk for bidragsytere og agenter.
 
 Wenche er et innsendingsverktøy for **passive holdingselskaper og småaksjeselskaper**: det
 bygger og sender årsregnskap, skattemelding/næringsspesifikasjon og aksjonærregisteroppgave
-til norske myndigheter (Altinn, Skatteetaten, Brønnøysund). Autentisering via Maskinporten
-med et selvgenerert RSA-nøkkelpar, ingen virksomhetssertifikat eller BankID.
+til norske myndigheter (Altinn, Skatteetaten, Brønnøysund). API-autentisering via Maskinporten
+med et selvgenerert RSA-nøkkelpar (ingen virksomhetssertifikat); BankID brukes fortsatt i Altinn
+til å godkjenne systembruker-tilkoblingen og signere innsendingene (lovpålagt, ikke maskinelt).
 
 ## Arkitektur
 
