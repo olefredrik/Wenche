@@ -31,7 +31,7 @@ interface Me {
   env?: string;
   demo?: boolean;
   idporten?: boolean; // er ID-porten-innlogging tilgjengelig (prod) – styrer gateskjermen
-  reportees?: boolean; // har altinn:reportees-scopet (henter selskapslista fra Altinn) – ellers manuell orgnr
+  reportees?: boolean; // har altinn:accessmanagement/authorizedparties-scopet (henter selskapslista fra Altinn), ellers manuell orgnr
   kontakt?: string | null;
 }
 
@@ -134,7 +134,7 @@ interface OrgItem {
   navn: string;
 }
 
-// Etter ID-porten-innlogging: velg selskap. Når altinn:reportees-scopet er tildelt (me.reportees),
+// Etter ID-porten-innlogging: velg selskap. Når altinn:accessmanagement/authorizedparties-scopet er tildelt (me.reportees),
 // hentes listen over orger brukeren kan representere fra Altinn automatisk. Ellers (eller ved feil)
 // faller steget tilbake til manuell orgnr-inntasting med brreg-navnematch.
 function VelgOrg({ me, onValgt }: { me: Me; onValgt: () => void }) {

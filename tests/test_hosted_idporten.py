@@ -31,7 +31,7 @@ _META = {
 
 
 def _bygg_klient(monkeypatch, *, reportees: bool):
-    """Felles oppsett for ID-porten-test-klienten. reportees styrer altinn:reportees-scopet."""
+    """Felles oppsett for ID-porten-test-klienten. reportees styrer altinn:accessmanagement/authorizedparties-scopet."""
     monkeypatch.setenv("WENCHE_ENV", "test")
     monkeypatch.setenv("HOSTED_SESSION_SECRET", "test-session-secret")
     monkeypatch.setenv("HOSTED_INVITE_SECRET", "test-invite-secret")
@@ -63,7 +63,7 @@ def _bygg_klient(monkeypatch, *, reportees: bool):
 
 @pytest.fixture
 def klient(monkeypatch):
-    """ID-porten PÅ med altinn:reportees-scopet (selskapslista hentes fra Altinn)."""
+    """ID-porten PÅ med altinn:accessmanagement/authorizedparties-scopet (selskapslista hentes fra Altinn)."""
     from hosted.api import config
 
     main_mod = _bygg_klient(monkeypatch, reportees=True)
@@ -74,7 +74,7 @@ def klient(monkeypatch):
 
 @pytest.fixture
 def klient_uten_reportees(monkeypatch):
-    """ID-porten PÅ men UTEN altinn:reportees (scopet ikke tildelt): manuell orgnr-inntasting."""
+    """ID-porten PÅ men UTEN altinn:accessmanagement/authorizedparties (scopet ikke tildelt): manuell orgnr-inntasting."""
     from hosted.api import config
 
     main_mod = _bygg_klient(monkeypatch, reportees=False)
@@ -83,7 +83,7 @@ def klient_uten_reportees(monkeypatch):
     config.settings.cache_clear()
 
 
-def _login(klient, *, scope: str = "openid profile altinn:reportees") -> str:
+def _login(klient, *, scope: str = "openid profile altinn:accessmanagement/authorizedparties") -> str:
     """Start innlogging og returner state-en (uten å følge redirecten til ID-porten)."""
     r = klient.get("/api/auth/idporten/login", follow_redirects=False)
     assert r.status_code in (302, 307)
@@ -97,7 +97,7 @@ def _login(klient, *, scope: str = "openid profile altinn:reportees") -> str:
 
 def _logg_inn(
     klient, monkeypatch, navn="Ole Fredrik Lie", access_token="fake-access-token",
-    scope="openid profile altinn:reportees",
+    scope="openid profile altinn:accessmanagement/authorizedparties",
 ):
     """Fullfør login + callback med mocket token og id_token-validering."""
     state = _login(klient, scope=scope)
@@ -194,7 +194,7 @@ def test_login_bygger_pkce_redirect(klient):
 
 def test_login_uten_reportees_ber_kun_om_openid_profile(klient_uten_reportees):
     """
-    Uten altinn:reportees-scopet (ikke tildelt klienten) ber innloggingen kun om openid+profile,
+    Uten altinn:accessmanagement/authorizedparties-scopet (ikke tildelt klienten) ber innloggingen kun om openid+profile,
     så ID-porten ikke avviser autorisasjonsforespørselen (invalid_scope). Regresjonsvern: scopet
     skal aldri snike seg inn i forespørselen før operatøren har skrudd det på.
     """
