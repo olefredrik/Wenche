@@ -4,7 +4,7 @@ Wenche er et verktøy for holdingselskaper og småaksjeselskaper som må levere 
 
 Du fyller ut selskapsinformasjon, regnskapstall og aksjonærdata i et grafisk webgrensesnitt, og Wenche håndterer innsendingen til riktig myndighet.
 
-Autentisering skjer via Maskinporten med et selvgenerert RSA-nøkkelpar. Ingen virksomhetssertifikat eller BankID-innlogging nødvendig.
+Wenche autentiserer seg mot API-ene via Maskinporten med et selvgenerert RSA-nøkkelpar, så du slipper virksomhetssertifikat. Du logger fortsatt inn med BankID i Altinn for å koble til selskapet (én gang) og for å signere innsendingene, det er lovpålagt og kan ikke gjøres maskinelt.
 
 ## Hva hjelper Wenche med?
 
