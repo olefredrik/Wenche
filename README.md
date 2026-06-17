@@ -84,6 +84,11 @@ Krever egne credentials og syntetiske Tenor-orgnumre. Se [Testing mot tt02](http
 
 Webgrensesnittet er bygd med FastAPI og en React/Tailwind-SPA, med et delt designsystem som også brukes av den hostede versjonen. Hvordan koden henger sammen og hvordan du kjører front-enden med hot reload, er beskrevet i [Utvikling](https://olefredrik.github.io/Wenche/avansert/utvikling/).
 
+## Bakgrunn
+
+Hvorfor finnes Wenche? Jeg skrev om erfaringen med å bygge mot statens åpne
+API-er i et [leserinnlegg på kode24](https://www.kode24.no/artikkel/staten-tilbyr-apne-api-er-det-vanskelige-er-a-finne-veien-gjennom-dem/265665).
+
 ## Ansvar
 
 Wenche er et hjelpeverktøy for enkle holdingselskaper og er i aktiv utvikling. Det er ikke en erstatning for profesjonell regnskapsbistand. Kontroller alltid at genererte dokumenter er korrekte før innsending. Du er selv ansvarlig for at innsendte opplysninger er riktige.
