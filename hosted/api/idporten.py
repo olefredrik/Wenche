@@ -49,14 +49,19 @@ def _scope() -> str:
     """
     OIDC-scope for innloggingen.
 
-    `altinn:reportees` («se hvem du kan representere») kreves for å (a) la Altinn godta
-    token-vekslingen (exchange/id-porten avviser tokens uten en altinn:-scope, jf. Altinns
-    HasAltinnScope) og (b) hente autoriserte parter. Men scopet må være tildelt klienten i
-    Samarbeidsportalen, ellers avviser ID-porten HELE innloggingen (invalid_scope). Derfor ber
-    vi om det kun når operatøren har skrudd på flagget; ellers logger man inn med bare
+    `altinn:accessmanagement/authorizedparties` («se hvem du kan representere») kreves for å (a)
+    la Altinn godta token-vekslingen (exchange/id-porten avviser tokens uten en altinn:-scope, jf.
+    Altinns HasAltinnScope) og (b) hente autoriserte parter. Dette er Altinn III-scopet (det gamle
+    altinn:reportees er Altinn II og forsvinner når Altinn II skrus av). Men scopet må være tildelt
+    klienten i Samarbeidsportalen, ellers avviser ID-porten HELE innloggingen (invalid_scope).
+    Derfor ber vi om det kun når operatøren har skrudd på flagget; ellers logger man inn med bare
     openid+profile og velger selskap manuelt.
     """
-    return "openid profile altinn:reportees" if settings().idporten_reportees else "openid profile"
+    return (
+        "openid profile altinn:accessmanagement/authorizedparties"
+        if settings().idporten_reportees
+        else "openid profile"
+    )
 
 # Well-known-metadata og JWKS per miljø (test/prod), cachet i minnet.
 _metadata_cache: dict[str, dict] = {}
@@ -308,7 +313,7 @@ def hent_organisasjoner(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="Logg inn med ID-porten først.")
     s = settings()
     if not s.idporten_reportees:
-        # Scopet altinn:reportees er ikke tildelt, så vi har ikke tilgang til parter-lista.
+        # Scopet altinn:accessmanagement/authorizedparties er ikke tildelt, så vi har ikke tilgang til parter-lista.
         # Tom liste uten feil: SPA-en viser manuell orgnr-inntasting (som den skal når flagget er av).
         return {"organisasjoner": []}
     access_token = request.session.get("idporten_access_token", "")

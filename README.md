@@ -57,12 +57,13 @@ Før første innsending må du generere et RSA-nøkkelpar og registrere en Maski
 
 I tillegg til å kjøre Wenche selv, finnes en hostet versjon på
 **[wenche.cloud](https://wenche.cloud)**. Der er Maskinporten-/Altinn-oppsettet gjort én
-gang av operatøren, så du slipper å generere egne nøkler. Du kommer inn enten via en
-invitasjonslenke, eller ved å skrive inn navnet ditt og organisasjonsnummeret til selskapet:
-står du som daglig leder eller styremedlem i Enhetsregisteret, bindes økten til selskapet med
-en gang. Deretter godkjenner du Wenche i Altinn med BankID, fyller inn tallene og sender.
-Dataene behandles kun i økten og lagres ikke. Tjenesten er fortsatt i beta, og bygger på
-nøyaktig samme åpne kildekode som denne self-hosted-versjonen.
+gang av operatøren, så du slipper å generere egne nøkler. Du logger inn med BankID via
+ID-porten og kobler økten til selskapet du representerer. Har operatøren delt en
+invitasjonslenke med deg, kommer du rett inn via den i stedet. Deretter godkjenner du Wenche
+i Altinn, slik at den får rett til å sende inn på vegne av selskapet, og så fyller du inn
+tallene og sender. Fødselsnummeret ditt lagres aldri, og dataene behandles kun i økten.
+Tjenesten er fortsatt i beta, og bygger på nøyaktig samme åpne kildekode som denne
+self-hosted-versjonen.
 
 Drifts- og deploy-dokumentasjon for operatøren: [`hosted/README.md`](hosted/README.md).
 

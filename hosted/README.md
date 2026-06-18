@@ -63,7 +63,7 @@ Per-org invite-lenker lages med `./.venv/bin/python hosted/mint_invite.py <orgnr
 | `HOSTED_IDPORTEN_KEY_PEM` | (valgfri) PEM-innhold for ID-porten-klientens private nøkkel (egen, *ikke* vendor-nøkkelen). Foretrukket i prod (Fly-secret). |
 | `HOSTED_IDPORTEN_KEY_PATH` | (valgfri) Sti til ID-porten-privatnøkkelen (PEM). Brukes i dev; `_PEM` har forrang. |
 | `HOSTED_IDPORTEN_REDIRECT_URI` | (valgfri) Callback-URL registrert på klienten (HTTPS i prod, `http://127.0.0.1:5173/...` i dev). |
-| `HOSTED_IDPORTEN_REPORTEES` | (valgfri, `1`/`true`) Be om `altinn:reportees` og hent selskapslista fra Altinn autoriserte parter. Krever at scopet er tildelt klienten (se under). Av som standard: da logger man inn med kun `openid profile` og taster orgnr manuelt. Skru ALDRI på før scopet faktisk er tildelt, ellers avviser ID-porten innloggingen (`invalid_scope`). |
+| `HOSTED_IDPORTEN_REPORTEES` | (valgfri, `1`/`true`) Be om `altinn:accessmanagement/authorizedparties` og hent selskapslista fra Altinn autoriserte parter. Krever at scopet er tildelt klienten (se under). Av som standard: da logger man inn med kun `openid profile` og taster orgnr manuelt. Skru ALDRI på før scopet faktisk er tildelt, ellers avviser ID-porten innloggingen (`invalid_scope`). |
 | `HOSTED_VENDOR_ORGNR` | Operatørens organisasjonsnummer (vendor). |
 | `HOSTED_VENDOR_CLIENT_ID` | Operatørens Maskinporten-klient-ID. |
 | `HOSTED_VENDOR_KID` | Operatørens nøkkel-ID (KID). |
@@ -81,7 +81,9 @@ ID-porten-innlogging, gjør dette én gang per miljø (test og prod hver for seg
    «ID-porten & API-Klient»):
    - Applikasjonstype **web**, autentiseringsmetode **private_key_jwt**.
    - Grant **authorization_code** (ikke refresh), PKCE **S256**.
-   - Eksterne scope **Nei** (`openid` + `profile` holder; fødselsnummer kommer som `pid`-claim).
+   - Eksterne scope **Nei** for ren innlogging (`openid` + `profile` holder; fødselsnummer kommer
+     som `pid`-claim). Skal appen hente selskapslista fra Altinn (se under), svar i stedet **Ja**
+     her, da registreres klienten som en API-klient som kan bære Altinn-scopet.
    - **Redirect URI** = `https://<din-app>/api/auth/idporten/callback` (prod, HTTPS) eller
      `http://127.0.0.1:5173/api/auth/idporten/callback` (dev; loopback-IP, ikke `localhost`).
 2. **Generer et eget RSA-nøkkelpar** (ikke gjenbruk vendor/Maskinporten-nøkkelen) og registrer
@@ -98,27 +100,34 @@ ID-porten-innlogging, gjør dette én gang per miljø (test og prod hver for seg
 Endepunkter og JWKS hentes fra ID-portens well-known-dokument ved kjøretid
 (`test.idporten.no` / `idporten.no` etter `WENCHE_ENV`), så ingen URL-er hardkodes.
 
-### Selskapsvalg fra Altinn (valgfritt, `altinn:reportees`)
+### Selskapsvalg fra Altinn (valgfritt, `altinn:accessmanagement/authorizedparties`)
 
 Med kun `openid profile` taster brukeren inn organisasjonsnummeret selv, og det bekreftes mot
 det åpne Enhetsregisteret (verifisert navn mot daglig leder/styreleder). Vil du i stedet vise en
 liste over selskapene brukeren kan representere, hentet fra **Altinn autoriserte parter**, kreves
-scopet **`altinn:reportees`**:
+scopet **`altinn:accessmanagement/authorizedparties`** (Altinn III; det gamle `altinn:reportees`
+er Altinn II og forsvinner når Altinn II skrus av):
 
-1. Be Altinn/Digdir tildele org-en din tilgang til `altinn:reportees` (servicedesk@digdir.no), og
-   legg deretter scopet på ID-porten-klienten i Samarbeidsportalen. Scopet eies av Altinn, så det
-   dukker ikke opp i scope-velgeren før det er tildelt.
-2. Sett `HOSTED_IDPORTEN_REPORTEES=1`.
+1. Be Altinn tildele org-en din tilgang til scopet (servicedesk@digdir.no). Scopet eies av Altinn,
+   så det dukker ikke opp i scope-velgeren før det er tildelt.
+2. ID-porten-klienten må være en **API-klient** (svar **Ja** på «Skal klienten benytte eksterne
+   scope?» ved opprettelse). En ren innloggings-klient kan ikke bære eksterne scope. Legg så til
+   scopet under klientens **Scopes**-fane (hjelp fra Digdir: servicedesk@digdir.no).
+3. Nøkler registreres **per klient**, så en ny API-klient trenger egen nøkkelregistrering. Du kan
+   gjenbruke samme nøkkelpar, men `kid` blir ny, oppdater `HOSTED_IDPORTEN_KID` deretter.
+4. Sett `HOSTED_IDPORTEN_REPORTEES=1`.
 
 Da veksles ID-porten-tokenet mot et Altinn-token (`exchange/id-porten`) og selskapslista hentes fra
-`accessmanagement/api/v1/authorizedparties`. Er scopet ikke tildelt, MÅ flagget være av, ellers
-avviser ID-porten hele innloggingen.
+`accessmanagement/api/v1/authorizedparties`. Brukeren samtykker til oppslaget ved innlogging
+(ID-porten husker samtykket en kort stund); lista hentes én gang per innlogging, og access_tokenet
+slettes straks selskap er valgt. Er scopet ikke på klienten, MÅ flagget være av, ellers avviser
+ID-porten hele innloggingen (`invalid_scope`).
 
 ### Kjøre lokalt mot prod (røyktest uten deploy)
 
 For å teste ID-porten-innloggingen mot ekte BankID og din egen org uten å deploye, kjør den hostede
 appen lokalt med prod-miljø og prod-creds. ID-porten-login + manuell orgnr-inntasting (brreg-match)
-kan testes slik; selskapslista krever at `altinn:reportees` er tildelt prod-klienten.
+kan testes slik; selskapslista krever at `altinn:accessmanagement/authorizedparties` er tildelt prod-klienten.
 
 Forutsetning: prod-ID-porten-klienten må ha `http://127.0.0.1:5173/api/auth/idporten/callback`
 registrert som redirect-URI (sjekk at prod-klienten godtar loopback-IP).

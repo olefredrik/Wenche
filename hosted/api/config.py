@@ -57,7 +57,7 @@ class Settings:
         self._idporten_key_pem = os.getenv("HOSTED_IDPORTEN_KEY_PEM")
         self._idporten_key_path = os.getenv("HOSTED_IDPORTEN_KEY_PATH")
         self.idporten_redirect_uri = os.getenv("HOSTED_IDPORTEN_REDIRECT_URI")
-        # Be om Altinn-scopet altinn:reportees (for å hente selskapslista fra autoriserte parter)
+        # Be om Altinn-scopet altinn:accessmanagement/authorizedparties (for å hente selskapslista fra autoriserte parter)
         # KUN når operatøren har fått scopet tildelt klienten i Samarbeidsportalen. Ber vi om et
         # ikke-tildelt scope, avviser ID-porten hele innloggingen (invalid_scope). Av som standard:
         # da logger man inn med bare openid+profile, og selskap velges ved manuell orgnr-inntasting.
@@ -82,7 +82,7 @@ class Settings:
     @property
     def idporten_reportees(self) -> bool:
         """
-        Om vi skal be om altinn:reportees og tilby selskapsvalg fra Altinn autoriserte parter.
+        Om vi skal be om altinn:accessmanagement/authorizedparties og tilby selskapsvalg fra Altinn autoriserte parter.
 
         Krever at ID-porten er aktivert og at scopet faktisk er tildelt klienten (env-flagget
         settes da av operatøren). Er det av, hoppes auto-lista over og brukeren taster orgnr selv.
