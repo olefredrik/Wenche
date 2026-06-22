@@ -10,7 +10,7 @@ import httpx
 import pytest
 from fastapi import HTTPException
 
-from hosted.api.innsending import _utfor
+from hosted.api.innsending import _steg_av_url, _utfor
 from wenche.innsending import InnsendingValideringsfeil
 from wenche.skd_skattemelding_client import SkattemeldingValideringsfeil
 
@@ -98,7 +98,7 @@ def test_bevisst_httpexception_slipper_gjennom_uendret():
 
 def test_upstream_feilkropp_lekker_ikke_til_klient():
     """Rå feilkropp fra Altinn/SKD skal logges server-side, aldri sendes til nettleseren."""
-    req = httpx.Request("POST", "https://skatt.skatteetaten.no/api/skattemelding/v2")
+    req = httpx.Request("POST", "https://skatt.skatteetaten.no/api/skattemelding/v2/2025/123456789")
     svar = httpx.Response(400, text="intern-altinn-detalj-xyz stacktrace", request=req)
     feil = httpx.HTTPStatusError("400", request=req, response=svar)
     with pytest.raises(HTTPException) as ei:
@@ -106,3 +106,76 @@ def test_upstream_feilkropp_lekker_ikke_til_klient():
     assert ei.value.status_code == 502
     assert "intern-altinn-detalj-xyz" not in str(ei.value.detail)
     assert "400" in str(ei.value.detail)  # statuskoden er fortsatt synlig for brukeren
+
+
+def test_feilmelding_navngir_steget_forhandsutfylt():
+    # Feiler GET-en av forhåndsutfylt, skal meldingen si nettopp det (utledet av URL-en),
+    # slik at et skjermbilde fra brukeren alene peker oss til riktig steg.
+    req = httpx.Request("GET", "https://api.skatteetaten.no/api/skattemelding/v2/2025/123456789")
+    feil = httpx.HTTPStatusError("400", request=req, response=httpx.Response(400, request=req))
+    with pytest.raises(HTTPException) as ei:
+        _utfor(_hev(feil))
+    assert "forhåndsutfylt" in str(ei.value.detail).lower()
+
+
+def test_feilmelding_navngir_steget_validering():
+    req = httpx.Request("POST", "https://api.skatteetaten.no/api/skattemelding/v2/valider/2025/123456789")
+    feil = httpx.HTTPStatusError("500", request=req, response=httpx.Response(500, request=req))
+    with pytest.raises(HTTPException) as ei:
+        _utfor(_hev(feil))
+    assert "validering" in str(ei.value.detail).lower()
+    assert "serverfeil" in str(ei.value.detail).lower()
+
+
+def test_feilmelding_navngir_steget_altinn_instans():
+    req = httpx.Request("POST", "https://999999999.apps.altinn.no/ttd/skattemelding/instances")
+    feil = httpx.HTTPStatusError("403", request=req, response=httpx.Response(403, request=req))
+    with pytest.raises(HTTPException) as ei:
+        _utfor(_hev(feil))
+    assert "altinn" in str(ei.value.detail).lower()
+
+
+def test_401_navngir_steg_og_beholder_koden():
+    req = httpx.Request("POST", "https://999999999.apps.altinn.no/ttd/skattemelding/instances")
+    feil = httpx.HTTPStatusError("401", request=req, response=httpx.Response(401, request=req))
+    with pytest.raises(HTTPException) as ei:
+        _utfor(_hev(feil))
+    assert ei.value.status_code == 502
+    assert "401" in str(ei.value.detail)
+    assert "altinn" in str(ei.value.detail).lower()
+
+
+@pytest.mark.parametrize(
+    "url, forventet",
+    [
+        ("https://api.skatteetaten.no/api/skattemelding/v2/valider/2025/123", "validering"),
+        ("https://api.skatteetaten.no/api/skattemelding/v2/2025/123", "forhåndsutfylt"),
+        ("https://999999999.apps.altinn.no/ttd/skattemelding/instances/abc/process/next", "fullføring"),
+        ("https://999999999.apps.altinn.no/ttd/skattemelding/instances/abc/data", "opplasting"),
+        ("https://999999999.apps.altinn.no/ttd/skattemelding/instances", "oppretting"),
+        ("https://platform.altinn.no/authentication/api/v1/exchange", "kommunikasjon med Altinn"),
+        ("https://api.skatteetaten.no/api/noe-annet", "kommunikasjon med Skatteetaten"),
+    ],
+)
+def test_steg_av_url_kartlegger_alle_kjente_steg(url, forventet):
+    assert forventet in _steg_av_url(url)
+
+
+def test_steg_av_url_ukjent_url_gir_none():
+    # Ukjent URL skal gi None, slik at meldingen faller tilbake på generisk formulering uten
+    # å henge på et villedende stegnavn.
+    assert _steg_av_url("https://eksempel.no/ukjent") is None
+    assert _steg_av_url("") is None
+
+
+def test_runtimeerror_med_kropp_etter_linjeskift_stripper_kroppen():
+    # SKD-klienten pakker statuskode + rå kropp i samme RuntimeError-streng. Klienten skal kun
+    # se første linje (steg + kode), ikke kroppen; hele teksten logges server-side.
+    feil = RuntimeError(
+        "Feil ved henting av forhåndsutfylt skattemelding: 400\n<feil>intern-kropp-hemmelig</feil>"
+    )
+    with pytest.raises(HTTPException) as ei:
+        _utfor(_hev(feil))
+    assert ei.value.status_code == 502
+    assert "intern-kropp-hemmelig" not in str(ei.value.detail)
+    assert "forhåndsutfylt skattemelding: 400" in str(ei.value.detail)
