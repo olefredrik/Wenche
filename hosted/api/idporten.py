@@ -272,7 +272,10 @@ def callback(
 
     navn = _navn_fra_claims(claims)
     if not navn:
-        # Uten et verifisert navn kan vi ikke gjøre rollesjekken mot Enhetsregisteret.
+        # Uten et verifisert navn kan vi ikke gjøre rollesjekken mot Enhetsregisteret. Logg hvilke
+        # claim-nøkler ID-porten faktisk sendte (kun nøklene, aldri verdiene: name/pid er
+        # personopplysninger) så et tomt navn er feilsøkbart uten logghistorikk på Fly.
+        _log.warning("Tomt navn fra ID-porten; claim-nøkler: %s", sorted(claims.keys()))
         return _tilbake("Fikk ikke navnet ditt fra ID-porten. Ta kontakt for manuell tilgang.")
 
     # Bind den verifiserte identiteten til økten. Fødselsnummeret (`pid`) lagres aldri; kun
