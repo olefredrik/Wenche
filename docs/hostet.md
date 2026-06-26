@@ -10,7 +10,7 @@ eller bruke den hostede versjonen på **[wenche.cloud](https://wenche.cloud)**.
 | Oppsett | Du genererer RSA-nøkkel og registrerer en Maskinporten-klient | Gjort én gang av operatøren |
 | Innlogging | Kjører lokalt på din maskin | Logg inn med ID-porten (BankID), så godkjenning i Altinn |
 | Data | Blir på din maskin | Behandles kun i økten, ingenting lagres i database |
-| Tilgang | Åpen kildekode, gratis | Foreløpig en tidlig testfase |
+| Tilgang | Åpen kildekode, gratis | Gratis, ingen installasjon |
 
 Den hostede tjenesten er for deg som heller vil slippe det tekniske oppsettet. Det er
 nøyaktig samme åpne kildekode under panseret, så du kan når som helst velge å kjøre

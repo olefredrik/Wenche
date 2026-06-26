@@ -53,7 +53,7 @@ Wenche åpner `http://localhost:8080` i nettleseren, der du fyller ut oppsett og
 
 Før første innsending må du generere et RSA-nøkkelpar og registrere en Maskinporten-klient. Hele veiledningen for installasjon, oppsett og bruk finner du i dokumentasjonen.
 
-## Hostet variant (beta)
+## Hostet variant
 
 I tillegg til å kjøre Wenche selv, finnes en hostet versjon på
 **[wenche.cloud](https://wenche.cloud)**. Der er Maskinporten-/Altinn-oppsettet gjort én
@@ -62,8 +62,7 @@ ID-porten og kobler økten til selskapet du representerer. Har operatøren delt 
 invitasjonslenke med deg, kommer du rett inn via den i stedet. Deretter godkjenner du Wenche
 i Altinn, slik at den får rett til å sende inn på vegne av selskapet, og så fyller du inn
 tallene og sender. Fødselsnummeret ditt lagres aldri, og dataene behandles kun i økten.
-Tjenesten er fortsatt i beta, og bygger på nøyaktig samme åpne kildekode som denne
-self-hosted-versjonen.
+Tjenesten bygger på nøyaktig samme åpne kildekode som denne self-hosted-versjonen.
 
 Drifts- og deploy-dokumentasjon for operatøren: [`hosted/README.md`](hosted/README.md).
 
