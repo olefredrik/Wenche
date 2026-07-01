@@ -748,27 +748,6 @@ export default function App() {
     }
   }, []);
 
-  // Keep-alive-heartbeat: holder Fly-maskinen våken mens appen er i AKTIV bruk, så scale-to-zero
-  // ikke sovner midt i en økt. Pinger kun når fanen er synlig og brukeren har vært aktiv siste
-  // 10 min, så en glemt åpen fane lar maskinen sove.
-  useEffect(() => {
-    let sisteAktivitet = Date.now();
-    const merkAktiv = () => {
-      sisteAktivitet = Date.now();
-    };
-    const hendelser = ["mousemove", "keydown", "click", "touchstart", "scroll"];
-    hendelser.forEach((e) => window.addEventListener(e, merkAktiv, { passive: true }));
-    const id = setInterval(() => {
-      const aktiv =
-        document.visibilityState === "visible" && Date.now() - sisteAktivitet < 10 * 60 * 1000;
-      if (aktiv) fetch("/api/health").catch(() => {});
-    }, 45000);
-    return () => {
-      clearInterval(id);
-      hendelser.forEach((e) => window.removeEventListener(e, merkAktiv));
-    };
-  }, []);
-
   const naviger = (id: string) => {
     setFane(id as FaneId);
     window.scrollTo({ top: 0 });
