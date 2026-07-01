@@ -4,6 +4,20 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.0.1] - 2026-07-01
+
+### Endret
+
+- Den hostede tjenesten dvaler nå med `suspend` i stedet for `stop`. En maskin som har
+  sovet våkner da på under et sekund i stedet for rundt to sekunders kaldstart, så en
+  bruker som tar seg tid til å fylle ut skjemaet ikke merker pausen. Kostnadsprofilen er
+  praktisk talt uendret.
+
+### Fjernet
+
+- Fjernet en keep-alive-heartbeat i den hostede webappen. Den kunne uansett ikke hindre
+  Fly i å dvale og ga ingen reell effekt.
+
 ## [1.0.0] - 2026-06-26
 
 Første stabile utgave. Wenche har sendt inn årsregnskap, skattemelding og

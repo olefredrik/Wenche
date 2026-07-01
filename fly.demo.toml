@@ -22,10 +22,11 @@ primary_region = "ams"         # Amsterdam, EØS (samme som prod). Flyttet fra "
 [http_service]
   internal_port = 8080
   force_https = true
-  # Scale-to-zero for minimal kostnad: maskinen sovner når ingen bruker den, og våkner
-  # automatisk på første request. SPA-ens keep-alive-heartbeat hindrer dvale midt i en økt.
-  # Kun én maskin (in-memory-sesjon må ikke spres mellom maskiner).
-  auto_stop_machines = "stop"
+  # Scale-to-zero for minimal kostnad: maskinen dvaler når ingen bruker den, og våkner
+  # automatisk på første request. "suspend" fryser VM-en med RAM intakt (sub-sekund vekking
+  # i stedet for ~2 s kaldstart); kostnad ~lik "stop". Kan sjelden falle tilbake til "stop",
+  # det er trygt. Kun én maskin (in-memory-sesjon må ikke spres mellom maskiner).
+  auto_stop_machines = "suspend"
   auto_start_machines = true
   min_machines_running = 0
 

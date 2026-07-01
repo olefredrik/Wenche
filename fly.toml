@@ -18,13 +18,14 @@ primary_region = "ams"         # Amsterdam, EØS. Flyttet fra "arn" (Stockholm) 
 [http_service]
   internal_port = 8080
   force_https = true
-  # SCALE-TO-ZERO for minimal kostnad (invite-only test): maskinen sovner når ingen
-  # bruker den, og våkner automatisk på første request. SPA-en kjører en keep-alive-
-  # heartbeat (App.tsx) så den ikke sovner MIDT i en økt og mister in-memory-tilstanden.
-  # Ikke skaler til flere maskiner (da ville sesjoner spostes mellom dem).
-  # Tips: bytt "stop" -> "suspend" for å bevare minnet over dvale (raskere vekking +
-  # in-memory-tilstand overlever), hvis Fly-planen din støtter det.
-  auto_stop_machines = "stop"
+  # SCALE-TO-ZERO for minimal kostnad (invite-only): maskinen dvaler når ingen bruker den
+  # og våkner automatisk på første request. "suspend" fryser VM-en med RAM intakt i stedet
+  # for å boote på nytt, så vekking er sub-sekund (ikke ~2 s kaldstart) og en bruker som
+  # tar seg tid til å fylle ut ikke merker pausen. Kostnadsprofilen er ~lik "stop" (ingen
+  # CPU/RAM-kost mens suspendert). Fly kan i sjeldne tilfeller falle tilbake til "stop";
+  # det er trygt (session-tilstand ligger i signert cookie, ingen kundedata i serverminnet).
+  # Ikke skaler til flere maskiner (da ville sesjoner spres mellom dem).
+  auto_stop_machines = "suspend"
   auto_start_machines = true
   min_machines_running = 0
 
