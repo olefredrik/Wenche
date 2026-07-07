@@ -95,3 +95,40 @@ def test_avvist_forespoersel_binder_ikke(klient, monkeypatch):
     data = klient.post("/api/systembruker/status").json()
     assert data["godkjent"] is False
     assert data["kunde_org"] is None
+
+
+def test_auth_00004_gir_lesbar_409_ikke_500(klient, monkeypatch):
+    """Altinn AUTH-00004 på opprett_forespørsel skal bli et lesbart 409, ikke en naken 500."""
+    _inviter(klient)
+    _stub_vendor(monkeypatch)
+    monkeypatch.setattr(sb.wsb, "hent_systembrukere", lambda token, vendor: [])
+    monkeypatch.setattr(sb.wsb, "registrer_system", lambda token, vendor, cid: {})
+
+    def kast_auth_00004(token, vendor, party):
+        raise RuntimeError(
+            '400 Bad Request:\n{"detail":"Failed to create new SystemUser, existing '
+            'SystemUser tied to the given System-Id.","code":"AUTH-00004"}'
+        )
+
+    monkeypatch.setattr(sb.wsb, "opprett_forespørsel", kast_auth_00004)
+
+    r = klient.post("/api/systembruker/request")
+    assert r.status_code == 409
+    assert "allerede" in r.json()["detail"].lower()
+    assert klient.get("/api/auth/me").json()["kunde_org"] is None
+
+
+def test_annen_runtimeerror_propagerer_uendret(klient, monkeypatch):
+    """Andre feil enn AUTH-00004 skal ikke fanges av 409-grenen (uendret oppførsel)."""
+    _inviter(klient)
+    _stub_vendor(monkeypatch)
+    monkeypatch.setattr(sb.wsb, "hent_systembrukere", lambda token, vendor: [])
+    monkeypatch.setattr(sb.wsb, "registrer_system", lambda token, vendor, cid: {})
+
+    def kast_annet(token, vendor, party):
+        raise RuntimeError("500 Internal Server Error:\nnoe helt annet")
+
+    monkeypatch.setattr(sb.wsb, "opprett_forespørsel", kast_annet)
+
+    with pytest.raises(RuntimeError):
+        klient.post("/api/systembruker/request")
