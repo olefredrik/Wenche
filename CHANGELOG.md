@@ -4,6 +4,16 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.0.2] - 2026-07-07
+
+### Rettet
+
+- `hent_systembrukere` følger nå pagineringen fra Altinn (`links.next`) og henter alle
+  sidene. Tidligere ble bare de første 50 systembrukerne hentet, så kunde nr. 51 og utover
+  ble usynlig for gjenkjennings-sjekken ved ny tilkobling. Resultatet var at en kunde som
+  allerede hadde godkjent Wenche med BankID fikk «HTTP 500» (AUTH-00004 fra Altinn) i stedet
+  for å bli koblet til. Rammet både den hostede tjenesten og self-hosted-oppsettet.
+
 ## [1.0.1] - 2026-07-01
 
 ### Endret
