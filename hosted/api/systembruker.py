@@ -52,7 +52,22 @@ def request_systembruker(request: Request) -> dict:
         return {"status": "AlreadyApproved", "godkjent": True, "kunde_org": org}
     # Ny kunde: sikre at systemet er registrert (idempotent), så opprett forespørselen.
     wsb.registrer_system(token, vendor_orgnr, creds.client_id)
-    svar = wsb.opprett_forespørsel(token, vendor_orgnr, org)
+    try:
+        svar = wsb.opprett_forespørsel(token, vendor_orgnr, org)
+    except RuntimeError as e:
+        # AUTH-00004: Altinn har allerede en systembruker/forespørsel for dette org-et for
+        # systemet vårt. Godkjente systembrukere fanges normalt av AlreadyApproved-sjekken over;
+        # havner vi likevel her finnes det typisk en påbegynt (ikke godkjent) forespørsel. Svar
+        # lesbart i stedet for en naken 500. Andre feil propagerer uendret.
+        if "AUTH-00004" in str(e):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Det finnes allerede en påbegynt eller godkjent tilkobling for dette "
+                    "selskapet. Last siden på nytt for å fortsette. Vedvarer det, ta kontakt."
+                ),
+            ) from e
+        raise
     request.session["request_id"] = svar.get("id")
     request.session["pending_org"] = org
     return {

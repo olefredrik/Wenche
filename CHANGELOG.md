@@ -4,6 +4,15 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.0.3] - 2026-07-07
+
+### Rettet
+
+- Systembruker-tilkoblingen svarer nå med en lesbar melding hvis Altinn avviser med AUTH-00004
+  («existing SystemUser tied to the given System-Id»), i stedet for en rå «HTTP 500». Selve
+  årsaken til at feilen oppsto ble fjernet i 1.0.2 (paginering); dette er et ekstra sikkerhetsnett
+  slik at en tilsvarende Altinn-avvisning fra en annen årsak gir brukeren en forståelig beskjed.
+
 ## [1.0.2] - 2026-07-07
 
 ### Rettet
