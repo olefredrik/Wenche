@@ -216,16 +216,25 @@ def hent_systembrukere(maskinporten_token: str, vendor_orgnr: str) -> list[dict]
     """
     Henter alle godkjente systembrukere for Wenche-systemet.
 
-    Returnerer en liste med systembruker-objekter fra Altinn.
+    Returnerer en liste med systembruker-objekter fra Altinn. Endepunktet er paginert
+    (50 per side, med `links.next` til neste side); vi følger lenkene til alle sidene er
+    hentet. Uten dette ble bare de første 50 sett, så kunde nr. 51+ ble usynlig for
+    gjenkjennings-sjekken og fikk AUTH-00004 («existing SystemUser tied to System-Id») ved
+    ny tilkobling.
     """
     sid = system_id(vendor_orgnr)
-    resp = httpx.get(
-        f"{_base()}/authentication/api/v1/systemuser/vendor/bysystem/{sid}",
-        headers={"Authorization": f"Bearer {maskinporten_token}"},
-        timeout=15,
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    return data.get("data", data) if isinstance(data, dict) else data
+    url = f"{_base()}/authentication/api/v1/systemuser/vendor/bysystem/{sid}"
+    headers = {"Authorization": f"Bearer {maskinporten_token}"}
+    alle: list[dict] = []
+    while url:
+        resp = httpx.get(url, headers=headers, timeout=15)
+        resp.raise_for_status()
+        data = resp.json()
+        if not isinstance(data, dict):
+            # Uventet flat liste (ingen paginerings-wrapper): returner som den er.
+            return data
+        alle.extend(data.get("data", []))
+        url = (data.get("links") or {}).get("next")
+    return alle
 
 
