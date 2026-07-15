@@ -4,6 +4,21 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.1.0] - 2026-07-15
+
+### Rettet
+
+- Tallfeltene i skjemaet starter nå blanke i stedet for å være forhåndsutfylt med `0`, og du
+  kan tømme et felt helt uten at nullen spretter tilbake. Lagrede verdier (også et bevisst `0`)
+  vises som før. Ved innsending fylles blanke påkrevde felt til `0`, så payloaden til
+  myndighetene er uendret.
+
+### Endret
+
+- Beløps- og tallfelt viser tusenskille (`1 000 000`) når feltet ikke er i fokus, så det er
+  lettere å lese av at tallet er riktig. Formateringen er kun visning; SAF-T-/Bodil-import,
+  skjembygging og innsending bruker samme rene tall som før.
+
 ## [1.0.3] - 2026-07-07
 
 ### Rettet

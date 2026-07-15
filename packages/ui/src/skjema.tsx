@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import yaml from "js-yaml";
 import { monoLabel, input, btnPrimar, btnOutlineLett as btnOutline } from "./styles";
-import { Inn } from "./komponenter";
+import { Inn, TallInput, TallFelt } from "./komponenter";
 
 // Skjema-drevet datainntasting. Feltstrukturen er data; én generisk renderer bygger
 // config-objektet (samme form som config.yaml) som sendes til backenden.
@@ -105,20 +105,28 @@ const BALANSE_EK_GJELD = BALANSE_FELTER.filter((f) => f.key.includes(".egenkapit
 interface Aksjonaer {
   navn: string;
   fodselsnummer: string;
-  antall_aksjer: number;
+  // Tallfeltene kan stå tomme ("") under redigering, så brukeren slipper å slette en ledende 0.
+  // Normaliseres til tall ved lagring (se normaliserForLagring).
+  antall_aksjer: number | "";
   aksjeklasse: string;
-  utbytte_utbetalt: number;
-  innbetalt_kapital_per_aksje: number;
+  utbytte_utbetalt: number | "";
+  innbetalt_kapital_per_aksje: number | "";
 }
+
+const AKSJONAER_TALLFELT = [
+  "antall_aksjer",
+  "utbytte_utbetalt",
+  "innbetalt_kapital_per_aksje",
+] as const;
 
 function tomAksjonaer(): Aksjonaer {
   return {
     navn: "",
     fodselsnummer: "",
-    antall_aksjer: 0,
+    antall_aksjer: "",
     aksjeklasse: "ordinære",
-    utbytte_utbetalt: 0,
-    innbetalt_kapital_per_aksje: 0,
+    utbytte_utbetalt: "",
+    innbetalt_kapital_per_aksje: "",
   };
 }
 
@@ -139,14 +147,43 @@ function sett(obj: any, path: string, value: any): any {
   return ny;
 }
 
+// Alle ikke-valgfrie tallfelt (kostnader, balanse, årstall, aksjekapital osv.). Disse står
+// tomme under redigering, men må være tall i payloaden: flere av dem leses med direkte
+// indeksering i kjernen (selskap.stiftelsesaar/aksjekapital, regnskapsaar) og krasjer på "".
+const PAAKREVDE_TALLFELT: string[] = SEKSJONER.flatMap((s) =>
+  s.felter.filter((f) => f.type === "number" && !f.valgfri).map((f) => f.key),
+);
+
+// Tomt tallfelt ("", null, NaN) → true. Valgfrie felt får stå tomme (kjernen tolererer dem),
+// men påkrevde felt og aksjonær-tall må gjøres om til 0 før innsending.
+function erTomtTall(v: unknown): boolean {
+  return v === "" || v == null || (typeof v === "number" && Number.isNaN(v));
+}
+
+// Gjør blanke påkrevde tallfelt om til 0 rett før lagring/innsending, slik at payloaden er
+// identisk med den gamle (der feltene alltid var 0). Rører ikke valgfrie felt eller tekst.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function normaliserForLagring(config: any): any {
+  let c = config;
+  for (const key of PAAKREVDE_TALLFELT) if (erTomtTall(hent(c, key))) c = sett(c, key, 0);
+  const aksjonaerer = (config?.aksjonaerer ?? []).map((a: Aksjonaer) => {
+    const na = { ...a };
+    for (const f of AKSJONAER_TALLFELT) if (erTomtTall(na[f])) na[f] = 0;
+    return na;
+  });
+  return { ...c, aksjonaerer };
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function grunnConfig(): any {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let c: any = {};
+  // Tallfelt starter tomme ("") slik at brukeren slipper å slette en ledende 0.
+  // De normaliseres tilbake til tall ved lagring (normaliserForLagring).
   for (const s of SEKSJONER)
     for (const f of s.felter)
       if (!f.valgfri)
-        c = sett(c, f.key, f.type === "checkbox" ? false : f.type === "text" ? "" : 0);
+        c = sett(c, f.key, f.type === "checkbox" ? false : "");
   c.aksjonaerer = [tomAksjonaer()];
   return c;
 }
@@ -303,16 +340,25 @@ function Feltrutenett({
               {f.label}
               {f.help ? ` (${f.help})` : ""}
             </span>
-            <input
-              className={`${input} ${laast ? "cursor-not-allowed opacity-60" : ""}`}
-              type={f.type === "number" ? "number" : "text"}
-              value={hent(config, f.key) ?? ""}
-              disabled={laast}
-              title={laast ? "Låst til selskapet i invitasjonen" : undefined}
-              onChange={(e) =>
-                oppdater(f.key, f.type === "number" ? Number(e.target.value) || 0 : e.target.value)
-              }
-            />
+            {f.type === "number" ? (
+              // Tallfelt: tusenskille i visningen, rent number i config (se TallInput).
+              <TallInput
+                className={`${input} ${laast ? "cursor-not-allowed opacity-60" : ""}`}
+                value={hent(config, f.key) ?? ""}
+                disabled={laast}
+                title={laast ? "Låst til selskapet i invitasjonen" : undefined}
+                onChange={(v) => oppdater(f.key, v)}
+              />
+            ) : (
+              <input
+                className={`${input} ${laast ? "cursor-not-allowed opacity-60" : ""}`}
+                type="text"
+                value={hent(config, f.key) ?? ""}
+                disabled={laast}
+                title={laast ? "Låst til selskapet i invitasjonen" : undefined}
+                onChange={(e) => oppdater(f.key, e.target.value)}
+              />
+            )}
           </label>
         );
       })}
@@ -452,7 +498,7 @@ export function DataSkjema({
   const lagre = async () => {
     setLagrer(true);
     try {
-      await onLagre(config);
+      await onLagre(normaliserForLagring(config));
       // Etter vellykket lagring er gjeldende innhold den nye baselinen.
       pristine.current = JSON.stringify(configRef.current);
     } finally {
@@ -790,10 +836,10 @@ export function DataSkjema({
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Inn label="Navn" value={a.navn} onChange={(v) => settAksj(i, "navn", v)} />
                 <Inn label="Fødselsnummer" value={a.fodselsnummer} onChange={(v) => settAksj(i, "fodselsnummer", v)} />
-                <Inn label="Antall aksjer" type="number" value={a.antall_aksjer} onChange={(v) => settAksj(i, "antall_aksjer", Number(v) || 0)} />
+                <TallFelt label="Antall aksjer" value={a.antall_aksjer} onChange={(v) => settAksj(i, "antall_aksjer", v)} />
                 <Inn label="Aksjeklasse" value={a.aksjeklasse} onChange={(v) => settAksj(i, "aksjeklasse", v)} />
-                <Inn label="Utbytte utbetalt (kr)" type="number" value={a.utbytte_utbetalt} onChange={(v) => settAksj(i, "utbytte_utbetalt", Number(v) || 0)} />
-                <Inn label="Innbetalt kapital per aksje (kr)" type="number" value={a.innbetalt_kapital_per_aksje} onChange={(v) => settAksj(i, "innbetalt_kapital_per_aksje", Number(v) || 0)} />
+                <TallFelt label="Utbytte utbetalt (kr)" value={a.utbytte_utbetalt} onChange={(v) => settAksj(i, "utbytte_utbetalt", v)} />
+                <TallFelt label="Innbetalt kapital per aksje (kr)" value={a.innbetalt_kapital_per_aksje} onChange={(v) => settAksj(i, "innbetalt_kapital_per_aksje", v)} />
               </div>
               {aksjonaerer.length > 1 && (
                 <button
