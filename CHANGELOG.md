@@ -4,6 +4,21 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.1.1] - 2026-07-29
+
+Ingen funksjonelle endringer. Utgivelsen finnes for at rettelsene under skal bli synlige på
+PyPI, siden README-en er pakkebeskrivelsen der.
+
+### Lagt til
+
+- Sikkerhetspolicy (`SECURITY.md`) som beskriver hvordan sårbarheter rapporteres privat, hva
+  som er i og utenfor scope, og hvilke regler som gjelder for testing. README lenker til den.
+
+### Rettet
+
+- Lenkene til `LICENSE` og `hosted/README.md` i README var relative, og virket derfor bare på
+  GitHub. På PyPI ga de 404. Nå er de absolutte.
+
 ## [1.1.0] - 2026-07-15
 
 ### Rettet
