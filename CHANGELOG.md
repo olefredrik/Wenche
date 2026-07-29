@@ -6,8 +6,15 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 
 ## [1.1.1] - 2026-07-29
 
-Ingen funksjonelle endringer. Utgivelsen finnes for at rettelsene under skal bli synlige på
-PyPI, siden README-en er pakkebeskrivelsen der.
+### Sikkerhet
+
+- Oppdatert `js-yaml` (4.2.0 til 4.3.0), som er bundlet i webgrensesnittet og leser
+  `config.yaml` når du importerer fra Bodil. Den gamle versjonen kunne bruke svært lang tid på
+  en fil med visse nøstede `<<`-referanser, slik at nettleserfanen ble hengende. Filen leses
+  kun i nettleseren din, så en slik fil kunne ikke påvirke andre brukere eller den hostede
+  tjenesten.
+- Oppdatert `postcss` (8.5.15 til 8.5.24), som kun brukes når prosjektet bygges, ikke av
+  ferdig installert Wenche.
 
 ### Lagt til
 
