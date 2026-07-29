@@ -64,7 +64,7 @@ i Altinn, slik at den får rett til å sende inn på vegne av selskapet, og så 
 tallene og sender. Fødselsnummeret ditt lagres aldri, og dataene behandles kun i økten.
 Tjenesten bygger på nøyaktig samme åpne kildekode som denne self-hosted-versjonen.
 
-Drifts- og deploy-dokumentasjon for operatøren: [`hosted/README.md`](hosted/README.md).
+Drifts- og deploy-dokumentasjon for operatøren: [`hosted/README.md`](https://github.com/olefredrik/Wenche/blob/main/hosted/README.md).
 
 ## Dokumentasjon
 
@@ -101,7 +101,7 @@ Har du funnet en sikkerhetssårbarhet, ikke bruk et offentlig issue. Se [SECURIT
 
 ## Lisens
 
-MIT, se [LICENSE](LICENSE).
+MIT, se [LICENSE](https://github.com/olefredrik/Wenche/blob/main/LICENSE).
 
 ---
 
