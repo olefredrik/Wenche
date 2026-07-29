@@ -64,7 +64,7 @@ i Altinn, slik at den får rett til å sende inn på vegne av selskapet, og så 
 tallene og sender. Fødselsnummeret ditt lagres aldri, og dataene behandles kun i økten.
 Tjenesten bygger på nøyaktig samme åpne kildekode som denne self-hosted-versjonen.
 
-Drifts- og deploy-dokumentasjon for operatøren: [`hosted/README.md`](hosted/README.md).
+Drifts- og deploy-dokumentasjon for operatøren: [`hosted/README.md`](https://github.com/olefredrik/Wenche/blob/main/hosted/README.md).
 
 ## Dokumentasjon
 
@@ -97,9 +97,11 @@ Wenche er et hjelpeverktøy for enkle holdingselskaper og er i aktiv utvikling. 
 
 Bidrag er velkomne. Åpne gjerne en issue eller pull request.
 
+Har du funnet en sikkerhetssårbarhet, ikke bruk et offentlig issue. Se [SECURITY.md](https://github.com/olefredrik/Wenche/blob/main/SECURITY.md) for hvordan du rapporterer privat.
+
 ## Lisens
 
-MIT, se [LICENSE](LICENSE).
+MIT, se [LICENSE](https://github.com/olefredrik/Wenche/blob/main/LICENSE).
 
 ---
 
