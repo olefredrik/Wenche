@@ -97,6 +97,8 @@ Wenche er et hjelpeverktøy for enkle holdingselskaper og er i aktiv utvikling. 
 
 Bidrag er velkomne. Åpne gjerne en issue eller pull request.
 
+Har du funnet en sikkerhetssårbarhet, ikke bruk et offentlig issue. Se [SECURITY.md](https://github.com/olefredrik/Wenche/blob/main/SECURITY.md) for hvordan du rapporterer privat.
+
 ## Lisens
 
 MIT, se [LICENSE](LICENSE).
