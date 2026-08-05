@@ -129,8 +129,8 @@ def generer_hovedskjema(regnskap: Aarsregnskap) -> bytes:
   <Skjemainnhold>
     <regnskapsperiode>
       <regnskapsaar orid="17102">{aar}</regnskapsaar>
-      <regnskapsstart orid="17103">{aar}-01-01</regnskapsstart>
-      <regnskapsslutt orid="17104">{aar}-12-31</regnskapsslutt>
+      <regnskapsstart orid="17103">{regnskap.periode_start.isoformat()}</regnskapsstart>
+      <regnskapsslutt orid="17104">{regnskap.periode_slutt.isoformat()}</regnskapsslutt>
     </regnskapsperiode>
     <konsern>
       <morselskap orid="4168">{morselskap}</morselskap>

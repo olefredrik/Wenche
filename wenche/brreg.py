@@ -9,6 +9,8 @@ sin selvbetjenings-navnematch, som beholder en strengere feilkontrakt (se hosted
 """
 from __future__ import annotations
 
+from datetime import date
+
 import httpx
 
 _BASE = "https://data.brreg.no/enhetsregisteret/api/enheter"
@@ -62,6 +64,21 @@ def parse_stiftelsesaar(data: dict) -> int:
         return 0
 
 
+def parse_stiftelsesdato(data: dict) -> str:
+    """
+    Hele `stiftelsesdato` (YYYY-MM-DD) fra et enhets-svar. Tom streng om ukjent eller ugyldig.
+
+    Årstallet alene er ikke nok: aksjonærregisteroppgaven oppgir stiftelsesdato, og et
+    forlenget første regnskapsår starter på stiftelsesdatoen. Begge ble før satt til 1. januar
+    fordi oppslaget kastet bort dag og måned.
+    """
+    stiftelsesdato = (data.get("stiftelsesdato") or "").strip()
+    try:
+        return date.fromisoformat(stiftelsesdato).isoformat()
+    except ValueError:
+        return ""
+
+
 def _format_adresse(adr: dict) -> str:
     """Sett sammen brregs strukturerte forretningsadresse til én linje, f.eks.
     «Kong Carls gate 29, 4010 STAVANGER». Tom streng om adressen mangler."""
@@ -78,6 +95,7 @@ def parse_enhet(data: dict) -> dict:
         "navn": data.get("navn") or "",
         "forretningsadresse": _format_adresse(data.get("forretningsadresse") or {}),
         "stiftelsesaar": parse_stiftelsesaar(data),
+        "stiftelsesdato": parse_stiftelsesdato(data),
     }
 
 
@@ -103,4 +121,6 @@ def hent_roller(orgnr: str, *, timeout: float = 5.0) -> dict:
 def hent_enhet(orgnr: str, *, timeout: float = 5.0) -> dict:
     """Navn, forretningsadresse og stiftelsesår for orgnr fra Enhetsregisteret. Fail-soft (tomt ved feil)."""
     data = _hent_json(f"{_BASE}/{orgnr}", timeout)
-    return parse_enhet(data) if data else {"navn": "", "forretningsadresse": "", "stiftelsesaar": 0}
+    if not data:
+        return {"navn": "", "forretningsadresse": "", "stiftelsesaar": 0, "stiftelsesdato": ""}
+    return parse_enhet(data)

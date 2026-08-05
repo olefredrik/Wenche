@@ -25,6 +25,10 @@ class Selskap:
     stiftelsesaar: int
     aksjekapital: float
     kontakt_epost: str = ""     # Påkrevd for aksjonærregisteroppgave (RF-1086)
+    # Eksakt stiftelsesdato når den er kjent (hentes fra Enhetsregisteret). Årstallet alene
+    # holder ikke overalt: aksjonærregisteroppgaven oppgir stiftelsesdato, og et forlenget
+    # første regnskapsår starter på stiftelsesdatoen, ikke 1. januar.
+    stiftelsesdato: Optional[date] = None
 
 
 # ---------------------------------------------------------------------------
@@ -215,6 +219,28 @@ class Aarsregnskap:
     foregaaende_aar_resultat: Resultatregnskap = field(default_factory=Resultatregnskap)
     foregaaende_aar_balanse: Balanse = field(default_factory=Balanse)
     utbytte_utbetalt: float = 0.0              # Totalt utbytte utbetalt til aksjonærer i løpet av året
+    # Regnskapsperioden. Normalt hele kalenderåret (rskl. § 1-7 første ledd), og da kan begge
+    # stå tomme. Settes bare når perioden avviker, i praksis et forlenget første regnskapsår
+    # etter § 1-7 andre ledd: da starter perioden på stiftelsesdatoen og kan løpe i inntil
+    # 18 måneder, fram til 31.12 året etter.
+    regnskapsstart: Optional[date] = None
+    regnskapsslutt: Optional[date] = None
+
+    @property
+    def periode_start(self) -> date:
+        """Første dag i regnskapsperioden. 1. januar med mindre noe annet er oppgitt."""
+        return self.regnskapsstart or date(self.regnskapsaar, 1, 1)
+
+    @property
+    def periode_slutt(self) -> date:
+        """Siste dag i regnskapsperioden. 31. desember med mindre noe annet er oppgitt."""
+        return self.regnskapsslutt or date(self.regnskapsaar, 12, 31)
+
+    @property
+    def periode_maaneder(self) -> int:
+        """Antall kalendermåneder perioden berører. 12 for et vanlig regnskapsår."""
+        start, slutt = self.periode_start, self.periode_slutt
+        return (slutt.year * 12 + slutt.month) - (start.year * 12 + start.month) + 1
 
 
 # ---------------------------------------------------------------------------

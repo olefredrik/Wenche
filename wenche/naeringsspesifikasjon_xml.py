@@ -455,9 +455,9 @@ def generer_naeringsspesifikasjon(
 
     regnskapsperiode = SubElement(virksomhet, "regnskapsperiode")
     start = SubElement(regnskapsperiode, "start")
-    SubElement(start, "dato").text = f"{regnskap.regnskapsaar}-01-01"
+    SubElement(start, "dato").text = regnskap.periode_start.isoformat()
     slutt = SubElement(regnskapsperiode, "slutt")
-    SubElement(slutt, "dato").text = f"{regnskap.regnskapsaar}-12-31"
+    SubElement(slutt, "dato").text = regnskap.periode_slutt.isoformat()
 
     vt = SubElement(virksomhet, "virksomhetstype")
     SubElement(vt, "virksomhetstype").text = "oevrigSelskap"

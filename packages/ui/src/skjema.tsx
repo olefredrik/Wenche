@@ -6,7 +6,7 @@ import { Inn, TallInput, TallFelt } from "./komponenter";
 // Skjema-drevet datainntasting. Feltstrukturen er data; én generisk renderer bygger
 // config-objektet (samme form som config.yaml) som sendes til backenden.
 
-type FeltType = "number" | "text" | "checkbox";
+type FeltType = "number" | "text" | "checkbox" | "date";
 interface Felt {
   key: string; // punkt-sti inn i config, f.eks. "selskap.navn"
   label: string;
@@ -71,10 +71,29 @@ const SEKSJONER: Seksjon[] = [
       { key: "selskap.styreleder", label: "Styreleder", type: "text" },
       { key: "selskap.forretningsadresse", label: "Forretningsadresse", type: "text" },
       { key: "selskap.stiftelsesaar", label: "Stiftelsesår", type: "number" },
+      {
+        key: "selskap.stiftelsesdato",
+        label: "Stiftelsesdato",
+        type: "date",
+        valgfri: true,
+        help: "Hentes fra Enhetsregisteret. Brukes i aksjonærregisteroppgaven",
       },
       { key: "selskap.aksjekapital", label: "Aksjekapital (kr)", type: "number" },
       { key: "selskap.kontakt_epost", label: "Kontakt-e-post", type: "text" },
       { key: "regnskapsaar", label: "Regnskapsår", type: "number" },
+      {
+        key: "regnskapsstart",
+        label: "Regnskapsperiode fra",
+        type: "date",
+        valgfri: true,
+        help: "Kun ved forlenget første regnskapsår. Tom = 1. januar",
+      },
+      {
+        key: "regnskapsslutt",
+        label: "Regnskapsperiode til",
+        type: "date",
+        valgfri: true,
+        help: "Kun ved forlenget første regnskapsår. Tom = 31. desember",
       },
     ],
   },
@@ -370,7 +389,7 @@ function Feltrutenett({
             ) : (
               <input
                 className={`${input} ${laast ? "cursor-not-allowed opacity-60" : ""}`}
-                type="text"
+                type={f.type === "date" ? "date" : "text"}
                 value={hent(config, f.key) ?? ""}
                 disabled={laast}
                 title={laast ? "Låst til selskapet i invitasjonen" : undefined}
@@ -488,6 +507,7 @@ export function DataSkjema({
               daglig_leder: String(s.daglig_leder ?? "").trim() || d.daglig_leder || "",
               styreleder: String(s.styreleder ?? "").trim() || d.styreleder || "",
               stiftelsesaar: Number(s.stiftelsesaar) || d.stiftelsesaar || 0,
+              stiftelsesdato: String(s.stiftelsesdato ?? "").trim() || d.stiftelsesdato || "",
             },
           };
           pristine.current = JSON.stringify(oppdatert);
