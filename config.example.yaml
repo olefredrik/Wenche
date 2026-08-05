@@ -12,6 +12,8 @@ selskap:
   styreleder: ""                    # Kan være samme person som daglig leder
   forretningsadresse: "Eksempelgata 1, 0001 Oslo"
   stiftelsesaar: 2022
+  # stiftelsesdato: 2018-03-14        # Valgfri, eksakt dato (ÅÅÅÅ-MM-DD). Hentes fra
+                                      # Enhetsregisteret. Brukes i aksjonærregisteroppgaven
   aksjekapital: 30000               # NOK — fra stiftelsesdokumentene
   kontakt_epost: ""                 # Påkrevd for aksjonærregisteroppgave (RF-1086)
 
@@ -35,6 +37,20 @@ resultatregnskap:
     andre_finansinntekter: 0          # Renteinntekter og andre finansinntekter
     rentekostnader: 0                 # Renter på lån
     andre_finanskostnader: 0          # Andre finanskostnader
+
+  # Skattekostnad på ordinært resultat (rskl. § 6-1). Egen linje før årsresultatet.
+  # 0 for et selskap uten skattepliktig inntekt; har selskapet f.eks. renteinntekt,
+  # føres skatten her (og som betalbar_skatt i balansen hvis den ikke er betalt).
+  skattekostnad: 0
+
+# --- Regnskapsperiode (valgfritt) ---
+# Normalt hele kalenderåret, og da skal begge stå urørt.
+# Oppgi dem bare ved forlenget første regnskapsår (rskl. § 1-7 andre ledd): et selskap
+# stiftet sent på året kan la det første regnskapsåret løpe i inntil 18 måneder, fram til
+# 31.12 året etter. Da skal regnskapsaar over være året perioden AVSLUTTES.
+#
+# regnskapsstart: 2025-11-20      # Stiftelsesdatoen
+# regnskapsslutt: 2026-12-31      # Alltid 31. desember
 
 # --- Balanse ---
 # Balansen skal gå opp: sum eiendeler = sum egenkapital og gjeld.
@@ -60,6 +76,8 @@ balanse:
       andre_langsiktige_laan: 0       # Banklån og andre lån med løpetid over 1 år
     kortsiktig_gjeld:
       leverandoergjeld: 0             # Ubetalte fakturaer per 31.12
+      betalbar_skatt: 0               # Skyldig selskapsskatt per 31.12 (konto 2500),
+                                      # motposten til skattekostnaden i resultatregnskapet
       skyldige_offentlige_avgifter: 0 # Skyldig mva, arbeidsgiveravgift o.l.
       annen_kortsiktig_gjeld: 0       # Annen gjeld med forfall innen 1 år
 
@@ -82,6 +100,7 @@ foregaaende_aar:
       andre_finansinntekter: 0
       rentekostnader: 0
       andre_finanskostnader: 0
+    skattekostnad: 0
   balanse:
     eiendeler:
       anleggsmidler:
@@ -101,6 +120,7 @@ foregaaende_aar:
         andre_langsiktige_laan: 0
       kortsiktig_gjeld:
         leverandoergjeld: 0
+        betalbar_skatt: 0
         skyldige_offentlige_avgifter: 0
         annen_kortsiktig_gjeld: 0
 

@@ -61,7 +61,7 @@ Sammendraget inneholder:
 
 - Alle felt i næringsspesifikasjonen ferdig utfylt
 - Skatteberegning med fritaksmetoden der det er aktuelt
-- Beregnet skatt (22 %)
+- Beregnet skatt (22 %), og en kontroll mot skattekostnaden du har ført
 - Skattekostnad ført i resultatregnskapet
 - Fremførbart underskudd hvis selskapet gikk med tap
 - **Egenkapitalnote** (rskl. § 7-2b) med bevegelse per egenkapitalpost (inngående balanse, årsresultat, utbytte og utgående balanse)

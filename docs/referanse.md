@@ -18,6 +18,7 @@ Alle beløp oppgis i hele kroner (NOK). Bruk `0` for poster som ikke er aktuelle
 | `styreleder` | tekst | ja | Fullt navn på styreleder (kan være samme som daglig leder) |
 | `forretningsadresse` | tekst | ja | Gateadresse, postnummer og poststed |
 | `stiftelsesaar` | heltall | ja | Året selskapet ble stiftet |
+| `stiftelsesdato` | dato | nei | Eksakt stiftelsesdato (ÅÅÅÅ-MM-DD). Hentes fra Enhetsregisteret. Brukes som stiftelsesdato i aksjonærregisteroppgaven, og som start på et forlenget første regnskapsår. Uten den brukes 1. januar i stiftelsesåret |
 | `aksjekapital` | heltall | ja | Innbetalt aksjekapital i NOK, fra stiftelsesdokumentene |
 
 ### `regnskapsaar`
@@ -51,6 +52,29 @@ Alle beløp oppgis i hele kroner (NOK). Bruk `0` for poster som ikke er aktuelle
 | `andre_finansinntekter` | heltall | Renteinntekter og andre finansinntekter |
 | `rentekostnader` | heltall | Renter på lån |
 | `andre_finanskostnader` | heltall | Andre finanskostnader |
+
+#### Regnskapsperiode
+
+Feltene ligger på toppnivå i `config.yaml`, ved siden av `regnskapsaar`. Begge er valgfrie.
+
+| Felt | Type | Beskrivelse |
+|---|---|---|
+| `regnskapsstart` | dato | Første dag i regnskapsperioden (ÅÅÅÅ-MM-DD). Tom = 1. januar i regnskapsåret |
+| `regnskapsslutt` | dato | Siste dag i regnskapsperioden. Tom = 31. desember i regnskapsåret |
+
+Regnskapsåret er normalt kalenderåret (regnskapsloven § 1-7 første ledd), og da skal begge stå tomme. De oppgis bare ved **forlenget første regnskapsår** etter § 1-7 andre ledd: et selskap stiftet sent på året kan la det første regnskapsåret løpe i inntil 18 måneder, fram til 31. desember året etter. Perioden starter da på stiftelsesdatoen, og `regnskapsaar` skal være året perioden avsluttes.
+
+Wenche stopper innsendingen hvis perioden ikke kan tolkes entydig: over 18 måneder, slutt som ikke er 31. desember, slutt før start, eller `regnskapsaar` som ikke er sluttåret. En periode over 12 måneder gir en advarsel som viser hvilket inntektsår den fastsettes i.
+
+#### Skattekostnad
+
+Feltet ligger direkte under `resultatregnskap`, ikke i en underseksjon.
+
+| Felt | Type | Beskrivelse |
+|---|---|---|
+| `skattekostnad` | heltall | Skattekostnad på ordinært resultat (rskl. § 6-1). Egen linje mellom resultat før skatt og årsresultat. 0 for et selskap uten skattepliktig inntekt |
+
+Årsresultatet utledes som resultat før skatt minus skattekostnad. Har selskapet skattepliktig inntekt (for eksempel renteinntekt, eller 3 %-tillegget på fritatt utbytte), skal skatten føres her, og som `betalbar_skatt` i balansen hvis den ikke er betalt ved årsslutt. Wenche kan foreslå tallet: knappen «Foreslå skattekostnad» i Tall-steget regner ut 22 % av skattepliktig inntekt. Forslaget føres aldri automatisk.
 
 ### `balanse`
 
@@ -89,7 +113,8 @@ Alle beløp oppgis i hele kroner (NOK). Bruk `0` for poster som ikke er aktuelle
 | Felt | Type | Beskrivelse |
 |---|---|---|
 | `leverandoergjeld` | heltall | Ubetalte fakturaer per 31.12 |
-| `skyldige_offentlige_avgifter` | heltall | Skyldig mva, arbeidsgiveravgift, skyldig skatt o.l. |
+| `betalbar_skatt` | heltall | Skyldig selskapsskatt per 31.12 (konto 2500), motposten til `skattekostnad` |
+| `skyldige_offentlige_avgifter` | heltall | Skyldig mva, arbeidsgiveravgift o.l. |
 | `annen_kortsiktig_gjeld` | heltall | Annen gjeld med forfall innen 1 år |
 
 ### `foregaaende_aar` (valgfritt)
