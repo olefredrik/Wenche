@@ -165,3 +165,58 @@ def test_xml_med_entitetsdefinisjoner_avvises():
     ).encode("utf-8")
     with pytest.raises(ValueError):
         importer_bytes(ondsinnet)
+
+
+def test_skattekostnad_importeres():
+    # Skattekostnaden har egen kategori i SAF-T. Uten mapping falt den ut av importen, og
+    # balansen gikk ikke opp for et selskap med skattepliktig inntekt.
+    cfg = importer_bytes(
+        _saft_xml(
+            _konto("finansinntekt", "8050", ub_kredit=50000)
+            + _konto("skattekostnad", "8300", ub_debet=11000)
+        )
+    )
+    assert cfg["resultatregnskap"]["skattekostnad"] == 11000
+
+
+def test_skattekostnad_paa_kode_alene():
+    # Fallback: 83-serien er skatt uansett hva kategorien sier.
+    cfg = importer_bytes(_saft_xml(_konto("ukjentKategori", "8300", ub_debet=11000)))
+    assert cfg["resultatregnskap"]["skattekostnad"] == 11000
+
+
+def test_betalbar_skatt_egen_linje():
+    # 2500 lå tidligere i skyldige offentlige avgifter. Den er motposten til skattekostnaden,
+    # og har nå egen linje (rskl. § 6-2).
+    cfg = importer_bytes(
+        _saft_xml(
+            _konto("kortsiktigGjeld", "2500", ub_kredit=11000)
+            + _konto("kortsiktigGjeld", "2700", ub_kredit=3000)
+        )
+    )
+    kg = cfg["balanse"]["egenkapital_og_gjeld"]["kortsiktig_gjeld"]
+    assert kg["betalbar_skatt"] == 11000
+    assert kg["skyldige_offentlige_avgifter"] == 3000
+
+
+def test_saft_import_gir_balanse_som_gaar_opp_med_skatt():
+    # Ende-til-ende for caset i rapporten: renteinntekt, skattekostnad og skattegjeld.
+    cfg = importer_bytes(
+        _saft_xml(
+            _konto("finansinntekt", "8050", ub_kredit=50000)
+            + _konto("skattekostnad", "8300", ub_debet=11000)
+            + _konto("balanseverdiForOmloepsmiddel", "1920", ub_debet=189000)
+            + _konto("egenkapital", "2000", ub_kredit=30000)
+            + _konto("egenkapital", "2050", ub_kredit=148000)
+            + _konto("kortsiktigGjeld", "2500", ub_kredit=11000)
+        )
+    )
+    from wenche import aarsregnskap as ar
+
+    regnskap = ar.les_config(
+        {**cfg, "selskap": {**cfg["selskap"], "daglig_leder": "D L", "styreleder": "D L",
+                            "stiftelsesaar": 2020, "aksjekapital": 30000}}
+    )
+    assert regnskap.resultatregnskap.resultat_foer_skatt == 50000
+    assert regnskap.resultatregnskap.aarsresultat == 39000
+    assert ar.valider(regnskap) == []
