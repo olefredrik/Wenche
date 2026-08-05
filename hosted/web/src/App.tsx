@@ -625,6 +625,7 @@ function TallFane({
           laastOrg={org ?? undefined}
           importerSaft={api.importerSaft}
           prefillSelskap={api.selskap}
+          beregnSkatt={(c) => api.dokument("skatteberegning", c)}
           saftMerknad="SAF-T-filen behandles i minnet i EØS og lagres ikke."
           ekstraSeksjon={<NoterSeksjon noter={noter} setNoter={setNoter} />}
         />

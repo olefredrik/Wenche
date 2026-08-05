@@ -6,7 +6,7 @@ import { Inn, TallInput, TallFelt } from "./komponenter";
 // Skjema-drevet datainntasting. Feltstrukturen er data; én generisk renderer bygger
 // config-objektet (samme form som config.yaml) som sendes til backenden.
 
-type FeltType = "number" | "text" | "checkbox";
+type FeltType = "number" | "text" | "checkbox" | "date";
 interface Felt {
   key: string; // punkt-sti inn i config, f.eks. "selskap.navn"
   label: string;
@@ -30,6 +30,12 @@ const RESULTAT_FELTER: Felt[] = [
   { key: "resultatregnskap.finansposter.andre_finansinntekter", label: "Andre finansinntekter", type: "number" },
   { key: "resultatregnskap.finansposter.rentekostnader", label: "Rentekostnader", type: "number" },
   { key: "resultatregnskap.finansposter.andre_finanskostnader", label: "Andre finanskostnader", type: "number" },
+  {
+    key: "resultatregnskap.skattekostnad",
+    label: "Skattekostnad",
+    type: "number",
+    help: "Egen linje før årsresultatet (rskl. § 6-1). 0 uten skattepliktig inntekt",
+  },
 ];
 
 const BALANSE_FELTER: Felt[] = [
@@ -44,6 +50,12 @@ const BALANSE_FELTER: Felt[] = [
   { key: "balanse.egenkapital_og_gjeld.langsiktig_gjeld.laan_fra_aksjonaer", label: "Lån fra aksjonær", type: "number" },
   { key: "balanse.egenkapital_og_gjeld.langsiktig_gjeld.andre_langsiktige_laan", label: "Andre langsiktige lån", type: "number" },
   { key: "balanse.egenkapital_og_gjeld.kortsiktig_gjeld.leverandoergjeld", label: "Leverandørgjeld", type: "number" },
+  {
+    key: "balanse.egenkapital_og_gjeld.kortsiktig_gjeld.betalbar_skatt",
+    label: "Betalbar skatt",
+    type: "number",
+    help: "Motposten til skattekostnaden (konto 2500), hvis skatten ikke er betalt ved årsslutt",
+  },
   { key: "balanse.egenkapital_og_gjeld.kortsiktig_gjeld.skyldige_offentlige_avgifter", label: "Skyldige offentlige avgifter", type: "number" },
   { key: "balanse.egenkapital_og_gjeld.kortsiktig_gjeld.annen_kortsiktig_gjeld", label: "Annen kortsiktig gjeld", type: "number" },
 ];
@@ -59,9 +71,30 @@ const SEKSJONER: Seksjon[] = [
       { key: "selskap.styreleder", label: "Styreleder", type: "text" },
       { key: "selskap.forretningsadresse", label: "Forretningsadresse", type: "text" },
       { key: "selskap.stiftelsesaar", label: "Stiftelsesår", type: "number" },
+      {
+        key: "selskap.stiftelsesdato",
+        label: "Stiftelsesdato",
+        type: "date",
+        valgfri: true,
+        help: "Hentes fra Enhetsregisteret. Brukes i aksjonærregisteroppgaven",
+      },
       { key: "selskap.aksjekapital", label: "Aksjekapital (kr)", type: "number" },
       { key: "selskap.kontakt_epost", label: "Kontakt-e-post", type: "text" },
       { key: "regnskapsaar", label: "Regnskapsår", type: "number" },
+      {
+        key: "regnskapsstart",
+        label: "Regnskapsperiode fra",
+        type: "date",
+        valgfri: true,
+        help: "Kun ved forlenget første regnskapsår. Tom = 1. januar",
+      },
+      {
+        key: "regnskapsslutt",
+        label: "Regnskapsperiode til",
+        type: "date",
+        valgfri: true,
+        help: "Kun ved forlenget første regnskapsår. Tom = 31. desember",
+      },
     ],
   },
   { id: "resultatregnskap", tittel: "Resultatregnskap", felter: RESULTAT_FELTER },
@@ -210,6 +243,7 @@ const EKSEMPEL: any = {
       rentekostnader: 0,
       andre_finanskostnader: 0,
     },
+    skattekostnad: 0,
   },
   balanse: {
     eiendeler: {
@@ -221,6 +255,7 @@ const EKSEMPEL: any = {
       langsiktig_gjeld: { laan_fra_aksjonaer: 0, andre_langsiktige_laan: 0 },
       kortsiktig_gjeld: {
         leverandoergjeld: 0,
+        betalbar_skatt: 0,
         skyldige_offentlige_avgifter: 0,
         annen_kortsiktig_gjeld: 0,
       },
@@ -239,6 +274,7 @@ const EKSEMPEL: any = {
         rentekostnader: 0,
         andre_finanskostnader: 0,
       },
+      skattekostnad: 0,
     },
     balanse: {
       eiendeler: {
@@ -250,6 +286,7 @@ const EKSEMPEL: any = {
         langsiktig_gjeld: { laan_fra_aksjonaer: 0, andre_langsiktige_laan: 0 },
         kortsiktig_gjeld: {
           leverandoergjeld: 0,
+          betalbar_skatt: 0,
           skyldige_offentlige_avgifter: 0,
           annen_kortsiktig_gjeld: 0,
         },
@@ -352,7 +389,7 @@ function Feltrutenett({
             ) : (
               <input
                 className={`${input} ${laast ? "cursor-not-allowed opacity-60" : ""}`}
-                type="text"
+                type={f.type === "date" ? "date" : "text"}
                 value={hent(config, f.key) ?? ""}
                 disabled={laast}
                 title={laast ? "Låst til selskapet i invitasjonen" : undefined}
@@ -376,6 +413,7 @@ export function DataSkjema({
   importerSaft,
   saftMerknad,
   prefillSelskap,
+  beregnSkatt,
 }: {
   onLagre: (config: unknown) => Promise<void>;
   visEksempel?: boolean;
@@ -400,6 +438,11 @@ export function DataSkjema({
   // stiftelsesår) fra Enhetsregisteret. Hostet injiserer henteren; self-hosted lar den være.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   prefillSelskap?: () => Promise<any>;
+  // Valgfritt forslag til skattekostnad: kjernen beregner 22 % av skattepliktig inntekt fra
+  // tallene i skjemaet. Forslag, aldri auto-utfylling: brukeren fører selv tallet han signerer
+  // på. Uten denne vises ikke forslags-knappen.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  beregnSkatt?: (config: any) => Promise<any>;
 }) {
   const laasteFelter = laastOrg ? ["selskap.org_nummer"] : [];
   // Tving org til det låste selskapet (brukes ved start, Bodil-import og eksempeldata).
@@ -464,6 +507,7 @@ export function DataSkjema({
               daglig_leder: String(s.daglig_leder ?? "").trim() || d.daglig_leder || "",
               styreleder: String(s.styreleder ?? "").trim() || d.styreleder || "",
               stiftelsesaar: Number(s.stiftelsesaar) || d.stiftelsesaar || 0,
+              stiftelsesdato: String(s.stiftelsesdato ?? "").trim() || d.stiftelsesdato || "",
             },
           };
           pristine.current = JSON.stringify(oppdatert);
@@ -479,6 +523,25 @@ export function DataSkjema({
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const oppdater = (key: string, val: any) => setConfig((c: any) => sett(c, key, val));
+
+  // Forslag til skattekostnad. Hentes kun når brukeren ber om det, og settes kun inn ved et
+  // eksplisitt trykk: Wenche fastsetter ikke tallet, den regner det ut som hjelp.
+  const [skattForslag, setSkattForslag] = useState<number | null>(null);
+  const [skattLaster, setSkattLaster] = useState(false);
+  const [skattFeil, setSkattFeil] = useState<string | null>(null);
+  const hentSkattForslag = async () => {
+    if (!beregnSkatt) return;
+    setSkattLaster(true);
+    setSkattFeil(null);
+    try {
+      const d = await beregnSkatt(normaliserForLagring(config));
+      setSkattForslag(Number(d?.beregnet_skatt) || 0);
+    } catch (e) {
+      setSkattFeil(e instanceof Error ? e.message : "Klarte ikke å beregne skatten");
+    } finally {
+      setSkattLaster(false);
+    }
+  };
 
   const sumEiendeler = BALANSE_EIENDELER.reduce((s, k) => s + (Number(hent(config, k)) || 0), 0);
   const sumEkGjeld = BALANSE_EK_GJELD.reduce((s, k) => s + (Number(hent(config, k)) || 0), 0);
@@ -802,6 +865,37 @@ export function DataSkjema({
         <section key={s.tittel} id={s.id} className="scroll-mt-32">
           <h3 className="mb-4 font-display text-xl font-normal">{s.tittel}</h3>
           <Feltrutenett felter={s.felter} config={config} oppdater={oppdater} laasteFelter={laasteFelter} />
+          {s.id === "resultatregnskap" && beregnSkatt && (
+            <div className="mt-4 text-sm">
+              <div className="flex flex-wrap items-center gap-3">
+                <button className={btnOutline} onClick={hentSkattForslag} disabled={skattLaster}>
+                  {skattLaster ? "Beregner…" : "Foreslå skattekostnad"}
+                </button>
+                {skattForslag !== null && (
+                  <>
+                    <span className="text-muted-foreground">
+                      Beregnet skatt (22 %): {kr(skattForslag)}
+                    </span>
+                    <button
+                      className="text-spruce underline underline-offset-2"
+                      onClick={() => oppdater("resultatregnskap.skattekostnad", skattForslag)}
+                    >
+                      Sett inn
+                    </button>
+                  </>
+                )}
+              </div>
+              {skattFeil && <p className="mt-2 text-red-700">{skattFeil}</p>}
+              {skattForslag !== null && (
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  Forslaget er 22 % av skattepliktig inntekt slik Wenche beregner den, etter
+                  fritaksmetoden og fremført underskudd. Det dekker ikke utsatt skatt eller andre
+                  permanente forskjeller, så kontroller tallet før du fører det. Husk «Betalbar
+                  skatt» under kortsiktig gjeld hvis skatten ikke er betalt ved årsslutt.
+                </p>
+              )}
+            </div>
+          )}
           {s.id === "balanse" && (
             <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
               <span className="text-muted-foreground">Sum eiendeler: {kr(sumEiendeler)}</span>

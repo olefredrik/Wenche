@@ -129,8 +129,8 @@ def generer_hovedskjema(regnskap: Aarsregnskap) -> bytes:
   <Skjemainnhold>
     <regnskapsperiode>
       <regnskapsaar orid="17102">{aar}</regnskapsaar>
-      <regnskapsstart orid="17103">{aar}-01-01</regnskapsstart>
-      <regnskapsslutt orid="17104">{aar}-12-31</regnskapsslutt>
+      <regnskapsstart orid="17103">{regnskap.periode_start.isoformat()}</regnskapsstart>
+      <regnskapsslutt orid="17104">{regnskap.periode_slutt.isoformat()}</regnskapsslutt>
     </regnskapsperiode>
     <konsern>
       <morselskap orid="4168">{morselskap}</morselskap>
@@ -299,6 +299,7 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
           <aarets orid="167">{_i(r.resultat_foer_skatt)}</aarets>
           <fjoraarets orid="7042">{_i(fr.resultat_foer_skatt)}</fjoraarets>
         </resultatFoerSkattekostnad>
+        {linje("skattekostnad", r.skattekostnad, "Skattekostnad på ordinært resultat", "29013", "11835", "11836", fr.skattekostnad)}
         <aarsresultat>
           <aarets orid="172">{_i(r.aarsresultat)}</aarets>
           <fjoraarets orid="7054">{_i(fr.aarsresultat)}</fjoraarets>
@@ -408,6 +409,7 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
         </balanseGjeldAvsetningerForpliktelserAnnenLangsiktigGjeld>
         <balanseKortsiktigGjeld>
           {linje_enkel("leverandoergjeld", kg.leverandoergjeld, "220", "7162", fkg.leverandoergjeld)}
+          {linje("betalbarSkatt", kg.betalbar_skatt, "Betalbar skatt", "29038", "2483", "10293", fkg.betalbar_skatt)}
           {linje("skyldigeOffentligeAvgifter", kg.skyldige_offentlige_avgifter, "Skyldige offentlige avgifter", "29039", "225", "7170", fkg.skyldige_offentlige_avgifter)}
           {linje("annenKortsiktigGjeld", kg.annen_kortsiktig_gjeld, "Annen kortsiktig gjeld", "29040", "236", "7182", fkg.annen_kortsiktig_gjeld)}
           <sumKortsiktigGjeld>

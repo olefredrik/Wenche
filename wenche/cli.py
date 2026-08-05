@@ -408,7 +408,7 @@ def send_skattemelding(config_fil: str, dry_run: bool):
         click.echo(f"Partsnummer: {partsnummer}")
 
         skattemelding_xml = generer_skattemelding_fra_konfig(regnskap, konfig, partsnummer)
-        naeringsspesifikasjon_xml = generer_naeringsspesifikasjon(regnskap, partsnummer)
+        naeringsspesifikasjon_xml = generer_naeringsspesifikasjon(regnskap, partsnummer, konfig)
 
         if dry_run:
             ut_fil = Path("skattemelding.xml")
@@ -497,7 +497,7 @@ def valider_skattemelding(config_fil: str):
         click.echo(f"Partsnummer: {partsnummer}")
 
         skattemelding_xml = generer_skattemelding_fra_konfig(regnskap, konfig, partsnummer)
-        naeringsspesifikasjon_xml = generer_naeringsspesifikasjon(regnskap, partsnummer)
+        naeringsspesifikasjon_xml = generer_naeringsspesifikasjon(regnskap, partsnummer, konfig)
         konvolutt = generer_konvolutt(
             skattemelding_xml=skattemelding_xml,
             inntektsaar=regnskap.regnskapsaar,

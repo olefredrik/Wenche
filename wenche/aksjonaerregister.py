@@ -25,6 +25,19 @@ from wenche.skd_client import SkdAksjonaerClient
 _BRG_ENHET_URL = "https://data.brreg.no/enhetsregisteret/api/enheter"
 
 
+def _stiftelsestidspunkt(selskap: Selskap) -> str:
+    """
+    Stiftelsestidspunkt for RF-1086, som ISO-datetime.
+
+    Bruker den eksakte stiftelsesdatoen når den er kjent (Enhetsregisteret har den), og faller
+    ellers tilbake på 1. januar i stiftelsesåret. Fallbacket er en tilnærming: for et selskap
+    stiftet sent på året oppgav Wenche før 1. januar selv om registeret hadde riktig dato.
+    """
+    if selskap.stiftelsesdato:
+        return f"{selskap.stiftelsesdato.isoformat()}T00:00:00"
+    return f"{selskap.stiftelsesaar}-01-01T00:00:00"
+
+
 def _format_paalydende(verdi: float) -> str:
     """
     Formater pålydende per aksje for RF-1086-XMLen.
@@ -103,7 +116,7 @@ def generer_hovedskjema_xml(
         if totalt_aksjer > 0
         else "0"
     )
-    stiftelsesdato = f"{s.stiftelsesaar}-01-01T00:00:00"
+    stiftelsesdato = _stiftelsestidspunkt(s)
 
     # Fjorår-felter og stiftelsestransaksjon skal kun inkluderes i stiftelsesåret.
     # For påfølgende år er beholdningen uendret fra foregående år, og SKDs MTRA_004-regel
@@ -206,7 +219,7 @@ def generer_underskjema_xml(
     org = innsending_org or s.org_nummer
     aar = oppgave.regnskapsaar
     anskaffelsesverdi = round(aksjonaer.innbetalt_kapital_per_aksje * aksjonaer.antall_aksjer)
-    stiftelsesdato = f"{s.stiftelsesaar}-01-01T00:00:00"
+    stiftelsesdato = _stiftelsestidspunkt(s)
 
     # Transaksjoner skal kun inkluderes hvis stiftelsesåret er inntektsåret.
     # For påfølgende år er det ingen transaksjon — aksjonæren hadde samme beholdning

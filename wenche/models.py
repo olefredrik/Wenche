@@ -25,6 +25,10 @@ class Selskap:
     stiftelsesaar: int
     aksjekapital: float
     kontakt_epost: str = ""     # Påkrevd for aksjonærregisteroppgave (RF-1086)
+    # Eksakt stiftelsesdato når den er kjent (hentes fra Enhetsregisteret). Årstallet alene
+    # holder ikke overalt: aksjonærregisteroppgaven oppgir stiftelsesdato, og et forlenget
+    # første regnskapsår starter på stiftelsesdatoen, ikke 1. januar.
+    stiftelsesdato: Optional[date] = None
 
 
 # ---------------------------------------------------------------------------
@@ -73,6 +77,11 @@ class Resultatregnskap:
     driftsinntekter: Driftsinntekter = field(default_factory=Driftsinntekter)
     driftskostnader: Driftskostnader = field(default_factory=Driftskostnader)
     finansposter: Finansposter = field(default_factory=Finansposter)
+    # Skattekostnad på ordinært resultat, oppgitt som positiv kostnad (rskl. § 6-1 nr. 19).
+    # Egen linje fordi oppstillingsplanen krever den mellom resultat før skatt og årsresultat.
+    # 0 for et selskap uten skattepliktig inntekt (typisk holding med bare fritatt utbytte),
+    # men et selskap med renteinntekt har en reell skattekostnad som må stå her.
+    skattekostnad: float = 0.0
 
     @property
     def driftsresultat(self) -> float:
@@ -88,7 +97,7 @@ class Resultatregnskap:
 
     @property
     def aarsresultat(self) -> float:
-        return self.resultat_foer_skatt  # Skattekostnad = 0 for holdingselskap uten skattbar inntekt
+        return self.resultat_foer_skatt - self.skattekostnad
 
 
 # ---------------------------------------------------------------------------
@@ -150,6 +159,10 @@ class LangsiktigGjeld:
 @dataclass
 class KortsiktigGjeld:
     leverandoergjeld: float = 0.0
+    # Betalbar skatt, ikke fastsatt (konto 2500). Motposten til skattekostnaden i
+    # resultatregnskapet: uten denne linjen har et selskap med skattepliktig inntekt
+    # ingen riktig plass å føre skattegjelden, og balansen går ikke opp.
+    betalbar_skatt: float = 0.0
     skyldige_offentlige_avgifter: float = 0.0
     annen_kortsiktig_gjeld: float = 0.0
 
@@ -157,6 +170,7 @@ class KortsiktigGjeld:
     def sum(self) -> float:
         return (
             self.leverandoergjeld
+            + self.betalbar_skatt
             + self.skyldige_offentlige_avgifter
             + self.annen_kortsiktig_gjeld
         )
@@ -205,6 +219,28 @@ class Aarsregnskap:
     foregaaende_aar_resultat: Resultatregnskap = field(default_factory=Resultatregnskap)
     foregaaende_aar_balanse: Balanse = field(default_factory=Balanse)
     utbytte_utbetalt: float = 0.0              # Totalt utbytte utbetalt til aksjonærer i løpet av året
+    # Regnskapsperioden. Normalt hele kalenderåret (rskl. § 1-7 første ledd), og da kan begge
+    # stå tomme. Settes bare når perioden avviker, i praksis et forlenget første regnskapsår
+    # etter § 1-7 andre ledd: da starter perioden på stiftelsesdatoen og kan løpe i inntil
+    # 18 måneder, fram til 31.12 året etter.
+    regnskapsstart: Optional[date] = None
+    regnskapsslutt: Optional[date] = None
+
+    @property
+    def periode_start(self) -> date:
+        """Første dag i regnskapsperioden. 1. januar med mindre noe annet er oppgitt."""
+        return self.regnskapsstart or date(self.regnskapsaar, 1, 1)
+
+    @property
+    def periode_slutt(self) -> date:
+        """Siste dag i regnskapsperioden. 31. desember med mindre noe annet er oppgitt."""
+        return self.regnskapsslutt or date(self.regnskapsaar, 12, 31)
+
+    @property
+    def periode_maaneder(self) -> int:
+        """Antall kalendermåneder perioden berører. 12 for et vanlig regnskapsår."""
+        start, slutt = self.periode_start, self.periode_slutt
+        return (slutt.year * 12 + slutt.month) - (start.year * 12 + start.month) + 1
 
 
 # ---------------------------------------------------------------------------

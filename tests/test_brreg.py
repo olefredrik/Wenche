@@ -7,6 +7,7 @@ org, manglende felt og transient nettverksfeil skal aldri kaste, bare gi tomme v
 from unittest.mock import MagicMock, patch
 
 import httpx
+import pytest
 
 from wenche import brreg
 
@@ -83,7 +84,12 @@ def test_parse_enhet_navn_adresse_og_stiftelsesaar():
 
 
 def test_parse_enhet_tomt_svar():
-    assert brreg.parse_enhet({}) == {"navn": "", "forretningsadresse": "", "stiftelsesaar": 0}
+    assert brreg.parse_enhet({}) == {
+        "navn": "",
+        "forretningsadresse": "",
+        "stiftelsesaar": 0,
+        "stiftelsesdato": "",
+    }
 
 
 def _resp(status_code: int = 200, json_data: dict | None = None):
@@ -125,4 +131,26 @@ def test_hent_enhet_ok(mock_get):
 @patch("wenche.brreg.httpx.get")
 def test_hent_enhet_5xx_failsoft(mock_get):
     mock_get.return_value = _resp(status_code=503)
-    assert brreg.hent_enhet("999999999") == {"navn": "", "forretningsadresse": "", "stiftelsesaar": 0}
+    assert brreg.hent_enhet("999999999") == {
+        "navn": "",
+        "forretningsadresse": "",
+        "stiftelsesaar": 0,
+        "stiftelsesdato": "",
+    }
+
+
+def test_parse_stiftelsesdato_beholder_dag_og_maaned():
+    # Regresjon: oppslaget kastet før bort dag og måned, så RF-1086 oppgav 1. januar og et
+    # forlenget første regnskapsår startet på feil dato.
+    assert brreg.parse_stiftelsesdato({"stiftelsesdato": "2025-11-20"}) == "2025-11-20"
+
+
+@pytest.mark.parametrize("verdi", [None, "", "  ", "2025-13-01", "tullball", "2025"])
+def test_parse_stiftelsesdato_ugyldig_gir_tom(verdi):
+    assert brreg.parse_stiftelsesdato({"stiftelsesdato": verdi}) == ""
+
+
+def test_parse_enhet_tar_med_stiftelsesdato():
+    e = brreg.parse_enhet({"navn": "TEST AS", "stiftelsesdato": "2025-11-20"})
+    assert e["stiftelsesdato"] == "2025-11-20"
+    assert e["stiftelsesaar"] == 2025

@@ -8,11 +8,12 @@ Innsending via API krever registrering som systemleverandør hos Skatteetaten.
 Se modulens docstring i skattemelding.py for detaljer.
 """
 
-import math
-
 import yaml
 
 from wenche.aarsregnskap import _les_resultat, _les_balanse, _tall as _belop
+# Re-eksporteres bevisst: kallsteder (endepunkter, tester, CLI) har brukt sm.beregn_skatt
+# og sm.SKATTESATS siden før beregningen fikk egen modul.
+from wenche.skatteberegning import SKATTESATS, Skatteberegning, beregn_skatt
 from wenche.models import (
     Aarsregnskap,
     Balanse,
@@ -30,8 +31,6 @@ from wenche.models import (
     LangsiktigGjeld,
     KortsiktigGjeld,
 )
-
-SKATTESATS = 0.22  # 22 % selskapsskatt
 
 
 # Selskapsfelt skattemeldingen krever (org-nr utledes på annet vis ved innsending). I motsetning
@@ -130,13 +129,20 @@ def les_config(config_fil: str | dict) -> tuple[Aarsregnskap, SkattemeldingKonfi
         utbytte_utbetalt=utbytte_utbetalt,
     )
 
-    # Blanke tallfelt sendes som "" fra skjemaet, så vi tolererer dem (som leserne over) i
-    # stedet for å la float("")/int("") bli en naken 500. Tomt eierandel = 100 % (helt
-    # skattefritt), tom samlet_verdi = ingen overstyring.
-    sm_raw = raw.get("skattemelding", {})
+    return regnskap, _les_skattekonfig(raw)
+
+
+def _les_skattekonfig(raw: dict) -> SkattemeldingKonfig:
+    """Leser skattemelding-seksjonen av config-en.
+
+    Blanke tallfelt sendes som "" fra skjemaet, så vi tolererer dem (som leserne over) i
+    stedet for å la float("")/int("") bli en naken 500. Tomt eierandel = 100 % (helt
+    skattefritt), tom samlet_verdi = ingen overstyring.
+    """
+    sm_raw = raw.get("skattemelding") or {}
     _eierandel = sm_raw.get("eierandel_for_fritaksmetoden")
     _verdi_override = sm_raw.get("samlet_verdi_bak_aksjene")
-    konfig = SkattemeldingKonfig(
+    return SkattemeldingKonfig(
         underskudd_til_fremfoering=_belop(sm_raw.get("underskudd_til_fremfoering")),
         anvend_fritaksmetoden=bool(sm_raw.get("anvend_fritaksmetoden", True)),
         eierandel_for_fritaksmetoden=100 if _er_tom(_eierandel) else int(float(_eierandel)),
@@ -144,8 +150,6 @@ def les_config(config_fil: str | dict) -> tuple[Aarsregnskap, SkattemeldingKonfi
         formuesverdi_aksjer=_belop(sm_raw.get("formuesverdi_aksjer")),
         samlet_verdi_bak_aksjene=None if _er_tom(_verdi_override) else float(_verdi_override),
     )
-
-    return regnskap, konfig
 
 
 def _nok(beloep: float) -> str:
@@ -156,6 +160,19 @@ def _nok(beloep: float) -> str:
 def _nok2(aarets: float, fjoraarets: float) -> str:
     """Formaterer to beløp side om side (inneværende og foregående år)."""
     return f"{round(aarets):>12,} kr   {round(fjoraarets):>12,} kr".replace(",", " ")
+
+
+def beregn_skatt_fra_config(config_fil: str | dict) -> tuple[Skatteberegning, float]:
+    """
+    Beregner skatten direkte fra en config, og returnerer (beregning, ført skattekostnad).
+
+    Leser bare resultatregnskapet og skattemelding-seksjonen, ikke selskapsopplysningene:
+    forslaget hentes fra Tall-steget, der stiftelsesår og aksjekapital godt kan stå tomme
+    ennå. les_config ville kastet på dem.
+    """
+    raw = _raw(config_fil)
+    resultat = _les_resultat(raw.get("resultatregnskap") or {})
+    return beregn_skatt(resultat, _les_skattekonfig(raw)), resultat.skattekostnad
 
 
 def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
@@ -183,54 +200,20 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
 
     # --- RF-1028: Skatteberegning ---
 
-    # Fritaksmetoden (sktl. § 2-38): utbytte fra kvalifiserende selskaper er skattefritt.
-    # Ved eierandel < 90 % gjelder sjablonregelen (§ 2-38 sjette ledd): 3 % er skattepliktig.
-    # Ved eierandel ≥ 90 % er hele utbyttet fritatt (0 % skattepliktig).
-    # Merk: dette er basert på faglig vurdering — sjekk alltid mot gjeldende regelverk.
-    utbytte = r.finansposter.utbytte_fra_datterselskap
-    if konfig.anvend_fritaksmetoden and utbytte > 0:
-        if konfig.eierandel_for_fritaksmetoden >= 90:
-            skattepliktig_utbytte = 0
-            fritatt_utbytte = utbytte
-        else:
-            skattepliktig_utbytte = math.ceil(utbytte * 0.03)
-            fritatt_utbytte = utbytte - skattepliktig_utbytte
-    else:
-        skattepliktig_utbytte = utbytte
-        fritatt_utbytte = 0
-
-    # Skattepliktig inntekt før underskuddsfradrag
+    beregning = beregn_skatt(r, konfig)
+    utbytte = beregning.utbytte
+    fritatt_utbytte = beregning.fritatt_utbytte
+    skattepliktig_utbytte = beregning.skattepliktig_utbytte
+    skattepliktig_inntekt_brutto = beregning.skattepliktig_inntekt_brutto
+    fradrag_underskudd = beregning.fradrag_underskudd
+    skattepliktig_inntekt_netto = beregning.skattepliktig_inntekt_netto
+    nytt_underskudd = beregning.nytt_underskudd
+    beregnet_skatt = beregning.beregnet_skatt
     andre_finansinntekter = r.finansposter.andre_finansinntekter
-    skattepliktig_inntekt_brutto = (
-        driftsresultat
-        + skattepliktig_utbytte
-        + andre_finansinntekter
-        - fin_kostnader
-    )
 
-    # Fradrag for fremførbart underskudd (kun hvis positiv inntekt)
-    if skattepliktig_inntekt_brutto > 0 and konfig.underskudd_til_fremfoering > 0:
-        fradrag_underskudd = min(
-            konfig.underskudd_til_fremfoering, skattepliktig_inntekt_brutto
-        )
-    else:
-        fradrag_underskudd = 0
-
-    skattepliktig_inntekt_netto = skattepliktig_inntekt_brutto - fradrag_underskudd
-
-    # Underskudd til fremføring neste år
-    if skattepliktig_inntekt_brutto < 0:
-        nytt_underskudd = konfig.underskudd_til_fremfoering + abs(
-            skattepliktig_inntekt_brutto
-        )
-    else:
-        nytt_underskudd = konfig.underskudd_til_fremfoering - fradrag_underskudd
-
-    # Beregnet skatt
-    if skattepliktig_inntekt_netto > 0:
-        beregnet_skatt = math.ceil(skattepliktig_inntekt_netto * SKATTESATS)
-    else:
-        beregnet_skatt = 0
+    # Skattekostnaden som faktisk er ført i regnskapet (rskl. § 6-1 nr. 19). Den, ikke
+    # beregningen, er det som sendes inn; avvik mellom de to varsles nedenfor.
+    skattekostnad = r.skattekostnad
 
     # --- Balansesjekk ---
     i_balanse = b.er_i_balanse()
@@ -270,8 +253,8 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
         f"    Andre finanskostnader        {_nok(r.finansposter.andre_finanskostnader)}",
         "",
         f"  RESULTAT FØR SKATT             {_nok(resultat_foer_skatt)}",
-        f"  Skattekostnad                  {_nok(-beregnet_skatt)}",
-        f"  ÅRSRESULTAT                    {_nok(resultat_foer_skatt - beregnet_skatt)}",
+        f"  Skattekostnad                  {_nok(-skattekostnad)}",
+        f"  ÅRSRESULTAT                    {_nok(r.aarsresultat)}",
         "",
         linje,
         "  SKATTEMELDING FOR AS",
@@ -354,6 +337,7 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
         "",
         "    Kortsiktig gjeld:",
         f"      Leverandørgjeld             {_nok(b.egenkapital_og_gjeld.kortsiktig_gjeld.leverandoergjeld)}",
+        f"      Betalbar skatt              {_nok(b.egenkapital_og_gjeld.kortsiktig_gjeld.betalbar_skatt)}",
         f"      Skyldige offentlige avgifter {_nok(b.egenkapital_og_gjeld.kortsiktig_gjeld.skyldige_offentlige_avgifter)}",
         f"      Annen kortsiktig gjeld      {_nok(b.egenkapital_og_gjeld.kortsiktig_gjeld.annen_kortsiktig_gjeld)}",
         f"    Sum kortsiktig gjeld          {_nok(b.egenkapital_og_gjeld.kortsiktig_gjeld.sum)}",
@@ -396,7 +380,7 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
         s = ak + ok + aek
         return f"  {label:<20}{_ekk(ak)}{_ekk(ok)}{_ekk(aek)}{_ekk(s)}"
 
-    aarsresultat = resultat_foer_skatt - beregnet_skatt
+    aarsresultat = r.aarsresultat
     ek_ub = b.egenkapital_og_gjeld.egenkapital
 
     linjer += [
@@ -435,12 +419,26 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
     else:
         linjer.append(f"  ADVARSEL: Balansen stemmer ikke! Differanse: {_nok(differanse)}")
 
-    if beregnet_skatt > 0:
+    # Kontroll av ført skattekostnad mot beregningen. Wenche fastsetter ikke tallet
+    # (beregningen modellerer ikke utsatt skatt eller andre permanente forskjeller enn
+    # fritaksmetoden), men et sprik er verdt å se før innsending.
+    avvik_skatt = round(skattekostnad) - round(beregnet_skatt)
+    if beregnet_skatt > 0 and round(skattekostnad) == 0:
         linjer += [
             "",
-            f"  NB: Beregnet skatt er {_nok(beregnet_skatt).strip()}. Husk å føre dette",
-            "  som «Skyldig skatt» (konto 2500) under kortsiktig gjeld i balansen,",
-            "  og kontroller at balansen fortsatt går opp.",
+            f"  NB: Beregnet skatt er {_nok(beregnet_skatt).strip()}, men det er ikke ført",
+            "  noen skattekostnad i resultatregnskapet. Regnskapsloven § 6-1 krever egen",
+            "  linje for skattekostnad før årsresultatet. Fyll inn «Skattekostnad» under",
+            "  resultatregnskapet, og «Betalbar skatt» (konto 2500) under kortsiktig gjeld",
+            "  hvis skatten ikke er betalt ved årsslutt.",
+        ]
+    elif avvik_skatt != 0 and (beregnet_skatt > 0 or round(skattekostnad) != 0):
+        linjer += [
+            "",
+            f"  NB: Ført skattekostnad er {_nok(skattekostnad).strip()}, mens Wenche beregner",
+            f"  {_nok(beregnet_skatt).strip()} ({_nok(avvik_skatt).strip()} i avvik). Kontroller tallet.",
+            "  Avvik er ikke nødvendigvis feil: beregningen dekker ikke utsatt skatt eller",
+            "  andre permanente forskjeller enn fritaksmetoden.",
         ]
 
     linjer += [

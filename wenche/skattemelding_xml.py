@@ -21,6 +21,7 @@ from __future__ import annotations
 from xml.etree.ElementTree import Element, SubElement, fromstring, tostring
 
 from wenche.models import Aarsregnskap, SkattemeldingKonfig
+from wenche.skatteberegning import beregn_skatt
 
 _NS = (
     "urn:no:skatteetaten:fastsetting:formueinntekt:"
@@ -243,7 +244,14 @@ def generer_skattemelding_fra_konfig(
     verdi_foer_rabatt, samlet_gjeld = beregn_formue_inputs(regnskap, konfig)
     # Årets underskudd som positiv kroner-magnitude. For et overskuddsår
     # (eller nullresultat) blir det 0 og underskuddsbaserte felter utelates.
-    aarets_underskudd = max(0, int(round(-regnskap.resultatregnskap.aarsresultat)))
+    #
+    # Grunnlaget er den skattepliktige inntekten, samme definisjon som
+    # næringsspesifikasjonens skattemessige resultat. Regnskapets resultat er ikke
+    # riktig grunnlag: et holdingselskap med fritatt utbytte og kostnader kan ha
+    # regnskapsmessig overskudd og skattemessig underskudd samtidig. Brukte vi resultat
+    # før skatt, ville et slikt selskap mistet underskuddet til fremføring.
+    beregning = beregn_skatt(regnskap.resultatregnskap, konfig)
+    aarets_underskudd = max(0, int(round(-beregning.skattepliktig_inntekt_brutto)))
     return generer_skattemelding_upersonlig(
         partsnummer=partsnummer,
         inntektsaar=regnskap.regnskapsaar,

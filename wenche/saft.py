@@ -54,14 +54,27 @@ def _aapning_netto(account: ET.Element) -> float:
     return _tall(account, "OpeningDebitBalance") - _tall(account, "OpeningCreditBalance")
 
 
+def _er_betalbar_skatt(code: str) -> bool:
+    """
+    True for GroupingCode som tilsvarer betalbar selskapsskatt: 2500 (ikke fastsatt) og
+    2510 (fastsatt), med underkontoer. Egen linje i balansen fordi den er motposten til
+    skattekostnaden i resultatregnskapet; tidligere havnet den i skyldige offentlige avgifter.
+    """
+    try:
+        return 2500 <= int(code) <= 2519
+    except ValueError:
+        return False
+
+
 def _er_offentlig_avgift(code: str) -> bool:
     """
     True for GroupingCode som tilsvarer skyldige offentlige avgifter:
-    2500–2599 (betalbar skatt, forskuddsskatt) og 2700–2799 (MVA, aga, skattetrekk).
+    2520–2599 (forskuddsskatt o.l.) og 2700–2799 (MVA, aga, skattetrekk).
+    Betalbar selskapsskatt (2500–2519) har egen linje, se _er_betalbar_skatt.
     """
     try:
         c = int(code)
-        return 2500 <= c <= 2599 or 2700 <= c <= 2799
+        return 2520 <= c <= 2599 or 2700 <= c <= 2799
     except ValueError:
         return False
 
@@ -77,6 +90,7 @@ def _tom_akkumulator() -> dict:
         "andre_finansinntekter": 0.0,
         "rentekostnader": 0.0,
         "andre_finanskostnader": 0.0,
+        "skattekostnad": 0.0,
         "aksjer_i_datterselskap": 0.0,
         "andre_aksjer": 0.0,
         "langsiktige_fordringer": 0.0,
@@ -88,6 +102,7 @@ def _tom_akkumulator() -> dict:
         "laan_fra_aksjonaer": 0.0,
         "andre_langsiktige_laan": 0.0,
         "leverandoergjeld": 0.0,
+        "betalbar_skatt": 0.0,
         "skyldige_offentlige_avgifter": 0.0,
         "annen_kortsiktig_gjeld": 0.0,
     }
@@ -167,10 +182,21 @@ def _akkumuler(acc: dict, account: ET.Element, netto: float) -> None:
     elif cat == "kortsiktigGjeld":
         if code == "2400":
             acc["leverandoergjeld"] += -netto
+        elif _er_betalbar_skatt(code):
+            acc["betalbar_skatt"] += -netto
         elif _er_offentlig_avgift(code):
             acc["skyldige_offentlige_avgifter"] += -netto
         else:
             acc["annen_kortsiktig_gjeld"] += -netto
+
+    # Skattekostnad: 8300 (betalbar skatt på ordinært resultat) og 8321–8324 (utsatt skatt,
+    # avvik fra tidligere år). Kategorinavnet følger næringsspesifikasjonens elementnavn, som
+    # de øvrige kategoriene her. 83-serien tas også på kode alene, siden hele serien i
+    # kodelisten er skatt: uten dette forsvant skattekostnaden stille i importen, og balansen
+    # gikk ikke opp for et selskap med skattepliktig inntekt. Står sist, så en eksplisitt
+    # kategori over alltid vinner.
+    elif cat == "skattekostnad" or code.startswith("83"):
+        acc["skattekostnad"] += netto
 
 
 def _bygg_resultat(acc: dict) -> dict:
@@ -190,6 +216,7 @@ def _bygg_resultat(acc: dict) -> dict:
             "rentekostnader": acc["rentekostnader"],
             "andre_finanskostnader": acc["andre_finanskostnader"],
         },
+        "skattekostnad": acc["skattekostnad"],
     }
 
 
@@ -218,6 +245,7 @@ def _bygg_balanse(acc: dict) -> dict:
             },
             "kortsiktig_gjeld": {
                 "leverandoergjeld": acc["leverandoergjeld"],
+                "betalbar_skatt": acc["betalbar_skatt"],
                 "skyldige_offentlige_avgifter": acc["skyldige_offentlige_avgifter"],
                 "annen_kortsiktig_gjeld": acc["annen_kortsiktig_gjeld"],
             },

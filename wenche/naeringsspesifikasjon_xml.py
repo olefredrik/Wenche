@@ -20,20 +20,23 @@ Implementasjonen dekker en typisk norsk holding AS med:
   - Lønnskostnader (5000), avskrivninger (6000), andre driftskostnader (6700)
   - Finansinntekter: utbytte fra datterselskap (8090), andre (8050)
   - Finanskostnader: rentekostnader (8150), andre (8160)
+  - Skattekostnad: betalbar skatt på ordinært resultat (8300), tilbakeført som
+    permanent forskjell (positivSkattekostnad, kodeliste 2025_permanentForskjellstype)
   - Anleggsmidler: aksjer i datterselskap (1313), andre aksjer (1350),
     langsiktige fordringer (1390)
   - Omløpsmidler: kortsiktige fordringer (1500), bankinnskudd (1920)
   - Egenkapital: aksjekapital (2000), overkurs (2020), annen (2050/2080)
   - Langsiktig gjeld: gjeld til eiere (2250), annen (2290)
-  - Kortsiktig gjeld: leverandørgjeld (2400), offentlige avgifter (2600),
-    annen (2990)
+  - Kortsiktig gjeld: leverandørgjeld (2400), betalbar skatt (2500),
+    offentlige avgifter (2600), annen (2990)
 """
 
 from __future__ import annotations
 
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-from wenche.models import Aarsregnskap
+from wenche.models import Aarsregnskap, SkattemeldingKonfig
+from wenche.skatteberegning import beregn_skatt
 
 _NS = (
     "urn:no:skatteetaten:fastsetting:formueinntekt:"
@@ -116,6 +119,7 @@ def _balanseforekomst(
 def generer_naeringsspesifikasjon(
     regnskap: Aarsregnskap,
     partsnummer: int,
+    konfig: SkattemeldingKonfig | None = None,
 ) -> bytes:
     """
     Genererer naeringsspesifikasjon XML for innsending til Skatteetaten.
@@ -128,10 +132,17 @@ def generer_naeringsspesifikasjon(
     Args:
         regnskap:     Årsregnskap med resultatregnskap og balanse.
         partsnummer:  Skatteetatens interne partsnummer (fra forhåndsutfylt API).
+        konfig:       Skattemelding-konfigurasjonen. Nødvendig fordi det skattemessige
+                      resultatet avhenger av fritaksmetoden og eierandelen: uten den
+                      ville næringsspesifikasjonen oppgitt brutto utbytte som
+                      skattepliktig inntekt. Utelates den, brukes standardvalgene
+                      (fritaksmetoden på, 100 % eierandel).
 
     Returns:
         XML-bytes klar for innpakking i konvolutt via generer_konvolutt().
     """
+    konfig = konfig or SkattemeldingKonfig()
+    beregning = beregn_skatt(regnskap.resultatregnskap, konfig)
     root = Element("naeringsspesifikasjon", xmlns=_NS)
 
     SubElement(root, "partsreferanse").text = str(partsnummer)
@@ -185,6 +196,9 @@ def generer_naeringsspesifikasjon(
         _beloep_element(resultatregnskap, "sumFinansinntekt", fp.sum_inntekter)
     if fp.sum_kostnader:
         _beloep_element(resultatregnskap, "sumFinanskostnad", fp.sum_kostnader)
+    # sumSkattekostnad står etter sumFinanskostnad og før finansinntekt per XSD-sekvensen.
+    if res.skattekostnad:
+        _beloep_element(resultatregnskap, "sumSkattekostnad", res.skattekostnad)
 
     # Finansinntekter
     fi_poster = [
@@ -207,6 +221,11 @@ def generer_naeringsspesifikasjon(
         finanskostnad_el = SubElement(resultatregnskap, "finanskostnad")
         for beloep, kode in fk_poster:
             _resultatforekomst(finanskostnad_el, "kostnad", beloep, kode)
+
+    # Skattekostnad-forekomsten står etter finanskostnad per XSD-sekvensen.
+    if res.skattekostnad:
+        skattekostnad_el = SubElement(resultatregnskap, "skattekostnad")
+        _resultatforekomst(skattekostnad_el, "kostnad", res.skattekostnad, "8300")
 
     # aarsresultat står sist i Resultatregnskap-sekvensen.
     if res.aarsresultat:
@@ -286,6 +305,7 @@ def generer_naeringsspesifikasjon(
     # Kortsiktig gjeld
     kg_poster = [
         (kg.leverandoergjeld, "2400"),
+        (kg.betalbar_skatt, "2500"),
         (kg.skyldige_offentlige_avgifter, "2600"),
         (kg.annen_kortsiktig_gjeld, "2990"),
     ]
@@ -322,21 +342,108 @@ def generer_naeringsspesifikasjon(
     # -----------------------------------------------------------------------
     # BeregnetNaeringsinntekt (XSD-pos: etter balanseregnskap, før virksomhet)
     # For et upersonlig skattesubjekt (AS) fordeles skattemessig resultat på
-    # «forekomst 1» (én virksomhet). skattemessigResultat = aarsresultat for
-    # holdingselskap uten skattekostnad. SKD krysstillegger feltet mot
+    # «forekomst 1» (én virksomhet). SKD krysstillegger feltet mot
     # skattemeldingens inntektOgUnderskudd-poster.
+    #
+    # Grunnlaget er den skattepliktige inntekten slik skatteberegningen definerer den,
+    # ikke årsresultatet og ikke resultat før skatt. Forskjellen er reell for et
+    # holdingselskap: utbytte som er fritatt etter fritaksmetoden (sktl. § 2-38) er ikke
+    # skattepliktig inntekt, mens skattekostnaden ikke er fradragsberettiget (§ 6-1).
+    # Én kilde til tallet (skatteberegning.beregn_skatt) gjør at næringsspesifikasjonen
+    # og skatteberegningen ikke kan sprike.
+    #
+    # SKD utleder sitt eget skattemessige resultat som ÅRSRESULTAT + permanente
+    # forskjeller. Hver forskjell må derfor emitteres eksplisitt nedenfor, ellers
+    # svarer SKD validertMedFeil (avvikNaeringsopplysninger). Verifisert mot tt02
+    # 2026-08-05.
     # -----------------------------------------------------------------------
-    if res.aarsresultat:
+    skattemessig_resultat = beregning.skattepliktig_inntekt_brutto
+    # Emitteres også når resultatet er 0, så lenge det er aktivitet i resultatregnskapet.
+    # Et holdingselskap med bare fritatt utbytte har legitimt 0 i skattepliktig inntekt, og
+    # da savner SKD påstanden vår: de beregner 0 selv og flagger manglerNaeringsopplysninger
+    # (verifisert mot tt02 2026-08-05). Et helt hvilende selskap uten poster i det hele tatt
+    # skal derimot fortsatt utelate seksjonen, for der forventer ikke SKD den, og innsendingen
+    # er ren uten avvik i dag.
+    har_resultatposter = bool(
+        res.driftsinntekter.sum
+        or res.driftskostnader.sum
+        or res.finansposter.sum_inntekter
+        or res.finansposter.sum_kostnader
+        or res.skattekostnad
+    )
+    if skattemessig_resultat or har_resultatposter:
         bni_el = SubElement(root, "beregnetNaeringsinntekt")
         fordelt_el = SubElement(
             bni_el, "fordeltBeregnetNaeringsinntektForUpersonligSkattepliktig"
         )
         SubElement(fordelt_el, "id").text = "1"
-        _beloep_element(fordelt_el, "fordeltSkattemessigResultat", res.aarsresultat)
+        _beloep_element(fordelt_el, "fordeltSkattemessigResultat", skattemessig_resultat)
         _beloep_element(
-            fordelt_el, "fordeltSkattemessigResultatEtterKorreksjon", res.aarsresultat
+            fordelt_el,
+            "fordeltSkattemessigResultatEtterKorreksjon",
+            skattemessig_resultat,
         )
-        _beloep_element(bni_el, "skattemessigResultat", res.aarsresultat)
+        _beloep_element(bni_el, "skattemessigResultat", skattemessig_resultat)
+
+    # -----------------------------------------------------------------------
+    # ForskjellMellomRegnskapsmessigOgSkattemessigVerdi
+    # (XSD-pos: etter beregnetNaeringsinntekt, før virksomhet)
+    #
+    # Broen mellom regnskapet og skattegrunnlaget. SKD regner årsresultat + tillegg -
+    # fradrag og krysstjekker mot skattemessigResultat over, så denne seksjonen må
+    # forklare hele differansen. Kodene er hentet fra kodelisten
+    # 2025_permanentForskjellstype, og id settes lik koden (samme krav som for
+    # resultat- og balanseforekomstene, ellers avvik idAvvikerFraKrav).
+    #
+    # To forskjeller er aktuelle for et passivt holdingselskap:
+    #
+    #   Skattekostnaden er ikke fradragsberettiget (sktl. § 6-1) og legges tilbake.
+    #
+    #   Utbytte som er fritatt etter fritaksmetoden (sktl. § 2-38) er inntektsført i
+    #   regnskapet, men er ikke skattepliktig. Hele utbyttet tilbakeføres derfor, og
+    #   den skattepliktige delen legges til igjen: 0 ved eierandel >= 90 %, ellers
+    #   3 %-sjablonen (§ 2-38 sjette ledd). Uten dette paret oppgav
+    #   næringsspesifikasjonen brutto utbytte som skattepliktig inntekt.
+    #
+    # Regnestykket, med utbytte U, skattepliktig del S og skattekostnad K:
+    #   årsresultat + (K + S) - U == resultat før skatt - U + S == skattepliktig inntekt.
+    # -----------------------------------------------------------------------
+    tillegg: list[tuple[str, float]] = []
+    fradrag: list[tuple[str, float]] = []
+
+    if res.skattekostnad > 0:
+        tillegg.append(("positivSkattekostnad", res.skattekostnad))
+    elif res.skattekostnad < 0:
+        fradrag.append(("negativSkattekostnad", abs(res.skattekostnad)))
+
+    # Bare når fritaksmetoden faktisk er anvendt: er den av, er utbyttet skattepliktig i
+    # sin helhet, og et par som nullet hverandre ut ville bare vært støy i innsendingen.
+    utbytte = res.finansposter.utbytte_fra_datterselskap
+    if konfig.anvend_fritaksmetoden and utbytte > 0:
+        fradrag.append(("tilbakefoeringAvInntektsfoertUtbytte", utbytte))
+        if beregning.skattepliktig_utbytte > 0:
+            tillegg.append(
+                ("skattepliktigDelAvUtbytterOgUtdelinger", beregning.skattepliktig_utbytte)
+            )
+
+    if tillegg or fradrag:
+        forskjell_el = SubElement(root, "forskjellMellomRegnskapsmessigOgSkattemessigVerdi")
+        # Alle permanentForskjell-elementene først, så de avledede summene, per XSD-sekvensen.
+        for kode, beloep in tillegg + fradrag:
+            perm_el = SubElement(forskjell_el, "permanentForskjell")
+            SubElement(perm_el, "id").text = kode
+            type_el = SubElement(perm_el, "permanentForskjellstype")
+            SubElement(type_el, "permanentForskjellstype").text = kode
+            _beloep_element(perm_el, "beloep", beloep)
+        # Avledede summer, emitteres eksplisitt som de øvrige (jf. modulens docstring).
+        if tillegg:
+            _beloep_element(
+                forskjell_el, "sumTilleggINaeringsinntekt", sum(b for _, b in tillegg)
+            )
+        if fradrag:
+            _beloep_element(
+                forskjell_el, "sumFradragINaeringsinntekt", sum(b for _, b in fradrag)
+            )
 
     # -----------------------------------------------------------------------
     # Virksomhet (obligatorisk)
@@ -348,9 +455,9 @@ def generer_naeringsspesifikasjon(
 
     regnskapsperiode = SubElement(virksomhet, "regnskapsperiode")
     start = SubElement(regnskapsperiode, "start")
-    SubElement(start, "dato").text = f"{regnskap.regnskapsaar}-01-01"
+    SubElement(start, "dato").text = regnskap.periode_start.isoformat()
     slutt = SubElement(regnskapsperiode, "slutt")
-    SubElement(slutt, "dato").text = f"{regnskap.regnskapsaar}-12-31"
+    SubElement(slutt, "dato").text = regnskap.periode_slutt.isoformat()
 
     vt = SubElement(virksomhet, "virksomhetstype")
     SubElement(vt, "virksomhetstype").text = "oevrigSelskap"

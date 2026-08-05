@@ -4,6 +4,64 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.2.0] - 2026-08-05
+
+### Rettet
+
+- Årsregnskapet manglet **skattekostnad som egen linje** før årsresultatet, slik
+  regnskapsloven § 6-1 krever. Modellen regnet resultat før skatt som årsresultat direkte,
+  altså implisitt skattekostnad 0. Det gikk bra for et selskap uten skattepliktig inntekt,
+  men et passivt holdingselskap med renteinntekt (eller 3 %-tillegget på fritatt utbytte) har
+  en reell skattekostnad. Årsresultatet ble da rapportert for høyt til både Brønnøysund og
+  Skatteetaten, og balansen hadde ingen riktig plass til skattegjelden.
+
+- Næringsspesifikasjonen tilbakefører nå skattekostnaden som permanent forskjell
+  (`positivSkattekostnad`). Skatteetaten utleder sitt eget skattemessige resultat fra
+  årsresultatet pluss permanente forskjeller, så uten tilbakeføringen ville et selskap med
+  skattekostnad fått «Ugyldig innsending» med avvik i næringsopplysningene. Verifisert mot
+  Skatteetatens testmiljø.
+- **Utbytte som er fritatt etter fritaksmetoden ble oppgitt som skattepliktig inntekt** i
+  næringsspesifikasjonen. Skattegrunnlaget var dermed brutto utbytte, selv om bare
+  3 %-sjablonen (eller ingenting, ved eierandel fra 90 %) faktisk er skattepliktig. Utbyttet
+  tilbakeføres nå som permanent forskjell, og den skattepliktige delen legges til igjen, slik
+  at skattegrunnlaget stemmer med skatteberegningen. Sammen med skattekostnad-linjen var dette
+  en innsending som påsto et skattegrunnlag som ikke stemte med sin egen skattekostnad.
+- Et selskap med regnskapsmessig overskudd men skattemessig underskudd (fritatt utbytte og
+  fradragsberettigede kostnader) mistet underskuddet til fremføring, fordi underskuddet ble
+  regnet av regnskapets resultat i stedet for det skattepliktige. Nå føres det riktig.
+- Skattemessig resultat oppgis nå også når det er 0, så lenge det er poster i
+  resultatregnskapet. Et holdingselskap med bare fritatt utbytte har legitimt 0 i
+  skattepliktig inntekt, og Skatteetaten savnet påstanden. Helt hvilende selskap er uendret.
+
+- **Regnskapsperioden var hardkodet til 1. januar til 31. desember.** Et selskap stiftet sent
+  på året kan ha et forlenget første regnskapsår på inntil 18 måneder (regnskapsloven § 1-7
+  andre ledd), og rapporterte da en periode som ikke var den faktiske, både til Brønnøysund og
+  Skatteetaten. Tallene var riktige, men periodeangivelsen er en del av det signerte
+  regnskapet. Perioden kan nå oppgis med `regnskapsstart` og `regnskapsslutt`; står de tomme,
+  er den fortsatt hele kalenderåret. Skatteetaten godtar en periode over 12 måneder, verifisert
+  mot testmiljøet.
+- Aksjonærregisteroppgaven oppgav 1. januar som stiftelsesdato for alle selskap, fordi
+  Enhetsregister-oppslaget kastet bort dag og måned. Den eksakte datoen brukes nå.
+
+### Endret
+
+- SAF-T-importen leser nå skattekostnaden (kontoserie 83xx) inn i den nye linjen. Den falt
+  tidligere ut av importen, slik at balansen ikke gikk opp for et selskap med skattepliktig
+  inntekt. Betalbar skatt (konto 2500 og 2510) havner nå på egen linje i balansen i stedet
+  for i skyldige offentlige avgifter. Summen av kortsiktig gjeld er uendret.
+
+### Lagt til
+
+- Feltet `skattekostnad` under `resultatregnskap` og `betalbar_skatt` under
+  `balanse.egenkapital_og_gjeld.kortsiktig_gjeld`. Begge er 0 som standard, så et regnskap
+  uten skattepliktig inntekt gir nøyaktig samme innsending som før.
+- Knappen «Foreslå skattekostnad» i Tall-steget regner ut 22 % av skattepliktig inntekt
+  (etter fritaksmetoden og fremført underskudd) og viser den som forslag. Forslaget føres
+  aldri automatisk: du fører selv tallet du signerer på.
+- Sammendraget for skattemeldingen kontrollerer ført skattekostnad mot beregningen, og sier
+  fra hvis skatten er beregnet men ikke ført, eller hvis de to spriker. Valideringen av
+  årsregnskapet varsler også hvis en ført skattekostnad ikke har en motpost i balansen.
+
 ## [1.1.1] - 2026-07-29
 
 ### Sikkerhet

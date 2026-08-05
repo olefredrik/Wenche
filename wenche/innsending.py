@@ -121,7 +121,7 @@ def send_skattemelding(
                 "Skatteetaten ennå. Prøv igjen senere, eller ta kontakt."
             ) from e
     skattemelding_xml = generer_skattemelding_fra_konfig(regnskap, konfig, partsnummer)
-    naeringsspesifikasjon_xml = generer_naeringsspesifikasjon(regnskap, partsnummer)
+    naeringsspesifikasjon_xml = generer_naeringsspesifikasjon(regnskap, partsnummer, konfig)
     instans_id = skd_klient.send(
         inntektsaar=regnskap.regnskapsaar,
         orgnr=orgnr,

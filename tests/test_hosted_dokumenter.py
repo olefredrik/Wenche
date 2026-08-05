@@ -131,3 +131,18 @@ def test_aksjonaer_genereres_uten_tall(klient):
     r = klient.post("/api/dokumenter/aksjonaer", json=cfg)
     assert r.status_code == 200, r.text
     assert r.json()["filer"]
+
+
+def test_skatteberegning_gir_forslag(klient):
+    # Forslaget til skattekostnad-feltet, beregnet av kjernen (samme tall som visningen).
+    _inviter(klient)
+    cfg = _gyldig_config()
+    cfg["resultatregnskap"]["finansposter"]["andre_finansinntekter"] = 50000
+    r = klient.post("/api/dokumenter/skatteberegning", json=cfg)
+    assert r.status_code == 200, r.text
+    assert r.json()["beregnet_skatt"] == 11000
+
+
+def test_skatteberegning_krever_invite(klient):
+    r = klient.post("/api/dokumenter/skatteberegning", json=_gyldig_config())
+    assert r.status_code in (401, 403), r.text

@@ -93,6 +93,23 @@ def dok_skattemelding(request: Request, config: dict[str, Any] = Body(...)) -> d
     return {"filer": [_fil(navn, tekst.encode("utf-8"), "text/plain; charset=utf-8")]}
 
 
+@router.post("/skatteberegning")
+def dok_skatteberegning(request: Request, config: dict[str, Any] = Body(...)) -> dict:
+    """Beregnet skatt fra tallene i skjemaet, som forslag til skattekostnad-feltet.
+
+    Beregner og returnerer, lagrer ingenting: brukeren avgjør selv om forslaget skal føres
+    (samme forhåndsfyll-prinsipp som SAF-T-importen). Gjenbruker skattemelding.beregn_skatt
+    så forslaget ikke kan drifte fra tallet visningen viser.
+    """
+    krev_invitert(request)
+    beregning, foert = sm.beregn_skatt_fra_config(config)
+    return {
+        "beregnet_skatt": round(beregning.beregnet_skatt),
+        "skattepliktig_inntekt": round(beregning.skattepliktig_inntekt_netto),
+        "foert_skattekostnad": round(foert),
+    }
+
+
 @router.post("/aarsregnskap")
 def dok_aarsregnskap(request: Request, config: dict[str, Any] = Body(...)) -> dict:
     krev_invitert(request)

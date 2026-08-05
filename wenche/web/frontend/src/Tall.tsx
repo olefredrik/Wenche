@@ -40,6 +40,7 @@ export default function Tall({
           visEksempel={env === "test"}
           initial={config ?? undefined}
           importerSaft={api.importerSaft}
+          beregnSkatt={(c) => api.dokument("skatteberegning", c)}
           saftMerknad="SAF-T-filen behandles lokalt på din egen maskin og lagres ikke."
           ekstraSeksjon={<NoterSeksjon noter={noter} setNoter={setNoter} />}
         />
