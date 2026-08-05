@@ -95,3 +95,27 @@ def test_health_og_update_check(klient, monkeypatch):
     data = klient.get("/api/update-check").json()
     assert data["siste"] == "99.0.0"
     assert data["nyere"] is True
+
+
+def test_skatteberegning_gir_forslag(klient):
+    # Forslaget til skattekostnad-feltet: 22 % av skattepliktig inntekt, beregnet av kjernen
+    # så SPA-en ikke må duplisere fritaksmetoden og underskuddsfremføringen i TypeScript.
+    cfg = _gyldig_config()
+    cfg["resultatregnskap"]["finansposter"]["andre_finansinntekter"] = 50000
+    r = klient.post("/api/dokumenter/skatteberegning", json=cfg)
+    assert r.status_code == 200, r.text
+    assert r.json() == {
+        "beregnet_skatt": 11000,
+        "skattepliktig_inntekt": 50000,
+        "foert_skattekostnad": 0,
+    }
+
+
+def test_skatteberegning_uten_selskapsopplysninger(klient):
+    # Forslaget hentes fra Tall-steget, der stiftelsesår og aksjekapital godt kan stå tomme.
+    r = klient.post(
+        "/api/dokumenter/skatteberegning",
+        json={"resultatregnskap": {"finansposter": {"andre_finansinntekter": 50000}}},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["beregnet_skatt"] == 11000
