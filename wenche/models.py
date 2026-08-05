@@ -73,6 +73,11 @@ class Resultatregnskap:
     driftsinntekter: Driftsinntekter = field(default_factory=Driftsinntekter)
     driftskostnader: Driftskostnader = field(default_factory=Driftskostnader)
     finansposter: Finansposter = field(default_factory=Finansposter)
+    # Skattekostnad på ordinært resultat, oppgitt som positiv kostnad (rskl. § 6-1 nr. 19).
+    # Egen linje fordi oppstillingsplanen krever den mellom resultat før skatt og årsresultat.
+    # 0 for et selskap uten skattepliktig inntekt (typisk holding med bare fritatt utbytte),
+    # men et selskap med renteinntekt har en reell skattekostnad som må stå her.
+    skattekostnad: float = 0.0
 
     @property
     def driftsresultat(self) -> float:
@@ -88,7 +93,7 @@ class Resultatregnskap:
 
     @property
     def aarsresultat(self) -> float:
-        return self.resultat_foer_skatt  # Skattekostnad = 0 for holdingselskap uten skattbar inntekt
+        return self.resultat_foer_skatt - self.skattekostnad
 
 
 # ---------------------------------------------------------------------------
@@ -150,6 +155,10 @@ class LangsiktigGjeld:
 @dataclass
 class KortsiktigGjeld:
     leverandoergjeld: float = 0.0
+    # Betalbar skatt, ikke fastsatt (konto 2500). Motposten til skattekostnaden i
+    # resultatregnskapet: uten denne linjen har et selskap med skattepliktig inntekt
+    # ingen riktig plass å føre skattegjelden, og balansen går ikke opp.
+    betalbar_skatt: float = 0.0
     skyldige_offentlige_avgifter: float = 0.0
     annen_kortsiktig_gjeld: float = 0.0
 
@@ -157,6 +166,7 @@ class KortsiktigGjeld:
     def sum(self) -> float:
         return (
             self.leverandoergjeld
+            + self.betalbar_skatt
             + self.skyldige_offentlige_avgifter
             + self.annen_kortsiktig_gjeld
         )

@@ -90,6 +90,55 @@ class TestNaeringsspesifikasjonXsd:
             f"Feil rekkefølge i gjeldOgEgenkapital: {barn}"
         )
 
+    def test_validerer_med_skattekostnad(self, regnskap_med_skattekostnad):
+        # Skattekostnad (8300) og betalbar skatt (2500) er nye elementer i sekvensene
+        # Resultatregnskap og KortsiktigGjeld. XSD-en er fasit på plasseringen:
+        # sumSkattekostnad før finansinntekt, skattekostnad etter finanskostnad.
+        xml = generer_naeringsspesifikasjon(regnskap_med_skattekostnad, _PARTSNUMMER)
+        _valider(xml, "naeringsspesifikasjon_v6_ekstern.xsd")
+
+    def test_resultatregnskap_rekkefolge_med_skattekostnad(self, regnskap_med_skattekostnad):
+        xml = generer_naeringsspesifikasjon(regnskap_med_skattekostnad, _PARTSNUMMER)
+        root = etree.fromstring(xml)
+        res = root.find(f".//{_NS_NS}resultatregnskap")
+        barn = [c.tag.replace(_NS_NS, "") for c in res]
+        forventet = ["sumSkattekostnad", "finansinntekt", "skattekostnad", "aarsresultat"]
+        posisjoner = [barn.index(navn) for navn in forventet if navn in barn]
+        assert posisjoner == sorted(posisjoner), f"Feil rekkefølge i resultatregnskap: {barn}"
+        assert set(forventet) <= set(barn), f"Manglende elementer: {barn}"
+
+    def test_validerer_med_fritaksmetodens_forskjeller(self, regnskap_med_utbytte):
+        # Tre permanente forskjeller samtidig (skattekostnad, tilbakeført utbytte,
+        # 3 %-sjablonen) med begge de avledede summene. PermanentForskjell er unbounded,
+        # men rekkefølgen forskjeller-før-summer er bundet av XSD-sekvensen.
+        regnskap_med_utbytte.resultatregnskap.skattekostnad = 660
+        konfig = SkattemeldingKonfig(
+            anvend_fritaksmetoden=True, eierandel_for_fritaksmetoden=80
+        )
+        xml = generer_naeringsspesifikasjon(regnskap_med_utbytte, _PARTSNUMMER, konfig)
+        _valider(xml, "naeringsspesifikasjon_v6_ekstern.xsd")
+        root = etree.fromstring(xml)
+        forskjell = root.find(f".//{_NS_NS}forskjellMellomRegnskapsmessigOgSkattemessigVerdi")
+        barn = [c.tag.replace(_NS_NS, "") for c in forskjell]
+        assert barn.count("permanentForskjell") == 3, barn
+        assert barn.index("sumTilleggINaeringsinntekt") > max(
+            i for i, n in enumerate(barn) if n == "permanentForskjell"
+        ), barn
+
+    def test_rotsekvens_med_tilbakefoert_skattekostnad(self, regnskap_med_skattekostnad):
+        # forskjellMellomRegnskapsmessigOgSkattemessigVerdi står etter
+        # beregnetNaeringsinntekt og før virksomhet i rot-sekvensen.
+        xml = generer_naeringsspesifikasjon(regnskap_med_skattekostnad, _PARTSNUMMER)
+        root = etree.fromstring(xml)
+        barn = [c.tag.replace(_NS_NS, "") for c in root]
+        forventet = [
+            "beregnetNaeringsinntekt",
+            "forskjellMellomRegnskapsmessigOgSkattemessigVerdi",
+            "virksomhet",
+        ]
+        posisjoner = [barn.index(navn) for navn in forventet]
+        assert posisjoner == sorted(posisjoner), f"Feil rekkefølge i roten: {barn}"
+
     def test_id_er_lik_kode(self, regnskap_med_utbytte):
         # Skatteetaten krever at <id> på hver resultat-/balanseforekomst er lik
         # kodeverdien (resultatOgBalanseregnskapstype), ikke en tilfeldig UUID.

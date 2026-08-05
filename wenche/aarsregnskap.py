@@ -58,6 +58,7 @@ def _les_resultat(r: dict) -> Resultatregnskap:
             rentekostnader=_tall(fp.get("rentekostnader")),
             andre_finanskostnader=_tall(fp.get("andre_finanskostnader")),
         ),
+        skattekostnad=_tall(r.get("skattekostnad")),
     )
 
 
@@ -93,6 +94,7 @@ def _les_balanse(b: dict) -> Balanse:
             ),
             kortsiktig_gjeld=KortsiktigGjeld(
                 leverandoergjeld=_tall(kg.get("leverandoergjeld")),
+                betalbar_skatt=_tall(kg.get("betalbar_skatt")),
                 skyldige_offentlige_avgifter=_tall(kg.get("skyldige_offentlige_avgifter")),
                 annen_kortsiktig_gjeld=_tall(kg.get("annen_kortsiktig_gjeld")),
             ),
@@ -185,6 +187,21 @@ def advarsler(regnskap: Aarsregnskap) -> list[str]:
             "NOK). Utbytte kan bare deles ut av fri egenkapital (aksjeloven § 8-1). "
             "Kontroller at utbetalingen faktisk er utbytte og ikke f.eks. lån til "
             "aksjonær eller tilbakebetaling av innbetalt kapital."
+        )
+
+    # Skattekostnaden i resultatregnskapet har en motpost i balansen: er skatten ikke
+    # betalt ved årsslutt (normaltilfellet, den forfaller året etter), skal den stå som
+    # betalbar skatt under kortsiktig gjeld. Er den ført som kostnad uten å stå noe sted i
+    # balansen, mangler enten gjelden eller en tilsvarende reduksjon i bankinnskuddet.
+    # (Ikke-blokkerende: skatten kan være betalt i året, og da er det bankinnskuddet som er
+    # redusert. Balansekontrollen i valider() fanger opp om totalene ikke går opp.)
+    kg = regnskap.balanse.egenkapital_og_gjeld.kortsiktig_gjeld
+    if regnskap.resultatregnskap.skattekostnad > 0.01 and kg.betalbar_skatt < 0.01:
+        adv.append(
+            f"Det er ført en skattekostnad "
+            f"({regnskap.resultatregnskap.skattekostnad:,.0f} NOK), men betalbar skatt "
+            "står ikke i balansen. Er skatten ikke betalt ved årsslutt, skal den føres "
+            "som «Betalbar skatt» under kortsiktig gjeld (konto 2500)."
         )
 
     # Sammenligningstall for fjoråret er påkrevd etter regnskapsloven § 6-6 for

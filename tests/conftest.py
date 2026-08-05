@@ -67,6 +67,35 @@ def eksempel_regnskap(eksempel_selskap):
 
 
 @pytest.fixture
+def regnskap_med_skattekostnad(eksempel_selskap):
+    """
+    Passivt holdingselskap med renteinntekt, altså reell skattepliktig inntekt.
+
+    Resultat før skatt 50 000, skattekostnad 11 000 (22 %), årsresultat 39 000.
+    Skatten er ikke betalt ved årsslutt og står som betalbar skatt i balansen.
+    Balansen går opp: eiendeler = EK + gjeld = 189 000 kr.
+    """
+    return Aarsregnskap(
+        selskap=eksempel_selskap,
+        regnskapsaar=2025,
+        resultatregnskap=Resultatregnskap(
+            finansposter=Finansposter(andre_finansinntekter=50000),
+            skattekostnad=11000,
+        ),
+        balanse=Balanse(
+            eiendeler=Eiendeler(
+                anleggsmidler=Anleggsmidler(aksjer_i_datterselskap=100000),
+                omloepmidler=Omloepmidler(bankinnskudd=89000),
+            ),
+            egenkapital_og_gjeld=EgenkapitalOgGjeld(
+                egenkapital=Egenkapital(aksjekapital=30000, annen_egenkapital=148000),
+                kortsiktig_gjeld=KortsiktigGjeld(betalbar_skatt=11000),
+            ),
+        ),
+    )
+
+
+@pytest.fixture
 def regnskap_med_utbytte(eksempel_selskap):
     """Holdingselskap som har mottatt utbytte fra datterselskap."""
     return Aarsregnskap(
