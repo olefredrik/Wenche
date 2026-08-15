@@ -467,33 +467,75 @@ def generer_naeringsspesifikasjon(
 
     # -----------------------------------------------------------------------
     # Egenkapitalavstemming (XSD-pos: etter virksomhet, før andreForhold)
-    # inngående EK (foregående års utgående) + endring = utgående (avledet).
+    # inngående EK + separate tillegg - separate fradrag = utgående (avledet).
     # -----------------------------------------------------------------------
-    inngaaende_ek = round(regnskap.foregaaende_aar_balanse.egenkapital_og_gjeld.egenkapital.sum)
+    foregaaende_ek = (
+        regnskap.foregaaende_aar_balanse.egenkapital_og_gjeld.egenkapital
+    )
+    inngaaende_ek = round(foregaaende_ek.sum)
     utgaaende_ek = round(eg.egenkapital.sum)
-    if inngaaende_ek or utgaaende_ek:
+    endring = utgaaende_ek - inngaaende_ek
+
+    tillegg: list[tuple[str, int]] = []
+    fradrag: list[tuple[str, int]] = []
+
+    stiftet = regnskap.selskap.stiftelsesdato
+    stiftet_i_perioden = bool(
+        stiftet and regnskap.periode_start <= stiftet <= regnskap.periode_slutt
+    )
+    foerste_regnskapsaar = (
+        regnskap.selskap.stiftelsesaar >= regnskap.regnskapsaar
+        or stiftet_i_perioden
+    )
+
+    # I første regnskapsår er økningen i innskutt EK stiftelsesinnskuddet. Wenches
+    # minimalmodell skiller ikke kontant- og tinginnskudd, og støtter i praksis det vanlige
+    # kontantinnskuddet for et lite AS. Senere kapitaltransaksjoner utledes ikke som kontant-
+    # innskudd, siden modellen ikke har nok informasjon til å klassifisere dem sikkert.
+    if foerste_regnskapsaar:
+        inngaaende_innskutt_ek = round(
+            foregaaende_ek.aksjekapital + foregaaende_ek.overkursfond
+        )
+        utgaaende_innskutt_ek = round(ek.aksjekapital + ek.overkursfond)
+        kontantinnskudd = utgaaende_innskutt_ek - inngaaende_innskutt_ek
+        if kontantinnskudd > 0:
+            tillegg.append(("kontantinnskudd", kontantinnskudd))
+
+    aarsresultat = round(res.aarsresultat)
+    if aarsresultat > 0:
+        tillegg.append(("aaretsOverskudd", aarsresultat))
+    elif aarsresultat < 0:
+        fradrag.append(("aaretsUnderskudd", abs(aarsresultat)))
+
+    # Bevar avstemmingen også når modellen ikke kan klassifisere resten mer presist.
+    # Resten må aldri feilmerkes som årets resultat.
+    forklart_endring = sum(b for _, b in tillegg) - sum(b for _, b in fradrag)
+    annen_endring = endring - forklart_endring
+    if annen_endring > 0:
+        tillegg.append(("annenPositivEndringIEgenkapital", annen_endring))
+    elif annen_endring < 0:
+        fradrag.append(("annenNegativEndringIEgenkapital", abs(annen_endring)))
+
+    if inngaaende_ek or utgaaende_ek or tillegg or fradrag:
         ekavst = SubElement(root, "egenkapitalavstemming")
         _beloep_element(ekavst, "inngaaendeEgenkapital", inngaaende_ek)
-        # Endringen utledes fra de allerede rundede verdiene, slik at
-        # inngaaende ± endring == utgaaende går nøyaktig opp i hele kroner.
-        endring = utgaaende_ek - inngaaende_ek
         # sumTilleggIEgenkapital / sumFradragIEgenkapital må stå før
         # egenkapitalendring-listen per XSD-sekvensen.
-        if endring > 0:
-            _beloep_element(ekavst, "sumTilleggIEgenkapital", endring)
-        elif endring < 0:
-            _beloep_element(ekavst, "sumFradragIEgenkapital", abs(endring))
-        if endring:
-            # aaretsUnderskudd er kategori "fradrag", aaretsOverskudd "tillegg":
-            # utgaaende = inngaaende + tillegg - fradrag. Beløpet føres derfor
-            # som positiv magnitude, og fortegnet styres av kodevalget.
-            kode = "aaretsOverskudd" if endring > 0 else "aaretsUnderskudd"
+        if tillegg:
+            _beloep_element(
+                ekavst, "sumTilleggIEgenkapital", sum(b for _, b in tillegg)
+            )
+        if fradrag:
+            _beloep_element(
+                ekavst, "sumFradragIEgenkapital", sum(b for _, b in fradrag)
+            )
+        for kode, beloep in tillegg + fradrag:
             endring_el = SubElement(ekavst, "egenkapitalendring")
             # id må være lik kodeverdien (jf. idAvvikerFraKrav-regelen).
             SubElement(endring_el, "id").text = kode
             ekt = SubElement(endring_el, "egenkapitalendringstype")
             SubElement(ekt, "egenkapitalendringstype").text = kode
-            _beloep_element(endring_el, "beloep", abs(endring))
+            _beloep_element(endring_el, "beloep", beloep)
         # utgaaendeEgenkapital står sist i Egenkapitalavstemming.
         _beloep_element(ekavst, "utgaaendeEgenkapital", utgaaende_ek)
 
