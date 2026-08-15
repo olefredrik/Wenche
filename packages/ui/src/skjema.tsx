@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import yaml from "js-yaml";
+// js-yaml 5 fjernet default-eksporten, så navngitt import er eneste vei inn.
+import { load as lesYaml, CORE_SCHEMA } from "js-yaml";
 import { monoLabel, input, btnPrimar, btnOutlineLett as btnOutline } from "./styles";
 import { Inn, TallInput, TallFelt } from "./komponenter";
 
@@ -572,7 +573,18 @@ export function DataSkjema({
   const importerBodil = async (file: File) => {
     setImportMelding(null);
     try {
-      const parsed = yaml.load(await file.text());
+      // CORE_SCHEMA, ikke standardskjemaet, av to grunner. (1) Datoer: js-yaml 4 gjorde en
+      // naken YYYY-MM-DD om til et JS Date, som serialiseres til "2025-10-24T00:00:00.000Z".
+      // Det avvises av <input type="date"> (feltet ble blankt) og av backend (_dato), så en
+      // importert regnskapsperiode brakk innsendingen med en feilmelding om en dato brukeren
+      // aldri skrev. js-yaml 5 droppet timestamp fra standardskjemaet, så oppgraderingen
+      // alene retter det, men da avhenger oppførselen av bibliotekets standardvalg. De har
+      // endret seg én gang og kan endre seg igjen; et eksplisitt skjema låser den fast.
+      // (2) Sikkerhet: !!omap har hatt kvadratisk parsetid (GHSA-5p4m-2wfm-xmqj).
+      // CORE_SCHEMA har ikke taggen i det hele tatt, så den klassen av inndata avvises
+      // i stedet for å parses. En config.yaml består av skalarer, lister og maps, så vi
+      // mister ingenting vi faktisk bruker.
+      const parsed = lesYaml(await file.text(), { schema: CORE_SCHEMA });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if (!parsed || typeof parsed !== "object" || !(parsed as any).selskap) {
         setImportMelding("Dette ser ikke ut som en Wenche/Bodil config.yaml.");
