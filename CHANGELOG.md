@@ -4,6 +4,28 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.2.2] - 2026-08-15
+
+### Rettet
+
+- **Aksjonærregisteroppgaven oppgav fortsatt 1. januar som stiftelsestidspunkt.** 1.2.0 sa at
+  den eksakte datoen nå brukes, og halve veien stemte: Enhetsregister-oppslaget sluttet å
+  kaste bort dag og måned, så datoen havnet riktig i konfigurasjonen. Men RF-1086 leser
+  konfigurasjonen sin gjennom en egen vei som aldri plukket den opp igjen, så oppgaven
+  rapporterte 1. januar i stiftelsesåret uansett. Et selskap stiftet 24. oktober oppgav altså
+  feil stiftelsestidspunkt på de nyutstedte aksjene. Endringsloggen for 1.2.0 var på dette
+  punktet mer optimistisk enn koden.
+
+### Endret
+
+- De tre config-leserne (årsregnskap, skattemelding og aksjonærregister) har nå en
+  regresjonsvakt som sammenligner dem mot hverandre på en konfigurasjon der alle valgfrie felt
+  er fylt ut. Testene sammenlignet før hver leser med seg selv, og fanget derfor ikke at et
+  nytt felt bare ble lagt til i én av dem. Det er samme årsak som lå bak både denne rettelsen
+  og periodefeilen i 1.2.1, og vakten feiler nå på begge.
+- Definisjonen av «første regnskapsår» bor nå ett sted, som `Aarsregnskap.er_foerste_regnskapsaar`,
+  i stedet for i to kopier. Ingen endring i XML-en som sendes inn.
+
 ## [1.2.1] - 2026-08-15
 
 ### Rettet
