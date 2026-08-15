@@ -500,3 +500,75 @@ def test_valider_mot_brg_uten_stiftelsesdato_i_svar(mock_get, eksempel_oppgave):
     # BRG-svar uten stiftelsesdato (uvanlig, men håndteres trygt).
     mock_get.return_value = _brg_mock(json_data={"navn": "TEST AS"})
     assert valider_mot_brg(eksempel_oppgave) == []
+
+
+# ---------------------------------------------------------------------------
+# Stiftelsestidspunkt gjennom les_config
+# ---------------------------------------------------------------------------
+#
+# `_stiftelsestidspunkt` har alltid kunnet bruke den eksakte datoen, men
+# `les_config` bygget Selskap uten `stiftelsesdato`, så grenen var i praksis død og
+# RF-1086 oppgav 1. januar for alle. Testene går derfor gjennom les_config, ikke
+# direkte på Selskap: en test som konstruerer Selskap selv ville vært grønn hele veien.
+
+_CFG_STIFTET_I_OKTOBER = {
+    "selskap": {
+        "navn": "Nystiftet Holding AS",
+        "org_nummer": "123456789",
+        "daglig_leder": "Ola Nordmann",
+        "styreleder": "Ola Nordmann",
+        "forretningsadresse": "Testveien 1, 0001 Oslo",
+        "stiftelsesaar": 2025,
+        "stiftelsesdato": "2025-10-24",
+        "aksjekapital": 30000,
+        "kontakt_epost": "ola@test.no",
+    },
+    "regnskapsaar": 2025,
+    "aksjonaerer": [
+        {
+            "navn": "Ola Nordmann",
+            "fodselsnummer": "20916997389",
+            "antall_aksjer": 100,
+            "aksjeklasse": "A",
+            "utbytte_utbetalt": 0,
+            "innbetalt_kapital_per_aksje": 300,
+        }
+    ],
+}
+
+
+def test_les_config_beholder_stiftelsesdato():
+    from datetime import date
+
+    from wenche.aksjonaerregister import les_config
+
+    oppgave = les_config(dict(_CFG_STIFTET_I_OKTOBER))
+    assert oppgave.selskap.stiftelsesdato == date(2025, 10, 24)
+
+
+def test_hovedskjema_bruker_eksakt_stiftelsesdato():
+    from wenche.aksjonaerregister import les_config
+
+    oppgave = les_config(dict(_CFG_STIFTET_I_OKTOBER))
+    root = _parse(generer_hovedskjema_xml(oppgave))
+    tidspunkt = root.find(
+        ".//AksjerNyutstedteStiftelseMvTidspunkt-datadef-17671"
+    )
+    assert tidspunkt is not None
+    assert tidspunkt.text == "2025-10-24T00:00:00"
+
+
+def test_hovedskjema_faller_tilbake_paa_1_januar_uten_dato():
+    """Uten stiftelsesdato i configen er 1. januar fortsatt eneste tilgjengelige svar."""
+    from wenche.aksjonaerregister import les_config
+
+    cfg = {**_CFG_STIFTET_I_OKTOBER}
+    cfg["selskap"] = {
+        k: v for k, v in cfg["selskap"].items() if k != "stiftelsesdato"
+    }
+    oppgave = les_config(cfg)
+    root = _parse(generer_hovedskjema_xml(oppgave))
+    tidspunkt = root.find(
+        ".//AksjerNyutstedteStiftelseMvTidspunkt-datadef-17671"
+    )
+    assert tidspunkt.text == "2025-01-01T00:00:00"
