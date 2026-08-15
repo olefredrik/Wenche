@@ -48,8 +48,15 @@ def _dato(verdi) -> date | None:
         return None
     if isinstance(verdi, date):
         return verdi
+    tekst = str(verdi).strip()
+    # En ISO-datetime ("2025-10-24T00:00:00.000Z") er ikke noe skjemaet sender, men den
+    # oppstår når et JS Date serialiseres til JSON. Kilden er rettet (SPA-en parser YAML
+    # med CORE_SCHEMA), men gamle lagrede configer kan bære formen, og en dato med
+    # tidsdel er utvetydig nok til å ta imot i stedet for å avvise med formatfeil.
+    if "T" in tekst:
+        tekst = tekst.split("T", 1)[0]
     try:
-        return date.fromisoformat(str(verdi).strip())
+        return date.fromisoformat(tekst)
     except ValueError:
         raise ValueError(f"«{verdi}» er ikke en gyldig dato. Bruk formatet ÅÅÅÅ-MM-DD.")
 

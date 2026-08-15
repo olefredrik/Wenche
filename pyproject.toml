@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "wenche"
-version = "1.2.2"
+version = "1.2.3"
 description = "Enkel innsending av årsregnskap, skattemelding og aksjonærregisteroppgave til Altinn for små selskaper uten ordinær drift"
 readme = "README.md"
 license = { file = "LICENSE" }
