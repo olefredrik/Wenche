@@ -10,7 +10,7 @@ Se modulens docstring i skattemelding.py for detaljer.
 
 import yaml
 
-from wenche.aarsregnskap import _les_resultat, _les_balanse, _tall as _belop
+from wenche.aarsregnskap import _dato, _les_resultat, _les_balanse, _tall as _belop
 # Re-eksporteres bevisst: kallsteder (endepunkter, tester, CLI) har brukt sm.beregn_skatt
 # og sm.SKATTESATS siden før beregningen fikk egen modul.
 from wenche.skatteberegning import SKATTESATS, Skatteberegning, beregn_skatt
@@ -106,6 +106,7 @@ def les_config(config_fil: str | dict) -> tuple[Aarsregnskap, SkattemeldingKonfi
         forretningsadresse=s["forretningsadresse"],
         stiftelsesaar=_tall(s.get("stiftelsesaar"), "Stiftelsesår", int),
         aksjekapital=_tall(s.get("aksjekapital"), "Aksjekapital", float),
+        stiftelsesdato=_dato(s.get("stiftelsesdato")),
     )
 
     resultatregnskap = _les_resultat(raw["resultatregnskap"])
@@ -127,6 +128,8 @@ def les_config(config_fil: str | dict) -> tuple[Aarsregnskap, SkattemeldingKonfi
         foregaaende_aar_resultat=foregaaende_resultat,
         foregaaende_aar_balanse=foregaaende_balanse,
         utbytte_utbetalt=utbytte_utbetalt,
+        regnskapsstart=_dato(raw.get("regnskapsstart")),
+        regnskapsslutt=_dato(raw.get("regnskapsslutt")),
     )
 
     return regnskap, _les_skattekonfig(raw)
