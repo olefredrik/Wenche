@@ -4,6 +4,31 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.2.1] - 2026-08-15
+
+### Rettet
+
+- **Egenkapitalavstemmingen la hele endringen i egenkapitalen på årets resultat.** Wenche
+  regnet ut utgående minus inngående egenkapital og døpte hele nettobeløpet til «årets
+  overskudd» eller «årets underskudd» etter fortegnet. Skatteetaten krysssjekker den posten
+  mot årsresultatet i resultatregnskapet, og svarte med avviket «Det er avvik mellom
+  årsresultat og årets overskudd eller årets underskudd i egenkapitalavstemmingen» for alle
+  selskaper der de to ikke var like. I praksis gjaldt det alle som hadde betalt utbytte, alle
+  med tomme fjorårstall, og alle nystiftede selskaper; bare et helt hvilende selskap slapp
+  unna. For et selskap stiftet i året ble aksjekapitalen på 30 000 minus et underskudd på
+  6 500 rapportert som et overskudd på 23 500, altså en uriktig opplysning og ikke bare et
+  avvik. Avstemmingen bygges nå av separate poster: stiftelsesinnskudd, årets resultat, og en
+  eventuell rest som modellen ikke kan klassifisere nærmere. Verifisert mot Skatteetatens
+  testmiljø: de tre tilfellene over går nå gjennom uten merknader.
+
+- **Regnskapsperioden nådde ikke skattemeldingen.** `regnskapsstart` og `regnskapsslutt` kom
+  inn i 1.2.0, men skattemeldingen leser konfigurasjonen sin gjennom en egen vei som ikke ble
+  oppdatert. Næringsspesifikasjonen oppgav derfor fortsatt 1. januar til 31. desember selv om
+  perioden var fylt ut, mens årsregnskapet til Brønnøysund fikk den riktige. Et selskap
+  stiftet i oktober rapporterte dermed en periode som startet ni måneder før det fantes.
+
+Begge rapportert og rettet i [#156](https://github.com/olefredrik/Wenche/pull/156).
+
 ## [1.2.0] - 2026-08-05
 
 ### Rettet
