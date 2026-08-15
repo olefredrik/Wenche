@@ -84,6 +84,35 @@ class TestPeriodeEgenskaper:
         assert ar.valider(r) == []
 
 
+class TestErFoersteRegnskapsaar:
+    """Definisjonen deles av fjorårsadvarselen og egenkapitalavstemmingen."""
+
+    def test_stiftet_tidligere_aar_er_ikke_foerste(self, eksempel_selskap):
+        # stiftelsesaar 2020 i fixturen
+        assert not _regnskap(eksempel_selskap, regnskapsaar=2025).er_foerste_regnskapsaar
+
+    def test_stiftelsesaar_lik_regnskapsaar_er_foerste(self, eksempel_selskap):
+        eksempel_selskap.stiftelsesaar = 2025
+        assert _regnskap(eksempel_selskap, regnskapsaar=2025).er_foerste_regnskapsaar
+
+    def test_forlenget_foerste_aar_teller_selv_om_aarstallet_er_lavere(self, eksempel_selskap):
+        # Perioden løper fra stiftelsen i 2025 til 31.12.2026, så stiftelsesåret er
+        # lavere enn regnskapsåret selv om dette ER det første regnskapsåret.
+        eksempel_selskap.stiftelsesaar = 2025
+        eksempel_selskap.stiftelsesdato = date(2025, 11, 20)
+        r = _regnskap(
+            eksempel_selskap,
+            regnskapsaar=2026,
+            regnskapsstart=date(2025, 11, 20),
+            regnskapsslutt=date(2026, 12, 31),
+        )
+        assert r.er_foerste_regnskapsaar
+
+    def test_stiftelsesdato_utenfor_perioden_teller_ikke(self, eksempel_selskap):
+        eksempel_selskap.stiftelsesdato = date(2020, 3, 14)
+        assert not _regnskap(eksempel_selskap, regnskapsaar=2025).er_foerste_regnskapsaar
+
+
 class TestConfigLesing:
     def _config(self, **ekstra):
         return {

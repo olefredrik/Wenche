@@ -479,20 +479,11 @@ def generer_naeringsspesifikasjon(
     tillegg: list[tuple[str, int]] = []
     fradrag: list[tuple[str, int]] = []
 
-    stiftet = regnskap.selskap.stiftelsesdato
-    stiftet_i_perioden = bool(
-        stiftet and regnskap.periode_start <= stiftet <= regnskap.periode_slutt
-    )
-    foerste_regnskapsaar = (
-        regnskap.selskap.stiftelsesaar >= regnskap.regnskapsaar
-        or stiftet_i_perioden
-    )
-
     # I første regnskapsår er økningen i innskutt EK stiftelsesinnskuddet. Wenches
     # minimalmodell skiller ikke kontant- og tinginnskudd, og støtter i praksis det vanlige
     # kontantinnskuddet for et lite AS. Senere kapitaltransaksjoner utledes ikke som kontant-
     # innskudd, siden modellen ikke har nok informasjon til å klassifisere dem sikkert.
-    if foerste_regnskapsaar:
+    if regnskap.er_foerste_regnskapsaar:
         inngaaende_innskutt_ek = round(
             foregaaende_ek.aksjekapital + foregaaende_ek.overkursfond
         )
