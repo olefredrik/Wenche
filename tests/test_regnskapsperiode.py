@@ -160,6 +160,25 @@ class TestConfigLesing:
         with pytest.raises(ValueError, match="ÅÅÅÅ-MM-DD"):
             ar.les_config(self._config(regnskapsstart="20. november"))
 
+    def test_iso_datetime_godtas(self):
+        # Et JS Date serialiseres til JSON som "2025-11-20T00:00:00.000Z". SPA-en lager
+        # ikke lenger slike (den parser YAML med CORE_SCHEMA), men lagrede configer fra
+        # før kan bære formen, og da skal innsendingen gå, ikke feile på formatet.
+        r = ar.les_config(
+            self._config(
+                regnskapsstart="2025-11-20T00:00:00.000Z",
+                regnskapsslutt="2026-12-31T00:00:00.000Z",
+                selskap={"stiftelsesdato": "2025-11-20T00:00:00Z"},
+            )
+        )
+        assert r.periode_start == date(2025, 11, 20)
+        assert r.periode_slutt == date(2026, 12, 31)
+        assert r.selskap.stiftelsesdato == date(2025, 11, 20)
+
+    def test_tull_med_t_i_seg_avvises_fortsatt(self):
+        with pytest.raises(ValueError, match="ÅÅÅÅ-MM-DD"):
+            ar.les_config(self._config(regnskapsstart="TULLT"))
+
 
 class TestValidering:
     def test_snudd_periode_avvises(self, eksempel_selskap):
