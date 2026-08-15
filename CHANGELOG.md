@@ -4,6 +4,34 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.2.3] - 2026-08-15
+
+### Rettet
+
+- **Import av en `config.yaml` med regnskapsperiode brakk innsendingen.** YAML-leseren i
+  skjemaet tolket en naken `2025-10-24` som et tidspunkt og gjorde den om til
+  `2025-10-24T00:00:00.000Z`. Datofeltet i skjemaet avviser den formen og ble stående blankt,
+  mens verdien lå igjen under panseret, så innsendingen stoppet med «`2025-10-24T00:00:00.000Z`
+  er ikke en gyldig dato» om en dato brukeren aldri hadde skrevet. Datoer leses nå som ren
+  tekst og kommer uendret gjennom hele veien, både fordi YAML-leseren er oppgradert og fordi
+  Wenche nå ber om et minimalt skjema i stedet for å stole på bibliotekets standardvalg.
+  Rammet `regnskapsstart`, `regnskapsslutt` og `selskap.stiftelsesdato`, altså feltene som kom
+  i 1.2.0, ved import fra både Bodil og en tidligere Wenche-config. Self-hosted bruk via
+  kommandolinjen var ikke rammet, siden den leser `config.yaml` direkte.
+- Datofelt godtar nå også et tidspunkt (`2025-10-24T00:00:00.000Z`) og leser datodelen av det.
+  Årsaken over er fjernet, men en config som allerede er lagret med den formen skal kunne
+  sendes inn i stedet for å måtte rettes for hånd.
+
+### Sikkerhet
+
+- Oppdatert `js-yaml` (4.3.0 til 5.3.0), som leser `config.yaml` i nettleseren når du
+  importerer fra Bodil. Den gamle versjonen kunne bruke svært lang tid på en fil med visse
+  `!!omap`-strukturer (GHSA-5p4m-2wfm-xmqj), og rettelsen ble ikke gjort tilgjengelig for
+  4.x-serien. Filen leses kun i nettleseren din, så en slik fil kunne ikke påvirke andre
+  brukere eller den hostede tjenesten. Wenche leser i tillegg nå YAML med et minimalt
+  skjema, så den aktuelle strukturen avvises i stedet for å tolkes.
+- Oppdatert `nanoid`, som kun brukes når prosjektet bygges, ikke av ferdig installert Wenche.
+
 ## [1.2.2] - 2026-08-15
 
 ### Rettet
