@@ -82,6 +82,89 @@ def test_aksjonaer_dict_og_fil_gir_likt(tmp_path):
     assert akr.les_config(dict(_CFG)) == akr.les_config(_fil(tmp_path))
 
 
+# ---------------------------------------------------------------------------
+# Leser mot leser
+# ---------------------------------------------------------------------------
+#
+# Testene over sammenligner hver leser med seg selv (dict mot fil). Det fanger ikke at de
+# tre leserne driver fra hverandre, og det er nettopp det som har skjedd to ganger: et nytt
+# felt ble lagt til i én leser, og de andre fortsatte å bruke standardverdien i stillhet.
+# Symptomene var feil regnskapsperiode i næringsspesifikasjonen (#156) og 1. januar som
+# stiftelsestidspunkt i RF-1086. Configen under fyller derfor ut ALLE valgfrie felt: et felt
+# som bare én leser plukker opp, faller igjennom her.
+
+# Selskapet er stiftet i oktober i regnskapsåret, så stiftelsesår, stiftelsesdato og
+# periode henger sammen. Et kalenderår ville gjort de tre periodefeltene like uansett.
+_CFG_ALLE_FELT = copy.deepcopy(_CFG)
+_CFG_ALLE_FELT["selskap"]["stiftelsesaar"] = 2024
+_CFG_ALLE_FELT["selskap"]["stiftelsesdato"] = "2024-10-24"
+_CFG_ALLE_FELT["regnskapsstart"] = "2024-10-24"
+_CFG_ALLE_FELT["regnskapsslutt"] = "2024-12-31"
+
+# Eneste feltet som med hensikt bare leses av én leser: e-postadressen er påkrevd for
+# RF-1086 og ubrukt i de to andre skjemaene.
+_KUN_AKSJONAERREGISTER = {"kontakt_epost"}
+
+
+def test_aarsregnskap_og_skattemelding_leser_identisk():
+    """Skattemeldingen har sin egen config-leser, og den må gi samme Aarsregnskap."""
+    fra_aarsregnskap = ar.les_config(copy.deepcopy(_CFG_ALLE_FELT))
+    fra_skattemelding, _ = sm.les_config(copy.deepcopy(_CFG_ALLE_FELT))
+    assert fra_aarsregnskap == fra_skattemelding
+
+
+def test_alle_lesere_bygger_samme_selskap():
+    """Alle tre leserne må plukke opp de samme selskapsfeltene fra samme config."""
+    import dataclasses
+
+    from wenche.models import Selskap
+
+    selskaper = {
+        "aarsregnskap": ar.les_config(copy.deepcopy(_CFG_ALLE_FELT)).selskap,
+        "skattemelding": sm.les_config(copy.deepcopy(_CFG_ALLE_FELT))[0].selskap,
+        "aksjonaerregister": akr.les_config(copy.deepcopy(_CFG_ALLE_FELT)).selskap,
+    }
+    felles = [
+        f.name for f in dataclasses.fields(Selskap) if f.name not in _KUN_AKSJONAERREGISTER
+    ]
+    for felt in felles:
+        verdier = {navn: getattr(s, felt) for navn, s in selskaper.items()}
+        assert len(set(verdier.values())) == 1, f"leserne er uenige om {felt}: {verdier}"
+        assert verdier["aarsregnskap"] == _forventet_selskapsfelt(felt), felt
+
+
+def _forventet_selskapsfelt(felt: str):
+    """Forventet verdi fra _CFG_ALLE_FELT, så en leser ikke kan «bli enig» om en tom verdi."""
+    from datetime import date
+
+    forventet = {
+        "navn": "Delt Test AS",
+        "org_nummer": "314273818",
+        "daglig_leder": "Ola Nordmann",
+        "styreleder": "Ola Nordmann",
+        "forretningsadresse": "Testveien 1, 0001 Oslo",
+        "stiftelsesaar": 2024,
+        "aksjekapital": 30000,
+        "stiftelsesdato": date(2024, 10, 24),
+    }
+    assert felt in forventet, f"nytt felt i Selskap: bestem om {felt} skal leses av alle"
+    return forventet[felt]
+
+
+def test_regnskapsperioden_naar_alle_veier():
+    """Perioden må overleve begge veiene inn til XML-byggingen, ikke bare årsregnskapets."""
+    from datetime import date
+
+    for les in (
+        lambda c: ar.les_config(c),
+        lambda c: sm.les_config(c)[0],
+    ):
+        regnskap = les(copy.deepcopy(_CFG_ALLE_FELT))
+        assert regnskap.periode_start == date(2024, 10, 24)
+        assert regnskap.periode_slutt == date(2024, 12, 31)
+        assert regnskap.er_foerste_regnskapsaar
+
+
 def test_delvis_fjoraar_uten_underseksjoner_kraesjer_ikke():
     # Regresjon: skjemaet utelater urørte (valgfrie) felt, så et delvis utfylt fjorår mangler
     # hele underseksjoner (her driftsinntekter). Før kastet _les_resultat KeyError på det direkte

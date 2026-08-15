@@ -242,6 +242,26 @@ class Aarsregnskap:
         start, slutt = self.periode_start, self.periode_slutt
         return (slutt.year * 12 + slutt.month) - (start.year * 12 + start.month) + 1
 
+    @property
+    def er_foerste_regnskapsaar(self) -> bool:
+        """
+        Om dette er selskapets første regnskapsår.
+
+        Årstallet alene holder ikke: et forlenget første regnskapsår (rskl. § 1-7 andre ledd)
+        spenner over to kalenderår, så stiftelsesåret er lavere enn regnskapsåret selv om
+        dette ER det første året. Faller stiftelsesdatoen innenfor perioden, teller det
+        derfor også.
+
+        To kallsteder er avhengige av samme svar: fjorårsadvarselen i `aarsregnskap.valider`
+        og stiftelsesinnskuddet i egenkapitalavstemmingen. Da de var to kopier rakk de å
+        drive fra hverandre, derfor bor definisjonen her.
+        """
+        stiftet = self.selskap.stiftelsesdato
+        stiftet_i_perioden = bool(
+            stiftet and self.periode_start <= stiftet <= self.periode_slutt
+        )
+        return self.selskap.stiftelsesaar >= self.regnskapsaar or stiftet_i_perioden
+
 
 # ---------------------------------------------------------------------------
 # Aksjonærregisteroppgave

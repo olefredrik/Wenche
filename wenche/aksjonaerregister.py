@@ -17,6 +17,7 @@ from xml.sax.saxutils import escape
 import httpx
 import yaml
 
+from wenche.aarsregnskap import _dato
 from wenche.models import Aksjonaer, Aksjonaerregisteroppgave, Selskap
 from wenche.skd_client import SkdAksjonaerClient
 
@@ -74,6 +75,7 @@ def les_config(config_fil: str | dict) -> Aksjonaerregisteroppgave:
         stiftelsesaar=s["stiftelsesaar"],
         aksjekapital=s["aksjekapital"],
         kontakt_epost=s.get("kontakt_epost", ""),
+        stiftelsesdato=_dato(s.get("stiftelsesdato")),
     )
 
     aksjonaerer = [

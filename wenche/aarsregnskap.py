@@ -304,12 +304,7 @@ def advarsler(regnskap: Aarsregnskap) -> list[str]:
     stiftelsesaar = regnskap.selskap.stiftelsesaar
     fb = regnskap.foregaaende_aar_balanse
     fjoraar_tomt = abs(fb.eiendeler.sum) < 0.01 and abs(fb.egenkapital_og_gjeld.sum) < 0.01
-    stiftet_i_perioden = bool(
-        regnskap.selskap.stiftelsesdato
-        and regnskap.periode_start <= regnskap.selskap.stiftelsesdato <= regnskap.periode_slutt
-    )
-    foerste_regnskapsaar = stiftelsesaar >= regnskap.regnskapsaar or stiftet_i_perioden
-    if stiftelsesaar and not foerste_regnskapsaar and fjoraar_tomt:
+    if stiftelsesaar and not regnskap.er_foerste_regnskapsaar and fjoraar_tomt:
         adv.append(
             f"Selskapet ble stiftet i {stiftelsesaar}, men det er ikke oppgitt "
             f"sammenligningstall for fjoråret ({regnskap.regnskapsaar - 1}). "
