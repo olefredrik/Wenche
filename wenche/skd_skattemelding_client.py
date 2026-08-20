@@ -313,6 +313,19 @@ def _parse_valideringsrespons(raw: bytes) -> dict:
 # Klartekst-forklaringer for valideringskoder vi har sett i praksis.
 # Skatteetatens koder er kryptiske; her oversetter vi de kjente til hva
 # brukeren faktisk kan gjøre. Rent informativt; påvirker ikke hva som sendes.
+_KODELISTEFEIL = (
+    "En av grupperingskodene finnes ikke i Skatteetatens kodeliste "
+    "«2025_resultatregnskapOgBalanse». Linjen «verdiAvvikerFraKodeliste» over navngir "
+    "koden som ble avvist. Ingenting er sendt inn.\n"
+    "    Bruker du seksjonen «naeringsspesifikasjon.poster» i konfigurasjonen, kommer "
+    "koden derfra: finn posten med den koden og rett eller fjern den. Merk at kodelisten "
+    "for rapportering er grovere enn en vanlig kontoplan, så enkelte bokføringskoder skal "
+    "slås sammen. For eksempel hører 7770 hjemme under 6700. Fjerner du seksjonen helt, "
+    "bruker Wenche sin egen standardfordeling, som alltid består valideringen.\n"
+    "    Bruker du ikke den seksjonen, er dette en feil i Wenche. Meld gjerne fra."
+)
+
+
 _KODE_FORKLARINGER = {
     "UP_HAR_NÆRINGSSPESIFIKASJON_MANGLER_SKATTEMELDING": (
         "Skattemeldingen inneholder ingen skattepliktige poster, mens "
@@ -326,6 +339,12 @@ _KODE_FORKLARINGER = {
         "selskaper uten aksjer eller for selskaper med drift. Slike må leveres "
         "via skatteetaten.no eller et regnskapsprogram."
     ),
+    # Skatteetaten sjekker grupperingskodene mot kodeliste 2025_resultatregnskapOgBalanse.
+    # Den lista ligger ikke i repoet, og XSD-en enumererer ikke kodeverdier, så Wenche kan
+    # ikke fange en ugyldig kode lokalt. Begge kodene under kommer av samme feil, så de
+    # deler forklaring og vises bare én gang.
+    "UgyldigKodelisteverdi": _KODELISTEFEIL,
+    "verdiAvvikerFraKodeliste": _KODELISTEFEIL,
     "innkommendeForespoerselManglerReferanseTilGjeldendeSkattemelding": (
         "Innsendingen mangler referanse til den forhåndsutfylte skattemeldingen. "
         "Oppgrader Wenche til nyeste versjon og prøv igjen."
@@ -381,11 +400,13 @@ def formater_valideringsresultat(res: dict) -> str:
         for v in veil:
             linjer.append(f"  - {v.get('veiledningstype')}: {v.get('hjelpetekst')}")
 
-    forklaringer = [
-        (kode, _KODE_FORKLARINGER[kode])
-        for kode in _koder_i_resultat(res)
-        if kode in _KODE_FORKLARINGER
-    ]
+    # Dedupliser på tekst, ikke bare kode: flere koder kan komme av samme feil og dele
+    # forklaring, og da skal brukeren se den én gang.
+    forklaringer: list[tuple[str, str]] = []
+    for kode in _koder_i_resultat(res):
+        tekst = _KODE_FORKLARINGER.get(kode)
+        if tekst and all(tekst != t for _, t in forklaringer):
+            forklaringer.append((kode, tekst))
     if forklaringer:
         linjer.append("\nHva betyr dette?")
         for kode, tekst in forklaringer:

@@ -522,6 +522,13 @@ export function DataSkjema({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Postlisten er en integrasjonsflate uten egne skjemafelt. Uten denne tellingen er den
+  // usynlig for den som har arvet en config fra regnskapssystemet sitt, og en kode som
+  // Skatteetaten avviser blir umulig å spore herfra.
+  const antallEgneKoder: number = Array.isArray(config?.naeringsspesifikasjon?.poster)
+    ? config.naeringsspesifikasjon.poster.length
+    : 0;
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const oppdater = (key: string, val: any) => setConfig((c: any) => sett(c, key, val));
 
@@ -877,6 +884,28 @@ export function DataSkjema({
         <section key={s.tittel} id={s.id} className="scroll-mt-32">
           <h3 className="mb-4 font-display text-xl font-normal">{s.tittel}</h3>
           <Feltrutenett felter={s.felter} config={config} oppdater={oppdater} laasteFelter={laasteFelter} />
+          {s.id === "skattemelding" && antallEgneKoder > 0 && (
+            <div className="mt-4 rounded-sm border border-border bg-background p-4 text-sm">
+              <p className={monoLabel}>Eksakte grupperingskoder</p>
+              <p className="mt-2 leading-relaxed text-muted-foreground">
+                Denne konfigurasjonen har en egen kodefordeling for næringsspesifikasjonen
+                ({antallEgneKoder} {antallEgneKoder === 1 ? "post" : "poster"} under{" "}
+                <code className="font-mono">naeringsspesifikasjon.poster</code>), som regel lagt
+                inn av et regnskapssystem. Kodene brukes i stedet for Wenches standardfordeling,
+                og de kan ikke redigeres her. Summene må stemme med tallene over, så endrer du et
+                beløp må listen oppdateres av systemet som lagde den.
+              </p>
+              <button
+                className="mt-3 text-spruce underline underline-offset-2"
+                // Fjerningen lagres først ved «Lagre data», og vakten mot ulagrede endringer
+                // fanger et uhell. Derfor ingen bekreftelsesdialog, i tråd med resten av skjemaet.
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                onClick={() => setConfig(({ naeringsspesifikasjon: _fjernet, ...resten }: any) => resten)}
+              >
+                Bruk standardkoder i stedet
+              </button>
+            </div>
+          )}
           {s.id === "resultatregnskap" && beregnSkatt && (
             <div className="mt-4 text-sm">
               <div className="flex flex-wrap items-center gap-3">
