@@ -142,6 +142,48 @@ foregaaende_aar:
 | `formuesverdi_aksjer` | heltall | nei | Formuesverdi av aksjer selskapet eier i andre selskap, fra aksjeoppgaven (RF-1088S, post 209). Brukes til å beregne netto formuesverdi bak selskapets egne aksjer. Standard: `0` |
 | `samlet_verdi_bak_aksjene` | heltall | nei | Overstyrer den beregnede netto formuesverdien bak aksjene direkte. Utelat for å la Wenche beregne den fra `formuesverdi_aksjer` og balansen |
 
+### `naeringsspesifikasjon.poster` (integrasjonsflate)
+
+`naeringsspesifikasjon.poster` er et valgfritt felt for regnskapssystemer som må bevare
+eksakte grupperingskoder i næringsspesifikasjonen. Ved vanlig bruk skal seksjonen utelates.
+Når listen finnes, bruker Wenche den i stedet for den forenklede standardfordelingen.
+
+Hver post har disse feltene:
+
+| Felt | Type | Beskrivelse |
+|---|---|---|
+| `kategori` | tekst | Kategorien posten tilhører, se listen nedenfor |
+| `kode` | tekst | Firesifret kode fra Skatteetatens grupperingskodeliste, for eksempel `6350` |
+| `beloep` | tall | Beløpet som skal rapporteres på koden |
+
+Tillatte kategorier er `salgsinntekt`, `annenDriftsinntekt`, `loennskostnad`,
+`annenDriftskostnad`, `finansinntekt`, `finanskostnad`, `skattekostnad`,
+`balanseverdiForAnleggsmiddel`, `balanseverdiForOmloepsmiddel`, `egenkapital`,
+`langsiktigGjeld` og `kortsiktigGjeld`.
+
+```yaml
+naeringsspesifikasjon:
+  poster:
+    - kategori: annenDriftskostnad
+      kode: "6350"
+      beloep: 1000
+    - kategori: annenDriftskostnad
+      kode: "7700"
+      beloep: 250
+```
+
+Listen må være komplett og summere nøyaktig til hver tilsvarende kategori i
+`resultatregnskap` og `balanse`. Wenche stopper XML-genereringen hvis postlisten ikke
+avstemmer. Nullposter inngår i avstemmingen, men tas bort før XML-en bygges.
+
+Balansebeløp må være positive. Negativ annen egenkapital uttrykkes med kode `2080` og
+et positivt beløp. Andre negative balansebeløp avvises.
+
+Feltet er bare en integrasjonsflate. Postlisten vises ikke i webgrensesnittet og droppes
+ved SAF-T-import. Hvis et aggregert tall endres i webgrensesnittet etter import, vil
+postlisten ikke lenger avstemme. Da må integrasjonen levere en ny komplett liste, eller
+seksjonen må fjernes slik at Wenche bruker standardfordelingen.
+
 ### `aksjonaerer`
 
 Liste over alle aksjonærer per 31.12 i regnskapsåret.
