@@ -48,6 +48,27 @@ def test_komplett_selskap_gir_ingen_avvik():
     assert sm.valider_selskap(_config()) == []
 
 
+def test_styreleder_uten_daglig_leder_er_tilstrekkelig():
+    config = _config()
+    config["selskap"]["daglig_leder"] = ""
+    assert sm.valider_selskap(config) == []
+
+
+def test_daglig_leder_uten_styreleder_er_tilstrekkelig():
+    config = _config()
+    config["selskap"]["styreleder"] = ""
+    assert sm.valider_selskap(config) == []
+
+
+def test_mangler_begge_representanter_gir_avvik():
+    config = _config()
+    config["selskap"]["daglig_leder"] = ""
+    config["selskap"]["styreleder"] = ""
+    feil = sm.valider_selskap(config)
+    assert len(feil) == 1
+    assert "Daglig leder eller styreleder" in feil[0]
+
+
 def test_les_config_tom_verdi_gir_lesbar_valueerror_ikke_rå_int():
     # Defense-in-depth for direkte/CLI-kallere: en tom verdi skal gi en forklarende melding,
     # ikke "invalid literal for int() with base 10: ''".
