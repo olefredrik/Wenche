@@ -315,6 +315,41 @@ class Noter:
 # Skattemelding-konfigurasjon
 # ---------------------------------------------------------------------------
 
+NAERINGSKATEGORIER = (
+    "salgsinntekt",
+    "annenDriftsinntekt",
+    "loennskostnad",
+    "annenDriftskostnad",
+    "finansinntekt",
+    "finanskostnad",
+    "skattekostnad",
+    "balanseverdiForAnleggsmiddel",
+    "balanseverdiForOmloepsmiddel",
+    "egenkapital",
+    "langsiktigGjeld",
+    "kortsiktigGjeld",
+)
+
+BALANSEKATEGORIER = frozenset(
+    {
+        "balanseverdiForAnleggsmiddel",
+        "balanseverdiForOmloepsmiddel",
+        "egenkapital",
+        "langsiktigGjeld",
+        "kortsiktigGjeld",
+    }
+)
+
+
+@dataclass(frozen=True)
+class NaeringsspesifikasjonPost:
+    """Eksakt resultat-/balansepost fra den offisielle grupperingskodelisten."""
+
+    kategori: str
+    kode: str
+    beloep: float
+
+
 @dataclass
 class SkattemeldingKonfig:
     underskudd_til_fremfoering: float = 0.0   # Ubenyttet underskudd fra tidligere år
@@ -327,3 +362,6 @@ class SkattemeldingKonfig:
     samlet_verdi_bak_aksjene: Optional[float] = None  # Manuell overstyring av netto
                                                # formuesverdi bak selskapets egne aksjer.
                                                # None = beregnes fra formuesverdi + balanse.
+    # Valgfri, komplett kodefordeling for næringsspesifikasjonen. Når den er oppgitt,
+    # valideres kategorisummene mot regnskapet før XML bygges.
+    naeringsspesifikasjonsposter: tuple[NaeringsspesifikasjonPost, ...] = ()

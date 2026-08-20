@@ -74,3 +74,48 @@ def test_valider_skattemelding_ok_for_komplett_config():
     assert svar["ok"] is True
     assert svar["feil"] == []
     assert svar["regnskapsaar"] == 2025
+
+
+def test_leser_eksakte_naeringsspesifikasjonsposter():
+    config = _config()
+    config["naeringsspesifikasjon"] = {
+        "poster": [
+            {"kategori": "annenDriftskostnad", "kode": "7700", "beloep": 0},
+        ]
+    }
+    _, konfig = sm.les_config(config)
+    assert len(konfig.naeringsspesifikasjonsposter) == 1
+    assert konfig.naeringsspesifikasjonsposter[0].kode == "7700"
+
+
+def test_avviser_duplikate_naeringsspesifikasjonsposter():
+    config = _config()
+    config["naeringsspesifikasjon"] = {
+        "poster": [
+            {"kategori": "kortsiktigGjeld", "kode": "2740", "beloep": 1},
+            {"kategori": "kortsiktigGjeld", "kode": "2740", "beloep": 2},
+        ]
+    }
+    with pytest.raises(ValueError, match="duplikat"):
+        sm.les_config(config)
+
+
+@pytest.mark.parametrize(
+    ("post", "melding"),
+    [
+        ({"kategori": "ukjent", "kode": "7700", "beloep": 1}, "ukjent kategori"),
+        (
+            {"kategori": "annenDriftskostnad", "kode": "77", "beloep": 1},
+            "firesifret kode",
+        ),
+        (
+            {"kategori": "kortsiktigGjeld", "kode": "2740", "beloep": -1},
+            "positivt balansebeløp",
+        ),
+    ],
+)
+def test_avviser_ugyldige_naeringsspesifikasjonsposter(post, melding):
+    config = _config()
+    config["naeringsspesifikasjon"] = {"poster": [post]}
+    with pytest.raises(ValueError, match=melding):
+        sm.les_config(config)

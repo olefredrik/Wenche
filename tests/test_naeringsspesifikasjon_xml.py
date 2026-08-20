@@ -27,9 +27,11 @@ from wenche.models import (
     Finansposter,
     KortsiktigGjeld,
     LangsiktigGjeld,
+    NaeringsspesifikasjonPost,
     Omloepmidler,
     Resultatregnskap,
     Selskap,
+    SkattemeldingKonfig,
 )
 from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
 
@@ -375,6 +377,54 @@ class TestBalanse:
         root = _parse(regnskap)
         gek = root.find(f".//{{{_NS}}}gjeldOgEgenkapital")
         assert gek.find(f"{{{_NS}}}kortsiktigGjeld") is None
+
+
+class TestEksakteGrupperingskoder:
+    def test_egne_koder_bevares_uten_forenklet_dobbeltfoering(self):
+        regnskap = _lag_regnskap()
+        konfig = SkattemeldingKonfig(
+            naeringsspesifikasjonsposter=(
+                NaeringsspesifikasjonPost("annenDriftskostnad", "7700", 5500),
+                NaeringsspesifikasjonPost("balanseverdiForAnleggsmiddel", "1313", 100000),
+                NaeringsspesifikasjonPost("balanseverdiForOmloepsmiddel", "1920", 1200),
+                NaeringsspesifikasjonPost("egenkapital", "2000", 30000),
+                NaeringsspesifikasjonPost("egenkapital", "2080", 34300),
+                NaeringsspesifikasjonPost("langsiktigGjeld", "2250", 67200),
+            )
+        )
+        root = fromstring(
+            generer_naeringsspesifikasjon(regnskap, _PARTSNUMMER, konfig).decode("utf-8")
+        )
+        assert _finn_kode(root, "7700")
+        assert not _finn_kode(root, "6700")
+
+    def test_nullposter_avstemmes_men_utelates_fra_xml(self):
+        regnskap = _lag_regnskap()
+        konfig = SkattemeldingKonfig(
+            naeringsspesifikasjonsposter=(
+                NaeringsspesifikasjonPost("annenDriftskostnad", "6350", 0),
+                NaeringsspesifikasjonPost("annenDriftskostnad", "7700", 5500),
+                NaeringsspesifikasjonPost("balanseverdiForAnleggsmiddel", "1313", 100000),
+                NaeringsspesifikasjonPost("balanseverdiForOmloepsmiddel", "1920", 1200),
+                NaeringsspesifikasjonPost("egenkapital", "2000", 30000),
+                NaeringsspesifikasjonPost("egenkapital", "2080", 34300),
+                NaeringsspesifikasjonPost("langsiktigGjeld", "2250", 67200),
+            )
+        )
+        root = fromstring(
+            generer_naeringsspesifikasjon(regnskap, _PARTSNUMMER, konfig).decode("utf-8")
+        )
+        assert _finn_kode(root, "7700")
+        assert not _finn_kode(root, "6350")
+
+    def test_egne_koder_maa_summere_til_regnskapet(self):
+        konfig = SkattemeldingKonfig(
+            naeringsspesifikasjonsposter=(
+                NaeringsspesifikasjonPost("annenDriftskostnad", "7700", 1),
+            )
+        )
+        with pytest.raises(ValueError, match="annenDriftskostnad"):
+            generer_naeringsspesifikasjon(_lag_regnskap(), _PARTSNUMMER, konfig)
 
 
 # ---------------------------------------------------------------------------

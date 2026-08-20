@@ -8,6 +8,8 @@ Innsending via API krever registrering som systemleverandør hos Skatteetaten.
 Se modulens docstring i skattemelding.py for detaljer.
 """
 
+import math
+
 import yaml
 
 from wenche.aarsregnskap import _dato, _les_resultat, _les_balanse, _tall as _belop
@@ -30,6 +32,9 @@ from wenche.models import (
     Egenkapital,
     LangsiktigGjeld,
     KortsiktigGjeld,
+    BALANSEKATEGORIER,
+    NAERINGSKATEGORIER,
+    NaeringsspesifikasjonPost,
 )
 
 
@@ -152,7 +157,50 @@ def _les_skattekonfig(raw: dict) -> SkattemeldingKonfig:
         boersnotert=bool(sm_raw.get("boersnotert", False)),
         formuesverdi_aksjer=_belop(sm_raw.get("formuesverdi_aksjer")),
         samlet_verdi_bak_aksjene=None if _er_tom(_verdi_override) else float(_verdi_override),
+        naeringsspesifikasjonsposter=_les_naeringsspesifikasjonsposter(raw),
     )
+
+
+def _les_naeringsspesifikasjonsposter(raw: dict) -> tuple[NaeringsspesifikasjonPost, ...]:
+    seksjon = raw.get("naeringsspesifikasjon") or {}
+    poster = seksjon.get("poster") or []
+    if not isinstance(poster, list):
+        raise ValueError("naeringsspesifikasjon.poster må være en liste.")
+    resultat: list[NaeringsspesifikasjonPost] = []
+    sett: set[tuple[str, str]] = set()
+    for nummer, post in enumerate(poster, start=1):
+        if not isinstance(post, dict):
+            raise ValueError(f"Næringsspesifikasjonspost {nummer} må være et objekt.")
+        kategori = str(post.get("kategori") or "").strip()
+        kode = str(post.get("kode") or "").strip()
+        if kategori not in NAERINGSKATEGORIER:
+            raise ValueError(
+                f"Næringsspesifikasjonspost {nummer} har ukjent kategori {kategori!r}."
+            )
+        if len(kode) != 4 or not kode.isdigit():
+            raise ValueError(
+                f"Næringsspesifikasjonspost {nummer} må ha en firesifret kode."
+            )
+        try:
+            beloep = float(post.get("beloep"))
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"Næringsspesifikasjonspost {nummer} må ha et numerisk beløp."
+            )
+        if not math.isfinite(beloep):
+            raise ValueError(f"Næringsspesifikasjonspost {nummer} har ugyldig beløp.")
+        if kategori in BALANSEKATEGORIER and beloep < 0:
+            raise ValueError(
+                f"Næringsspesifikasjonspost {nummer} må ha positivt balansebeløp."
+            )
+        identitet = (kategori, kode)
+        if identitet in sett:
+            raise ValueError(
+                f"Næringsspesifikasjonen har duplikat for {kategori} kode {kode}."
+            )
+        sett.add(identitet)
+        resultat.append(NaeringsspesifikasjonPost(kategori, kode, beloep))
+    return tuple(sorted(resultat, key=lambda post: (post.kategori, post.kode)))
 
 
 def _nok(beloep: float) -> str:

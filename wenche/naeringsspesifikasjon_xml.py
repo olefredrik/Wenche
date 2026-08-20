@@ -35,13 +35,141 @@ from __future__ import annotations
 
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-from wenche.models import Aarsregnskap, SkattemeldingKonfig
+from wenche.models import (
+    Aarsregnskap,
+    NAERINGSKATEGORIER,
+    NaeringsspesifikasjonPost,
+    SkattemeldingKonfig,
+)
 from wenche.skatteberegning import beregn_skatt
 
 _NS = (
     "urn:no:skatteetaten:fastsetting:formueinntekt:"
     "naeringsspesifikasjon:ekstern:v6"
 )
+
+
+def _standardposter(regnskap: Aarsregnskap) -> tuple[NaeringsspesifikasjonPost, ...]:
+    res = regnskap.resultatregnskap
+    bal = regnskap.balanse
+    am = bal.eiendeler.anleggsmidler
+    om = bal.eiendeler.omloepmidler
+    ekg = bal.egenkapital_og_gjeld
+    poster = [
+        NaeringsspesifikasjonPost("salgsinntekt", "3200", res.driftsinntekter.salgsinntekter),
+        NaeringsspesifikasjonPost(
+            "annenDriftsinntekt", "3900", res.driftsinntekter.andre_driftsinntekter
+        ),
+        NaeringsspesifikasjonPost("loennskostnad", "5000", res.driftskostnader.loennskostnader),
+        NaeringsspesifikasjonPost(
+            "annenDriftskostnad", "6000", res.driftskostnader.avskrivninger
+        ),
+        NaeringsspesifikasjonPost(
+            "annenDriftskostnad", "6700", res.driftskostnader.andre_driftskostnader
+        ),
+        NaeringsspesifikasjonPost(
+            "finansinntekt", "8090", res.finansposter.utbytte_fra_datterselskap
+        ),
+        NaeringsspesifikasjonPost(
+            "finansinntekt", "8050", res.finansposter.andre_finansinntekter
+        ),
+        NaeringsspesifikasjonPost("finanskostnad", "8150", res.finansposter.rentekostnader),
+        NaeringsspesifikasjonPost(
+            "finanskostnad", "8160", res.finansposter.andre_finanskostnader
+        ),
+        NaeringsspesifikasjonPost("skattekostnad", "8300", res.skattekostnad),
+        NaeringsspesifikasjonPost(
+            "balanseverdiForAnleggsmiddel", "1313", am.aksjer_i_datterselskap
+        ),
+        NaeringsspesifikasjonPost("balanseverdiForAnleggsmiddel", "1350", am.andre_aksjer),
+        NaeringsspesifikasjonPost(
+            "balanseverdiForAnleggsmiddel", "1390", am.langsiktige_fordringer
+        ),
+        NaeringsspesifikasjonPost(
+            "balanseverdiForOmloepsmiddel", "1500", om.kortsiktige_fordringer
+        ),
+        NaeringsspesifikasjonPost("balanseverdiForOmloepsmiddel", "1920", om.bankinnskudd),
+        NaeringsspesifikasjonPost("egenkapital", "2000", ekg.egenkapital.aksjekapital),
+        NaeringsspesifikasjonPost("egenkapital", "2020", ekg.egenkapital.overkursfond),
+        NaeringsspesifikasjonPost(
+            "egenkapital",
+            "2050" if ekg.egenkapital.annen_egenkapital >= 0 else "2080",
+            abs(ekg.egenkapital.annen_egenkapital),
+        ),
+        NaeringsspesifikasjonPost(
+            "langsiktigGjeld", "2250", ekg.langsiktig_gjeld.laan_fra_aksjonaer
+        ),
+        NaeringsspesifikasjonPost(
+            "langsiktigGjeld", "2290", ekg.langsiktig_gjeld.andre_langsiktige_laan
+        ),
+        NaeringsspesifikasjonPost(
+            "kortsiktigGjeld", "2400", ekg.kortsiktig_gjeld.leverandoergjeld
+        ),
+        NaeringsspesifikasjonPost(
+            "kortsiktigGjeld", "2500", ekg.kortsiktig_gjeld.betalbar_skatt
+        ),
+        NaeringsspesifikasjonPost(
+            "kortsiktigGjeld", "2600", ekg.kortsiktig_gjeld.skyldige_offentlige_avgifter
+        ),
+        NaeringsspesifikasjonPost(
+            "kortsiktigGjeld", "2990", ekg.kortsiktig_gjeld.annen_kortsiktig_gjeld
+        ),
+    ]
+    return tuple(post for post in poster if post.beloep)
+
+
+def _poster_per_kategori(
+    regnskap: Aarsregnskap, konfig: SkattemeldingKonfig
+) -> dict[str, list[tuple[float, str]]]:
+    poster = konfig.naeringsspesifikasjonsposter or _standardposter(regnskap)
+    per_kategori: dict[str, list[tuple[float, str]]] = {
+        kategori: [] for kategori in NAERINGSKATEGORIER
+    }
+    for post in poster:
+        if post.kategori not in per_kategori:
+            raise ValueError(f"Ukjent næringsspesifikasjonskategori: {post.kategori}")
+        per_kategori[post.kategori].append((post.beloep, post.kode))
+
+    if konfig.naeringsspesifikasjonsposter:
+        res = regnskap.resultatregnskap
+        bal = regnskap.balanse
+        ekg = bal.egenkapital_og_gjeld
+        forventet = {
+            "salgsinntekt": res.driftsinntekter.salgsinntekter,
+            "annenDriftsinntekt": res.driftsinntekter.andre_driftsinntekter,
+            "loennskostnad": res.driftskostnader.loennskostnader,
+            "annenDriftskostnad": (
+                res.driftskostnader.avskrivninger + res.driftskostnader.andre_driftskostnader
+            ),
+            "finansinntekt": res.finansposter.sum_inntekter,
+            "finanskostnad": res.finansposter.sum_kostnader,
+            "skattekostnad": res.skattekostnad,
+            "balanseverdiForAnleggsmiddel": bal.eiendeler.anleggsmidler.sum,
+            "balanseverdiForOmloepsmiddel": bal.eiendeler.omloepmidler.sum,
+            "egenkapital": ekg.egenkapital.sum,
+            "langsiktigGjeld": ekg.langsiktig_gjeld.sum,
+            "kortsiktigGjeld": ekg.kortsiktig_gjeld.sum,
+        }
+        for kategori, forventet_sum in forventet.items():
+            if kategori == "egenkapital":
+                faktisk_sum = sum(
+                    -abs(beloep) if kode == "2080" else beloep
+                    for beloep, kode in per_kategori[kategori]
+                )
+            else:
+                faktisk_sum = sum(beloep for beloep, _ in per_kategori[kategori])
+            if abs(faktisk_sum - forventet_sum) > 0.01:
+                raise ValueError(
+                    f"Næringsspesifikasjonens {kategori} summerer til {faktisk_sum:.2f}, "
+                    f"men regnskapet viser {forventet_sum:.2f}."
+                )
+    # Avstemmingen over skal se hele integrasjonslisten, også eksplisitte nullposter.
+    # Nullposter tas først bort etterpå, slik standardstien alltid har gjort, for å
+    # unngå egne 0.00-forekomster i XML-en.
+    return {
+        kategori: [(beloep, kode) for beloep, kode in poster if beloep]
+        for kategori, poster in per_kategori.items()
+    }
 
 
 def _beloep_element(parent: Element, tag: str, beloep: float) -> Element:
@@ -143,6 +271,7 @@ def generer_naeringsspesifikasjon(
     """
     konfig = konfig or SkattemeldingKonfig()
     beregning = beregn_skatt(regnskap.resultatregnskap, konfig)
+    poster = _poster_per_kategori(regnskap, konfig)
     root = Element("naeringsspesifikasjon", xmlns=_NS)
 
     SubElement(root, "partsreferanse").text = str(partsnummer)
@@ -163,28 +292,27 @@ def generer_naeringsspesifikasjon(
     if di.sum:
         _beloep_element(driftsinntekt_el, "sumDriftsinntekt", di.sum)
 
-    if di.salgsinntekter:
+    if poster["salgsinntekt"]:
         salgsinntekt_el = SubElement(driftsinntekt_el, "salgsinntekt")
-        _resultatforekomst(salgsinntekt_el, "inntekt", di.salgsinntekter, "3200")
+        for beloep, kode in poster["salgsinntekt"]:
+            _resultatforekomst(salgsinntekt_el, "inntekt", beloep, kode)
 
-    if di.andre_driftsinntekter:
+    if poster["annenDriftsinntekt"]:
         annen_di_el = SubElement(driftsinntekt_el, "annenDriftsinntekt")
-        _resultatforekomst(annen_di_el, "inntekt", di.andre_driftsinntekter, "3900")
+        for beloep, kode in poster["annenDriftsinntekt"]:
+            _resultatforekomst(annen_di_el, "inntekt", beloep, kode)
 
     # Driftskostnader. sumDriftskostnad må stå først i Driftskostnad per XSD.
     driftskostnad_el = SubElement(resultatregnskap, "driftskostnad")
     if dk.sum:
         _beloep_element(driftskostnad_el, "sumDriftskostnad", dk.sum)
 
-    if dk.loennskostnader:
+    if poster["loennskostnad"]:
         loenn_el = SubElement(driftskostnad_el, "loennskostnad")
-        _resultatforekomst(loenn_el, "kostnad", dk.loennskostnader, "5000")
+        for beloep, kode in poster["loennskostnad"]:
+            _resultatforekomst(loenn_el, "kostnad", beloep, kode)
 
-    annen_dk_poster = [
-        (dk.avskrivninger, "6000"),
-        (dk.andre_driftskostnader, "6700"),
-    ]
-    annen_dk_poster = [(b, k) for b, k in annen_dk_poster if b]
+    annen_dk_poster = poster["annenDriftskostnad"]
     if annen_dk_poster:
         annen_dk_el = SubElement(driftskostnad_el, "annenDriftskostnad")
         for beloep, kode in annen_dk_poster:
@@ -201,31 +329,24 @@ def generer_naeringsspesifikasjon(
         _beloep_element(resultatregnskap, "sumSkattekostnad", res.skattekostnad)
 
     # Finansinntekter
-    fi_poster = [
-        (fp.utbytte_fra_datterselskap, "8090"),
-        (fp.andre_finansinntekter, "8050"),
-    ]
-    fi_poster = [(b, k) for b, k in fi_poster if b]
+    fi_poster = poster["finansinntekt"]
     if fi_poster:
         finansinntekt_el = SubElement(resultatregnskap, "finansinntekt")
         for beloep, kode in fi_poster:
             _resultatforekomst(finansinntekt_el, "inntekt", beloep, kode)
 
     # Finanskostnader
-    fk_poster = [
-        (fp.rentekostnader, "8150"),
-        (fp.andre_finanskostnader, "8160"),
-    ]
-    fk_poster = [(b, k) for b, k in fk_poster if b]
+    fk_poster = poster["finanskostnad"]
     if fk_poster:
         finanskostnad_el = SubElement(resultatregnskap, "finanskostnad")
         for beloep, kode in fk_poster:
             _resultatforekomst(finanskostnad_el, "kostnad", beloep, kode)
 
     # Skattekostnad-forekomsten står etter finanskostnad per XSD-sekvensen.
-    if res.skattekostnad:
+    if poster["skattekostnad"]:
         skattekostnad_el = SubElement(resultatregnskap, "skattekostnad")
-        _resultatforekomst(skattekostnad_el, "kostnad", res.skattekostnad, "8300")
+        for beloep, kode in poster["skattekostnad"]:
+            _resultatforekomst(skattekostnad_el, "kostnad", beloep, kode)
 
     # aarsresultat står sist i Resultatregnskap-sekvensen.
     if res.aarsresultat:
@@ -242,12 +363,7 @@ def generer_naeringsspesifikasjon(
     balanseregnskap = SubElement(root, "balanseregnskap")
 
     # Anleggsmidler. sumBalanseverdiForAnleggsmiddel må stå først per XSD.
-    am_poster = [
-        (am.aksjer_i_datterselskap, "1313"),
-        (am.andre_aksjer, "1350"),
-        (am.langsiktige_fordringer, "1390"),
-    ]
-    am_poster = [(b, k) for b, k in am_poster if b]
+    am_poster = poster["balanseverdiForAnleggsmiddel"]
     if am_poster or am.sum:
         anleggsmiddel_el = SubElement(balanseregnskap, "anleggsmiddel")
         if am.sum:
@@ -258,11 +374,7 @@ def generer_naeringsspesifikasjon(
                 _balanseforekomst(bv_am_el, "balanseverdi", beloep, kode)
 
     # Omløpsmidler. sumBalanseverdiForOmloepsmiddel må stå først per XSD.
-    om_poster = [
-        (om.kortsiktige_fordringer, "1500"),
-        (om.bankinnskudd, "1920"),
-    ]
-    om_poster = [(b, k) for b, k in om_poster if b]
+    om_poster = poster["balanseverdiForOmloepsmiddel"]
     if om_poster or om.sum:
         omloepsmiddel_el = SubElement(balanseregnskap, "omloepsmiddel")
         if om.sum:
@@ -292,41 +404,21 @@ def generer_naeringsspesifikasjon(
         _beloep_element(gek_el, "sumEgenkapital", ek.sum)
 
     # Langsiktig gjeld
-    lg_poster = [
-        (lg.laan_fra_aksjonaer, "2250"),
-        (lg.andre_langsiktige_laan, "2290"),
-    ]
-    lg_poster = [(b, k) for b, k in lg_poster if b]
+    lg_poster = poster["langsiktigGjeld"]
     if lg_poster:
         langsiktig_gjeld_el = SubElement(gek_el, "langsiktigGjeld")
         for beloep, kode in lg_poster:
             _balanseforekomst(langsiktig_gjeld_el, "gjeld", beloep, kode)
 
     # Kortsiktig gjeld
-    kg_poster = [
-        (kg.leverandoergjeld, "2400"),
-        (kg.betalbar_skatt, "2500"),
-        (kg.skyldige_offentlige_avgifter, "2600"),
-        (kg.annen_kortsiktig_gjeld, "2990"),
-    ]
-    kg_poster = [(b, k) for b, k in kg_poster if b]
+    kg_poster = poster["kortsiktigGjeld"]
     if kg_poster:
         kortsiktig_gjeld_el = SubElement(gek_el, "kortsiktigGjeld")
         for beloep, kode in kg_poster:
             _balanseforekomst(kortsiktig_gjeld_el, "gjeld", beloep, kode)
 
     # Egenkapital
-    ek_poster = [
-        (ek.aksjekapital, "2000"),
-        (ek.overkursfond, "2020"),
-    ]
-    # Annen egenkapital: 2050 (positiv) eller 2080 (udekket tap / negativ)
-    if ek.annen_egenkapital >= 0:
-        ek_poster.append((ek.annen_egenkapital, "2050"))
-    else:
-        ek_poster.append((abs(ek.annen_egenkapital), "2080"))
-
-    ek_poster = [(b, k) for b, k in ek_poster if b]
+    ek_poster = poster["egenkapital"]
     if ek_poster:
         egenkapital_el = SubElement(gek_el, "egenkapital")
         for beloep, kode in ek_poster:

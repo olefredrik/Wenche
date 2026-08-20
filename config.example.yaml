@@ -144,6 +144,18 @@ skattemelding:
                                     # bak aksjene direkte (ellers beregnes den fra
                                     # formuesverdi_aksjer + balanse).
 
+# Valgfritt for regnskapssystemer som må bevare de eksakte offisielle kodene i
+# næringsspesifikasjonen. Utelat seksjonen ved manuell bruk. Oppgis listen, må den være
+# komplett og summere nøyaktig til resultat- og balansetallene over.
+# naeringsspesifikasjon:
+#   poster:
+#     - kategori: annenDriftskostnad
+#       kode: "6350"
+#       beloep: 1000
+#     - kategori: kortsiktigGjeld
+#       kode: "2740"
+#       beloep: 250
+
 # --- Aksjonærregister ---
 # List opp alle aksjonærer per 31.12 i regnskapsåret.
 # Fødselsnummer brukes av Skatteetaten til å forhåndsutfylle aksjonærenes skattemelding.
