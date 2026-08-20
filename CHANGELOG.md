@@ -4,6 +4,23 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.3.1] - 2026-08-20
+
+### Rettet
+
+- **En avvist grupperingskode sa ikke hvor koden kom fra.** Skatteetaten sjekker kodene i
+  næringsspesifikasjonen mot kodeliste `2025_resultatregnskapOgBalanse`, og en ukjent kode gir
+  et blokkerende avvik (`UgyldigKodelisteverdi`) som stopper innsendingen før noe er sendt.
+  Wenche kan ikke fange det lokalt, siden XSD-en ikke lister opp gyldige kodeverdier. Feilen
+  navnga koden, men ikke hvor den kom fra, og for en bruker som har fått konfigurasjonen fra
+  regnskapssystemet sitt var det et tall uten opphav. Feilteksten forklarer nå at koden kommer
+  fra `naeringsspesifikasjon.poster`, at kodelisten for rapportering er grovere enn en vanlig
+  kontoplan, og at seksjonen kan fjernes for å bruke Wenches standardfordeling.
+- **Den egne kodefordelingen var usynlig i skjemaet.** Listen har ingen egne skjemafelt, så den
+  fulgte med en importert `config.yaml` uten at noen så den. Skjemaet viser den nå som en
+  skrivebeskyttet merknad under Skattemelding, med antall poster og en knapp for å gå tilbake
+  til Wenches standardkoder.
+
 ## [1.3.0] - 2026-08-20
 
 ### Lagt til

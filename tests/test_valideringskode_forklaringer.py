@@ -63,3 +63,58 @@ def test_duplikate_koder_forklares_kun_en_gang():
     )
     ut = formater_valideringsresultat(res)
     assert ut.count("passivt holdingselskap") == 1
+
+
+def test_kodelistefeil_peker_paa_egen_postliste():
+    # Formen tt02 svarte med 2026-08-20 da en kode utenfor kodelisten ble sendt.
+    res = _res(
+        aarsak="UgyldigKodelisteverdi",
+        avvik_ved_validering=[
+            {
+                "avvikstype": "UgyldigKodelisteverdi",
+                "oevrigInformasjon": (
+                    "Verdien er ikke definert i kodeliste 2025_resultatregnskapOgBalanse"
+                ),
+            },
+            {"avvikstype": "verdiAvvikerFraKodeliste", "oevrigInformasjon": "UgyldigKodeverdi:7770"},
+        ],
+    )
+    ut = formater_valideringsresultat(res)
+    assert "naeringsspesifikasjon.poster" in ut
+    assert "Ingenting er sendt inn" in ut
+
+
+def test_kodelistefeil_forklares_bare_en_gang():
+    # aarsak og to avvikstyper peker på samme feil. Brukeren skal se forklaringen én gang.
+    res = _res(
+        aarsak="UgyldigKodelisteverdi",
+        avvik_ved_validering=[
+            {"avvikstype": "UgyldigKodelisteverdi", "oevrigInformasjon": ""},
+            {"avvikstype": "verdiAvvikerFraKodeliste", "oevrigInformasjon": "UgyldigKodeverdi:7770"},
+        ],
+    )
+    ut = formater_valideringsresultat(res)
+    assert ut.count("finnes ikke i Skatteetatens kodeliste") == 1
+
+
+def test_kodelistefeil_forklares_ogsaa_uten_aarsak():
+    # SKD kan svare med avvikstypen alene. Hintet skal komme uansett.
+    res = _res(
+        avvik_ved_validering=[
+            {"avvikstype": "verdiAvvikerFraKodeliste", "oevrigInformasjon": "UgyldigKodeverdi:7770"},
+        ],
+    )
+    assert "naeringsspesifikasjon.poster" in formater_valideringsresultat(res)
+
+
+def test_ulike_koder_med_ulik_forklaring_vises_hver_for_seg():
+    # Dedupliseringen er på tekst, ikke på antall koder: to ulike feil skal fortsatt gi to svar.
+    res = _res(
+        aarsak="UgyldigKodelisteverdi",
+        avvik_ved_validering=[
+            {"avvikstype": "innkommendeForespoerselManglerSporTilUtfoerende", "oevrigInformasjon": ""},
+        ],
+    )
+    ut = formater_valideringsresultat(res)
+    assert "finnes ikke i Skatteetatens kodeliste" in ut
+    assert "logg inn i Altinn med BankID" in ut
