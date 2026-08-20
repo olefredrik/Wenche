@@ -40,8 +40,6 @@ from wenche.models import (
 PAAKREVDE_SELSKAPSFELT: list[tuple[str, str]] = [
     ("navn", "Selskapsnavn"),
     ("org_nummer", "Organisasjonsnummer"),
-    ("daglig_leder", "Daglig leder"),
-    ("styreleder", "Styreleder"),
     ("forretningsadresse", "Forretningsadresse"),
     ("stiftelsesaar", "Stiftelsesår"),
     ("aksjekapital", "Aksjekapital"),
@@ -90,6 +88,11 @@ def valider_selskap(config_fil: str | dict) -> list[str]:
                 float(verdi)
             except (TypeError, ValueError):
                 feil.append(f"{etikett} må være et tall.")
+    if _er_tom(s.get("daglig_leder")) and _er_tom(s.get("styreleder")):
+        feil.append(
+            "Daglig leder eller styreleder mangler. Fyll inn minst én bekreftende "
+            "selskapsrepresentant."
+        )
     return feil
 
 
@@ -101,8 +104,8 @@ def les_config(config_fil: str | dict) -> tuple[Aarsregnskap, SkattemeldingKonfi
     selskap = Selskap(
         navn=s["navn"],
         org_nummer=str(s["org_nummer"]),
-        daglig_leder=s["daglig_leder"],
-        styreleder=s["styreleder"],
+        daglig_leder=str(s.get("daglig_leder") or ""),
+        styreleder=str(s.get("styreleder") or ""),
         forretningsadresse=s["forretningsadresse"],
         stiftelsesaar=_tall(s.get("stiftelsesaar"), "Stiftelsesår", int),
         aksjekapital=_tall(s.get("aksjekapital"), "Aksjekapital", float),
