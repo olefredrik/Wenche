@@ -14,8 +14,8 @@ Alle beløp oppgis i hele kroner (NOK). Bruk `0` for poster som ikke er aktuelle
 |---|---|---|---|
 | `navn` | tekst | ja | Selskapets registrerte navn |
 | `org_nummer` | tekst | ja | Organisasjonsnummer, 9 siffer uten mellomrom |
-| `daglig_leder` | tekst | ja | Fullt navn på daglig leder |
-| `styreleder` | tekst | ja | Fullt navn på styreleder (kan være samme som daglig leder) |
+| `daglig_leder` | tekst | delvis | Fullt navn på daglig leder. Minst én av `daglig_leder` og `styreleder` må være fylt ut |
+| `styreleder` | tekst | delvis | Fullt navn på styreleder (kan være samme som daglig leder). Minst én av `daglig_leder` og `styreleder` må være fylt ut |
 | `forretningsadresse` | tekst | ja | Gateadresse, postnummer og poststed |
 | `stiftelsesaar` | heltall | ja | Året selskapet ble stiftet |
 | `stiftelsesdato` | dato | nei | Eksakt stiftelsesdato (ÅÅÅÅ-MM-DD). Hentes fra Enhetsregisteret. Brukes som stiftelsesdato i aksjonærregisteroppgaven, og som start på et forlenget første regnskapsår. Uten den brukes 1. januar i stiftelsesåret |
@@ -178,6 +178,14 @@ avstemmer. Nullposter inngår i avstemmingen, men tas bort før XML-en bygges.
 
 Balansebeløp må være positive. Negativ annen egenkapital uttrykkes med kode `2080` og
 et positivt beløp. Andre negative balansebeløp avvises.
+
+Koden må finnes i Skatteetatens kodeliste `2025_resultatregnskapOgBalanse`. Wenche kan ikke
+sjekke det lokalt, fordi XSD-en ikke lister opp de gyldige kodeverdiene. En ukjent kode
+oppdages derfor først av Skatteetaten, som svarer med et blokkerende avvik
+(`UgyldigKodelisteverdi`) og navngir koden. Innsendingen stopper da før noe er sendt, så en
+feil kode kan ikke gi en gal innsending, men den må rettes i konfigurasjonen før du kommer
+videre. Merk også at kodelisten for rapportering er grovere enn en vanlig kontoplan: enkelte
+bokføringskoder skal aggregeres, for eksempel hører `7770` hjemme under `6700`.
 
 Feltet er bare en integrasjonsflate. Postlisten vises ikke i webgrensesnittet og droppes
 ved SAF-T-import. Hvis et aggregert tall endres i webgrensesnittet etter import, vil
