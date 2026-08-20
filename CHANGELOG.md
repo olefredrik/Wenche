@@ -4,6 +4,39 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.3.0] - 2026-08-20
+
+### Lagt til
+
+- **Regnskapssystemer kan nå bevare de eksakte grupperingskodene i næringsspesifikasjonen.**
+  Wenches forenklede modell samler flere offisielle koder i én standardkode, så et system som
+  allerede har fordelt saldoene riktig mistet fordelingen på vei til Skatteetaten. Aksjer i et
+  tilknyttet selskap (`1320`) ble rapportert som aksjer i datterselskap (`1313`), overkursfond
+  (`2030`) som `2020`, og lån til foretak i samme konsern (`1370`) som andre langsiktige
+  fordringer (`1390`). Den nye, valgfrie seksjonen `naeringsspesifikasjon.poster` lar en
+  integrasjon oppgi kodene selv. Feltet er en integrasjonsflate: det vises ikke i
+  webgrensesnittet, og manuell bruk trenger det ikke. Se `docs/referanse.md`.
+
+  Listen valideres fail-closed. Hver post må ha kjent kategori, firesifret kode, endelig
+  numerisk beløp og unik kombinasjon av kategori og kode, og hver kategorisum må avstemme mot
+  resultatregnskapet og balansen før XML-en bygges. En ufullstendig liste kan derfor ikke gi en
+  stille delvis innsending, og listen kan aldri endre totalsummene. Verifisert mot
+  Skatteetatens testmiljø i to varianter, begge `validertOK` uten nye avvik mot baseline.
+
+  Uten seksjonen er innsendingen byte-identisk med før.
+
+### Rettet
+
+- **Skattemeldingen krevde både daglig leder og styreleder.** Det var strengere enn resten av
+  Wenche, som allerede godtar at et passivt selskap mangler daglig leder, og strengere enn
+  veiledningen i webskjemaet om å fylle inn minst én representant. Nå kreves minst én av dem,
+  og mangler begge er det fortsatt en blokkerende og lesbar feil.
+
+### Endret
+
+- Kodefordelingen i næringsspesifikasjonen er samlet ett sted i stedet for å ligge spredt på
+  16 steder inne i generatoren. Ingen endring i XML-en som sendes inn.
+
 ## [1.2.3] - 2026-08-15
 
 ### Rettet
