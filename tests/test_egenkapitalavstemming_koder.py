@@ -8,9 +8,12 @@ brukt som autoritet her: hver kode Wenche kan sende må finnes der, være gyldig
 virksomhetstype `oevrigSelskap` og regnskapspliktstype `fullRegnskapsplikt` (kombinasjonen
 Wenche alltid sender), og ligge i den kategorien Wenche plasserer den i.
 
-Skatteetaten har bekreftet (SSV-5813) at egenkapitalendringstypen ikke inngår i noen
-maskinell kontroll: et feilvalg gir en uriktig opplysning og ikke et avvik. Derav denne
-testen framfor tt02.
+Kodevalgene er avklart med Skatteetaten i SSV-5813:
+- utbytte skal ikke rapporteres i samleposten `annenNegativEndringIEgenkapital`
+- koden følger beslutningsgrunnlaget: `tilleggsutbytte` for utdeling i løpet av året basert
+  på sist godkjente årsregnskap, `ekstraordinaertUtbytte` bare med mellombalanse
+- egenkapitalendringstypen inngår ikke i noen maskinell kontroll, så et feilvalg gir en
+  uriktig opplysning og ikke et avvik. Derav denne testen framfor tt02.
 """
 
 from pathlib import Path
@@ -56,6 +59,7 @@ KODER = {
     "aaretsOverskudd": "tillegg",
     "annenPositivEndringIEgenkapital": "tillegg",
     "aaretsUnderskudd": "fradrag",
+    "tilleggsutbytte": "fradrag",
     "annenNegativEndringIEgenkapital": "fradrag",
 }
 
@@ -224,6 +228,7 @@ ALLE_TILFELLER = [
     _overskudd_med_utbytte,
     _uforklart_oekning,
     _uforklart_nedgang_uten_utbytte,
+    _nedgang_stoerre_enn_utbytte,
 ]
 
 
@@ -285,6 +290,47 @@ class TestTinginnskudd:
         assert [f for f in valider(regnskap) if "Tinginnskudd" in f] == []
         assert any("Tinginnskudd" in a for a in advarsler(regnskap))
         assert all(kode != "tinginnskudd" for kode, _ in _endringer(regnskap))
+
+
+# ---------------------------------------------------------------------------
+# Utbytte (punkt 2 i issue #159)
+# ---------------------------------------------------------------------------
+
+class TestUtbytte:
+    def test_utbytte_rapporteres_som_tilleggsutbytte(self):
+        assert _endringer(_overskudd_med_utbytte()) == [
+            ("aaretsOverskudd", 95000.0),
+            ("tilleggsutbytte", 80000.0),
+        ]
+
+    def test_utbytte_havner_ikke_i_samleposten(self):
+        """Skatteetaten avviste annenNegativEndringIEgenkapital for utbytte (SSV-5813)."""
+        koder = [kode for kode, _ in _endringer(_overskudd_med_utbytte())]
+        assert "annenNegativEndringIEgenkapital" not in koder
+
+    def test_bare_den_delen_utbyttet_dekker_omklassifiseres(self):
+        """Aldri en motpost: resten blir liggende i samleposten."""
+        assert _endringer(_nedgang_stoerre_enn_utbytte()) == [
+            ("tilleggsutbytte", 10000.0),
+            ("annenNegativEndringIEgenkapital", 20000.0),
+        ]
+
+    def test_utbytte_stoerre_enn_nedgangen_gir_ingen_motpost(self):
+        """Er utbyttet større enn nedgangen (typisk avsatt i fjor), skal resten ikke oppstå."""
+        regnskap = _nedgang_stoerre_enn_utbytte()
+        regnskap.utbytte_utbetalt = 500000
+
+        assert _endringer(regnskap) == [("tilleggsutbytte", 30000.0)]
+
+    def test_uten_utbytte_er_samleposten_uendret(self):
+        assert _endringer(_uforklart_nedgang_uten_utbytte()) == [
+            ("annenNegativEndringIEgenkapital", 20000.0)
+        ]
+
+    def test_positiv_rest_er_uberoert_av_utbytte(self):
+        assert _endringer(_uforklart_oekning()) == [
+            ("annenPositivEndringIEgenkapital", 20000.0)
+        ]
 
 
 # ---------------------------------------------------------------------------
