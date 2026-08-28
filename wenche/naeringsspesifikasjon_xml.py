@@ -571,18 +571,28 @@ def generer_naeringsspesifikasjon(
     tillegg: list[tuple[str, int]] = []
     fradrag: list[tuple[str, int]] = []
 
-    # I første regnskapsår er økningen i innskutt EK stiftelsesinnskuddet. Wenches
-    # minimalmodell skiller ikke kontant- og tinginnskudd, og støtter i praksis det vanlige
-    # kontantinnskuddet for et lite AS. Senere kapitaltransaksjoner utledes ikke som kontant-
-    # innskudd, siden modellen ikke har nok informasjon til å klassifisere dem sikkert.
+    # I første regnskapsår er økningen i innskutt EK stiftelsesinnskuddet. Kodelisten skiller
+    # kontantinnskudd og tinginnskudd, og modellen kan ikke utlede hvilken som gjelder, så
+    # selskapet oppgir tingdelen selv. 0 (standard) betyr alt kontant, som er det vanlige for
+    # et lite AS. Senere kapitaltransaksjoner utledes ikke som innskudd, siden modellen ikke
+    # har nok informasjon til å klassifisere dem sikkert.
     if regnskap.er_foerste_regnskapsaar:
         inngaaende_innskutt_ek = round(
             foregaaende_ek.aksjekapital + foregaaende_ek.overkursfond
         )
         utgaaende_innskutt_ek = round(ek.aksjekapital + ek.overkursfond)
-        kontantinnskudd = utgaaende_innskutt_ek - inngaaende_innskutt_ek
-        if kontantinnskudd > 0:
-            tillegg.append(("kontantinnskudd", kontantinnskudd))
+        innskudd = utgaaende_innskutt_ek - inngaaende_innskutt_ek
+        if innskudd > 0:
+            # Klemmes mot innskuddet: valider() stopper et for stort beløp, men XML-en skal
+            # aldri kunne rapportere mer tinginnskudd enn det faktiske innskuddet.
+            tinginnskudd = min(
+                max(round(regnskap.selskap.tinginnskudd_ved_stiftelse), 0), innskudd
+            )
+            kontantinnskudd = innskudd - tinginnskudd
+            if kontantinnskudd > 0:
+                tillegg.append(("kontantinnskudd", kontantinnskudd))
+            if tinginnskudd > 0:
+                tillegg.append(("tinginnskudd", tinginnskudd))
 
     aarsresultat = round(res.aarsresultat)
     if aarsresultat > 0:

@@ -20,6 +20,7 @@ Alle beløp oppgis i hele kroner (NOK). Bruk `0` for poster som ikke er aktuelle
 | `stiftelsesaar` | heltall | ja | Året selskapet ble stiftet |
 | `stiftelsesdato` | dato | nei | Eksakt stiftelsesdato (ÅÅÅÅ-MM-DD). Hentes fra Enhetsregisteret. Brukes som stiftelsesdato i aksjonærregisteroppgaven, og som start på et forlenget første regnskapsår. Uten den brukes 1. januar i stiftelsesåret |
 | `aksjekapital` | heltall | ja | Innbetalt aksjekapital i NOK, fra stiftelsesdokumentene |
+| `tinginnskudd_ved_stiftelse` | heltall | nei | Den delen av stiftelsesinnskuddet som ble gjort som tinginnskudd, i NOK. Brukes bare i selskapets første regnskapsår, der egenkapitalavstemmingen skiller kontantinnskudd og tinginnskudd på hver sin kode. Tom eller 0 = hele innskuddet var kontant |
 
 ### `regnskapsaar`
 

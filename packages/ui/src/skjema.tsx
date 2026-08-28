@@ -80,6 +80,13 @@ const SEKSJONER: Seksjon[] = [
         help: "Hentes fra Enhetsregisteret. Brukes i aksjonærregisteroppgaven",
       },
       { key: "selskap.aksjekapital", label: "Aksjekapital (kr)", type: "number" },
+      {
+        key: "selskap.tinginnskudd_ved_stiftelse",
+        label: "Tinginnskudd ved stiftelse (kr)",
+        type: "number",
+        valgfri: true,
+        help: "Kun i første regnskapsår, hvis selskapet ble stiftet med annet enn penger (typisk aksjer). Tom = alt innskutt kontant",
+      },
       { key: "selskap.kontakt_epost", label: "Kontakt-e-post", type: "text" },
       { key: "regnskapsaar", label: "Regnskapsår", type: "number" },
       {
