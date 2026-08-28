@@ -98,6 +98,7 @@ def test_aksjonaer_dict_og_fil_gir_likt(tmp_path):
 _CFG_ALLE_FELT = copy.deepcopy(_CFG)
 _CFG_ALLE_FELT["selskap"]["stiftelsesaar"] = 2024
 _CFG_ALLE_FELT["selskap"]["stiftelsesdato"] = "2024-10-24"
+_CFG_ALLE_FELT["selskap"]["tinginnskudd_ved_stiftelse"] = 25000
 _CFG_ALLE_FELT["regnskapsstart"] = "2024-10-24"
 _CFG_ALLE_FELT["regnskapsslutt"] = "2024-12-31"
 
@@ -146,6 +147,7 @@ def _forventet_selskapsfelt(felt: str):
         "stiftelsesaar": 2024,
         "aksjekapital": 30000,
         "stiftelsesdato": date(2024, 10, 24),
+        "tinginnskudd_ved_stiftelse": 25000.0,
     }
     assert felt in forventet, f"nytt felt i Selskap: bestem om {felt} skal leses av alle"
     return forventet[felt]

@@ -145,6 +145,7 @@ def les_config(config_fil: str | dict) -> Aarsregnskap:
         stiftelsesaar=s["stiftelsesaar"],
         aksjekapital=s["aksjekapital"],
         stiftelsesdato=_dato(s.get("stiftelsesdato")),
+        tinginnskudd_ved_stiftelse=_tall(s.get("tinginnskudd_ved_stiftelse")),
     )
 
     resultat = _les_resultat(cfg["resultatregnskap"])
@@ -189,8 +190,48 @@ def valider(regnskap: Aarsregnskap) -> list[str]:
         feil.append("Organisasjonsnummeret må være 9 siffer.")
 
     feil.extend(_valider_periode(regnskap))
+    feil.extend(_valider_tinginnskudd(regnskap))
 
     return feil
+
+
+def _valider_tinginnskudd(regnskap: Aarsregnskap) -> list[str]:
+    """
+    Kontrollerer tinginnskuddet mot stiftelsesinnskuddet. Tom liste betyr OK.
+
+    Tinginnskuddet er en oppdeling av økningen i innskutt egenkapital, ikke et beløp som
+    kommer i tillegg til den. Er det større enn økningen, er minst ett av tallene feil, og
+    egenkapitalavstemmingen ville rapportert et tinginnskudd selskapet ikke har hatt.
+    """
+    tinginnskudd = regnskap.selskap.tinginnskudd_ved_stiftelse
+    if not tinginnskudd:
+        return []
+
+    if tinginnskudd < 0:
+        return [
+            f"Tinginnskudd ved stiftelse kan ikke være negativt "
+            f"({tinginnskudd:,.2f} NOK)."
+        ]
+
+    if not regnskap.er_foerste_regnskapsaar:
+        # Ikke en feil: en config som bæres videre fra år til år (typisk fra Bodil) tar
+        # feltet med seg, og da skal innsendingen gå. Advarselen forklarer at det ignoreres.
+        return []
+
+    ek = regnskap.balanse.egenkapital_og_gjeld.egenkapital
+    fek = regnskap.foregaaende_aar_balanse.egenkapital_og_gjeld.egenkapital
+    innskudd = (ek.aksjekapital + ek.overkursfond) - (
+        fek.aksjekapital + fek.overkursfond
+    )
+    if tinginnskudd > innskudd + 0.01:
+        return [
+            f"Tinginnskudd ved stiftelse ({tinginnskudd:,.2f} NOK) er større enn økningen "
+            f"i innskutt egenkapital ({innskudd:,.2f} NOK). Tinginnskuddet er den delen av "
+            "aksjekapital og overkursfond som ble skutt inn som ting, ikke et beløp i "
+            "tillegg til den."
+        ]
+
+    return []
 
 
 def _valider_periode(regnskap: Aarsregnskap) -> list[str]:
@@ -318,6 +359,16 @@ def advarsler(regnskap: Aarsregnskap) -> list[str]:
             "Regnskapsloven § 6-6 krever sammenligningstall for selskaper som ikke "
             "er nystiftet. Fyll inn «Fjorårets tall», eller bekreft at fjoråret "
             "faktisk var null hvis selskapet var helt uten aktivitet."
+        )
+
+    # Tinginnskuddet hører til stiftelsen. Står det igjen i en config som bæres videre til
+    # senere år, blir det stille ignorert, og da skal brukeren få vite det.
+    if regnskap.selskap.tinginnskudd_ved_stiftelse > 0 and not regnskap.er_foerste_regnskapsaar:
+        adv.append(
+            f"Tinginnskudd ved stiftelse "
+            f"({regnskap.selskap.tinginnskudd_ved_stiftelse:,.0f} NOK) er oppgitt, men "
+            f"{regnskap.regnskapsaar} er ikke selskapets første regnskapsår. Feltet gjelder "
+            "bare stiftelsesinnskuddet og påvirker ikke denne innsendingen. Det kan fjernes."
         )
 
     return adv

@@ -80,6 +80,13 @@ const SEKSJONER: Seksjon[] = [
         help: "Hentes fra Enhetsregisteret. Brukes i aksjonærregisteroppgaven",
       },
       { key: "selskap.aksjekapital", label: "Aksjekapital (kr)", type: "number" },
+      {
+        key: "selskap.tinginnskudd_ved_stiftelse",
+        label: "Tinginnskudd ved stiftelse (kr)",
+        type: "number",
+        valgfri: true,
+        help: "Kun i første regnskapsår, hvis selskapet ble stiftet med annet enn penger (typisk aksjer). Tom = alt innskutt kontant",
+      },
       { key: "selskap.kontakt_epost", label: "Kontakt-e-post", type: "text" },
       { key: "regnskapsaar", label: "Regnskapsår", type: "number" },
       {
@@ -628,17 +635,23 @@ export function DataSkjema({
     setSaftFeil(false);
     setSaftLaster(true);
     try {
-      const data = await importerSaft(file, foregaaende);
+      const svar = await importerSaft(file, foregaaende);
+      // _advarsler er ikke et config-felt: den skilles ut her, slik at den aldri havner i
+      // configen brukeren lagrer, men fortsatt blir sagt.
+      const { _advarsler: saftAdvarsler, ...data } = svar ?? {};
       const aar = data?.regnskapsaar ? ` ${data.regnskapsaar}` : "";
+      const advarsel = Array.isArray(saftAdvarsler) && saftAdvarsler.length
+        ? " " + saftAdvarsler.join(" ")
+        : "";
       if (foregaaende) {
         // Kun fjorårets sammenligningstall: merge inn i gjeldende config, rør ikke resten.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setConfig((c: any) => ({ ...c, foregaaende_aar: data.foregaaende_aar }));
-        setSaftMelding(`Sammenligningstall for fjoråret importert fra SAF-T${aar}.`);
+        setSaftMelding(`Sammenligningstall for fjoråret importert fra SAF-T${aar}.${advarsel}`);
       } else {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setConfig((c: any) => medLaastOrg(flettStyring(data, c)));
-        setSaftMelding(`Tall importert fra SAF-T${aar}. Se over og lagre.`);
+        setSaftMelding(`Tall importert fra SAF-T${aar}. Se over og lagre.${advarsel}`);
       }
     } catch (e) {
       setSaftFeil(true);

@@ -79,6 +79,38 @@ def _er_offentlig_avgift(code: str) -> bool:
         return False
 
 
+def _er_uklassifisert_anleggsmiddel(code: str) -> bool:
+    """Om grupperingskoden er et anleggsmiddel Wenche ikke har en egen linje for."""
+    try:
+        return int(code) < 1300
+    except ValueError:
+        return False
+
+
+def _advarsler_om_uklassifiserte(acc: dict) -> list[str]:
+    """
+    Advarsler om anleggsmidler som er importert inn i en grovere linje enn de hører til.
+
+    Wenche har ingen linje for immaterielle eiendeler eller varige driftsmidler, verken i
+    årsregnskapet eller i næringsspesifikasjonen. Kontoene havner derfor i langsiktige
+    fordringer og rapporteres som kode 1390. Det er en uriktig opplysning, og brukeren er
+    den eneste som kan avgjøre hva beløpet skal gjøre.
+    """
+    uklassifiserte = acc["uklassifiserte_anleggsmidler"]
+    if not uklassifiserte:
+        return []
+
+    koder = ", ".join(sorted(uklassifiserte))
+    sum_beloep = sum(uklassifiserte.values())
+    return [
+        f"SAF-T-filen har {sum_beloep:,.0f} NOK på anleggsmiddelkontoer Wenche ikke har en "
+        f"egen linje for (grupperingskode {koder}), typisk immaterielle eiendeler eller "
+        "varige driftsmidler. Beløpet er lagt inn under «Langsiktige fordringer» og blir "
+        "rapportert som «andre langsiktige fordringer» (kode 1390). Kontroller at det er "
+        "riktig for selskapet, og rett tallene selv hvis det ikke er det."
+    ]
+
+
 def _tom_akkumulator() -> dict:
     return {
         "salgsinntekter": 0.0,
@@ -105,6 +137,10 @@ def _tom_akkumulator() -> dict:
         "betalbar_skatt": 0.0,
         "skyldige_offentlige_avgifter": 0.0,
         "annen_kortsiktig_gjeld": 0.0,
+        # Anleggsmiddelkontoer som samles i langsiktige_fordringer fordi modellen ikke har
+        # noen egen linje for dem: {grupperingskode: beløp}. Brukes bare til å advare, aldri
+        # til beløp, jf. _advarsler_om_uklassifiserte.
+        "uklassifiserte_anleggsmidler": {},
     }
 
 
@@ -154,6 +190,14 @@ def _akkumuler(acc: dict, account: ET.Element, netto: float) -> None:
             # 1370 (lån til eiere/konsern), 1390 (andre langsiktige fordringer),
             # 1105/1205/1280 (driftsmidler) — samles i langsiktige_fordringer
             acc["langsiktige_fordringer"] += netto
+            # Fordringskodene hører hjemme her, resten gjør det ikke: alt under 1300 er
+            # immaterielle eiendeler (10xx) eller varige driftsmidler (11xx/12xx), og de
+            # rapporteres da som «andre langsiktige fordringer» (1390). Beløpet blir liggende
+            # der, men brukeren skal få vite det i stedet for at det skjer i stillhet.
+            if netto and _er_uklassifisert_anleggsmiddel(code):
+                acc["uklassifiserte_anleggsmidler"][code] = (
+                    acc["uklassifiserte_anleggsmidler"].get(code, 0.0) + netto
+                )
 
     elif cat == "balanseverdiForOmloepsmiddel":
         # 1920/1950 = bankinnskudd (inkl. skattetrekkskonto)
@@ -359,6 +403,8 @@ def _fra_root(root: ET.Element) -> dict:
             "sikkerhet": "",
         })
 
+    advarsler = _advarsler_om_uklassifiserte(nar)
+
     return {
         "selskap": {
             "navn": navn,
@@ -388,4 +434,8 @@ def _fra_root(root: ET.Element) -> dict:
             "antall_ansatte": 0,
             "laan_til_naerstaaende": laan_til_naerstaaende,
         },
+        # Underscore-prefikset markerer at dette ikke er et config-felt: nøkkelen bæres bare
+        # fra importen til brukeren, og skal aldri skrives til config.yaml. Utelates helt når
+        # det ikke er noe å advare om, slik at en vanlig import gir samme config som før.
+        **({"_advarsler": advarsler} if advarsler else {}),
     }

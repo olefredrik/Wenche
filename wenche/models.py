@@ -29,6 +29,12 @@ class Selskap:
     # holder ikke overalt: aksjonærregisteroppgaven oppgir stiftelsesdato, og et forlenget
     # første regnskapsår starter på stiftelsesdatoen, ikke 1. januar.
     stiftelsesdato: Optional[date] = None
+    # Den delen av stiftelsesinnskuddet som ble gjort som tinginnskudd, typisk aksjer skutt
+    # inn i et nystiftet holdingselskap. Egenkapitalavstemmingen skiller kontantinnskudd og
+    # tinginnskudd på hver sin kode, og modellen kan ikke utlede hvilken som gjelder. 0 betyr
+    # at hele innskuddet var kontant, som er det vanlige for et lite AS. Brukes bare i
+    # selskapets første regnskapsår; senere år har ikke noe stiftelsesinnskudd å fordele.
+    tinginnskudd_ved_stiftelse: float = 0.0
 
 
 # ---------------------------------------------------------------------------

@@ -571,18 +571,28 @@ def generer_naeringsspesifikasjon(
     tillegg: list[tuple[str, int]] = []
     fradrag: list[tuple[str, int]] = []
 
-    # I første regnskapsår er økningen i innskutt EK stiftelsesinnskuddet. Wenches
-    # minimalmodell skiller ikke kontant- og tinginnskudd, og støtter i praksis det vanlige
-    # kontantinnskuddet for et lite AS. Senere kapitaltransaksjoner utledes ikke som kontant-
-    # innskudd, siden modellen ikke har nok informasjon til å klassifisere dem sikkert.
+    # I første regnskapsår er økningen i innskutt EK stiftelsesinnskuddet. Kodelisten skiller
+    # kontantinnskudd og tinginnskudd, og modellen kan ikke utlede hvilken som gjelder, så
+    # selskapet oppgir tingdelen selv. 0 (standard) betyr alt kontant, som er det vanlige for
+    # et lite AS. Senere kapitaltransaksjoner utledes ikke som innskudd, siden modellen ikke
+    # har nok informasjon til å klassifisere dem sikkert.
     if regnskap.er_foerste_regnskapsaar:
         inngaaende_innskutt_ek = round(
             foregaaende_ek.aksjekapital + foregaaende_ek.overkursfond
         )
         utgaaende_innskutt_ek = round(ek.aksjekapital + ek.overkursfond)
-        kontantinnskudd = utgaaende_innskutt_ek - inngaaende_innskutt_ek
-        if kontantinnskudd > 0:
-            tillegg.append(("kontantinnskudd", kontantinnskudd))
+        innskudd = utgaaende_innskutt_ek - inngaaende_innskutt_ek
+        if innskudd > 0:
+            # Klemmes mot innskuddet: valider() stopper et for stort beløp, men XML-en skal
+            # aldri kunne rapportere mer tinginnskudd enn det faktiske innskuddet.
+            tinginnskudd = min(
+                max(round(regnskap.selskap.tinginnskudd_ved_stiftelse), 0), innskudd
+            )
+            kontantinnskudd = innskudd - tinginnskudd
+            if kontantinnskudd > 0:
+                tillegg.append(("kontantinnskudd", kontantinnskudd))
+            if tinginnskudd > 0:
+                tillegg.append(("tinginnskudd", tinginnskudd))
 
     aarsresultat = round(res.aarsresultat)
     if aarsresultat > 0:
@@ -597,7 +607,19 @@ def generer_naeringsspesifikasjon(
     if annen_endring > 0:
         tillegg.append(("annenPositivEndringIEgenkapital", annen_endring))
     elif annen_endring < 0:
-        fradrag.append(("annenNegativEndringIEgenkapital", abs(annen_endring)))
+        rest = abs(annen_endring)
+        # Utdelt utbytte er den vanligste grunnen til at egenkapitalen faller mer enn
+        # årsresultatet, og Skatteetaten har avvist samleposten for utbytte (SSV-5813).
+        # Koden følger beslutningsgrunnlaget: `tilleggsutbytte` er utdeling i løpet av året
+        # basert på sist fastsatte årsregnskap, som er Wenches tilfelle. Modellen har ingen
+        # post for avsatt utbytte (da ville egenkapitalen falt i avsetningsåret i stedet), og
+        # ingen mellombalanse, som `ekstraordinaertUtbytte` forutsetter. Aldri en motpost:
+        # bare den delen av resten utbetalingen faktisk dekker blir omklassifisert.
+        utbytte = min(rest, max(round(regnskap.utbytte_utbetalt), 0))
+        if utbytte > 0:
+            fradrag.append(("tilleggsutbytte", utbytte))
+        if rest - utbytte > 0:
+            fradrag.append(("annenNegativEndringIEgenkapital", rest - utbytte))
 
     if inngaaende_ek or utgaaende_ek or tillegg or fradrag:
         ekavst = SubElement(root, "egenkapitalavstemming")

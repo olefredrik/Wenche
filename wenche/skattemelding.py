@@ -115,6 +115,7 @@ def les_config(config_fil: str | dict) -> tuple[Aarsregnskap, SkattemeldingKonfi
         stiftelsesaar=_tall(s.get("stiftelsesaar"), "Stiftelsesår", int),
         aksjekapital=_tall(s.get("aksjekapital"), "Aksjekapital", float),
         stiftelsesdato=_dato(s.get("stiftelsesdato")),
+        tinginnskudd_ved_stiftelse=_belop(s.get("tinginnskudd_ved_stiftelse")),
     )
 
     resultatregnskap = _les_resultat(raw["resultatregnskap"])

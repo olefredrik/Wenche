@@ -220,3 +220,70 @@ def test_saft_import_gir_balanse_som_gaar_opp_med_skatt():
     assert regnskap.resultatregnskap.resultat_foer_skatt == 50000
     assert regnskap.resultatregnskap.aarsresultat == 39000
     assert ar.valider(regnskap) == []
+
+
+# ---------------------------------------------------------------------------
+# Anleggsmidler Wenche ikke har en egen linje for
+# ---------------------------------------------------------------------------
+
+def test_immaterielle_eiendeler_gir_advarsel_om_koden_de_faar():
+    """
+    Immaterielle eiendeler og driftsmidler samles i langsiktige fordringer og rapporteres
+    som kode 1390, siden modellen ikke har egne linjer for dem. Beløpet skal fortsatt komme
+    med (balansen må gå opp), men brukeren skal få vite hvilken kode det får.
+    """
+    cfg = importer_bytes(
+        _saft_xml(
+            KONTOER
+            + _konto("balanseverdiForAnleggsmiddel", "1070", ub_debet=45000)  # utsatt skattefordel
+            + _konto("balanseverdiForAnleggsmiddel", "1105", ub_debet=12000)  # driftsmiddel
+        )
+    )
+
+    assert cfg["balanse"]["eiendeler"]["anleggsmidler"]["langsiktige_fordringer"] == 57000
+    assert len(cfg["_advarsler"]) == 1
+    advarsel = cfg["_advarsler"][0]
+    assert "1070, 1105" in advarsel
+    assert "57,000" in advarsel
+    assert "1390" in advarsel
+
+
+def test_fordringskodene_gir_ingen_advarsel():
+    """1370 og 1390 hører faktisk hjemme i langsiktige fordringer."""
+    cfg = importer_bytes(
+        _saft_xml(
+            KONTOER
+            + _konto("balanseverdiForAnleggsmiddel", "1370", ub_debet=25000)
+            + _konto("balanseverdiForAnleggsmiddel", "1390", ub_debet=5000)
+        )
+    )
+
+    assert cfg["balanse"]["eiendeler"]["anleggsmidler"]["langsiktige_fordringer"] == 30000
+    assert "_advarsler" not in cfg
+
+
+def test_vanlig_import_har_ingen_advarselsnoekkel():
+    """Nøkkelen utelates helt når det ikke er noe å advare om, så configen er som før."""
+    assert "_advarsler" not in importer_bytes(_saft_xml(KONTOER))
+
+
+def test_advarselsnoekkelen_skrives_ikke_til_config_yaml(tmp_path):
+    """_advarsler er ikke et config-felt: CLI-en skal si det, ikke lagre det."""
+    from click.testing import CliRunner
+
+    from wenche.cli import main
+
+    saft_fil = tmp_path / "saft.xml"
+    saft_fil.write_bytes(
+        _saft_xml(KONTOER + _konto("balanseverdiForAnleggsmiddel", "1080", ub_debet=90000))
+    )
+    ut_fil = tmp_path / "config.yaml"
+
+    resultat = CliRunner().invoke(
+        main, ["importer-saft", str(saft_fil), "--ut", str(ut_fil)]
+    )
+
+    assert resultat.exit_code == 0
+    assert "Advarsel:" in resultat.output
+    assert "1080" in resultat.output
+    assert "_advarsler" not in ut_fil.read_text(encoding="utf-8")
