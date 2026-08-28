@@ -4,6 +4,21 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.5.1] - 2026-08-28
+
+### Rettet
+
+- **En utbetaling av fjorårets avsetning kunne stemple et egenkapitalfall som utbytte.**
+  Skatteetaten har bekreftet at når utbyttet er avsatt i årsregnskapet for ett år og utbetalt
+  det neste, skal avstemmingen for utbetalingsåret ikke inneholde noen utbyttepost: egenkapitalen
+  falt i avsetningsåret, og utbetalingen gjør bare opp en gjeldspost. Omklassifiseringen så bare
+  på utbetalt utbytte, så falt egenkapitalen i utbetalingsåret av en annen grunn, ble nedgangen
+  rapportert som tilleggsutbytte opp til det utbetalte beløpet. Fjorårets balanse forteller nå
+  hvor mye av utbetalingen som gjør opp en tidligere avsetning, og bare beløp utover den kan
+  være en utdeling vedtatt i år. Tilfellet krevde både en utbetalt avsetning fra i fjor og et
+  egenkapitalfall av en annen grunn i samme år; avsetter selskapet også i inneværende år, tar
+  årets avsetning hele nedgangen først.
+
 ## [1.5.0] - 2026-08-28
 
 ### Lagt til
