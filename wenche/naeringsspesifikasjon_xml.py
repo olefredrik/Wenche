@@ -613,9 +613,23 @@ def generer_naeringsspesifikasjon(
         rest = abs(annen_endring)
         # Utbytte er den vanligste grunnen til at egenkapitalen faller mer enn årsresultatet,
         # og Skatteetaten har avvist samleposten for utbytte (SSV-5813). Koden følger
-        # grunnlaget for vedtaket: `tilleggsutbytte` er utdeling i løpet av året basert på
-        # sist fastsatte årsregnskap, som er Wenches tilfelle. Aldri en motpost: bare den
-        # delen av resten utbetalingen faktisk dekker blir omklassifisert.
+        # grunnlaget for vedtaket, og de to tilfellene Wenche kan skille kommer i denne
+        # rekkefølgen, siden et selskap som deler ut hvert år både betaler fjorårets
+        # avsetning og avsetter årets i samme regnskapsår:
+        #
+        #   1. Årets avsetning (`avsattEllerForventetUtbytte`) reduserer egenkapitalen nå.
+        #      En utbetaling av en TIDLIGERE avsetning gjør bare opp en gjeldspost og rører
+        #      ikke egenkapitalen, så avsetningen må forklare nedgangen først.
+        #   2. Er det ingen avsetning, men utbetalt utbytte, er utdelingen vedtatt i året på
+        #      grunnlag av sist godkjente årsregnskap: `tilleggsutbytte`. Wenche har ingen
+        #      mellombalanse, som `ekstraordinaertUtbytte` forutsetter.
+        #
+        # Aldri en motpost: bare den delen av resten hvert beløp faktisk dekker blir
+        # omklassifisert, og en rest utover det blir liggende i samleposten.
+        avsatt = min(rest, max(round(eg.kortsiktig_gjeld.avsatt_utbytte), 0))
+        if avsatt > 0:
+            fradrag.append(("avsattEllerForventetUtbytte", avsatt))
+        rest -= avsatt
         utbytte = min(rest, max(round(regnskap.utbytte_utbetalt), 0))
         if utbytte > 0:
             fradrag.append(("tilleggsutbytte", utbytte))

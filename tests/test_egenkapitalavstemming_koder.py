@@ -59,6 +59,7 @@ KODER = {
     "aaretsOverskudd": "tillegg",
     "annenPositivEndringIEgenkapital": "tillegg",
     "aaretsUnderskudd": "fradrag",
+    "avsattEllerForventetUtbytte": "fradrag",
     "tilleggsutbytte": "fradrag",
     "annenNegativEndringIEgenkapital": "fradrag",
 }
@@ -86,6 +87,7 @@ def _balanse(
     bankinnskudd: float = 0.0,
     aksjer: float = 0.0,
     kortsiktig_gjeld: float = 0.0,
+    avsatt_utbytte: float = 0.0,
 ) -> Balanse:
     return Balanse(
         eiendeler=Eiendeler(
@@ -99,7 +101,10 @@ def _balanse(
                 annen_egenkapital=annen_egenkapital,
             ),
             langsiktig_gjeld=LangsiktigGjeld(),
-            kortsiktig_gjeld=KortsiktigGjeld(annen_kortsiktig_gjeld=kortsiktig_gjeld),
+            kortsiktig_gjeld=KortsiktigGjeld(
+                annen_kortsiktig_gjeld=kortsiktig_gjeld,
+                avsatt_utbytte=avsatt_utbytte,
+            ),
         ),
     )
 
@@ -223,12 +228,57 @@ def _nedgang_stoerre_enn_utbytte() -> Aarsregnskap:
     )
 
 
+
+def _avsatt_utbytte() -> Aarsregnskap:
+    """Avsetningsstien: overskudd 95 000, styret foreslår 80 000, ingenting utbetalt i året."""
+    return Aarsregnskap(
+        selskap=_selskap(),
+        regnskapsaar=2024,
+        resultatregnskap=_resultat(inntekt=95000),
+        balanse=_balanse(
+            aksjekapital=30000,
+            annen_egenkapital=-15000,
+            bankinnskudd=95000,
+            avsatt_utbytte=80000,
+        ),
+        foregaaende_aar_balanse=_balanse(
+            aksjekapital=30000, annen_egenkapital=-30000, bankinnskudd=0
+        ),
+    )
+
+
+def _avsatt_og_utbetalt_samme_aar() -> Aarsregnskap:
+    """
+    Året etter: fjorårets avsetning på 80 000 utbetales, og styret avsetter 50 000 nye.
+
+    Bare avsetningen reduserer egenkapitalen; utbetalingen gjør opp en gjeldspost.
+    """
+    return Aarsregnskap(
+        selskap=_selskap(),
+        regnskapsaar=2024,
+        resultatregnskap=_resultat(inntekt=60000),
+        balanse=_balanse(
+            aksjekapital=30000,
+            annen_egenkapital=-5000,
+            bankinnskudd=75000,
+            avsatt_utbytte=50000,
+        ),
+        foregaaende_aar_balanse=_balanse(
+            aksjekapital=30000, annen_egenkapital=-15000, bankinnskudd=95000,
+            avsatt_utbytte=80000,
+        ),
+        utbytte_utbetalt=80000,
+    )
+
+
 ALLE_TILFELLER = [
     _nystiftet_med_tinginnskudd,
     _overskudd_med_utbytte,
     _uforklart_oekning,
     _uforklart_nedgang_uten_utbytte,
     _nedgang_stoerre_enn_utbytte,
+    _avsatt_utbytte,
+    _avsatt_og_utbetalt_samme_aar,
 ]
 
 
@@ -330,6 +380,54 @@ class TestUtbytte:
     def test_positiv_rest_er_uberoert_av_utbytte(self):
         assert _endringer(_uforklart_oekning()) == [
             ("annenPositivEndringIEgenkapital", 20000.0)
+        ]
+
+
+# ---------------------------------------------------------------------------
+# Avsatt utbytte (issue #167)
+# ---------------------------------------------------------------------------
+
+class TestAvsattUtbytte:
+    def test_avsetningen_faar_egen_kode(self):
+        assert _endringer(_avsatt_utbytte()) == [
+            ("aaretsOverskudd", 95000.0),
+            ("avsattEllerForventetUtbytte", 80000.0),
+        ]
+
+    def test_avsetningen_havner_ikke_i_samleposten(self):
+        """
+        Regresjon: dette var hullet 1.4.0 ikke lukket. I avsetningsåret er utbytte_utbetalt
+        null, så omklassifiseringen til tilleggsutbytte utløses ikke, og nedgangen lå igjen
+        i samleposten Skatteetaten har avvist for utbytte.
+        """
+        koder = [kode for kode, _ in _endringer(_avsatt_utbytte())]
+        assert "annenNegativEndringIEgenkapital" not in koder
+        assert "tilleggsutbytte" not in koder
+
+    def test_avsetningen_gaar_foran_utbetalingen(self):
+        """
+        Deler selskapet ut hvert år, betales fjorårets avsetning og årets avsettes i samme
+        regnskapsår. Bare avsetningen reduserte egenkapitalen, så utbetalingen skal ikke
+        forklare noe: uten rekkefølgen ble samme nedgang forklart to ganger.
+        """
+        assert _endringer(_avsatt_og_utbetalt_samme_aar()) == [
+            ("aaretsOverskudd", 60000.0),
+            ("avsattEllerForventetUtbytte", 50000.0),
+        ]
+
+    def test_uten_avsetning_er_utbyttestien_uendret(self):
+        assert _endringer(_overskudd_med_utbytte()) == [
+            ("aaretsOverskudd", 95000.0),
+            ("tilleggsutbytte", 80000.0),
+        ]
+
+    def test_avsetning_stoerre_enn_nedgangen_gir_ingen_motpost(self):
+        regnskap = _avsatt_utbytte()
+        regnskap.balanse.egenkapital_og_gjeld.kortsiktig_gjeld.avsatt_utbytte = 500000
+
+        assert _endringer(regnskap) == [
+            ("aaretsOverskudd", 95000.0),
+            ("avsattEllerForventetUtbytte", 80000.0),
         ]
 
 
