@@ -170,6 +170,11 @@ class KortsiktigGjeld:
     # ingen riktig plass å føre skattegjelden, og balansen går ikke opp.
     betalbar_skatt: float = 0.0
     skyldige_offentlige_avgifter: float = 0.0
+    # Utbytte styret har foreslått for regnskapsåret (konto 2800). Forslaget er en forpliktelse
+    # ved årsslutt og reduserer egenkapitalen i avsetningsåret, ikke i utbetalingsåret. Uten
+    # denne linjen måtte avsetningen føres som annen kortsiktig gjeld, og egenkapitalnedgangen
+    # ble stående uten en utbyttekode Skatteetaten godtar.
+    avsatt_utbytte: float = 0.0
     annen_kortsiktig_gjeld: float = 0.0
 
     @property
@@ -178,6 +183,7 @@ class KortsiktigGjeld:
             self.leverandoergjeld
             + self.betalbar_skatt
             + self.skyldige_offentlige_avgifter
+            + self.avsatt_utbytte
             + self.annen_kortsiktig_gjeld
         )
 

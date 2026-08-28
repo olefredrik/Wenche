@@ -4,6 +4,34 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.5.0] - 2026-08-28
+
+### Lagt til
+
+- **Avsatt utbytte kan nå oppgis, og rapporteres riktig.** Wenche hadde ingen post for avsatt
+  utbytte, så et selskap som følger aksjelovens normalsti (styret foreslår utbyttet, forslaget
+  avsettes i årets regnskap, og generalforsamlingen godkjenner regnskapet med avsetningen) måtte
+  føre det som annen kortsiktig gjeld. Det nye, valgfrie feltet
+  `balanse.egenkapital_og_gjeld.kortsiktig_gjeld.avsatt_utbytte` gir avsetningen sin egen plass:
+  kode `2800` i næringsspesifikasjonen, og den egne utbyttelinjen i årsregnskapets underskjema.
+  SAF-T-importen leser konto `2800` inn i feltet, der beløpet før havnet i annen kortsiktig gjeld.
+  Tomt eller 0 gir samme innsending som før.
+
+### Rettet
+
+- **Et avsatt utbytte havnet i samleposten Skatteetaten har avvist.** Egenkapitalavstemmingen ga
+  bare utbetalt utbytte en utbyttekode. For et selskap som avsetter utbyttet er utbetalingen null
+  i avsetningsåret, mens egenkapitalen faller med det avsatte beløpet, så nedgangen ble stående i
+  «andre negative endringer i egenkapital». Årets avsetning føres nå som
+  `avsattEllerForventetUtbytte`, og går foran utbetalingen: et selskap som deler ut hvert år
+  betaler fjorårets avsetning og avsetter årets i samme regnskapsår, og det er bare avsetningen
+  som reduserer egenkapitalen. En utbetaling av en tidligere avsetning gjør opp en gjeldspost.
+- **Advarselen om fri egenkapital var blind for avsetninger.** En avsetning er en utdeling etter
+  aksjeloven § 8-1 og er allerede trukket fra annen egenkapital, så den kan gjøre fri egenkapital
+  negativ helt alene. Den gikk stille gjennom fordi sjekken bare så på utbetalt utbytte.
+- **Egenkapitalnoten trakk utbetalingen i stedet for avsetningen.** Er utbyttet avsatt, viser noten
+  nå avsetningen, slik at den stemmer med balansen og ikke trekker samme beløp to ganger.
+
 ## [1.4.0] - 2026-08-28
 
 ### Lagt til

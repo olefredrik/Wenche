@@ -112,6 +112,9 @@ def _standardposter(regnskap: Aarsregnskap) -> tuple[NaeringsspesifikasjonPost, 
             "kortsiktigGjeld", "2600", ekg.kortsiktig_gjeld.skyldige_offentlige_avgifter
         ),
         NaeringsspesifikasjonPost(
+            "kortsiktigGjeld", "2800", ekg.kortsiktig_gjeld.avsatt_utbytte
+        ),
+        NaeringsspesifikasjonPost(
             "kortsiktigGjeld", "2990", ekg.kortsiktig_gjeld.annen_kortsiktig_gjeld
         ),
     ]
@@ -608,13 +611,25 @@ def generer_naeringsspesifikasjon(
         tillegg.append(("annenPositivEndringIEgenkapital", annen_endring))
     elif annen_endring < 0:
         rest = abs(annen_endring)
-        # Utdelt utbytte er den vanligste grunnen til at egenkapitalen faller mer enn
-        # årsresultatet, og Skatteetaten har avvist samleposten for utbytte (SSV-5813).
-        # Koden følger beslutningsgrunnlaget: `tilleggsutbytte` er utdeling i løpet av året
-        # basert på sist fastsatte årsregnskap, som er Wenches tilfelle. Modellen har ingen
-        # post for avsatt utbytte (da ville egenkapitalen falt i avsetningsåret i stedet), og
-        # ingen mellombalanse, som `ekstraordinaertUtbytte` forutsetter. Aldri en motpost:
-        # bare den delen av resten utbetalingen faktisk dekker blir omklassifisert.
+        # Utbytte er den vanligste grunnen til at egenkapitalen faller mer enn årsresultatet,
+        # og Skatteetaten har avvist samleposten for utbytte (SSV-5813). Koden følger
+        # grunnlaget for vedtaket, og de to tilfellene Wenche kan skille kommer i denne
+        # rekkefølgen, siden et selskap som deler ut hvert år både betaler fjorårets
+        # avsetning og avsetter årets i samme regnskapsår:
+        #
+        #   1. Årets avsetning (`avsattEllerForventetUtbytte`) reduserer egenkapitalen nå.
+        #      En utbetaling av en TIDLIGERE avsetning gjør bare opp en gjeldspost og rører
+        #      ikke egenkapitalen, så avsetningen må forklare nedgangen først.
+        #   2. Er det ingen avsetning, men utbetalt utbytte, er utdelingen vedtatt i året på
+        #      grunnlag av sist godkjente årsregnskap: `tilleggsutbytte`. Wenche har ingen
+        #      mellombalanse, som `ekstraordinaertUtbytte` forutsetter.
+        #
+        # Aldri en motpost: bare den delen av resten hvert beløp faktisk dekker blir
+        # omklassifisert, og en rest utover det blir liggende i samleposten.
+        avsatt = min(rest, max(round(eg.kortsiktig_gjeld.avsatt_utbytte), 0))
+        if avsatt > 0:
+            fradrag.append(("avsattEllerForventetUtbytte", avsatt))
+        rest -= avsatt
         utbytte = min(rest, max(round(regnskap.utbytte_utbetalt), 0))
         if utbytte > 0:
             fradrag.append(("tilleggsutbytte", utbytte))

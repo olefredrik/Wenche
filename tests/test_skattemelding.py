@@ -162,6 +162,28 @@ def test_egenkapitalnote_utbytte_vises(eksempel_regnskap):
     assert "-50 000" in tekst
 
 
+def test_egenkapitalnote_viser_avsetning_i_stedet_for_utbetaling(eksempel_regnskap):
+    """
+    Er utbyttet avsatt, er det avsetningen som reduserer egenkapitalen. Utbetalingen året
+    etter gjør bare opp en gjeldspost, og noten skal ikke trekke beløpet en gang til.
+    """
+    from wenche.models import Balanse, Egenkapital, EgenkapitalOgGjeld, LangsiktigGjeld
+
+    eksempel_regnskap.utbytte_utbetalt = 50000
+    eksempel_regnskap.balanse.egenkapital_og_gjeld.kortsiktig_gjeld.avsatt_utbytte = 30000
+    eksempel_regnskap.foregaaende_aar_balanse = Balanse(
+        egenkapital_og_gjeld=EgenkapitalOgGjeld(
+            egenkapital=Egenkapital(aksjekapital=30000, annen_egenkapital=20000),
+            langsiktig_gjeld=LangsiktigGjeld(laan_fra_aksjonaer=0),
+        ),
+    )
+    tekst = generer(eksempel_regnskap, SkattemeldingKonfig())
+
+    assert "Avsatt utbytte" in tekst
+    assert "-30 000" in tekst
+    assert "Utbytte utbetalt" not in tekst
+
+
 def test_egenkapitalnote_ingen_utbytte_linje_naar_null(eksempel_regnskap):
     """Utbytte-linjen skal ikke vises når utbytte er 0."""
     from wenche.models import Balanse, Egenkapital, EgenkapitalOgGjeld, LangsiktigGjeld

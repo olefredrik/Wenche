@@ -82,3 +82,20 @@ def test_ingen_fjoraar_advarsel_for_nystiftet(eksempel_regnskap):
         selskap=replace(eksempel_regnskap.selskap, stiftelsesaar=eksempel_regnskap.regnskapsaar),
     )
     assert advarsler(nystiftet) == []
+
+
+def test_avsatt_utbytte_over_fri_egenkapital_gir_advarsel(eksempel_regnskap):
+    """
+    En avsetning er en utdeling etter aksjeloven § 8-1, og er allerede trukket fra annen
+    egenkapital. Uten dette gikk en avsetning som tømmer fri egenkapital stille gjennom,
+    siden den gamle sjekken bare så på utbetalt utbytte.
+    """
+    ekg = eksempel_regnskap.balanse.egenkapital_og_gjeld
+    ekg.egenkapital.overkursfond = 0
+    ekg.egenkapital.annen_egenkapital = -5000
+    ekg.kortsiktig_gjeld.avsatt_utbytte = 50000
+
+    meldinger = advarsler(eksempel_regnskap)
+
+    assert any("avsatt utbytte" in m for m in meldinger)
+    assert any("§ 8-1" in m for m in meldinger)

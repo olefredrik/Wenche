@@ -411,6 +411,7 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
           {linje_enkel("leverandoergjeld", kg.leverandoergjeld, "220", "7162", fkg.leverandoergjeld)}
           {linje("betalbarSkatt", kg.betalbar_skatt, "Betalbar skatt", "29038", "2483", "10293", fkg.betalbar_skatt)}
           {linje("skyldigeOffentligeAvgifter", kg.skyldige_offentlige_avgifter, "Skyldige offentlige avgifter", "29039", "225", "7170", fkg.skyldige_offentlige_avgifter)}
+          {linje_enkel("utbytte", kg.avsatt_utbytte, "235", "7171", fkg.avsatt_utbytte)}
           {linje("annenKortsiktigGjeld", kg.annen_kortsiktig_gjeld, "Annen kortsiktig gjeld", "29040", "236", "7182", fkg.annen_kortsiktig_gjeld)}
           <sumKortsiktigGjeld>
             <aarets orid="85">{_i(kg.sum)}</aarets>
