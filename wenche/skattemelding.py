@@ -450,13 +450,21 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
         ek_ib = fb.egenkapital_og_gjeld.egenkapital
         delta_ak = ek_ub.aksjekapital - ek_ib.aksjekapital
         delta_ok = ek_ub.overkursfond - ek_ib.overkursfond
-        forklart_aek = ek_ib.annen_egenkapital + aarsresultat - regnskap.utbytte_utbetalt
+        # Det er årets avsetning som reduserer egenkapitalen. Er utbyttet avsatt, gjør
+        # utbetalingen året etter bare opp en gjeldspost, og noten skal ikke trekke den en
+        # gang til. Samme rekkefølge som i egenkapitalavstemmingen.
+        avsatt_utbytte = regnskap.balanse.egenkapital_og_gjeld.kortsiktig_gjeld.avsatt_utbytte
+        if avsatt_utbytte:
+            utbytte_mot_ek, utbytte_etikett = avsatt_utbytte, "Avsatt utbytte"
+        else:
+            utbytte_mot_ek, utbytte_etikett = regnskap.utbytte_utbetalt, "Utbytte utbetalt"
+        forklart_aek = ek_ib.annen_egenkapital + aarsresultat - utbytte_mot_ek
         andre_aek = ek_ub.annen_egenkapital - forklart_aek
 
         linjer.append(_ek_rad(f"EK 01.01.{år}", ek_ib.aksjekapital, ek_ib.overkursfond, ek_ib.annen_egenkapital))
         linjer.append(_ek_rad("Årsresultat", 0, 0, aarsresultat))
-        if regnskap.utbytte_utbetalt != 0:
-            linjer.append(_ek_rad("Utbytte utbetalt", 0, 0, -regnskap.utbytte_utbetalt))
+        if utbytte_mot_ek != 0:
+            linjer.append(_ek_rad(utbytte_etikett, 0, 0, -utbytte_mot_ek))
         if delta_ak != 0 or delta_ok != 0 or andre_aek != 0:
             linjer.append(_ek_rad("Andre endringer", delta_ak, delta_ok, andre_aek))
         linjer.append(_ek_rad(f"EK 31.12.{år}", ek_ub.aksjekapital, ek_ub.overkursfond, ek_ub.annen_egenkapital))

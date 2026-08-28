@@ -293,6 +293,16 @@ def advarsler(regnskap: Aarsregnskap) -> list[str]:
     # overstiger det utdelbare, blir fri egenkapital negativ etter utdelingen.
     ek = regnskap.balanse.egenkapital_og_gjeld.egenkapital
     fri_egenkapital = ek.overkursfond + ek.annen_egenkapital
+    # Både en utbetaling og en avsetning er en utdeling etter § 8-1: avsetningen er allerede
+    # trukket fra annen egenkapital, så den kan gjøre fri egenkapital negativ helt alene.
+    avsatt_utbytte = regnskap.balanse.egenkapital_og_gjeld.kortsiktig_gjeld.avsatt_utbytte
+    if avsatt_utbytte > 0 and fri_egenkapital < -0.01:
+        adv.append(
+            f"Det er avsatt utbytte ({avsatt_utbytte:,.0f} NOK), men fri egenkapital etter "
+            f"avsetningen er negativ ({fri_egenkapital:,.0f} NOK). Utbytte kan bare deles ut "
+            "av fri egenkapital (aksjeloven § 8-1). Kontroller avsetningen mot siste "
+            "godkjente årsregnskap."
+        )
     if regnskap.utbytte_utbetalt > 0 and fri_egenkapital < -0.01:
         adv.append(
             f"Det er utbetalt utbytte ({regnskap.utbytte_utbetalt:,.0f} NOK), men "
