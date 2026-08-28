@@ -620,9 +620,10 @@ def generer_naeringsspesifikasjon(
         #   1. Årets avsetning (`avsattEllerForventetUtbytte`) reduserer egenkapitalen nå.
         #      En utbetaling av en TIDLIGERE avsetning gjør bare opp en gjeldspost og rører
         #      ikke egenkapitalen, så avsetningen må forklare nedgangen først.
-        #   2. Er det ingen avsetning, men utbetalt utbytte, er utdelingen vedtatt i året på
-        #      grunnlag av sist godkjente årsregnskap: `tilleggsutbytte`. Wenche har ingen
-        #      mellombalanse, som `ekstraordinaertUtbytte` forutsetter.
+        #   2. Er det utbetalt utbytte som IKKE gjør opp en tidligere avsetning, er
+        #      utdelingen vedtatt i året på grunnlag av sist godkjente årsregnskap:
+        #      `tilleggsutbytte`. Wenche har ingen mellombalanse, som
+        #      `ekstraordinaertUtbytte` forutsetter.
         #
         # Aldri en motpost: bare den delen av resten hvert beløp faktisk dekker blir
         # omklassifisert, og en rest utover det blir liggende i samleposten.
@@ -630,7 +631,20 @@ def generer_naeringsspesifikasjon(
         if avsatt > 0:
             fradrag.append(("avsattEllerForventetUtbytte", avsatt))
         rest -= avsatt
-        utbytte = min(rest, max(round(regnskap.utbytte_utbetalt), 0))
+
+        # En utbetaling som gjør opp fjorårets avsetning skal ikke stå i avstemmingen i det
+        # hele tatt (bekreftet i SSV-5813): egenkapitalen falt året avsetningen ble gjort, og
+        # utbetalingen gjør bare opp en gjeldspost. Trekkes den ikke fra, kan et fall i
+        # egenkapitalen som skyldes noe helt annet bli stemplet som utbytte i utbetalingsåret.
+        fjoraarets_avsetning = max(
+            round(
+                regnskap.foregaaende_aar_balanse.egenkapital_og_gjeld
+                .kortsiktig_gjeld.avsatt_utbytte
+            ),
+            0,
+        )
+        vedtatt_i_aar = max(max(round(regnskap.utbytte_utbetalt), 0) - fjoraarets_avsetning, 0)
+        utbytte = min(rest, vedtatt_i_aar)
         if utbytte > 0:
             fradrag.append(("tilleggsutbytte", utbytte))
         if rest - utbytte > 0:
