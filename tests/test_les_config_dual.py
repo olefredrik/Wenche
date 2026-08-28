@@ -99,6 +99,7 @@ _CFG_ALLE_FELT = copy.deepcopy(_CFG)
 _CFG_ALLE_FELT["selskap"]["stiftelsesaar"] = 2024
 _CFG_ALLE_FELT["selskap"]["stiftelsesdato"] = "2024-10-24"
 _CFG_ALLE_FELT["selskap"]["tinginnskudd_ved_stiftelse"] = 25000
+_CFG_ALLE_FELT["balanse"]["egenkapital_og_gjeld"]["kortsiktig_gjeld"]["avsatt_utbytte"] = 0
 _CFG_ALLE_FELT["regnskapsstart"] = "2024-10-24"
 _CFG_ALLE_FELT["regnskapsslutt"] = "2024-12-31"
 

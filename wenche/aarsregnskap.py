@@ -121,6 +121,7 @@ def _les_balanse(b: dict) -> Balanse:
                 leverandoergjeld=_tall(kg.get("leverandoergjeld")),
                 betalbar_skatt=_tall(kg.get("betalbar_skatt")),
                 skyldige_offentlige_avgifter=_tall(kg.get("skyldige_offentlige_avgifter")),
+                avsatt_utbytte=_tall(kg.get("avsatt_utbytte")),
                 annen_kortsiktig_gjeld=_tall(kg.get("annen_kortsiktig_gjeld")),
             ),
         ),

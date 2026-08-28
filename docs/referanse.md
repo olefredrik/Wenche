@@ -116,6 +116,7 @@ Feltet ligger direkte under `resultatregnskap`, ikke i en underseksjon.
 | `leverandoergjeld` | heltall | Ubetalte fakturaer per 31.12 |
 | `betalbar_skatt` | heltall | Skyldig selskapsskatt per 31.12 (konto 2500), motposten til `skattekostnad` |
 | `skyldige_offentlige_avgifter` | heltall | Skyldig mva, arbeidsgiveravgift o.l. |
+| `avsatt_utbytte` | heltall | Utbytte styret har foreslått for regnskapsåret (konto 2800). Forslaget er en forpliktelse ved årsslutt og reduserer egenkapitalen i avsetningsåret, ikke i året det utbetales. Er utbyttet i stedet vedtatt og utbetalt i året uten forutgående avsetning, skal feltet stå tomt og utbetalingen oppgis per aksjonær |
 | `annen_kortsiktig_gjeld` | heltall | Annen gjeld med forfall innen 1 år |
 
 ### `foregaaende_aar` (valgfritt)

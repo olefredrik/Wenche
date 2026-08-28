@@ -359,6 +359,22 @@ class TestBalanse:
         )
         assert _finn_kode(_parse(_lag_regnskap(balanse=balanse)), "2600")
 
+    def test_avsatt_utbytte_kode_2800(self):
+        balanse = Balanse(
+            eiendeler=Eiendeler(
+                anleggsmidler=Anleggsmidler(aksjer_i_datterselskap=100000),
+                omloepmidler=Omloepmidler(bankinnskudd=5000),
+            ),
+            egenkapital_og_gjeld=EgenkapitalOgGjeld(
+                egenkapital=Egenkapital(aksjekapital=30000, annen_egenkapital=45000),
+                kortsiktig_gjeld=KortsiktigGjeld(avsatt_utbytte=30000),
+            ),
+        )
+        root = _parse(_lag_regnskap(balanse=balanse))
+        assert _finn_kode(root, "2800")
+        # Skal IKKE lenger rapporteres som annen kortsiktig gjeld.
+        assert not _finn_kode(root, "2990")
+
     def test_annen_kortsiktig_gjeld_kode_2990(self):
         balanse = Balanse(
             eiendeler=Eiendeler(

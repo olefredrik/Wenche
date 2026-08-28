@@ -167,3 +167,49 @@ def test_underskjema_sum_overfoeringer_lik_aarsresultat(eksempel_regnskap):
     assert sum_overfoeringer is not None
     # årsresultat = driftsresultat + netto finans = -5500 + 0 = -5500
     assert int(sum_overfoeringer.text) == -5500
+
+
+# ---------------------------------------------------------------------------
+# Avsatt utbytte (issue #167)
+# ---------------------------------------------------------------------------
+
+def test_underskjema_avsatt_utbytte_egen_linje(eksempel_regnskap):
+    """
+    RR-0002U har en egen linje for avsatt utbytte: elementet `utbytte` under
+    `balanseKortsiktigGjeld`, med orid 235 for årets og 7171 for fjorårets. Verifisert mot
+    Altinn-appens datamodell (brg/aarsregnskap-vanlig-202406). Årsregnskapet har ingen
+    valideringstjeneste, så orid-ene må vaktes her.
+    """
+    kg = eksempel_regnskap.balanse.egenkapital_og_gjeld.kortsiktig_gjeld
+    kg.avsatt_utbytte = 80000
+
+    root = _parse(generer_underskjema(eksempel_regnskap))
+    utbytte = root.find(f".//{{{NS_UNDER}}}balanseKortsiktigGjeld/{{{NS_UNDER}}}utbytte")
+
+    assert utbytte is not None
+    aarets = utbytte.find(f"{{{NS_UNDER}}}aarets")
+    fjoraarets = utbytte.find(f"{{{NS_UNDER}}}fjoraarets")
+    assert aarets.text == "80000"
+    assert aarets.attrib["orid"] == "235"
+    assert fjoraarets.attrib["orid"] == "7171"
+
+
+def test_underskjema_avsatt_utbytte_utelates_naar_null(eksempel_regnskap):
+    root = _parse(generer_underskjema(eksempel_regnskap))
+    assert root.find(f".//{{{NS_UNDER}}}balanseKortsiktigGjeld/{{{NS_UNDER}}}utbytte") is None
+
+
+def test_underskjema_avsatt_utbytte_staar_foer_annen_kortsiktig_gjeld(eksempel_regnskap):
+    """Elementrekkefølgen er bundet av XSD-en: utbytte kommer før annenKortsiktigGjeld."""
+    kg = eksempel_regnskap.balanse.egenkapital_og_gjeld.kortsiktig_gjeld
+    kg.skyldige_offentlige_avgifter = 2000
+    kg.avsatt_utbytte = 80000
+    kg.annen_kortsiktig_gjeld = 1500
+
+    root = _parse(generer_underskjema(eksempel_regnskap))
+    blokk = root.find(f".//{{{NS_UNDER}}}balanseKortsiktigGjeld")
+    navn = [el.tag.split("}")[1] for el in blokk]
+
+    assert navn.index("utbytte") < navn.index("annenKortsiktigGjeld")
+    assert navn.index("skyldigeOffentligeAvgifter") < navn.index("utbytte")
+    assert navn[-1] == "sumKortsiktigGjeld"

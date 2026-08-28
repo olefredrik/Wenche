@@ -58,6 +58,12 @@ const BALANSE_FELTER: Felt[] = [
     help: "Motposten til skattekostnaden (konto 2500), hvis skatten ikke er betalt ved årsslutt",
   },
   { key: "balanse.egenkapital_og_gjeld.kortsiktig_gjeld.skyldige_offentlige_avgifter", label: "Skyldige offentlige avgifter", type: "number" },
+  {
+    key: "balanse.egenkapital_og_gjeld.kortsiktig_gjeld.avsatt_utbytte",
+    label: "Avsatt utbytte",
+    type: "number",
+    help: "Utbytte styret har foreslått for regnskapsåret (konto 2800). Reduserer egenkapitalen i år, ikke i utbetalingsåret",
+  },
   { key: "balanse.egenkapital_og_gjeld.kortsiktig_gjeld.annen_kortsiktig_gjeld", label: "Annen kortsiktig gjeld", type: "number" },
 ];
 

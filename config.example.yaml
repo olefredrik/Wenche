@@ -79,6 +79,10 @@ balanse:
       betalbar_skatt: 0               # Skyldig selskapsskatt per 31.12 (konto 2500),
                                       # motposten til skattekostnaden i resultatregnskapet
       skyldige_offentlige_avgifter: 0 # Skyldig mva, arbeidsgiveravgift o.l.
+      avsatt_utbytte: 0               # Utbytte styret har foreslått for regnskapsåret
+                                      # (konto 2800). Reduserer egenkapitalen i år, ikke i
+                                      # året utbetalingen skjer. La stå 0 hvis utbyttet er
+                                      # vedtatt og utbetalt i året uten forutgående avsetning
       annen_kortsiktig_gjeld: 0       # Annen gjeld med forfall innen 1 år
 
 # --- Foregående år (sammenligningstall) ---
@@ -122,6 +126,7 @@ foregaaende_aar:
         leverandoergjeld: 0
         betalbar_skatt: 0
         skyldige_offentlige_avgifter: 0
+        avsatt_utbytte: 0
         annen_kortsiktig_gjeld: 0
 
 # --- Skattemelding ---
