@@ -271,6 +271,28 @@ def _avsatt_og_utbetalt_samme_aar() -> Aarsregnskap:
     )
 
 
+
+def _utbetaling_av_fjoraarets_avsetning() -> Aarsregnskap:
+    """
+    Utbetalingsåret: fjorårets avsetning på 80 000 betales ut, uten ny avsetning, og
+    egenkapitalen faller 20 000 av en helt annen grunn.
+
+    Utbetalingen gjør bare opp en gjeldspost og skal ikke stå i avstemmingen i det hele tatt,
+    så de 20 000 hører hjemme i samleposten.
+    """
+    return Aarsregnskap(
+        selskap=_selskap(),
+        regnskapsaar=2024,
+        resultatregnskap=_resultat(),
+        balanse=_balanse(aksjekapital=30000, annen_egenkapital=30000, bankinnskudd=60000),
+        foregaaende_aar_balanse=_balanse(
+            aksjekapital=30000, annen_egenkapital=50000, bankinnskudd=160000,
+            avsatt_utbytte=80000,
+        ),
+        utbytte_utbetalt=80000,
+    )
+
+
 ALLE_TILFELLER = [
     _nystiftet_med_tinginnskudd,
     _overskudd_med_utbytte,
@@ -279,6 +301,7 @@ ALLE_TILFELLER = [
     _nedgang_stoerre_enn_utbytte,
     _avsatt_utbytte,
     _avsatt_og_utbetalt_samme_aar,
+    _utbetaling_av_fjoraarets_avsetning,
 ]
 
 
@@ -428,6 +451,27 @@ class TestAvsattUtbytte:
         assert _endringer(regnskap) == [
             ("aaretsOverskudd", 95000.0),
             ("avsattEllerForventetUtbytte", 80000.0),
+        ]
+
+
+    def test_utbetaling_av_fjoraarets_avsetning_forklarer_ingenting(self):
+        """
+        Regresjon: omklassifiseringen så bare på utbetalt utbytte, så et egenkapitalfall som
+        skyldtes noe helt annet ble stemplet som tilleggsutbytte i utbetalingsåret. Fjorårets
+        avsetning forteller hvor mye av utbetalingen som bare gjør opp en gjeldspost.
+        """
+        assert _endringer(_utbetaling_av_fjoraarets_avsetning()) == [
+            ("annenNegativEndringIEgenkapital", 20000.0)
+        ]
+
+    def test_utdeling_utover_fjoraarets_avsetning_er_vedtatt_i_aar(self):
+        """Bare den delen som gjør opp avsetningen trekkes fra; resten er årets utdeling."""
+        regnskap = _utbetaling_av_fjoraarets_avsetning()
+        regnskap.utbytte_utbetalt = 95000        # 80 000 gjør opp fjoråret, 15 000 er nytt
+
+        assert _endringer(regnskap) == [
+            ("tilleggsutbytte", 15000.0),
+            ("annenNegativEndringIEgenkapital", 5000.0),
         ]
 
 
