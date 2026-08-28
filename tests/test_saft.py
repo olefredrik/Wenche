@@ -287,3 +287,17 @@ def test_advarselsnoekkelen_skrives_ikke_til_config_yaml(tmp_path):
     assert "Advarsel:" in resultat.output
     assert "1080" in resultat.output
     assert "_advarsler" not in ut_fil.read_text(encoding="utf-8")
+
+
+def test_avsatt_utbytte_konto_2800_faar_egen_linje():
+    """
+    Konto 2800 havnet før i annen kortsiktig gjeld og ble rapportert som kode 2990.
+    Avsatt utbytte har egen linje i årsregnskapet og egen kode (2800).
+    """
+    cfg = importer_bytes(
+        _saft_xml(KONTOER + _konto("kortsiktigGjeld", "2800", ub_kredit=80000))
+    )
+    kg = cfg["balanse"]["egenkapital_og_gjeld"]["kortsiktig_gjeld"]
+
+    assert kg["avsatt_utbytte"] == 80000
+    assert kg["annen_kortsiktig_gjeld"] == 0

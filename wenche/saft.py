@@ -136,6 +136,7 @@ def _tom_akkumulator() -> dict:
         "leverandoergjeld": 0.0,
         "betalbar_skatt": 0.0,
         "skyldige_offentlige_avgifter": 0.0,
+        "avsatt_utbytte": 0.0,
         "annen_kortsiktig_gjeld": 0.0,
         # Anleggsmiddelkontoer som samles i langsiktige_fordringer fordi modellen ikke har
         # noen egen linje for dem: {grupperingskode: beløp}. Brukes bare til å advare, aldri
@@ -230,6 +231,11 @@ def _akkumuler(acc: dict, account: ET.Element, netto: float) -> None:
             acc["betalbar_skatt"] += -netto
         elif _er_offentlig_avgift(code):
             acc["skyldige_offentlige_avgifter"] += -netto
+        elif code == "2800":
+            # Avsatt utbytte har egen linje i årsregnskapet og egen kode (2800) i
+            # næringsspesifikasjonen. Før havnet den i annen kortsiktig gjeld og ble
+            # rapportert som 2990.
+            acc["avsatt_utbytte"] += -netto
         else:
             acc["annen_kortsiktig_gjeld"] += -netto
 
@@ -291,6 +297,7 @@ def _bygg_balanse(acc: dict) -> dict:
                 "leverandoergjeld": acc["leverandoergjeld"],
                 "betalbar_skatt": acc["betalbar_skatt"],
                 "skyldige_offentlige_avgifter": acc["skyldige_offentlige_avgifter"],
+                "avsatt_utbytte": acc["avsatt_utbytte"],
                 "annen_kortsiktig_gjeld": acc["annen_kortsiktig_gjeld"],
             },
         },
