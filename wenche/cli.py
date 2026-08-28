@@ -335,12 +335,19 @@ def importer_saft(saft_fil: str, ut_fil: str):
         click.echo(f"Feil ved import: {e}", err=True)
         raise SystemExit(1)
 
+    # _advarsler er ikke et config-felt: den bæres fra importen til brukeren og skal ikke
+    # skrives til config.yaml.
+    saft_advarsler = data.pop("_advarsler", [])
+
     from pathlib import Path
     Path(ut_fil).write_text(
         yaml.dump(data, allow_unicode=True, sort_keys=False),
         encoding="utf-8",
     )
     click.echo(f"config.yaml skrevet til {ut_fil}")
+
+    for advarsel in saft_advarsler:
+        click.echo(f"\nAdvarsel: {advarsel}")
     click.echo(
         "\nHusk å fylle inn følgende manuelt i config.yaml:\n"
         "  - selskap.daglig_leder\n"

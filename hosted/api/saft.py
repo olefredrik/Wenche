@@ -43,5 +43,7 @@ async def importer_saft(request: Request, foregaaende: bool = Query(False)) -> d
                 "resultatregnskap": config["resultatregnskap"],
                 "balanse": config["balanse"],
             },
+            # Advarsler gjelder tallene som importeres, også når bare fjoråret hentes.
+            **({"_advarsler": config["_advarsler"]} if "_advarsler" in config else {}),
         }
     return config
