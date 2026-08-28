@@ -4,6 +4,50 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.4.0] - 2026-08-28
+
+### Lagt til
+
+- **Et selskap stiftet ved tinginnskudd kan nå oppgi det.** Egenkapitalavstemmingen rapporterte
+  hele økningen i innskutt egenkapital som kontantinnskudd i første regnskapsår. Det stemmer for
+  et lite AS stiftet med penger, men ikke for et holdingselskap stiftet ved at aksjer i et annet
+  selskap skytes inn, som er en vanlig måte å etablere en holdingstruktur på. Det nye, valgfrie
+  feltet `selskap.tinginnskudd_ved_stiftelse` oppgir tingdelen i kroner, og kontantinnskuddet
+  blir resten av økningen, slik at en stiftelse med både penger og ting kan rapporteres riktig.
+  Tomt eller 0 gir samme innsending som før. Feltet gjelder bare første regnskapsår: bæres en
+  konfigurasjon videre til senere år, gir det en advarsel om at det ignoreres, ikke en feil.
+  Wenche stopper innsendingen hvis tinginnskuddet er negativt eller større enn økningen i
+  innskutt egenkapital, siden det er en oppdeling av innskuddet og ikke et beløp i tillegg.
+
+### Endret
+
+- **Utbetalt utbytte får sin egen kode i egenkapitalavstemmingen.** Utbyttet havnet tidligere i
+  samleposten «andre negative endringer i egenkapital», fordi Wenche ikke kunne vite hvilken
+  utbyttekode som gjaldt. Skatteetaten har nå avklart begge deler: samleposten skal ikke brukes
+  ved utdeling av utbytte, og koden følger grunnlaget for vedtaket. `tilleggsutbytte` er utdeling
+  i løpet av året basert på sist godkjente årsregnskap, mens `ekstraordinaertUtbytte` forutsetter
+  en mellombalanse. Det første er Wenches tilfelle, og regelen utledes av tall Wenche allerede
+  har, uten at brukeren må klassifisere vedtaket juridisk. Bare den delen av
+  egenkapitalnedgangen utbetalingen faktisk dekker blir omklassifisert: resten blir liggende i
+  samleposten, og et utbytte større enn nedgangen gir ingen motpost. Summene i avstemmingen er
+  uendret. Uten utbetalt utbytte er innsendingen uendret.
+
+  Egenkapitalendringstypen inngår ikke i noen maskinell kontroll hos Skatteetaten, så verken
+  den gamle eller den nye koden gir avvik ved validering. Kodene enumereres heller ikke i
+  XSD-en, så lokal validering kan ikke fange en ugyldig kode. Kodelisten
+  `2025_egenkapitalendringstype` er derfor sjekket inn som testfixtur, med krav om at hver kode
+  Wenche kan sende finnes der, er gyldig for kombinasjonen Wenche sender, og ligger på riktig
+  side av avstemmingen.
+
+### Rettet
+
+- **SAF-T-importen sa ikke fra når et anleggsmiddel ikke kunne rapporteres presist.**
+  Immaterielle eiendeler (utvikling, konsesjoner, utsatt skattefordel, goodwill) og varige
+  driftsmidler ble lagt inn under langsiktige fordringer og rapportert til Skatteetaten som
+  «andre langsiktige fordringer», uten at brukeren kunne se det. Importen sier nå hvilke
+  grupperingskoder det gjelder, hvor mye det er, og hvilken kode beløpet får, slik at tallene
+  kan rettes. Beløpet blir liggende der det ligger, siden balansen må gå opp.
+
 ## [1.3.1] - 2026-08-20
 
 ### Rettet
