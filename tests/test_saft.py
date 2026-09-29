@@ -59,10 +59,10 @@ def _saft_xml(kontoer: str, *, aar: int = 2024) -> bytes:
 # Et lite, men representativt holdingselskap-regnskap.
 KONTOER = (
     _konto("salgsinntekt", "3000", ub_kredit=100000)
-    + _konto("finansinntekt", "8040", ub_kredit=50000)          # utbytte fra datterselskap
+    + _konto("finansinntekt", "8090", ub_kredit=50000)          # utbytte fra datterselskap
     + _konto("finansinntekt", "8050", ub_kredit=5000)           # andre finansinntekter
     + _konto("finanskostnad", "8150", ub_debet=2000)            # rentekostnader
-    + _konto("balanseverdiForAnleggsmiddel", "1300",
+    + _konto("balanseverdiForAnleggsmiddel", "1313",
              ub_debet=1000000, ib_debet=900000)                 # aksjer i datterselskap
     + _konto("balanseverdiForOmloepsmiddel", "1920",
              ub_debet=200000, ib_debet=150000)                  # bankinnskudd
@@ -301,3 +301,46 @@ def test_avsatt_utbytte_konto_2800_faar_egen_linje():
 
     assert kg["avsatt_utbytte"] == 80000
     assert kg["annen_kortsiktig_gjeld"] == 0
+
+
+def test_utbytte_konto_8090_er_utbytte_fra_datterselskap():
+    """
+    8090 er Skatteetatens grupperingskode for utbytte, og den næringsspesifikasjonen bruker.
+    Før ble utbyttet lest fra 8040, som ikke finnes, og havnet i andre finansinntekter,
+    der fritaksmetoden ikke virker.
+    """
+    cfg = importer_bytes(_saft_xml(_konto("finansinntekt", "8090", ub_kredit=70000)))
+    fp = cfg["resultatregnskap"]["finansposter"]
+
+    assert fp["utbytte_fra_datterselskap"] == 70000
+    assert fp["andre_finansinntekter"] == 0
+
+
+def test_aksjer_konto_1313_er_aksjer_i_datterselskap():
+    """1313 er aksjer i datterselskap. Før ble 1300 lest, og 1313 havnet i fordringene."""
+    cfg = importer_bytes(
+        _saft_xml(
+            _konto("balanseverdiForAnleggsmiddel", "1313", ub_debet=400000, ib_debet=300000)
+        )
+    )
+    am = cfg["balanse"]["eiendeler"]["anleggsmidler"]
+    fam = cfg["foregaaende_aar"]["balanse"]["eiendeler"]["anleggsmidler"]
+
+    assert am["aksjer_i_datterselskap"] == 400000
+    assert am["langsiktige_fordringer"] == 0
+    assert fam["aksjer_i_datterselskap"] == 300000
+
+
+def test_overkurs_konto_2020_er_overkursfond():
+    """2020 er overkurs. Før havnet den i annen egenkapital, altså opptjent egenkapital."""
+    cfg = importer_bytes(
+        _saft_xml(
+            _konto("egenkapital", "2000", ub_kredit=30000)
+            + _konto("egenkapital", "2020", ub_kredit=120000)
+            + _konto("egenkapital", "2050", ub_kredit=15000)
+        )
+    )
+    ek = cfg["balanse"]["egenkapital_og_gjeld"]["egenkapital"]
+
+    assert ek["overkursfond"] == 120000
+    assert ek["annen_egenkapital"] == 15000
