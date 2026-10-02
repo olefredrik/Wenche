@@ -168,8 +168,9 @@ def _akkumuler(acc: dict, account: ET.Element, netto: float) -> None:
             acc["andre_driftskostnader"] += netto
 
     elif cat == "finansinntekt":
-        # GroupingCode 8040 = utbytte fra datterselskap/tilknyttede selskaper
-        if code == "8040":
+        # GroupingCode 8090 = inntekt av andre investeringer/utbytte, samme kode som
+        # næringsspesifikasjonen bruker for utbytte_fra_datterselskap
+        if code == "8090":
             acc["utbytte_fra_datterselskap"] += -netto
         else:
             acc["andre_finansinntekter"] += -netto
@@ -182,8 +183,8 @@ def _akkumuler(acc: dict, account: ET.Element, netto: float) -> None:
             acc["andre_finanskostnader"] += netto
 
     elif cat == "balanseverdiForAnleggsmiddel":
-        # 1300 = aksjer i heleide datterselskaper, 1320 = tilknyttede selskaper
-        if code in ("1300", "1320"):
+        # 1313 = investeringer i andre datter- og konsernselskap
+        if code in ("1313", "1320"):
             acc["aksjer_i_datterselskap"] += netto
         elif code == "1350":
             acc["andre_aksjer"] += netto
@@ -211,7 +212,9 @@ def _akkumuler(acc: dict, account: ET.Element, netto: float) -> None:
         # Egenkapital er kredit-normal: positivt netto = underskudd
         if code == "2000":
             acc["aksjekapital_balanse"] += -netto
-        elif code == "2030":
+        elif code in ("2020", "2030"):
+            # 2020 = overkurs. 2030 (annen innskutt egenkapital) har ingen egen linje og
+            # er innskutt, ikke opptjent, så den følger overkursen.
             acc["overkursfond"] += -netto
         else:
             # 2045 (fond), 2050 (annen EK), 2080 (udekket tap = debet = negativt)
