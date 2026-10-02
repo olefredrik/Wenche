@@ -184,12 +184,13 @@ def _akkumuler(acc: dict, account: ET.Element, netto: float) -> None:
 
     elif cat == "balanseverdiForAnleggsmiddel":
         # 1313 = investeringer i andre datter- og konsernselskap
-        if code in ("1313", "1320"):
+        if code == "1313":
             acc["aksjer_i_datterselskap"] += netto
         elif code == "1350":
             acc["andre_aksjer"] += netto
         else:
-            # 1370 (lån til eiere/konsern), 1390 (andre langsiktige fordringer),
+            # 1320 (lån til foretak i samme konsern), 1370 (fordringer på eiere),
+            # 1390 (andre langsiktige fordringer),
             # 1105/1205/1280 (driftsmidler) — samles i langsiktige_fordringer
             acc["langsiktige_fordringer"] += netto
             # Fordringskodene hører hjemme her, resten gjør det ikke: alt under 1300 er

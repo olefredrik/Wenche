@@ -331,6 +331,26 @@ def test_aksjer_konto_1313_er_aksjer_i_datterselskap():
     assert fam["aksjer_i_datterselskap"] == 300000
 
 
+def test_konsernlaan_konto_1320_er_langsiktig_fordring():
+    """
+    1320 er lån til foretak i samme konsern, en fordring. Før ble lånet lest som aksjer i
+    datterselskap, og selskapet ble merket som morselskap i årsregnskapet.
+    """
+    cfg = importer_bytes(
+        _saft_xml(
+            _konto("balanseverdiForAnleggsmiddel", "1320", ub_debet=250000, ib_debet=200000)
+        )
+    )
+    am = cfg["balanse"]["eiendeler"]["anleggsmidler"]
+    fam = cfg["foregaaende_aar"]["balanse"]["eiendeler"]["anleggsmidler"]
+
+    assert am["langsiktige_fordringer"] == 250000
+    assert am["aksjer_i_datterselskap"] == 0
+    assert fam["langsiktige_fordringer"] == 200000
+    assert fam["aksjer_i_datterselskap"] == 0
+    assert "_advarsler" not in cfg
+
+
 def test_overkurs_konto_2020_er_overkursfond():
     """2020 er overkurs. Før havnet den i annen egenkapital, altså opptjent egenkapital."""
     cfg = importer_bytes(
