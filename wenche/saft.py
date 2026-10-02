@@ -79,8 +79,16 @@ def _er_offentlig_avgift(code: str) -> bool:
         return False
 
 
+# Finansielle anleggsmidler uten egen linje i modellen: investeringer i datter- og
+# konsernselskap med deltakerfastsetting (1312), i tilknyttede selskap (1331, 1332) og
+# obligasjoner (1360).
+_UKLASSIFISERTE_INVESTERINGER = frozenset({"1312", "1331", "1332", "1360"})
+
+
 def _er_uklassifisert_anleggsmiddel(code: str) -> bool:
     """Om grupperingskoden er et anleggsmiddel Wenche ikke har en egen linje for."""
+    if code in _UKLASSIFISERTE_INVESTERINGER:
+        return True
     try:
         return int(code) < 1300
     except ValueError:
@@ -91,7 +99,8 @@ def _advarsler_om_uklassifiserte(acc: dict) -> list[str]:
     """
     Advarsler om anleggsmidler som er importert inn i en grovere linje enn de hører til.
 
-    Wenche har ingen linje for immaterielle eiendeler eller varige driftsmidler, verken i
+    Wenche har ingen linje for immaterielle eiendeler, varige driftsmidler, investeringer i
+    tilknyttede selskap eller deltakerlignede datterselskap, eller obligasjoner, verken i
     årsregnskapet eller i næringsspesifikasjonen. Kontoene havner derfor i langsiktige
     fordringer og rapporteres som kode 1390. Det er en uriktig opplysning, og brukeren er
     den eneste som kan avgjøre hva beløpet skal gjøre.
@@ -104,8 +113,8 @@ def _advarsler_om_uklassifiserte(acc: dict) -> list[str]:
     sum_beloep = sum(uklassifiserte.values())
     return [
         f"SAF-T-filen har {sum_beloep:,.0f} NOK på anleggsmiddelkontoer Wenche ikke har en "
-        f"egen linje for (grupperingskode {koder}), typisk immaterielle eiendeler eller "
-        "varige driftsmidler. Beløpet er lagt inn under «Langsiktige fordringer» og blir "
+        f"egen linje for (grupperingskode {koder}), typisk immaterielle eiendeler, varige "
+        "driftsmidler, investeringer i tilknyttede selskap eller obligasjoner. Beløpet er lagt inn under «Langsiktige fordringer» og blir "
         "rapportert som «andre langsiktige fordringer» (kode 1390). Kontroller at det er "
         "riktig for selskapet, og rett tallene selv hvis det ikke er det."
     ]
@@ -184,17 +193,19 @@ def _akkumuler(acc: dict, account: ET.Element, netto: float) -> None:
 
     elif cat == "balanseverdiForAnleggsmiddel":
         # 1313 = investeringer i andre datter- og konsernselskap
-        if code in ("1313", "1320"):
+        if code == "1313":
             acc["aksjer_i_datterselskap"] += netto
         elif code == "1350":
             acc["andre_aksjer"] += netto
         else:
-            # 1370 (lån til eiere/konsern), 1390 (andre langsiktige fordringer),
+            # 1320 (lån til foretak i samme konsern), 1370 (fordringer på eiere),
+            # 1390 (andre langsiktige fordringer),
             # 1105/1205/1280 (driftsmidler) — samles i langsiktige_fordringer
             acc["langsiktige_fordringer"] += netto
             # Fordringskodene hører hjemme her, resten gjør det ikke: alt under 1300 er
-            # immaterielle eiendeler (10xx) eller varige driftsmidler (11xx/12xx), og de
-            # rapporteres da som «andre langsiktige fordringer» (1390). Beløpet blir liggende
+            # immaterielle eiendeler (10xx) eller varige driftsmidler (11xx/12xx), og
+            # 1312/1331/1332/1360 er investeringer. De rapporteres da som «andre langsiktige
+            # fordringer» (1390). Beløpet blir liggende
             # der, men brukeren skal få vite det i stedet for at det skjer i stillhet.
             if netto and _er_uklassifisert_anleggsmiddel(code):
                 acc["uklassifiserte_anleggsmidler"][code] = (

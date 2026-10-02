@@ -331,6 +331,48 @@ def test_aksjer_konto_1313_er_aksjer_i_datterselskap():
     assert fam["aksjer_i_datterselskap"] == 300000
 
 
+def test_konsernlaan_konto_1320_er_langsiktig_fordring():
+    """
+    1320 er lån til foretak i samme konsern, en fordring. Før ble lånet lest som aksjer i
+    datterselskap, og selskapet ble merket som morselskap i årsregnskapet.
+    """
+    cfg = importer_bytes(
+        _saft_xml(
+            _konto("balanseverdiForAnleggsmiddel", "1320", ub_debet=250000, ib_debet=200000)
+        )
+    )
+    am = cfg["balanse"]["eiendeler"]["anleggsmidler"]
+    fam = cfg["foregaaende_aar"]["balanse"]["eiendeler"]["anleggsmidler"]
+
+    assert am["langsiktige_fordringer"] == 250000
+    assert am["aksjer_i_datterselskap"] == 0
+    assert fam["langsiktige_fordringer"] == 200000
+    assert fam["aksjer_i_datterselskap"] == 0
+    assert "_advarsler" not in cfg
+
+
+def test_investeringer_uten_egen_linje_gir_advarsel():
+    """
+    Tilknyttede selskap, deltakerlignede datterselskap og obligasjoner har ingen egen linje.
+    Beløpet havner i langsiktige fordringer som før, men ikke lenger i stillhet.
+    """
+    cfg = importer_bytes(
+        _saft_xml(
+            KONTOER
+            + _konto("balanseverdiForAnleggsmiddel", "1312", ub_debet=10000)
+            + _konto("balanseverdiForAnleggsmiddel", "1331", ub_debet=20000)
+            + _konto("balanseverdiForAnleggsmiddel", "1332", ub_debet=30000)
+            + _konto("balanseverdiForAnleggsmiddel", "1360", ub_debet=40000)
+        )
+    )
+
+    assert cfg["balanse"]["eiendeler"]["anleggsmidler"]["langsiktige_fordringer"] == 100000
+    assert len(cfg["_advarsler"]) == 1
+    advarsel = cfg["_advarsler"][0]
+    assert "1312, 1331, 1332, 1360" in advarsel
+    assert "100,000" in advarsel
+
+
 def test_overkurs_konto_2020_er_overkursfond():
     """2020 er overkurs. Før havnet den i annen egenkapital, altså opptjent egenkapital."""
     cfg = importer_bytes(

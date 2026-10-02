@@ -4,6 +4,23 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.5.3] - 2026-10-02
+
+### Rettet
+
+- **SAF-T-importen leste lån til konsernselskap som aksjer i datterselskap.** Grupperingskode
+  1320 er lån til foretak i samme konsern, men importen la beløpet sammen med 1313 som
+  investering i datterselskap. Lånet ble derfor sendt som 1313 i næringsspesifikasjonen og
+  ført som investering i datterselskap i årsregnskapet. Hadde selskapet ingen
+  datterselskapsaksjer i tillegg, ble det også merket som morselskap. Importen leser nå 1320
+  som en langsiktig fordring, og beløpet sendes som 1390 (andre langsiktige fordringer).
+- **SAF-T-importen advarer nå om investeringer uten egen linje.** Investeringer i tilknyttede
+  selskap (1331, 1332), datter- og konsernselskap med deltakerfastsetting (1312) og
+  obligasjoner (1360) har ingen egen linje i Wenche, og havnet i langsiktige fordringer uten
+  at importen sa fra. Beløpet blir fortsatt liggende der, men importen gir nå samme advarsel
+  som for immaterielle eiendeler og varige driftsmidler, slik at du kan kontrollere og rette
+  tallene selv.
+
 ## [1.5.2] - 2026-10-02
 
 ### Rettet
