@@ -8,10 +8,11 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 
 ### Rettet
 
-- **SAF-T-importen leste utbytte, aksjer i datterselskap og overkurs fra koder som ikke finnes.**
+- **SAF-T-importen leste utbytte, aksjer i datterselskap og overkurs fra feil koder.**
   Importen så etter grupperingskodene 8040, 1300 og 2030, mens Skatteetatens kodeliste for
   næringsspesifikasjonen bruker 8090 (utbytte), 1313 (investeringer i datter- og
-  konsernselskap) og 2020 (overkurs). Utbyttet havnet derfor i andre finansinntekter, der
+  konsernselskap) og 2020 (overkurs). 8040 og 1300 finnes ikke i listen, og 2030 er annen
+  innskutt egenkapital. Utbyttet havnet derfor i andre finansinntekter, der
   fritaksmetoden ikke virker, aksjene i langsiktige fordringer og overkursen i annen
   egenkapital. Importen bruker nå de samme kodene som næringsspesifikasjonen. Annen innskutt
   egenkapital (2030) følger fortsatt overkursen, siden den er innskutt og ikke opptjent. Har du
