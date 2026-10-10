@@ -120,6 +120,46 @@ def _advarsler_om_uklassifiserte(acc: dict) -> list[str]:
     ]
 
 
+# Verdiøkning (8080) og verdireduksjon (8100) av finansielle instrumenter vurdert til virkelig
+# verdi, og nedskrivning av finansielle eiendeler (8115). Urealiserte endringer er ikke
+# skattepliktige eller fradragsberettigede, men Wenche har ingen linje som skiller dem ut.
+_VERDIENDRINGSKODER = frozenset({"8080", "8100", "8115"})
+
+
+def _advarsler_om_aksjegevinst(acc: dict) -> list[str]:
+    """
+    Advarsler om gevinst og tap på aksjer, og om verdiendringer på finansielle eiendeler.
+
+    Gevinst (8074) og tap (8174) får egne linjer, men koden dekker også fondsandeler, og
+    fritaksmetoden gjelder ikke alt: gevinst på rentefond og aksjer i lavskatteland utenfor
+    EØS er skattepliktig. Importen slår heller ikke på fritaksmetoden. Verdiendringer og
+    nedskrivninger skattlegges fullt i Wenche, selv om de ikke skal det.
+    """
+    advarsler = []
+    gevinst = acc["gevinst_ved_realisasjon_av_aksjer"]
+    tap = acc["tap_ved_realisasjon_av_aksjer"]
+    if gevinst or tap:
+        advarsler.append(
+            f"SAF-T-filen har gevinst ({gevinst:,.0f} NOK) og/eller tap ({tap:,.0f} NOK) ved "
+            "realisasjon av aksjer, egenkapitalbevis og fondsandeler (grupperingskode 8074 og "
+            "8174). Med fritaksmetoden er gevinsten skattefri og tapet ikke "
+            "fradragsberettiget. Fritaksmetoden er ikke slått på av importen, og den gjelder "
+            "ikke gevinst og tap på rentefond eller aksjer i lavskatteland utenfor EØS. Flytt "
+            "slike beløp til andre finansinntekter eller andre finanskostnader."
+        )
+    verdiendringer = acc["verdiendringer_finansielle"]
+    if verdiendringer:
+        koder = ", ".join(sorted(verdiendringer))
+        advarsler.append(
+            f"SAF-T-filen har verdiendringer eller nedskrivninger på finansielle eiendeler "
+            f"(grupperingskode {koder}). Wenche har ingen egen linje for dem, så de ligger i "
+            "andre finansinntekter eller andre finanskostnader og blir skattlagt eller "
+            "fradragsført fullt ut. Urealiserte verdiendringer er normalt verken "
+            "skattepliktige eller fradragsberettigede. Kontroller skatteberegningen selv."
+        )
+    return advarsler
+
+
 def _tom_akkumulator() -> dict:
     return {
         "salgsinntekter": 0.0,
@@ -131,6 +171,8 @@ def _tom_akkumulator() -> dict:
         "andre_finansinntekter": 0.0,
         "rentekostnader": 0.0,
         "andre_finanskostnader": 0.0,
+        "gevinst_ved_realisasjon_av_aksjer": 0.0,
+        "tap_ved_realisasjon_av_aksjer": 0.0,
         "skattekostnad": 0.0,
         "aksjer_i_datterselskap": 0.0,
         "andre_aksjer": 0.0,
@@ -151,6 +193,10 @@ def _tom_akkumulator() -> dict:
         # noen egen linje for dem: {grupperingskode: beløp}. Brukes bare til å advare, aldri
         # til beløp, jf. _advarsler_om_uklassifiserte.
         "uklassifiserte_anleggsmidler": {},
+        # Verdiendringer og nedskrivninger på finansielle eiendeler (8080, 8100, 8115). De
+        # blir liggende i andre finansinntekter/-kostnader og skattlegges fullt, så brukeren
+        # skal få vite om dem. {grupperingskode: beløp}, bare til advarsel.
+        "verdiendringer_finansielle": {},
     }
 
 
@@ -181,15 +227,30 @@ def _akkumuler(acc: dict, account: ET.Element, netto: float) -> None:
         # næringsspesifikasjonen bruker for utbytte_fra_datterselskap
         if code == "8090":
             acc["utbytte_fra_datterselskap"] += -netto
+        elif code == "8074":
+            # Gevinst ved realisasjon av aksjer, egenkapitalbevis og fondsandeler. Egen linje
+            # fordi gevinsten er skattefri etter fritaksmetoden (sktl. § 2-38).
+            acc["gevinst_ved_realisasjon_av_aksjer"] += -netto
         else:
             acc["andre_finansinntekter"] += -netto
+            if netto and code in _VERDIENDRINGSKODER:
+                acc["verdiendringer_finansielle"][code] = (
+                    acc["verdiendringer_finansielle"].get(code, 0.0) - netto
+                )
 
     elif cat == "finanskostnad":
         # GroupingCode 8150 = rentekostnader
         if code == "8150":
             acc["rentekostnader"] += netto
+        elif code == "8174":
+            # Tap ved realisasjon av aksjer mv. Ikke fradragsberettiget etter fritaksmetoden.
+            acc["tap_ved_realisasjon_av_aksjer"] += netto
         else:
             acc["andre_finanskostnader"] += netto
+            if netto and code in _VERDIENDRINGSKODER:
+                acc["verdiendringer_finansielle"][code] = (
+                    acc["verdiendringer_finansielle"].get(code, 0.0) + netto
+                )
 
     elif cat == "balanseverdiForAnleggsmiddel":
         # 1313 = investeringer i andre datter- og konsernselskap
@@ -279,6 +340,8 @@ def _bygg_resultat(acc: dict) -> dict:
             "andre_finansinntekter": acc["andre_finansinntekter"],
             "rentekostnader": acc["rentekostnader"],
             "andre_finanskostnader": acc["andre_finanskostnader"],
+            "gevinst_ved_realisasjon_av_aksjer": acc["gevinst_ved_realisasjon_av_aksjer"],
+            "tap_ved_realisasjon_av_aksjer": acc["tap_ved_realisasjon_av_aksjer"],
         },
         "skattekostnad": acc["skattekostnad"],
     }
@@ -424,7 +487,7 @@ def _fra_root(root: ET.Element) -> dict:
             "sikkerhet": "",
         })
 
-    advarsler = _advarsler_om_uklassifiserte(nar)
+    advarsler = _advarsler_om_uklassifiserte(nar) + _advarsler_om_aksjegevinst(nar)
 
     return {
         "selskap": {

@@ -37,6 +37,11 @@ resultatregnskap:
     andre_finansinntekter: 0          # Renteinntekter og andre finansinntekter
     rentekostnader: 0                 # Renter på lån
     andre_finanskostnader: 0          # Andre finanskostnader
+    # Gevinst og tap ved salg av aksjer innenfor fritaksmetoden (sktl. § 2-38): gevinsten
+    # er skattefri og tapet gir ikke fradrag. Valgfrie. Gevinst på rentefond og aksjer i
+    # lavskatteland utenfor EØS føres i stedet som andre finansinntekter/-kostnader.
+    gevinst_ved_realisasjon_av_aksjer: 0
+    tap_ved_realisasjon_av_aksjer: 0
 
   # Skattekostnad på ordinært resultat (rskl. § 6-1). Egen linje før årsresultatet.
   # 0 for et selskap uten skattepliktig inntekt; har selskapet f.eks. renteinntekt,

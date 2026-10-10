@@ -18,8 +18,10 @@ Kodeliste: 2025_resultatregnskapOgBalanse.xml
 Implementasjonen dekker en typisk norsk holding AS med:
   - Salgsinntekter (3200) og andre driftsinntekter (3900)
   - Lønnskostnader (5000), avskrivninger (6000), andre driftskostnader (6700)
-  - Finansinntekter: utbytte fra datterselskap (8090), andre (8050)
-  - Finanskostnader: rentekostnader (8150), andre (8160)
+  - Finansinntekter: utbytte fra datterselskap (8090), andre (8050), gevinst ved
+    realisasjon av aksjer (8074)
+  - Finanskostnader: rentekostnader (8150), andre (8160), tap ved realisasjon av
+    aksjer (8174)
   - Skattekostnad: betalbar skatt på ordinært resultat (8300), tilbakeført som
     permanent forskjell (positivSkattekostnad, kodeliste 2025_permanentForskjellstype)
   - Anleggsmidler: aksjer i datterselskap (1313), andre aksjer (1350),
@@ -73,9 +75,15 @@ def _standardposter(regnskap: Aarsregnskap) -> tuple[NaeringsspesifikasjonPost, 
         NaeringsspesifikasjonPost(
             "finansinntekt", "8050", res.finansposter.andre_finansinntekter
         ),
+        NaeringsspesifikasjonPost(
+            "finansinntekt", "8074", res.finansposter.gevinst_ved_realisasjon_av_aksjer
+        ),
         NaeringsspesifikasjonPost("finanskostnad", "8150", res.finansposter.rentekostnader),
         NaeringsspesifikasjonPost(
             "finanskostnad", "8160", res.finansposter.andre_finanskostnader
+        ),
+        NaeringsspesifikasjonPost(
+            "finanskostnad", "8174", res.finansposter.tap_ved_realisasjon_av_aksjer
         ),
         NaeringsspesifikasjonPost("skattekostnad", "8300", res.skattekostnad),
         NaeringsspesifikasjonPost(
@@ -490,7 +498,7 @@ def generer_naeringsspesifikasjon(
     # 2025_permanentForskjellstype, og id settes lik koden (samme krav som for
     # resultat- og balanseforekomstene, ellers avvik idAvvikerFraKrav).
     #
-    # To forskjeller er aktuelle for et passivt holdingselskap:
+    # Tre forskjeller er aktuelle for et passivt holdingselskap:
     #
     #   Skattekostnaden er ikke fradragsberettiget (sktl. § 6-1) og legges tilbake.
     #
@@ -500,8 +508,13 @@ def generer_naeringsspesifikasjon(
     #   3 %-sjablonen (§ 2-38 sjette ledd). Uten dette paret oppgav
     #   næringsspesifikasjonen brutto utbytte som skattepliktig inntekt.
     #
-    # Regnestykket, med utbytte U, skattepliktig del S og skattekostnad K:
-    #   årsresultat + (K + S) - U == resultat før skatt - U + S == skattepliktig inntekt.
+    #   Gevinst ved realisasjon av aksjer innenfor fritaksmetoden er skattefri, og tap gir
+    #   ikke fradrag (§ 2-38). Gevinsten tilbakeføres i sin helhet, siden 3 %-sjablonen
+    #   bare gjelder utbytte, og tapet legges til igjen.
+    #
+    # Regnestykket, med utbytte U, skattepliktig del S, skattekostnad K, gevinst G og tap T:
+    #   årsresultat + (K + S + T) - (U + G)
+    #     == resultat før skatt - U + S - G + T == skattepliktig inntekt.
     # -----------------------------------------------------------------------
     tillegg: list[tuple[str, float]] = []
     fradrag: list[tuple[str, float]] = []
@@ -520,6 +533,23 @@ def generer_naeringsspesifikasjon(
             tillegg.append(
                 ("skattepliktigDelAvUtbytterOgUtdelinger", beregning.skattepliktig_utbytte)
             )
+
+    # beregn_skatt setter beløpene bare når fritaksmetoden er anvendt. Kodenavnene er fra
+    # 2025_permanentForskjellstype (0833 og 0633).
+    if beregning.fritatt_gevinst_aksjer > 0:
+        fradrag.append(
+            (
+                "regnskapsmessigGevinstVedRealisasjonAvFinansielleInstrumenter",
+                beregning.fritatt_gevinst_aksjer,
+            )
+        )
+    if beregning.ikke_fradragsberettiget_tap_aksjer > 0:
+        tillegg.append(
+            (
+                "regnskapsmessigTapVedRealisasjonAvFinansielleInstrumenter",
+                beregning.ikke_fradragsberettiget_tap_aksjer,
+            )
+        )
 
     if tillegg or fradrag:
         forskjell_el = SubElement(root, "forskjellMellomRegnskapsmessigOgSkattemessigVerdi")

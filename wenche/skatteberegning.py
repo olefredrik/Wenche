@@ -30,6 +30,11 @@ class Skatteberegning:
     skattepliktig_inntekt_netto: float      # Grunnlaget for skatten
     nytt_underskudd: float                  # Underskudd til fremføring neste år
     beregnet_skatt: float                   # 22 % av netto skattepliktig inntekt, avrundet opp
+    # Gevinst og tap ved realisasjon av aksjer som fritaksmetoden holder utenfor
+    # skattegrunnlaget (sktl. § 2-38). Står sist med standardverdi, så eksisterende
+    # kallsteder som bygger Skatteberegning selv ikke knekker.
+    fritatt_gevinst_aksjer: float = 0.0     # Gevinst som er skattefri
+    ikke_fradragsberettiget_tap_aksjer: float = 0.0  # Tap som ikke gir fradrag
 
 
 def beregn_skatt(
@@ -67,13 +72,26 @@ def beregn_skatt(
         skattepliktig_utbytte = utbytte
         fritatt_utbytte = 0
 
+    # Gevinst ved realisasjon av aksjer innenfor fritaksmetoden er skattefri, og tap gir ikke
+    # fradrag (sktl. § 2-38). Sjablonregelen på 3 % gjelder bare utbytte (§ 2-38 sjette
+    # ledd), ikke gevinst, så hele gevinsten er fritatt uansett eierandel. Feltene er ment
+    # for norske aksjer: aksjer i selskap i lavskatteland utenfor EØS, og fondsandeler med
+    # renteandel, er ikke (fullt ut) omfattet, og brukeren må da føre beløpet som andre
+    # finansinntekter eller andre finanskostnader.
+    gevinst = r.finansposter.gevinst_ved_realisasjon_av_aksjer
+    tap = r.finansposter.tap_ved_realisasjon_av_aksjer
+    fritatt_gevinst = gevinst if konfig.anvend_fritaksmetoden and gevinst > 0 else 0
+    ikke_fradragsberettiget_tap = tap if konfig.anvend_fritaksmetoden and tap > 0 else 0
+
     # Skattepliktig inntekt før underskuddsfradrag. Grunnlaget er postene før
     # skatt: skattekostnaden er ikke fradragsberettiget (sktl. § 6-1).
     skattepliktig_inntekt_brutto = (
         r.driftsresultat
         + skattepliktig_utbytte
         + r.finansposter.andre_finansinntekter
-        - r.finansposter.sum_kostnader
+        + gevinst
+        - fritatt_gevinst
+        - (r.finansposter.sum_kostnader - ikke_fradragsberettiget_tap)
     )
 
     # Fradrag for fremførbart underskudd (kun hvis positiv inntekt)
@@ -109,4 +127,6 @@ def beregn_skatt(
         skattepliktig_inntekt_netto=skattepliktig_inntekt_netto,
         nytt_underskudd=nytt_underskudd,
         beregnet_skatt=beregnet_skatt,
+        fritatt_gevinst_aksjer=fritatt_gevinst,
+        ikke_fradragsberettiget_tap_aksjer=ikke_fradragsberettiget_tap,
     )

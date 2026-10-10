@@ -68,14 +68,28 @@ class Finansposter:
     andre_finansinntekter: float = 0.0
     rentekostnader: float = 0.0
     andre_finanskostnader: float = 0.0
+    # Gevinst og tap ved realisasjon av aksjer (grupperingskode 8074 og 8174). Egne linjer
+    # fordi fritaksmetoden (sktl. § 2-38) gjør gevinsten skattefri og tapet ikke
+    # fradragsberettiget, mens andre finansposter skattlegges fullt. Står sist, så eldre
+    # kallsteder og config uten feltene gir samme resultat som før.
+    gevinst_ved_realisasjon_av_aksjer: float = 0.0
+    tap_ved_realisasjon_av_aksjer: float = 0.0
 
     @property
     def sum_inntekter(self) -> float:
-        return self.utbytte_fra_datterselskap + self.andre_finansinntekter
+        return (
+            self.utbytte_fra_datterselskap
+            + self.andre_finansinntekter
+            + self.gevinst_ved_realisasjon_av_aksjer
+        )
 
     @property
     def sum_kostnader(self) -> float:
-        return self.rentekostnader + self.andre_finanskostnader
+        return (
+            self.rentekostnader
+            + self.andre_finanskostnader
+            + self.tap_ved_realisasjon_av_aksjer
+        )
 
 
 @dataclass
