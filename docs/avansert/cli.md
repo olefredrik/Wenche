@@ -160,6 +160,11 @@ wenche importer-saft SAF-T-FIL [--ut FILSTI]
 | `SAF-T-FIL` | Sti til SAF-T Financial XML-filen eksportert fra regnskapssystemet (påkrevd) |
 | `--ut` | Sti til `config.yaml` som skal skrives. Standard: `config.yaml` |
 
+Importen leser SAF-T Financial versjon 1.10 til 1.40, og plasserer kontoene ut fra
+grupperingskodene (`GroupingCategory` og `GroupingCode`) fra Skatteetatens kodeliste. En fil
+uten grupperingskoder avvises. Har en konto saldo som ikke får noen linje i regnskapet, gir
+importen en advarsel med konto-ID-ene og summen, så du kan rette tallene selv.
+
 Etter import må følgende felt fylles inn manuelt i `config.yaml`:
 
 - `selskap.daglig_leder`

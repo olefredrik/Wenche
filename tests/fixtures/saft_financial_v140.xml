@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Syntetisk SAF-T Financial v1.40-fil for et lite holdingselskap. Strukturen følger
+  Skatteetatens skjema Norwegian_SAF-T_Financial_Schema_v_1.40.xsd
+  (https://github.com/Skatteetaten/saf-t/tree/master/SAF-T_Financial_1.4), og filen
+  bruker de nye elementene i 1.40: flere AccountID per eier, VirtualCurrencyType og
+  Country i AmountStructure, CurrencyAmount/ExchangeRate med mange desimaler
+  (SAFlongmonetaryType) og DebitNOKTaxAmount i TaxInformation.
+-->
+<AuditFile xmlns="urn:StandardAuditFile-Taxation-Financial:NO">
+  <Header>
+    <AuditFileVersion>1.40</AuditFileVersion>
+    <AuditFileCountry>NO</AuditFileCountry>
+    <AuditFileDateCreated>2028-02-15</AuditFileDateCreated>
+    <SoftwareCompanyName>Testleverandør AS</SoftwareCompanyName>
+    <SoftwareID>Testregnskap</SoftwareID>
+    <SoftwareVersion>1.0</SoftwareVersion>
+    <Company>
+      <RegistrationNumber>310137715</RegistrationNumber>
+      <Name>Testholding AS</Name>
+      <Address>
+        <StreetName>Storgata 1</StreetName>
+        <City>Oslo</City>
+        <PostalCode>0001</PostalCode>
+        <Country>NO</Country>
+      </Address>
+      <Contact>
+        <ContactPerson>
+          <FirstName>Ola</FirstName>
+          <LastName>Nordmann</LastName>
+        </ContactPerson>
+        <Email>post@testholding.no</Email>
+      </Contact>
+    </Company>
+    <DefaultCurrencyCode>NOK</DefaultCurrencyCode>
+    <SelectionCriteria>
+      <PeriodStart>1</PeriodStart>
+      <PeriodStartYear>2027</PeriodStartYear>
+      <PeriodEnd>12</PeriodEnd>
+      <PeriodEndYear>2027</PeriodEndYear>
+    </SelectionCriteria>
+    <TaxAccountingBasis>A</TaxAccountingBasis>
+  </Header>
+  <MasterFiles>
+    <GeneralLedgerAccounts>
+      <Account>
+        <AccountID>1313</AccountID>
+        <AccountDescription>Aksjer i datterselskap</AccountDescription>
+        <GroupingCategory>balanseverdiForAnleggsmiddel</GroupingCategory>
+        <GroupingCode>1313</GroupingCode>
+        <AccountType>GL</AccountType>
+        <OpeningDebitBalance>900000.00</OpeningDebitBalance>
+        <ClosingDebitBalance>1000000.00</ClosingDebitBalance>
+      </Account>
+      <Account>
+        <AccountID>1920</AccountID>
+        <AccountDescription>Bankinnskudd</AccountDescription>
+        <GroupingCategory>balanseverdiForOmloepsmiddel</GroupingCategory>
+        <GroupingCode>1920</GroupingCode>
+        <AccountType>GL</AccountType>
+        <OpeningDebitBalance>150000.00</OpeningDebitBalance>
+        <ClosingDebitBalance>200000.00</ClosingDebitBalance>
+      </Account>
+      <Account>
+        <AccountID>2000</AccountID>
+        <AccountDescription>Aksjekapital</AccountDescription>
+        <GroupingCategory>egenkapital</GroupingCategory>
+        <GroupingCode>2000</GroupingCode>
+        <AccountType>GL</AccountType>
+        <OpeningCreditBalance>30000.00</OpeningCreditBalance>
+        <ClosingCreditBalance>30000.00</ClosingCreditBalance>
+      </Account>
+      <Account>
+        <AccountID>2250</AccountID>
+        <AccountDescription>Lån fra aksjonær</AccountDescription>
+        <GroupingCategory>langsiktigGjeld</GroupingCategory>
+        <GroupingCode>2250</GroupingCode>
+        <AccountType>GL</AccountType>
+        <OpeningCreditBalance>0.00</OpeningCreditBalance>
+        <ClosingCreditBalance>200000.00</ClosingCreditBalance>
+      </Account>
+      <Account>
+        <AccountID>8090</AccountID>
+        <AccountDescription>Utbytte</AccountDescription>
+        <GroupingCategory>finansinntekt</GroupingCategory>
+        <GroupingCode>8090</GroupingCode>
+        <AccountType>GL</AccountType>
+        <OpeningDebitBalance>0.00</OpeningDebitBalance>
+        <ClosingCreditBalance>50000.00</ClosingCreditBalance>
+      </Account>
+      <Account>
+        <AccountID>8800</AccountID>
+        <AccountDescription>Disponering av årsresultatet</AccountDescription>
+        <GroupingCategory>resultatDisponeringForSAF-T</GroupingCategory>
+        <GroupingCode>8800</GroupingCode>
+        <AccountType>GL</AccountType>
+        <OpeningDebitBalance>0.00</OpeningDebitBalance>
+        <ClosingDebitBalance>50000.00</ClosingDebitBalance>
+      </Account>
+    </GeneralLedgerAccounts>
+    <Owners>
+      <Owner>
+        <RegistrationNumber>988888889</RegistrationNumber>
+        <Name>Eier AS</Name>
+        <Address>
+          <City>Oslo</City>
+          <PostalCode>0001</PostalCode>
+        </Address>
+        <OwnerID>1</OwnerID>
+        <AccountID>2250</AccountID>
+        <AccountID>1370</AccountID>
+      </Owner>
+    </Owners>
+  </MasterFiles>
+  <GeneralLedgerEntries>
+    <NumberOfEntries>1</NumberOfEntries>
+    <TotalDebit>50000.00</TotalDebit>
+    <TotalCredit>50000.00</TotalCredit>
+    <Journal>
+      <JournalID>A</JournalID>
+      <Description>Bank</Description>
+      <Type>A</Type>
+      <Transaction>
+        <TransactionID>A1</TransactionID>
+        <Period>6</Period>
+        <PeriodYear>2027</PeriodYear>
+        <TransactionDate>2027-06-30</TransactionDate>
+        <Description>Mottatt utbytte</Description>
+        <SystemEntryDate>2027-06-30</SystemEntryDate>
+        <GLPostingDate>2027-06-30</GLPostingDate>
+        <Line>
+          <RecordID>1</RecordID>
+          <AccountID>1920</AccountID>
+          <Description>Utbytte innbetalt</Description>
+          <DebitAmount>
+            <Amount>50000.00</Amount>
+            <CurrencyCode>EUR</CurrencyCode>
+            <VirtualCurrencyType>Ingen</VirtualCurrencyType>
+            <CurrencyAmount>4335.123456789012345678</CurrencyAmount>
+            <ExchangeRate>11.533843210987654321</ExchangeRate>
+            <Country>FI</Country>
+          </DebitAmount>
+          <TaxInformation>
+            <TaxType>MVA</TaxType>
+            <TaxCode>0</TaxCode>
+            <TaxPercentage>0</TaxPercentage>
+            <TaxBase>0</TaxBase>
+            <DebitTaxAmount>
+              <Amount>0.00</Amount>
+              <CurrencyCode>EUR</CurrencyCode>
+              <CurrencyAmount>0.000000000000000001</CurrencyAmount>
+            </DebitTaxAmount>
+            <DebitNOKTaxAmount>
+              <NOKAmount>0.00</NOKAmount>
+            </DebitNOKTaxAmount>
+          </TaxInformation>
+        </Line>
+        <Line>
+          <RecordID>2</RecordID>
+          <AccountID>8090</AccountID>
+          <Description>Utbytte fra datterselskap</Description>
+          <CreditAmount>
+            <Amount>50000.00</Amount>
+          </CreditAmount>
+        </Line>
+      </Transaction>
+    </Journal>
+  </GeneralLedgerEntries>
+</AuditFile>

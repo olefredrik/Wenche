@@ -4,6 +4,27 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [Ikke utgitt]
+
+### Rettet
+
+- **SAF-T-importen mistet saldo på kontoer den ikke kunne plassere, uten å si fra.** En konto
+  med en grupperingskategori importen ikke håndterer (for eksempel varekostnad), eller uten
+  grupperingskode, havnet ingen steder, og tallene ble for lave uten advarsel. Importen gjør nå
+  en sumkontroll og advarer med konto-ID-ene og summen av saldoene som ikke er med, slik at du
+  kan rette tallene selv. Disponering av årsresultatet (`NA` og `resultatDisponeringForSAF-T`)
+  gir fortsatt ingen linje og ingen advarsel, siden motposten står i egenkapitalen.
+- **En SAF-T-fil helt uten grupperingskoder ga et nullregnskap.** Eldre filer (versjon 1.10 og
+  1.20) har ofte bare `StandardAccountID`. Importen stopper nå med en forklaring om at Wenche
+  trenger `GroupingCategory` og `GroupingCode`, i stedet for å fylle skjemaet med nuller.
+
+### Lagt til
+
+- **SAF-T-importen leser versjonen filen oppgir.** Versjon 1.10 til 1.40 leses som før. En
+  ukjent versjon leses også, men gir en advarsel om å kontrollere tallene. SAF-T 1.40, som er
+  påkrevd fra regnskapsår som starter 1. januar 2027, er testet med en fil som bruker de nye
+  elementene i skjemaet.
+
 ## [1.5.3] - 2026-10-02
 
 ### Rettet

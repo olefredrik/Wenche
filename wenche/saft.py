@@ -1,13 +1,19 @@
 """
 SAF-T Financial-importer for Wenche.
 
-Leser en SAF-T Financial XML-fil (v1.20 / v1.30,
+Leser en SAF-T Financial XML-fil (v1.10 til v1.40, alle med samme
 namespace: urn:StandardAuditFile-Taxation-Financial:NO) og returnerer en dict
 klar til å lagres som config.yaml.
 
 Støtter alle SAF-T-kompatible regnskapssystemer (Fiken, Tripletex, Visma,
 Uni Micro, PowerOffice Go, etc.) da GroupingCategory og GroupingCode er
-sentralt standardisert av Skatteetaten.
+sentralt standardisert av Skatteetaten. Kontoene plasseres ut fra disse to
+feltene alene, så en fil uten grupperingskoder kan ikke importeres. Eldre filer
+(v1.10/v1.20) har ofte bare StandardAccountID.
+
+Versjon 1.40 (påkrevd fra regnskapsår som starter 1. januar 2027) er
+bakoverkompatibel med 1.30: endringene gjelder eiere, valutabeløp og MVA i NOK
+på transaksjonsnivå, som importen ikke leser.
 """
 
 from __future__ import annotations
@@ -23,6 +29,18 @@ from defusedxml.ElementTree import parse as _safe_parse
 
 _NS = "urn:StandardAuditFile-Taxation-Financial:NO"
 _T = f"{{{_NS}}}"
+
+# AuditFileVersion-verdiene importen er laget for. Alle bruker samme namespace og samme
+# kontostruktur (GeneralLedgerAccounts/Account), så forskjellen ligger utenfor det som leses.
+_KJENTE_VERSJONER = ("1.10", "1.20", "1.30", "1.40")
+
+# Kategorier som med vilje ikke gir noen regnskapslinje: NA og resultatDisponeringForSAF-T
+# (8800) er begge disponering av årsresultatet, som Skatteetaten ber om å mappe til den ene
+# eller den andre. Motposten står allerede i egenkapitalen.
+_IKKE_REGNSKAPSLINJE = frozenset({"NA", "resultatDisponeringForSAF-T"})
+
+# Hvor mange konto-ID-er en advarsel lister opp før resten oppsummeres som et antall.
+_MAKS_KONTOER_I_ADVARSEL = 10
 
 
 def _tag(name: str) -> str:
@@ -120,6 +138,89 @@ def _advarsler_om_uklassifiserte(acc: dict) -> list[str]:
     ]
 
 
+def _konto_id(account: ET.Element) -> str:
+    """Kontoens ID slik brukeren kjenner den igjen fra regnskapssystemet."""
+    return (
+        _tekst(account, "AccountID")
+        or _tekst(account, "StandardAccountID")
+        or "(uten konto-ID)"
+    )
+
+
+def _har_gruppering(account: ET.Element) -> bool:
+    return bool(_tekst(account, "GroupingCategory") or _tekst(account, "GroupingCode"))
+
+
+def _kontoliste(kontoer) -> str:
+    """Kommaseparert liste med konto-ID-er, kortet ned når den blir lang."""
+    kontoer = sorted(kontoer)
+    vist = ", ".join(kontoer[:_MAKS_KONTOER_I_ADVARSEL])
+    resten = len(kontoer) - _MAKS_KONTOER_I_ADVARSEL
+    return f"{vist} og {resten} til" if resten > 0 else vist
+
+
+def _advarsler_om_versjon(versjon: str) -> list[str]:
+    """
+    Advarsel når filen oppgir en AuditFileVersion importen ikke er laget for.
+
+    Filen leses likevel: en ny versjon med samme namespace er som regel bakoverkompatibel,
+    slik 1.40 er. Manglende versjon gir ingen advarsel, siden feltet ikke endrer hvordan
+    kontoene leses.
+    """
+    if not versjon:
+        return []
+    try:
+        normalisert = f"{float(versjon):.2f}"
+    except ValueError:
+        normalisert = versjon
+    if normalisert in _KJENTE_VERSJONER:
+        return []
+    return [
+        f"SAF-T-filen oppgir versjon {versjon}, som Wenche ikke kjenner. Importen er laget "
+        f"for versjon {', '.join(_KJENTE_VERSJONER)}. Jeg har lest filen på samme måte, men "
+        "kontroller tallene mot regnskapet før du sender inn."
+    ]
+
+
+def _advarsler_om_ufordelte(nar: dict, fjor: dict) -> list[str]:
+    """
+    Sumkontroll: advarsel når saldo på kontoer ikke ble fordelt på noen regnskapslinje.
+
+    En konto med en kategori importen ikke håndterer, eller uten grupperingskode, faller
+    ellers ut av tallene uten at noen merker det. I verste fall blir resultatet et
+    nullregnskap. Beløpene legges ikke noe sted, siden det bare er brukeren som vet hvor de
+    hører hjemme.
+    """
+    ufordelte = {**fjor["ufordelte_kontoer"], **nar["ufordelte_kontoer"]}
+    if not ufordelte:
+        return []
+
+    sum_ub = sum(abs(b) for b in nar["ufordelte_kontoer"].values())
+    sum_ib = sum(abs(b) for b in fjor["ufordelte_kontoer"].values())
+    beloep = []
+    if sum_ub:
+        beloep.append(f"{sum_ub:,.0f} NOK i utgående saldo")
+    if sum_ib:
+        beloep.append(f"{sum_ib:,.0f} NOK i inngående saldo (fjorårets balanse)")
+
+    tekst = (
+        f"SAF-T-filen har saldo på {len(ufordelte)} konto(er) som importen ikke fant noen "
+        f"linje for i regnskapet (konto {_kontoliste(ufordelte)}). Til sammen "
+        f"{' og '.join(beloep)} er derfor ikke med i tallene."
+    )
+    uten_gruppering = nar["uten_gruppering"] | fjor["uten_gruppering"]
+    if uten_gruppering:
+        tekst += (
+            f" Konto {_kontoliste(uten_gruppering)} mangler GroupingCategory og "
+            "GroupingCode, som Wenche bruker til å plassere kontoene."
+        )
+    tekst += (
+        " Kontroller grupperingen i regnskapssystemet, eller legg inn beløpene selv der "
+        "de hører hjemme."
+    )
+    return [tekst]
+
+
 def _tom_akkumulator() -> dict:
     return {
         "salgsinntekter": 0.0,
@@ -151,6 +252,11 @@ def _tom_akkumulator() -> dict:
         # noen egen linje for dem: {grupperingskode: beløp}. Brukes bare til å advare, aldri
         # til beløp, jf. _advarsler_om_uklassifiserte.
         "uklassifiserte_anleggsmidler": {},
+        # Kontoer med saldo som ikke havnet på noen linje: {konto-ID: beløp}, og hvilke av
+        # dem som mangler grupperingskode. Brukes bare til sumkontrollen i
+        # _advarsler_om_ufordelte, aldri til beløp.
+        "ufordelte_kontoer": {},
+        "uten_gruppering": set(),
     }
 
 
@@ -158,7 +264,7 @@ def _akkumuler(acc: dict, account: ET.Element, netto: float) -> None:
     """Legger konto-saldo til riktig felt i akkumulatoren."""
     cat = _tekst(account, "GroupingCategory")
     code = _tekst(account, "GroupingCode")
-    if cat == "NA":
+    if cat in _IKKE_REGNSKAPSLINJE:
         return
 
     if cat == "salgsinntekt":
@@ -261,6 +367,14 @@ def _akkumuler(acc: dict, account: ET.Element, netto: float) -> None:
     # kategori over alltid vinner.
     elif cat == "skattekostnad" or code.startswith("83"):
         acc["skattekostnad"] += netto
+
+    # Alt annet (ukjent kategori, eller ingen grupperingskode) får ingen linje. Før forsvant
+    # saldoen her i stillhet; nå noteres den, så importen kan si fra.
+    elif netto:
+        konto = _konto_id(account)
+        acc["ufordelte_kontoer"][konto] = acc["ufordelte_kontoer"].get(konto, 0.0) + netto
+        if not _har_gruppering(account):
+            acc["uten_gruppering"].add(konto)
 
 
 def _bygg_resultat(acc: dict) -> dict:
@@ -392,10 +506,23 @@ def _fra_root(root: ET.Element) -> dict:
     if gl is None:
         raise ValueError("Finner ingen GeneralLedgerAccounts i SAF-T-filen.")
 
+    kontoer = gl.findall(_tag("Account"))
+    if kontoer and not any(_har_gruppering(a) for a in kontoer):
+        # Uten grupperingskoder havner hver konto utenfor regnskapet, og resultatet blir et
+        # nullregnskap. Det er bedre å stoppe her enn å gi en config med bare nuller.
+        raise ValueError(
+            "SAF-T-filen har ingen grupperingskoder (GroupingCategory og GroupingCode) på "
+            "kontoene. Wenche bruker dem til å plassere kontoene i regnskapet, og kan ikke "
+            "lese filen uten dem. Eldre SAF-T-filer (versjon 1.10 og 1.20) har ofte bare "
+            "StandardAccountID. Eksporter filen på nytt med grupperingskoder fra "
+            "Skatteetatens kodeliste for næringsspesifikasjonen, typisk som versjon 1.30 "
+            "eller nyere."
+        )
+
     nar = _tom_akkumulator()      # nåværende år (closing balances)
     fjor_b = _tom_akkumulator()   # foregående år balanse (opening balances)
 
-    for account in gl.findall(_tag("Account")):
+    for account in kontoer:
         _akkumuler(nar, account, _netto(account))
         _akkumuler(fjor_b, account, _aapning_netto(account))
 
@@ -406,7 +533,7 @@ def _fra_root(root: ET.Element) -> dict:
     # er regnskapsmessig og kan avvike fra det skattemessige fremførbare
     # underskuddet i fjorårets RF-1028; brukeren bør verifisere.
     underskudd_aapning = 0.0
-    for account in gl.findall(_tag("Account")):
+    for account in kontoer:
         if _tekst(account, "GroupingCode") == "2080":
             underskudd_aapning += _aapning_netto(account)
 
@@ -424,7 +551,11 @@ def _fra_root(root: ET.Element) -> dict:
             "sikkerhet": "",
         })
 
-    advarsler = _advarsler_om_uklassifiserte(nar)
+    advarsler = (
+        _advarsler_om_versjon(_tekst(header, "AuditFileVersion"))
+        + _advarsler_om_ufordelte(nar, fjor_b)
+        + _advarsler_om_uklassifiserte(nar)
+    )
 
     return {
         "selskap": {
