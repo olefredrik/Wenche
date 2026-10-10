@@ -226,6 +226,17 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
     fkg = fb.egenkapital_og_gjeld.kortsiktig_gjeld
 
     netto_finans = fp.sum_inntekter - fp.sum_kostnader
+
+    # Gevinst og tap ved realisasjon av aksjer har egne linjer i modellen fordi de behandles
+    # særskilt i skatten (fritaksmetoden). I årsregnskapet rapporteres de som før, sammen med
+    # andre finansinntekter og andre finanskostnader, så innsendingen til Brønnøysund er
+    # uendret av at beløpet er skilt ut.
+    andre_finansinntekter = fp.andre_finansinntekter + fp.gevinst_ved_realisasjon_av_aksjer
+    f_andre_finansinntekter = (
+        ffp.andre_finansinntekter + ffp.gevinst_ved_realisasjon_av_aksjer
+    )
+    andre_finanskostnader = fp.andre_finanskostnader + fp.tap_ved_realisasjon_av_aksjer
+    f_andre_finanskostnader = ffp.andre_finanskostnader + ffp.tap_ved_realisasjon_av_aksjer
     sum_gjeld = lg.sum + kg.sum
     sum_innskutt_ek = ek.aksjekapital + ek.overkursfond
 
@@ -277,7 +288,7 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
       </nettoFinans>
       <finansinntekt>
         {linje("investeringDatterforetakTilknyttetSelskap", fp.utbytte_fra_datterselskap, "Utbytte fra datterselskap", "29004", "27934", "27935", ffp.utbytte_fra_datterselskap)}
-        {linje_enkel("annenRenteinntekt", fp.andre_finansinntekter, "150", "7030", ffp.andre_finansinntekter)}
+        {linje_enkel("annenRenteinntekt", andre_finansinntekter, "150", "7030", f_andre_finansinntekter)}
         <sumFinansinntekter>
           <aarets orid="153">{_i(fp.sum_inntekter)}</aarets>
           <fjoraarets orid="7993">{_i(ffp.sum_inntekter)}</fjoraarets>
@@ -285,7 +296,7 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
       </finansinntekt>
       <finanskostnad>
         {linje_enkel("rentekostnad", fp.rentekostnader, "7037", "7038", ffp.rentekostnader)}
-        {linje("annenFinanskostnad", fp.andre_finanskostnader, "Andre finanskostnader", "29011", "156", "7041", ffp.andre_finanskostnader)}
+        {linje("annenFinanskostnad", andre_finanskostnader, "Andre finanskostnader", "29011", "156", "7041", f_andre_finanskostnader)}
         <sumFinanskostnader>
           <aarets orid="17130">{_i(fp.sum_kostnader)}</aarets>
           <fjoraarets orid="17131">{_i(ffp.sum_kostnader)}</fjoraarets>

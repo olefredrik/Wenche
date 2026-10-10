@@ -306,6 +306,18 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
         f"    Andre finansinntekter        {_nok(andre_finansinntekter)}",
         f"    Rentekostnader               {_nok(r.finansposter.rentekostnader)}",
         f"    Andre finanskostnader        {_nok(r.finansposter.andre_finanskostnader)}",
+    ]
+    # Bare når selskapet har slike poster, så rapporten er uendret for alle andre.
+    if r.finansposter.gevinst_ved_realisasjon_av_aksjer:
+        linjer.insert(
+            -2,
+            f"    Gevinst, realisasjon aksjer  {_nok(r.finansposter.gevinst_ved_realisasjon_av_aksjer)}",
+        )
+    if r.finansposter.tap_ved_realisasjon_av_aksjer:
+        linjer.append(
+            f"    Tap, realisasjon aksjer      {_nok(r.finansposter.tap_ved_realisasjon_av_aksjer)}",
+        )
+    linjer += [
         "",
         f"  RESULTAT FØR SKATT             {_nok(resultat_foer_skatt)}",
         f"  Skattekostnad                  {_nok(-skattekostnad)}",
@@ -336,7 +348,21 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
 
     linjer += [
         f"    Andre finansinntekter        {_nok(andre_finansinntekter)}",
-        f"    Finanskostnader             -{_nok(fin_kostnader)}",
+    ]
+    gevinst_aksjer = r.finansposter.gevinst_ved_realisasjon_av_aksjer
+    if gevinst_aksjer:
+        if beregning.fritatt_gevinst_aksjer:
+            linjer.append(f"    Aksjegevinst (100 % fritatt) {_nok(beregning.fritatt_gevinst_aksjer)}")
+        else:
+            linjer.append(f"    Gevinst, realisasjon aksjer  {_nok(gevinst_aksjer)}")
+    linjer += [
+        f"    Finanskostnader             -{_nok(fin_kostnader - beregning.ikke_fradragsberettiget_tap_aksjer)}",
+    ]
+    if beregning.ikke_fradragsberettiget_tap_aksjer:
+        linjer.append(
+            f"    Aksjetap (ikke fradrag)      {_nok(beregning.ikke_fradragsberettiget_tap_aksjer)}"
+        )
+    linjer += [
         f"  Skattepliktig inntekt (brutto) {_nok(skattepliktig_inntekt_brutto)}",
     ]
 

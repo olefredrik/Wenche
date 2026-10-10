@@ -82,6 +82,10 @@ def _les_resultat(r: dict) -> Resultatregnskap:
             andre_finansinntekter=_tall(fp.get("andre_finansinntekter")),
             rentekostnader=_tall(fp.get("rentekostnader")),
             andre_finanskostnader=_tall(fp.get("andre_finanskostnader")),
+            gevinst_ved_realisasjon_av_aksjer=_tall(
+                fp.get("gevinst_ved_realisasjon_av_aksjer")
+            ),
+            tap_ved_realisasjon_av_aksjer=_tall(fp.get("tap_ved_realisasjon_av_aksjer")),
         ),
         skattekostnad=_tall(r.get("skattekostnad")),
     )

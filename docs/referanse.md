@@ -53,6 +53,8 @@ Alle beløp oppgis i hele kroner (NOK). Bruk `0` for poster som ikke er aktuelle
 | `andre_finansinntekter` | heltall | Renteinntekter og andre finansinntekter |
 | `rentekostnader` | heltall | Renter på lån |
 | `andre_finanskostnader` | heltall | Andre finanskostnader |
+| `gevinst_ved_realisasjon_av_aksjer` | heltall | Valgfri. Gevinst ved salg av aksjer innenfor fritaksmetoden (kode 8074). Skattefri når `anvend_fritaksmetoden` er `true`, uansett eierandel |
+| `tap_ved_realisasjon_av_aksjer` | heltall | Valgfri. Tap ved salg av aksjer innenfor fritaksmetoden (kode 8174). Ikke fradragsberettiget når `anvend_fritaksmetoden` er `true` |
 
 #### Regnskapsperiode
 

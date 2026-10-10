@@ -4,6 +4,25 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [Ikke utgitt]
+
+### Rettet
+
+- **Fritaksmetoden gjaldt bare utbytte, ikke gevinst og tap ved salg av aksjer.** En
+  aksjegevinst måtte føres som andre finansinntekter og ble skattlagt fullt, og et aksjetap
+  ble trukket fra, selv om gevinsten er skattefri og tapet ikke fradragsberettiget for
+  aksjer innenfor fritaksmetoden (sktl. § 2-38). Finansposter har nå to valgfrie felt,
+  `gevinst_ved_realisasjon_av_aksjer` og `tap_ved_realisasjon_av_aksjer`. Med fritaksmetoden
+  på holdes de utenfor skattegrunnlaget, og næringsspesifikasjonen fører dem som 8074 og
+  8174 med permanente forskjeller som forklarer differansen. Sjablonregelen på 3 % gjelder
+  bare utbytte, så hele gevinsten er fritatt uansett eierandel. Årsregnskapet til
+  Brønnøysund er uendret: beløpene rapporteres der sammen med andre finansinntekter og andre
+  finanskostnader, som før. Config uten feltene gir samme resultat som før.
+- **SAF-T-importen leser gevinst (8074) og tap (8174) ved realisasjon av aksjer til de nye
+  feltene**, og advarer om at fritaksmetoden ikke gjelder rentefond og aksjer i lavskatteland
+  utenfor EØS. Importen advarer også om verdiendringer og nedskrivninger på finansielle
+  eiendeler (8080, 8100, 8115), som fortsatt skattlegges fullt i Wenche.
+
 ## [1.5.3] - 2026-10-02
 
 ### Rettet

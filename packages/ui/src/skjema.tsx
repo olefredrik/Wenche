@@ -32,6 +32,20 @@ const RESULTAT_FELTER: Felt[] = [
   { key: "resultatregnskap.finansposter.rentekostnader", label: "Rentekostnader", type: "number" },
   { key: "resultatregnskap.finansposter.andre_finanskostnader", label: "Andre finanskostnader", type: "number" },
   {
+    key: "resultatregnskap.finansposter.gevinst_ved_realisasjon_av_aksjer",
+    label: "Gevinst ved salg av aksjer",
+    type: "number",
+    valgfri: true,
+    help: "Skattefri etter fritaksmetoden. Ikke rentefond eller aksjer i lavskatteland utenfor EØS",
+  },
+  {
+    key: "resultatregnskap.finansposter.tap_ved_realisasjon_av_aksjer",
+    label: "Tap ved salg av aksjer",
+    type: "number",
+    valgfri: true,
+    help: "Gir ikke fradrag etter fritaksmetoden",
+  },
+  {
     key: "resultatregnskap.skattekostnad",
     label: "Skattekostnad",
     type: "number",
