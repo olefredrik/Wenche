@@ -69,12 +69,14 @@ def _er_betalbar_skatt(code: str) -> bool:
 def _er_offentlig_avgift(code: str) -> bool:
     """
     True for GroupingCode som tilsvarer skyldige offentlige avgifter:
-    2520–2599 (forskuddsskatt o.l.) og 2700–2799 (MVA, aga, skattetrekk).
+    2520-2599 (forskuddsskatt o.l.), 2600 (skattetrekk og andre trekk) og 2700-2799
+    (MVA, aga). 2600 er også koden næringsspesifikasjonen sender linjen som; før havnet
+    den i annen kortsiktig gjeld og ble rapportert som 2990.
     Betalbar selskapsskatt (2500–2519) har egen linje, se _er_betalbar_skatt.
     """
     try:
         c = int(code)
-        return 2520 <= c <= 2599 or 2700 <= c <= 2799
+        return 2520 <= c <= 2600 or 2700 <= c <= 2799
     except ValueError:
         return False
 
@@ -120,6 +122,60 @@ def _advarsler_om_uklassifiserte(acc: dict) -> list[str]:
     ]
 
 
+# Andre poster uten egen linje i modellen, med linjen de samles i og koden linjen sendes
+# som i næringsspesifikasjonen. Samme mekanisme som for anleggsmidlene over: beløpet blir
+# liggende der det havner, men importen sier fra.
+_UKLASSIFISERTE_POSTER = (
+    (
+        # 1800/1810 aksjer og fond, 1830/1840 obligasjoner og sertifikater, 1880 andre
+        # finansielle instrumenter, 1895 andel i selskap med deltakerfastsetting
+        frozenset({"1800", "1810", "1830", "1840", "1880", "1895"}),
+        "finansielle omløpsmidler (aksjer, fond, obligasjoner og andre finansielle "
+        "instrumenter)",
+        "Kortsiktige fordringer",
+        "«kortsiktige fordringer» (kode 1500)",
+    ),
+    (
+        frozenset({"2120"}),
+        "utsatt skatt",
+        "Andre langsiktige lån",
+        "«annen langsiktig gjeld» (kode 2290)",
+    ),
+    (
+        frozenset({"2010"}),
+        "egne aksjer",
+        "Annen egenkapital",
+        "annen egenkapital (kode 2050 eller 2080)",
+    ),
+)
+
+
+def _advarsler_om_uklassifiserte_poster(acc: dict) -> list[str]:
+    """Advarsler om omløpsmidler, gjeld og egenkapital Wenche ikke har en egen linje for."""
+    poster = acc["uklassifiserte_poster"]
+    advarsler = []
+    for koder, beskrivelse, linje, rapportert in _UKLASSIFISERTE_POSTER:
+        treff = {k: v for k, v in poster.items() if k in koder}
+        if not treff:
+            continue
+        sum_beloep = abs(sum(treff.values()))
+        advarsler.append(
+            f"SAF-T-filen har {sum_beloep:,.0f} NOK på kontoer for {beskrivelse} "
+            f"(grupperingskode {', '.join(sorted(treff))}), som Wenche ikke har en egen "
+            f"linje for. Beløpet er lagt inn under «{linje}» og blir rapportert som "
+            f"{rapportert}. Kontroller at det er riktig for selskapet, og rett tallene selv "
+            "hvis det ikke er det."
+        )
+    return advarsler
+
+
+def _noter_uklassifisert_post(acc: dict, code: str, netto: float) -> None:
+    if netto and any(code in koder for koder, *_ in _UKLASSIFISERTE_POSTER):
+        acc["uklassifiserte_poster"][code] = (
+            acc["uklassifiserte_poster"].get(code, 0.0) + netto
+        )
+
+
 def _tom_akkumulator() -> dict:
     return {
         "salgsinntekter": 0.0,
@@ -151,6 +207,8 @@ def _tom_akkumulator() -> dict:
         # noen egen linje for dem: {grupperingskode: beløp}. Brukes bare til å advare, aldri
         # til beløp, jf. _advarsler_om_uklassifiserte.
         "uklassifiserte_anleggsmidler": {},
+        # Tilsvarende for omløpsmidler, gjeld og egenkapital, jf. _UKLASSIFISERTE_POSTER.
+        "uklassifiserte_poster": {},
     }
 
 
@@ -213,11 +271,13 @@ def _akkumuler(acc: dict, account: ET.Element, netto: float) -> None:
                 )
 
     elif cat == "balanseverdiForOmloepsmiddel":
-        # 1920/1950 = bankinnskudd (inkl. skattetrekkskonto)
-        if code in ("1920", "1950"):
+        # 1900 = kontanter, 1920/1950 = bankinnskudd (inkl. skattetrekkskonto). Linjen i
+        # årsregnskapet er «bankinnskudd, kontanter o.l.», så kontantene hører hjemme her.
+        if code in ("1900", "1920", "1950"):
             acc["bankinnskudd"] += netto
         else:
             acc["kortsiktige_fordringer"] += netto
+            _noter_uklassifisert_post(acc, code, netto)
 
     elif cat == "egenkapital":
         # Egenkapital er kredit-normal: positivt netto = underskudd
@@ -228,15 +288,19 @@ def _akkumuler(acc: dict, account: ET.Element, netto: float) -> None:
             # er innskutt, ikke opptjent, så den følger overkursen.
             acc["overkursfond"] += -netto
         else:
-            # 2045 (fond), 2050 (annen EK), 2080 (udekket tap = debet = negativt)
+            # 2045 (fond), 2050 (annen EK), 2080 (udekket tap = debet = negativt).
+            # 2010 (egne aksjer) har ingen egen linje og gir en advarsel.
             acc["annen_egenkapital"] += -netto
+            _noter_uklassifisert_post(acc, code, netto)
 
     elif cat == "langsiktigGjeld":
         # 2250 = gjeld til eiere/styremedlemmer = lån fra aksjonær
         if code == "2250":
             acc["laan_fra_aksjonaer"] += -netto
         else:
+            # 2120 (utsatt skatt) har ingen egen linje og gir en advarsel.
             acc["andre_langsiktige_laan"] += -netto
+            _noter_uklassifisert_post(acc, code, netto)
 
     elif cat == "kortsiktigGjeld":
         if code == "2400":
@@ -424,7 +488,7 @@ def _fra_root(root: ET.Element) -> dict:
             "sikkerhet": "",
         })
 
-    advarsler = _advarsler_om_uklassifiserte(nar)
+    advarsler = _advarsler_om_uklassifiserte(nar) + _advarsler_om_uklassifiserte_poster(nar)
 
     return {
         "selskap": {

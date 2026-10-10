@@ -386,3 +386,110 @@ def test_overkurs_konto_2020_er_overkursfond():
 
     assert ek["overkursfond"] == 120000
     assert ek["annen_egenkapital"] == 15000
+
+
+def test_kontanter_konto_1900_er_bankinnskudd():
+    """
+    1900 er kontanter. Før havnet de i kortsiktige fordringer. Linjen i årsregnskapet er
+    bankinnskudd, kontanter o.l., så de hører hjemme i bankinnskudd.
+    """
+    cfg = importer_bytes(
+        _saft_xml(
+            _konto("balanseverdiForOmloepsmiddel", "1900", ub_debet=3000, ib_debet=2000)
+            + _konto("balanseverdiForOmloepsmiddel", "1920", ub_debet=50000)
+        )
+    )
+    om = cfg["balanse"]["eiendeler"]["omloepmidler"]
+    fom = cfg["foregaaende_aar"]["balanse"]["eiendeler"]["omloepmidler"]
+
+    assert om["bankinnskudd"] == 53000
+    assert om["kortsiktige_fordringer"] == 0
+    assert fom["bankinnskudd"] == 2000
+    assert "_advarsler" not in cfg
+
+
+@pytest.mark.parametrize("kode", ["1800", "1810", "1830", "1840", "1880", "1895"])
+def test_finansielle_omloepsmidler_gir_advarsel(kode):
+    """
+    Aksjer, fond, obligasjoner og andre finansielle instrumenter i omløpsmidlene har ingen
+    egen linje. Beløpet havner i kortsiktige fordringer som før, men ikke lenger i stillhet.
+    """
+    cfg = importer_bytes(
+        _saft_xml(KONTOER + _konto("balanseverdiForOmloepsmiddel", kode, ub_debet=60000))
+    )
+
+    assert cfg["balanse"]["eiendeler"]["omloepmidler"]["kortsiktige_fordringer"] == 60000
+    assert len(cfg["_advarsler"]) == 1
+    advarsel = cfg["_advarsler"][0]
+    assert kode in advarsel
+    assert "60,000" in advarsel
+    assert "1500" in advarsel
+
+
+def test_kortsiktige_fordringer_gir_ingen_advarsel():
+    """1570 er en fordring og hører hjemme i kortsiktige fordringer."""
+    cfg = importer_bytes(
+        _saft_xml(KONTOER + _konto("balanseverdiForOmloepsmiddel", "1570", ub_debet=8000))
+    )
+
+    assert cfg["balanse"]["eiendeler"]["omloepmidler"]["kortsiktige_fordringer"] == 8000
+    assert "_advarsler" not in cfg
+
+
+def test_skattetrekk_konto_2600_er_skyldige_offentlige_avgifter():
+    """
+    2600 er skattetrekk og andre trekk, og koden næringsspesifikasjonen sender skyldige
+    offentlige avgifter som. Før havnet den i annen kortsiktig gjeld og ble sendt som 2990.
+    """
+    cfg = importer_bytes(
+        _saft_xml(_konto("kortsiktigGjeld", "2600", ub_kredit=12000, ib_kredit=9000))
+    )
+    kg = cfg["balanse"]["egenkapital_og_gjeld"]["kortsiktig_gjeld"]
+    fkg = cfg["foregaaende_aar"]["balanse"]["egenkapital_og_gjeld"]["kortsiktig_gjeld"]
+
+    assert kg["skyldige_offentlige_avgifter"] == 12000
+    assert kg["annen_kortsiktig_gjeld"] == 0
+    assert fkg["skyldige_offentlige_avgifter"] == 9000
+
+
+def test_utsatt_skatt_konto_2120_gir_advarsel():
+    """Utsatt skatt har ingen egen linje og havner i andre langsiktige lån, ikke i stillhet."""
+    cfg = importer_bytes(_saft_xml(KONTOER + _konto("langsiktigGjeld", "2120", ub_kredit=7000)))
+    lg = cfg["balanse"]["egenkapital_og_gjeld"]["langsiktig_gjeld"]
+
+    assert lg["andre_langsiktige_laan"] == 7000
+    assert len(cfg["_advarsler"]) == 1
+    advarsel = cfg["_advarsler"][0]
+    assert "2120" in advarsel
+    assert "7,000" in advarsel
+    assert "2290" in advarsel
+
+
+def test_egne_aksjer_konto_2010_gir_advarsel():
+    """Egne aksjer har ingen egen linje og trekkes fra annen egenkapital, ikke i stillhet."""
+    cfg = importer_bytes(
+        _saft_xml(
+            _konto("egenkapital", "2050", ub_kredit=100000)
+            + _konto("egenkapital", "2010", ub_debet=25000)
+        )
+    )
+    ek = cfg["balanse"]["egenkapital_og_gjeld"]["egenkapital"]
+
+    assert ek["annen_egenkapital"] == 75000
+    assert len(cfg["_advarsler"]) == 1
+    advarsel = cfg["_advarsler"][0]
+    assert "2010" in advarsel
+    assert "25,000" in advarsel
+
+
+def test_vanlig_langsiktig_gjeld_og_egenkapital_gir_ingen_advarsel():
+    """2220 (banklån) og 2050 (annen egenkapital) har sine linjer."""
+    cfg = importer_bytes(
+        _saft_xml(
+            KONTOER
+            + _konto("langsiktigGjeld", "2220", ub_kredit=50000)
+            + _konto("egenkapital", "2050", ub_kredit=10000)
+        )
+    )
+
+    assert "_advarsler" not in cfg
