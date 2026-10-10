@@ -4,6 +4,22 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [Ikke utgitt]
+
+### Rettet
+
+- **SAF-T-importen leste kontanter og skattetrekk inn i feil linje.** Kontanter (1900) havnet
+  i kortsiktige fordringer, mens linjen i årsregnskapet er bankinnskudd, kontanter o.l.
+  Skattetrekk og andre trekk (2600) havnet i annen kortsiktig gjeld og ble sendt som 2990,
+  selv om 2600 er koden næringsspesifikasjonen bruker for skyldige offentlige avgifter.
+  Importen leser nå 1900 som bankinnskudd og 2600 som skyldige offentlige avgifter.
+- **SAF-T-importen advarer nå om flere poster uten egen linje.** Aksjer, fond, obligasjoner og
+  andre finansielle instrumenter i omløpsmidlene (1800, 1810, 1830, 1840, 1880, 1895), utsatt
+  skatt (2120) og egne aksjer (2010) har ingen egen linje i Wenche. De havnet i henholdsvis
+  kortsiktige fordringer, andre langsiktige lån og annen egenkapital uten at importen sa fra.
+  Beløpet blir fortsatt liggende der, men importen gir nå samme type advarsel som for
+  investeringer uten egen linje, slik at du kan kontrollere og rette tallene selv.
+
 ## [1.5.3] - 2026-10-02
 
 ### Rettet
