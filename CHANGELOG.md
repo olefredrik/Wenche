@@ -4,6 +4,19 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [Ikke utgitt]
+
+### Rettet
+
+- **Næringsspesifikasjonen sendte sekkepostene på spesifikke grupperingskoder.** Andre
+  driftskostnader ble sendt som 6700 (regnskapstjenester), andre finansinntekter som 8050
+  (annen renteinntekt), andre finanskostnader som 8160 (tap ved kursendring på valuta) og
+  kortsiktige fordringer som 1500 (kundefordringer). Beløpene havnet dermed på en post som
+  beskriver noe mer spesifikt enn det de er. Skatteetatens kodeliste for
+  næringsspesifikasjonen har egne restkoder for disse, og Wenche sender nå 7700 (andre
+  kostnader), 8079 (andre finansinntekter), 8179 (andre finanskostnader) og 1570 (andre
+  kortsiktige krav/fordringer). Summene og avstemmingen er uendret.
+
 ## [1.5.3] - 2026-10-02
 
 ### Rettet
