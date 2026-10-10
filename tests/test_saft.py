@@ -386,3 +386,173 @@ def test_overkurs_konto_2020_er_overkursfond():
 
     assert ek["overkursfond"] == 120000
     assert ek["annen_egenkapital"] == 15000
+
+
+# ---------------------------------------------------------------------------
+# Sumkontroll: saldo som ikke blir fordelt på noen linje
+# ---------------------------------------------------------------------------
+
+def _konto_med_id(konto_id, kategori=None, kode=None, *, ub_debet=0, ub_kredit=0,
+                  ib_debet=0, ib_kredit=0, standard_konto=None):
+    """Som _konto, men med AccountID og valgfrie grupperingsfelt (eldre SAF-T-filer)."""
+    gruppering = ""
+    if standard_konto:
+        gruppering += f"<StandardAccountID>{standard_konto}</StandardAccountID>"
+    if kategori:
+        gruppering += f"<GroupingCategory>{kategori}</GroupingCategory>"
+    if kode:
+        gruppering += f"<GroupingCode>{kode}</GroupingCode>"
+    return f"""
+    <Account>
+      <AccountID>{konto_id}</AccountID>
+      {gruppering}
+      <OpeningDebitBalance>{ib_debet}</OpeningDebitBalance>
+      <OpeningCreditBalance>{ib_kredit}</OpeningCreditBalance>
+      <ClosingDebitBalance>{ub_debet}</ClosingDebitBalance>
+      <ClosingCreditBalance>{ub_kredit}</ClosingCreditBalance>
+    </Account>"""
+
+
+def test_ukjent_kategori_gir_advarsel_med_konto_og_sum():
+    """
+    En kategori importen ikke håndterer (her varekostnad) forsvant før uten et ord.
+    Beløpet skal fortsatt ikke legges noe sted, men brukeren skal få vite hvilke kontoer
+    og hvor mye det gjelder.
+    """
+    cfg = importer_bytes(
+        _saft_xml(
+            KONTOER
+            + _konto_med_id("4000", "varekostnad", "4005", ub_debet=10000)
+            + _konto_med_id("4300", "varekostnad", "4300", ub_debet=2500, ib_debet=1000)
+        )
+    )
+
+    assert len(cfg["_advarsler"]) == 1
+    advarsel = cfg["_advarsler"][0]
+    assert "konto 4000, 4300" in advarsel
+    assert "12,500 NOK i utgående saldo" in advarsel
+    assert "1,000 NOK i inngående saldo" in advarsel
+    # Ingen av beløpene er gjettet inn på en linje.
+    assert cfg["resultatregnskap"]["driftskostnader"]["andre_driftskostnader"] == 0
+
+
+def test_sumkontrollen_teller_kredit_og_debet_uten_aa_nulle_dem_ut():
+    """En debet- og en kreditkonto som ikke fordeles, skal ikke se ut som null til sammen."""
+    cfg = importer_bytes(
+        _saft_xml(
+            KONTOER
+            + _konto_med_id("4000", "varekostnad", "4005", ub_debet=7000)
+            + _konto_med_id("9000", "ukjentKategori", "9000", ub_kredit=7000)
+        )
+    )
+
+    assert "14,000 NOK i utgående saldo" in cfg["_advarsler"][0]
+
+
+def test_konto_uten_grupperingskode_gir_advarsel():
+    """Enkeltkontoer uten GroupingCategory/GroupingCode nevnes særskilt i advarselen."""
+    cfg = importer_bytes(
+        _saft_xml(KONTOER + _konto_med_id("1500", standard_konto="15", ub_debet=8000))
+    )
+
+    advarsel = cfg["_advarsler"][0]
+    assert "konto 1500" in advarsel
+    assert "8,000 NOK" in advarsel
+    assert "mangler GroupingCategory og GroupingCode" in advarsel
+
+
+def test_ufordelte_kontoer_uten_saldo_gir_ingen_advarsel():
+    """En tom konto med ukjent kategori påvirker ikke tallene, og er ikke verdt en advarsel."""
+    cfg = importer_bytes(_saft_xml(KONTOER + _konto_med_id("4000", "varekostnad", "4005")))
+    assert "_advarsler" not in cfg
+
+
+def test_resultatdisponering_gir_ingen_advarsel():
+    """
+    NA og resultatDisponeringForSAF-T (8800) er disponering av årsresultatet. Motposten står i
+    egenkapitalen, så det er riktig at de ikke får noen linje, og ingen grunn til å advare.
+    """
+    cfg = importer_bytes(
+        _saft_xml(
+            KONTOER
+            + _konto_med_id("8800", "resultatDisponeringForSAF-T", "8800", ub_debet=50000)
+            + _konto_med_id("8960", "NA", "NA", ub_kredit=50000)
+        )
+    )
+    assert "_advarsler" not in cfg
+
+
+def test_lang_kontoliste_kortes_ned():
+    kontoer = "".join(
+        _konto_med_id(str(4000 + i), "varekostnad", "4005", ub_debet=100) for i in range(12)
+    )
+    advarsel = importer_bytes(_saft_xml(KONTOER + kontoer))["_advarsler"][0]
+
+    assert "12 konto(er)" in advarsel
+    assert "4009 og 2 til" in advarsel
+    assert "4011" not in advarsel
+
+
+def test_fil_helt_uten_grupperingskoder_avvises():
+    """
+    En SAF-T 1.10/1.20-fil med bare StandardAccountID ga før et nullregnskap uten advarsel.
+    Nå stopper importen med en forklaring, som web-flytene viser som en rettbar feil.
+    """
+    xml = _saft_xml(
+        _konto_med_id("1920", standard_konto="19", ub_debet=200000)
+        + _konto_med_id("2000", standard_konto="20", ub_kredit=30000)
+    )
+    with pytest.raises(ValueError, match="GroupingCategory og GroupingCode"):
+        importer_bytes(xml)
+
+
+def test_tom_kontoplan_avvises_ikke():
+    """Ingen kontoer er ikke det samme som kontoer uten grupperingskoder."""
+    cfg = importer_bytes(_saft_xml(""))
+    assert cfg["resultatregnskap"]["driftsinntekter"]["salgsinntekter"] == 0
+
+
+# ---------------------------------------------------------------------------
+# AuditFileVersion og SAF-T 1.40
+# ---------------------------------------------------------------------------
+
+def _med_versjon(xml: bytes, versjon: str) -> bytes:
+    return xml.replace(
+        b"<Header>", f"<Header><AuditFileVersion>{versjon}</AuditFileVersion>".encode(), 1
+    )
+
+
+@pytest.mark.parametrize("versjon", ["1.10", "1.20", "1.30", "1.40", "1.4"])
+def test_kjente_versjoner_gir_ingen_advarsel(versjon):
+    assert "_advarsler" not in importer_bytes(_med_versjon(_saft_xml(KONTOER), versjon))
+
+
+def test_ukjent_versjon_gir_advarsel_men_leses():
+    cfg = importer_bytes(_med_versjon(_saft_xml(KONTOER), "2.00"))
+
+    assert len(cfg["_advarsler"]) == 1
+    assert "versjon 2.00" in cfg["_advarsler"][0]
+    assert cfg["resultatregnskap"]["driftsinntekter"]["salgsinntekter"] == 100000
+
+
+def test_saft_versjon_140_leses():
+    """
+    SAF-T 1.40 er påkrevd fra regnskapsår som starter 1. januar 2027, og er bakoverkompatibel
+    med samme namespace. Fixturen validerer mot Skatteetatens 1.40-skjema (men ikke mot 1.30),
+    og bruker de nye elementene: flere AccountID per eier, VirtualCurrencyType og Country i
+    beløp, lange desimalbeløp og DebitNOKTaxAmount.
+    """
+    cfg = importer(Path(__file__).parent / "fixtures" / "saft_financial_v140.xml")
+
+    assert cfg["selskap"]["org_nummer"] == "310137715"
+    assert cfg["selskap"]["kontakt_epost"] == "post@testholding.no"
+    assert cfg["regnskapsaar"] == 2027
+    assert cfg["resultatregnskap"]["finansposter"]["utbytte_fra_datterselskap"] == 50000
+    b = cfg["balanse"]
+    assert b["eiendeler"]["anleggsmidler"]["aksjer_i_datterselskap"] == 1000000
+    assert b["eiendeler"]["omloepmidler"]["bankinnskudd"] == 200000
+    assert b["egenkapital_og_gjeld"]["langsiktig_gjeld"]["laan_fra_aksjonaer"] == 200000
+    fa = cfg["foregaaende_aar"]["balanse"]
+    assert fa["eiendeler"]["anleggsmidler"]["aksjer_i_datterselskap"] == 900000
+    # Alt er fordelt, og versjonen er kjent.
+    assert "_advarsler" not in cfg
