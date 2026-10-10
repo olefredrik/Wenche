@@ -17,14 +17,14 @@ Kodeliste: 2025_resultatregnskapOgBalanse.xml
 
 Implementasjonen dekker en typisk norsk holding AS med:
   - Salgsinntekter (3200) og andre driftsinntekter (3900)
-  - Lønnskostnader (5000), avskrivninger (6000), andre driftskostnader (6700)
-  - Finansinntekter: utbytte fra datterselskap (8090), andre (8050)
-  - Finanskostnader: rentekostnader (8150), andre (8160)
+  - Lønnskostnader (5000), avskrivninger (6000), andre driftskostnader (7700)
+  - Finansinntekter: utbytte fra datterselskap (8090), andre (8079)
+  - Finanskostnader: rentekostnader (8150), andre (8179)
   - Skattekostnad: betalbar skatt på ordinært resultat (8300), tilbakeført som
     permanent forskjell (positivSkattekostnad, kodeliste 2025_permanentForskjellstype)
   - Anleggsmidler: aksjer i datterselskap (1313), andre aksjer (1350),
     langsiktige fordringer (1390)
-  - Omløpsmidler: kortsiktige fordringer (1500), bankinnskudd (1920)
+  - Omløpsmidler: kortsiktige fordringer (1570), bankinnskudd (1920)
   - Egenkapital: aksjekapital (2000), overkurs (2020), annen (2050/2080)
   - Langsiktig gjeld: gjeld til eiere (2250), annen (2290)
   - Kortsiktig gjeld: leverandørgjeld (2400), betalbar skatt (2500),
@@ -65,17 +65,17 @@ def _standardposter(regnskap: Aarsregnskap) -> tuple[NaeringsspesifikasjonPost, 
             "annenDriftskostnad", "6000", res.driftskostnader.avskrivninger
         ),
         NaeringsspesifikasjonPost(
-            "annenDriftskostnad", "6700", res.driftskostnader.andre_driftskostnader
+            "annenDriftskostnad", "7700", res.driftskostnader.andre_driftskostnader
         ),
         NaeringsspesifikasjonPost(
             "finansinntekt", "8090", res.finansposter.utbytte_fra_datterselskap
         ),
         NaeringsspesifikasjonPost(
-            "finansinntekt", "8050", res.finansposter.andre_finansinntekter
+            "finansinntekt", "8079", res.finansposter.andre_finansinntekter
         ),
         NaeringsspesifikasjonPost("finanskostnad", "8150", res.finansposter.rentekostnader),
         NaeringsspesifikasjonPost(
-            "finanskostnad", "8160", res.finansposter.andre_finanskostnader
+            "finanskostnad", "8179", res.finansposter.andre_finanskostnader
         ),
         NaeringsspesifikasjonPost("skattekostnad", "8300", res.skattekostnad),
         NaeringsspesifikasjonPost(
@@ -86,7 +86,7 @@ def _standardposter(regnskap: Aarsregnskap) -> tuple[NaeringsspesifikasjonPost, 
             "balanseverdiForAnleggsmiddel", "1390", am.langsiktige_fordringer
         ),
         NaeringsspesifikasjonPost(
-            "balanseverdiForOmloepsmiddel", "1500", om.kortsiktige_fordringer
+            "balanseverdiForOmloepsmiddel", "1570", om.kortsiktige_fordringer
         ),
         NaeringsspesifikasjonPost("balanseverdiForOmloepsmiddel", "1920", om.bankinnskudd),
         NaeringsspesifikasjonPost("egenkapital", "2000", ekg.egenkapital.aksjekapital),

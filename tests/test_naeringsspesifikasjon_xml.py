@@ -33,7 +33,7 @@ from wenche.models import (
     Selskap,
     SkattemeldingKonfig,
 )
-from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
+from wenche.naeringsspesifikasjon_xml import _standardposter, generer_naeringsspesifikasjon
 
 _NS = (
     "urn:no:skatteetaten:fastsetting:formueinntekt:"
@@ -160,8 +160,8 @@ class TestResultatregnskap:
         )
         assert _finn_kode(_parse(regnskap), "6000")
 
-    def test_andre_driftskostnader_kode_6700(self):
-        assert _finn_kode(_parse(_lag_regnskap()), "6700")
+    def test_andre_driftskostnader_kode_7700(self):
+        assert _finn_kode(_parse(_lag_regnskap()), "7700")
 
     def test_utbytte_fra_datterselskap_kode_8090(self):
         regnskap = _lag_regnskap(
@@ -173,7 +173,7 @@ class TestResultatregnskap:
         )
         assert _finn_kode(_parse(regnskap), "8090")
 
-    def test_andre_finansinntekter_kode_8050(self):
+    def test_andre_finansinntekter_kode_8079(self):
         regnskap = _lag_regnskap(
             resultatregnskap=Resultatregnskap(
                 driftsinntekter=Driftsinntekter(),
@@ -181,7 +181,7 @@ class TestResultatregnskap:
                 finansposter=Finansposter(andre_finansinntekter=5000),
             )
         )
-        assert _finn_kode(_parse(regnskap), "8050")
+        assert _finn_kode(_parse(regnskap), "8079")
 
     def test_rentekostnader_kode_8150(self):
         regnskap = _lag_regnskap(
@@ -193,7 +193,7 @@ class TestResultatregnskap:
         )
         assert _finn_kode(_parse(regnskap), "8150")
 
-    def test_andre_finanskostnader_kode_8160(self):
+    def test_andre_finanskostnader_kode_8179(self):
         regnskap = _lag_regnskap(
             resultatregnskap=Resultatregnskap(
                 driftsinntekter=Driftsinntekter(),
@@ -201,7 +201,7 @@ class TestResultatregnskap:
                 finansposter=Finansposter(andre_finanskostnader=500),
             )
         )
-        assert _finn_kode(_parse(regnskap), "8160")
+        assert _finn_kode(_parse(regnskap), "8179")
 
     def test_null_inntekter_gir_ingen_driftsinntekt_element(self):
         regnskap = _lag_regnskap(
@@ -260,7 +260,7 @@ class TestBalanse:
         )
         assert _finn_kode(_parse(_lag_regnskap(balanse=balanse)), "1390")
 
-    def test_kortsiktige_fordringer_kode_1500(self):
+    def test_kortsiktige_fordringer_kode_1570(self):
         balanse = Balanse(
             eiendeler=Eiendeler(
                 anleggsmidler=Anleggsmidler(aksjer_i_datterselskap=100000),
@@ -270,7 +270,7 @@ class TestBalanse:
                 egenkapital=Egenkapital(aksjekapital=30000, annen_egenkapital=75500),
             ),
         )
-        assert _finn_kode(_parse(_lag_regnskap(balanse=balanse)), "1500")
+        assert _finn_kode(_parse(_lag_regnskap(balanse=balanse)), "1570")
 
     def test_bankinnskudd_kode_1920(self):
         assert _finn_kode(_parse(_lag_regnskap()), "1920")
@@ -400,7 +400,7 @@ class TestEksakteGrupperingskoder:
         regnskap = _lag_regnskap()
         konfig = SkattemeldingKonfig(
             naeringsspesifikasjonsposter=(
-                NaeringsspesifikasjonPost("annenDriftskostnad", "7700", 5500),
+                NaeringsspesifikasjonPost("annenDriftskostnad", "6700", 5500),
                 NaeringsspesifikasjonPost("balanseverdiForAnleggsmiddel", "1313", 100000),
                 NaeringsspesifikasjonPost("balanseverdiForOmloepsmiddel", "1920", 1200),
                 NaeringsspesifikasjonPost("egenkapital", "2000", 30000),
@@ -411,8 +411,8 @@ class TestEksakteGrupperingskoder:
         root = fromstring(
             generer_naeringsspesifikasjon(regnskap, _PARTSNUMMER, konfig).decode("utf-8")
         )
-        assert _finn_kode(root, "7700")
-        assert not _finn_kode(root, "6700")
+        assert _finn_kode(root, "6700")
+        assert not _finn_kode(root, "7700")
 
     def test_nullposter_avstemmes_men_utelates_fra_xml(self):
         regnskap = _lag_regnskap()
@@ -441,6 +441,49 @@ class TestEksakteGrupperingskoder:
         )
         with pytest.raises(ValueError, match="annenDriftskostnad"):
             generer_naeringsspesifikasjon(_lag_regnskap(), _PARTSNUMMER, konfig)
+
+
+class TestSekkeposterBrukerRestkoder:
+    """
+    Sekkepostene i Wenches modell («andre ...») skal sendes på restkoden i
+    Skatteetatens kodeliste, ikke på en spesifikk kode i samme kategori. Kilde:
+    Skatteetaten/saf-t, Grouping Category Code 2025-2026/CSV/naeringsspesifikasjon.csv.
+    """
+
+    @pytest.mark.parametrize(
+        ("felt", "kategori", "restkode", "spesifikk_kode"),
+        [
+            ("andre_driftskostnader", "annenDriftskostnad", "7700", "6700"),
+            ("andre_finansinntekter", "finansinntekt", "8079", "8050"),
+            ("andre_finanskostnader", "finanskostnad", "8179", "8160"),
+            ("kortsiktige_fordringer", "balanseverdiForOmloepsmiddel", "1570", "1500"),
+        ],
+    )
+    def test_sekkepost_sendes_paa_restkoden(self, felt, kategori, restkode, spesifikk_kode):
+        regnskap = _lag_regnskap(
+            resultatregnskap=Resultatregnskap(
+                driftsinntekter=Driftsinntekter(),
+                driftskostnader=Driftskostnader(andre_driftskostnader=1000),
+                finansposter=Finansposter(
+                    andre_finansinntekter=2000, andre_finanskostnader=3000
+                ),
+            ),
+            balanse=Balanse(
+                eiendeler=Eiendeler(
+                    anleggsmidler=Anleggsmidler(aksjer_i_datterselskap=100000),
+                    omloepmidler=Omloepmidler(kortsiktige_fordringer=4000, bankinnskudd=1000),
+                ),
+                egenkapital_og_gjeld=EgenkapitalOgGjeld(
+                    egenkapital=Egenkapital(aksjekapital=30000, annen_egenkapital=75000),
+                ),
+            ),
+        )
+        poster = {(p.kategori, p.kode): p.beloep for p in _standardposter(regnskap)}
+        assert (kategori, restkode) in poster
+        assert (kategori, spesifikk_kode) not in poster
+        root = _parse(regnskap)
+        assert _finn_kode(root, restkode)
+        assert not _finn_kode(root, spesifikk_kode)
 
 
 # ---------------------------------------------------------------------------
