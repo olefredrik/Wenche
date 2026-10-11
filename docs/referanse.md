@@ -85,8 +85,8 @@ Feltet ligger direkte under `resultatregnskap`, ikke i en underseksjon.
 
 | Felt | Type | Beskrivelse |
 |---|---|---|
-| `aksjer_i_datterselskap` | heltall | Kostpris for aksjer i heleide datterselskaper |
-| `andre_aksjer` | heltall | Aksjer i selskaper der eierandelen er under 90 % |
+| `aksjer_i_datterselskap` | heltall | Kostpris for aksjer i datterselskaper, det vil si selskaper du kontrollerer (normalt over 50 % av stemmene, rskl. § 1-3) |
+| `andre_aksjer` | heltall | Aksjer i selskaper som ikke er datterselskaper. Grensen her er kontroll, ikke 90 %-grensen i fritaksmetoden |
 | `langsiktige_fordringer` | heltall | Lån gitt til andre med løpetid over 1 år |
 
 #### `eiendeler.omloepmidler`
@@ -141,7 +141,7 @@ foregaaende_aar:
 |---|---|---|---|
 | `underskudd_til_fremfoering` | heltall | nei | Fremførbart underskudd fra tidligere år (NOK). Finnes i fjorårets skattemelding. Standard: `0` |
 | `anvend_fritaksmetoden` | boolsk | nei | `true` for holdingselskaper som eier aksjer (sktl. § 2-38). Gjelder utbytte og gevinst eller tap ved salg av aksjer. Standard: `true` |
-| `eierandel_for_fritaksmetoden` | heltall | nei | Eierandel i selskapet som deler ut utbytte, i prosent (0-100). Brukes bare når `anvend_fritaksmetoden` er `true`. ≥ 90 %: hele utbyttet fritatt. < 90 %: 3 % skattepliktig (sjablonregelen, sktl. § 2-38 sjette ledd). Standard: `100` |
+| `eierandel_for_fritaksmetoden` | desimaltall | nei | Eierandel i selskapet som deler ut utbytte, i prosent (0-100, desimaler tillatt, for eksempel `90.5`). Brukes bare når `anvend_fritaksmetoden` er `true`. Over 90 %: hele utbyttet fritatt. 90 % eller lavere: 3 % skattepliktig (sjablonregelen, sktl. § 2-38 sjette ledd). Standard: `100` |
 | `boersnotert` | boolsk | nei | `true` hvis selskapet er børsnotert. Standard: `false` |
 | `formuesverdi_aksjer` | heltall | nei | Formuesverdi av aksjer selskapet eier i andre selskap, fra aksjeoppgaven (RF-1088S, post 209). Brukes til å beregne netto formuesverdi bak selskapets egne aksjer. Standard: `0` |
 | `samlet_verdi_bak_aksjene` | heltall | nei | Overstyrer den beregnede netto formuesverdien bak aksjene direkte. Utelat for å la Wenche beregne den fra `formuesverdi_aksjer` og balansen |

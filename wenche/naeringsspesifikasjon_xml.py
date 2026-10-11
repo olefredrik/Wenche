@@ -504,7 +504,7 @@ def generer_naeringsspesifikasjon(
     #
     #   Utbytte som er fritatt etter fritaksmetoden (sktl. § 2-38) er inntektsført i
     #   regnskapet, men er ikke skattepliktig. Hele utbyttet tilbakeføres derfor, og
-    #   den skattepliktige delen legges til igjen: 0 ved eierandel >= 90 %, ellers
+    #   den skattepliktige delen legges til igjen: 0 ved eierandel over 90 %, ellers
     #   3 %-sjablonen (§ 2-38 sjette ledd). Uten dette paret oppgav
     #   næringsspesifikasjonen brutto utbytte som skattepliktig inntekt.
     #

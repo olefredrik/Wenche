@@ -41,7 +41,7 @@ def test_ingen_skatt_ved_underskudd(eksempel_regnskap):
 
 
 def test_fritaksmetoden_under_90_prosent_eierandel(regnskap_med_utbytte):
-    """Ved eierandel < 90 % gjelder sjablonregelen: 3 % er skattepliktig."""
+    """Ved eierandel på 90 % eller lavere gjelder sjablonregelen: 3 % er skattepliktig."""
     konfig = SkattemeldingKonfig(anvend_fritaksmetoden=True, eierandel_for_fritaksmetoden=50)
     tekst = generer(regnskap_med_utbytte, konfig)
     assert "fritatt, 97 %" in tekst
@@ -49,7 +49,7 @@ def test_fritaksmetoden_under_90_prosent_eierandel(regnskap_med_utbytte):
 
 
 def test_fritaksmetoden_over_90_prosent_eierandel(regnskap_med_utbytte):
-    """Ved eierandel ≥ 90 % er hele utbyttet fritatt — ingen sjablonregel."""
+    """Ved eierandel over 90 % er hele utbyttet fritatt, ingen sjablonregel."""
     konfig = SkattemeldingKonfig(anvend_fritaksmetoden=True, eierandel_for_fritaksmetoden=100)
     tekst = generer(regnskap_med_utbytte, konfig)
     assert "100 % fritatt" in tekst
@@ -66,7 +66,7 @@ def test_fritaksmetoden_under_90_skattepliktig_beloep(regnskap_med_utbytte):
 
 
 def test_fritaksmetoden_over_90_ingen_skatt(regnskap_med_utbytte):
-    """Ved eierandel ≥ 90 % og negativt driftsresultat skal det ikke beregnes skatt."""
+    """Ved eierandel over 90 % og negativt driftsresultat skal det ikke beregnes skatt."""
     # Driftsresultat = -5500, skattepliktig utbytte = 0 → ingen skatt
     konfig = SkattemeldingKonfig(anvend_fritaksmetoden=True, eierandel_for_fritaksmetoden=100)
     tekst = generer(regnskap_med_utbytte, konfig)

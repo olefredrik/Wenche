@@ -15,7 +15,12 @@ import yaml
 from wenche.aarsregnskap import _dato, _les_resultat, _les_balanse, _tall as _belop
 # Re-eksporteres bevisst: kallsteder (endepunkter, tester, CLI) har brukt sm.beregn_skatt
 # og sm.SKATTESATS siden før beregningen fikk egen modul.
-from wenche.skatteberegning import SKATTESATS, Skatteberegning, beregn_skatt
+from wenche.skatteberegning import (
+    SKATTESATS,
+    Skatteberegning,
+    beregn_skatt,
+    har_fullt_utbyttefritak,
+)
 from wenche.models import (
     Aarsregnskap,
     Balanse,
@@ -74,6 +79,41 @@ def _tall(verdi, etikett: str, konverter):
         raise ValueError(f"{etikett} må være et tall (fikk {verdi!r}).")
 
 
+def _eierandel(verdi) -> float:
+    """Leser eierandelen for fritaksmetoden som prosent, med lesbar feil ved ugyldig verdi.
+
+    Tom = 100 % (helt fritatt). Desimaler tillates, med komma eller punktum, fordi grensen for
+    fullt fritak er MER enn 90 %: kuttes 90,5 til 90, blir utbyttet feilaktig skattlagt.
+    Verdier utenfor 0-100 avvises i stedet for å gi en stille, meningsløs skatteberegning.
+    """
+    etikett = "Eierandel for fritaksmetoden"
+    if _er_tom(verdi):
+        return 100.0
+    try:
+        if isinstance(verdi, str):
+            tall = float(verdi.replace("\u00a0", "").replace(" ", "").replace(",", "."))
+        else:
+            tall = float(verdi)
+    except (TypeError, ValueError):
+        raise ValueError(f"{etikett} må være et tall (fikk {verdi!r}).")
+    if not 0 <= tall <= 100:  # avviser også nan og inf
+        raise ValueError(f"{etikett} må være mellom 0 og 100 % (fikk {verdi!r}).")
+    return tall
+
+
+def valider_skattekonfig(config_fil: str | dict) -> list[str]:
+    """Lesbare meldinger for ugyldige verdier i skattemelding-seksjonen. Tom liste betyr OK.
+
+    Bruker samme leser som les_config, så valideringen og beregningen ikke kan være uenige.
+    """
+    sm_raw = _raw(config_fil).get("skattemelding") or {}
+    try:
+        _eierandel(sm_raw.get("eierandel_for_fritaksmetoden"))
+    except ValueError as e:
+        return [str(e)]
+    return []
+
+
 def valider_selskap(config_fil: str | dict) -> list[str]:
     """
     Returnerer lesbare meldinger for selskapsfelt skattemeldingen krever, men som mangler, er
@@ -81,6 +121,9 @@ def valider_selskap(config_fil: str | dict) -> list[str]:
 
     Kjøres lokalt før bygging, så et ufullstendig selskap (typisk rett etter en SAF-T-import som
     ikke bærer disse feltene) blir et avvik brukeren kan rette, ikke en naken HTTP 500.
+    
+    Tar også med valider_skattekonfig, siden dette er porten alle kallsteder går gjennom før
+    skattemeldingen bygges.
     """
     s = (_raw(config_fil).get("selskap")) or {}
     feil: list[str] = []
@@ -98,6 +141,7 @@ def valider_selskap(config_fil: str | dict) -> list[str]:
             "Daglig leder eller styreleder mangler. Fyll inn minst én bekreftende "
             "selskapsrepresentant."
         )
+    feil += valider_skattekonfig(config_fil)
     return feil
 
 
@@ -152,12 +196,11 @@ def _les_skattekonfig(raw: dict) -> SkattemeldingKonfig:
     skattefritt), tom samlet_verdi = ingen overstyring.
     """
     sm_raw = raw.get("skattemelding") or {}
-    _eierandel = sm_raw.get("eierandel_for_fritaksmetoden")
     _verdi_override = sm_raw.get("samlet_verdi_bak_aksjene")
     return SkattemeldingKonfig(
         underskudd_til_fremfoering=_belop(sm_raw.get("underskudd_til_fremfoering")),
         anvend_fritaksmetoden=bool(sm_raw.get("anvend_fritaksmetoden", True)),
-        eierandel_for_fritaksmetoden=100 if _er_tom(_eierandel) else int(float(_eierandel)),
+        eierandel_for_fritaksmetoden=_eierandel(sm_raw.get("eierandel_for_fritaksmetoden")),
         boersnotert=bool(sm_raw.get("boersnotert", False)),
         formuesverdi_aksjer=_belop(sm_raw.get("formuesverdi_aksjer")),
         samlet_verdi_bak_aksjene=None if _er_tom(_verdi_override) else float(_verdi_override),
@@ -332,7 +375,7 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
     ]
 
     if konfig.anvend_fritaksmetoden and utbytte > 0:
-        if konfig.eierandel_for_fritaksmetoden >= 90:
+        if har_fullt_utbyttefritak(konfig):
             linjer += [
                 f"    Utbytte (100 % fritatt)      {_nok(fritatt_utbytte)}",
             ]

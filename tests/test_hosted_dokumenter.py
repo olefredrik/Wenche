@@ -146,3 +146,13 @@ def test_skatteberegning_gir_forslag(klient):
 def test_skatteberegning_krever_invite(klient):
     r = klient.post("/api/dokumenter/skatteberegning", json=_gyldig_config())
     assert r.status_code in (401, 403), r.text
+
+
+def test_skatteberegning_ugyldig_eierandel_gir_lesbar_422(klient):
+    # «Foreslå skattekostnad» går ikke via valider_selskap, så endepunktet sjekker selv.
+    _inviter(klient)
+    cfg = _gyldig_config()
+    cfg.setdefault("skattemelding", {})["eierandel_for_fritaksmetoden"] = 150
+    r = klient.post("/api/dokumenter/skatteberegning", json=cfg)
+    assert r.status_code == 422, r.text
+    assert "mellom 0 og 100" in r.json()["detail"]["feil"][0]

@@ -342,7 +342,7 @@ class TestFritaksmetoden:
         )
 
     def test_helt_fritatt_utbytte_gir_null_skattepliktig(self, eksempel_selskap):
-        # Eierandel >= 90 %: hele utbyttet er fritatt, ingen skatt, ingen 3 %-sjablon.
+        # Eierandel over 90 %: hele utbyttet er fritatt, ingen skatt, ingen 3 %-sjablon.
         regnskap = self._utbytteregnskap(eksempel_selskap, 1000000, 0)
         konfig = SkattemeldingKonfig(anvend_fritaksmetoden=True, eierandel_for_fritaksmetoden=100)
         root = self._root(regnskap, konfig)
@@ -351,7 +351,7 @@ class TestFritaksmetoden:
         assert self._skattemessig(root) == 0.0
 
     def test_sjablonregelen_gir_tre_prosent_som_skattepliktig(self, eksempel_selskap):
-        # Eierandel < 90 %: 3 % av utbyttet er skattepliktig, resten fritatt.
+        # Eierandel på 90 % eller lavere: 3 % av utbyttet er skattepliktig, resten fritatt.
         regnskap = self._utbytteregnskap(eksempel_selskap, 1000000, 6600)
         konfig = SkattemeldingKonfig(anvend_fritaksmetoden=True, eierandel_for_fritaksmetoden=80)
         root = self._root(regnskap, konfig)

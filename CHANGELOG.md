@@ -4,6 +4,24 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.6.1] - 2026-10-11
+
+### Rettet
+
+- **Eierandel på nøyaktig 90 % ga fullt utbyttefritak.** Unntaket fra 3 %-sjablonen i
+  fritaksmetoden gjelder bare når selskapet eier *mer enn* ni tideler av aksjene (sktl.
+  § 2-38 sjette ledd, jf. § 10-4). Wenche regnet 90 % som fullt fritatt. Nå gir 90 % eller
+  lavere sjablonregelen, og bare over 90 % gir fullt fritak. Eierandelen kan oppgis med
+  desimaler (for eksempel 90,5), med komma eller punktum. Før ble den kuttet til heltall.
+  En eierandel utenfor 0-100 gir nå en lesbar feilmelding i stedet for en stille beregning.
+- **Tallfelt med desimaler byttet til punktum under redigering.** 90,5 ble vist som 90.5
+  når du klikket i feltet. Nå beholdes desimalkommaet. Når «Foreslå skattekostnad» feiler,
+  fjernes også et eldre forslag, så «Sett inn» ikke står igjen ved siden av feilen.
+- **Dokumentasjonen blandet balanselinjen og skattegrensen.** `andre_aksjer` var beskrevet
+  som aksjer der eierandelen er under 90 %. Skillet mellom datterselskap og andre aksjer
+  følger kontroll (normalt over 50 % av stemmene, rskl. § 1-3), ikke 90 %-grensen i
+  fritaksmetoden.
+
 ## [1.6.0] - 2026-10-11
 
 ### Lagt til

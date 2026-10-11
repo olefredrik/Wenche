@@ -65,6 +65,10 @@ def dok_skatteberegning(config: dict[str, Any] = Body(...)) -> dict:
     (samme forhåndsfyll-prinsipp som SAF-T-importen). Gjenbruker skattemelding.beregn_skatt
     så forslaget ikke kan drifte fra tallet visningen viser.
     """
+    # Ugyldig eierandel blir en lesbar 422, ikke en naken 500 fra leseren.
+    feil = sm.valider_skattekonfig(config)
+    if feil:
+        raise HTTPException(status_code=422, detail={"feil": feil})
     beregning, foert = sm.beregn_skatt_fra_config(config)
     return {
         "beregnet_skatt": round(beregning.beregnet_skatt),

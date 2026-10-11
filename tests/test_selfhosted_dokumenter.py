@@ -119,3 +119,20 @@ def test_skatteberegning_uten_selskapsopplysninger(klient):
     )
     assert r.status_code == 200, r.text
     assert r.json()["beregnet_skatt"] == 11000
+
+
+def test_skatteberegning_ugyldig_eierandel_gir_lesbar_422(klient):
+    # «Foreslå skattekostnad» går ikke via valider_selskap, så endepunktet sjekker selv.
+    cfg = _gyldig_config()
+    cfg.setdefault("skattemelding", {})["eierandel_for_fritaksmetoden"] = 150
+    r = klient.post("/api/dokumenter/skatteberegning", json=cfg)
+    assert r.status_code == 422, r.text
+    assert "mellom 0 og 100" in r.json()["detail"]["feil"][0]
+
+
+def test_skattemelding_ugyldig_eierandel_gir_lesbar_422(klient):
+    cfg = _gyldig_config()
+    cfg.setdefault("skattemelding", {})["eierandel_for_fritaksmetoden"] = -5
+    r = klient.post("/api/dokumenter/skattemelding", json=cfg)
+    assert r.status_code == 422, r.text
+    assert any("Eierandel for fritaksmetoden" in f for f in r.json()["detail"]["feil"])

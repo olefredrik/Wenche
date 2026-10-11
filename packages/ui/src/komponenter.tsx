@@ -133,7 +133,8 @@ export function TallInput({
       disabled={disabled}
       title={title}
       onFocus={() => {
-        setTekst(value === "" || value == null ? "" : String(value));
+        // Desimalkomma også under redigering, ellers bytter 90,5 til 90.5 ved fokus.
+        setTekst(value === "" || value == null ? "" : String(value).replace(".", ","));
         setFokus(true);
       }}
       onChange={(e) => {

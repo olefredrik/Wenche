@@ -17,6 +17,15 @@ from wenche.models import Resultatregnskap, SkattemeldingKonfig
 
 SKATTESATS = 0.22  # 22 % selskapsskatt
 
+# Utbytte er helt fritatt bare når mottakeren eier MER enn ni tideler av aksjene (sktl. § 2-38
+# sjette ledd, jf. konsernvilkåret i § 10-4). Nøyaktig 90 % gir altså 3 %-sjablonen.
+GRENSE_FULLT_UTBYTTEFRITAK = 90
+
+
+def har_fullt_utbyttefritak(konfig: SkattemeldingKonfig) -> bool:
+    """True når utbyttet er helt fritatt, uten 3 %-sjablon. Eneste sted grensen avgjøres."""
+    return konfig.eierandel_for_fritaksmetoden > GRENSE_FULLT_UTBYTTEFRITAK
+
 
 @dataclass(frozen=True)
 class Skatteberegning:
@@ -57,12 +66,12 @@ def beregn_skatt(
     Resultatregnskap.
     """
     # Fritaksmetoden (sktl. § 2-38): utbytte fra kvalifiserende selskaper er skattefritt.
-    # Ved eierandel < 90 % gjelder sjablonregelen (§ 2-38 sjette ledd): 3 % er skattepliktig.
-    # Ved eierandel ≥ 90 % er hele utbyttet fritatt (0 % skattepliktig).
+    # Ved eierandel på 90 % eller lavere gjelder sjablonregelen (§ 2-38 sjette ledd): 3 % er
+    # skattepliktig. Ved eierandel over 90 % er hele utbyttet fritatt (0 % skattepliktig).
     # Merk: dette er basert på faglig vurdering — sjekk alltid mot gjeldende regelverk.
     utbytte = r.finansposter.utbytte_fra_datterselskap
     if konfig.anvend_fritaksmetoden and utbytte > 0:
-        if konfig.eierandel_for_fritaksmetoden >= 90:
+        if har_fullt_utbyttefritak(konfig):
             skattepliktig_utbytte = 0
             fritatt_utbytte = utbytte
         else:

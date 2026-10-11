@@ -140,7 +140,7 @@ const SEKSJONER: Seksjon[] = [
         label: "Eierandel for fritaksmetoden (%)",
         type: "number",
         valgfri: true,
-        help: "Brukes når fritaksmetoden er valgt. Tom = 100 % (helt skattefritt)",
+        help: "Brukes når fritaksmetoden er valgt. Over 90 % gir helt skattefritt utbytte. Tom = 100 %",
       },
       {
         key: "skattemelding.samlet_verdi_bak_aksjene",
@@ -572,6 +572,8 @@ export function DataSkjema({
       const d = await beregnSkatt(normaliserForLagring(config));
       setSkattForslag(Number(d?.beregnet_skatt) || 0);
     } catch (e) {
+      // Fjern et eldre forslag, ellers står «Sett inn» igjen ved siden av feilen.
+      setSkattForslag(null);
       setSkattFeil(e instanceof Error ? e.message : "Klarte ikke å beregne skatten");
     } finally {
       setSkattLaster(false);

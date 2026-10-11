@@ -69,8 +69,10 @@ Sammendraget inneholder:
 !!! info "Fritaksmetoden og sjablonregelen"
     Wenche håndterer **to tilfeller** avhengig av eierandelen i selskapet som deler ut utbytte (`eierandel_for_fritaksmetoden` i config.yaml):
 
-    - **Eierandel ≥ 90 %:** Hele utbyttet er skattefritt (fritaksmetoden, sktl. § 2-38).
-    - **Eierandel < 90 %:** 3 % av utbyttet er skattepliktig (sjablonregelen, sktl. § 2-38 sjette ledd). Skatteberegningen justeres automatisk.
+    - **Eierandel over 90 %:** Hele utbyttet er skattefritt (fritaksmetoden, sktl. § 2-38).
+    - **Eierandel på 90 % eller lavere:** 3 % av utbyttet er skattepliktig (sjablonregelen, sktl. § 2-38 sjette ledd). Skatteberegningen justeres automatisk.
+
+    Grensen er *mer enn* ni tideler, så nøyaktig 90 % gir sjablonregelen. Eierandelen kan oppgis med desimaler, for eksempel 90,5. Loven krever i tillegg at selskapet har en tilsvarende andel av stemmene. Wenche spør bare om eierandelen, så sjekk at stemmeandelen er minst like høy.
 
     Gevinst og tap ved salg av aksjer (`gevinst_ved_realisasjon_av_aksjer` og `tap_ved_realisasjon_av_aksjer`) er også omfattet: gevinsten er skattefri og tapet gir ikke fradrag, uansett eierandel. Sjablonregelen gjelder bare utbytte. Feltene er ment for norske aksjer. Gevinst og tap på rentefond, og på aksjer i lavskatteland utenfor EØS, er skattepliktig og føres som andre finansinntekter eller andre finanskostnader.
 
