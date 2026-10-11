@@ -74,6 +74,8 @@ Sammendraget inneholder:
 
     Gevinst og tap ved salg av aksjer (`gevinst_ved_realisasjon_av_aksjer` og `tap_ved_realisasjon_av_aksjer`) er også omfattet: gevinsten er skattefri og tapet gir ikke fradrag, uansett eierandel. Sjablonregelen gjelder bare utbytte. Feltene er ment for norske aksjer. Gevinst og tap på rentefond, og på aksjer i lavskatteland utenfor EØS, er skattepliktig og føres som andre finansinntekter eller andre finanskostnader.
 
+    Importerer du fra SAF-T, leses gevinst (kode 8074) og tap (kode 8174) inn i disse feltene. Importen slår ikke på fritaksmetoden selv, så kontroller at **Anvend fritaksmetoden** er krysset av, og se over advarselen importen gir hvis noe av beløpet kan gjelde rentefond eller aksjer i lavskatteland.
+
 !!! info "Egenkapitalnote"
     Egenkapitalnoten (rskl. § 7-2b) vises automatisk når `foregaaende_aar` er utfylt i `config.yaml`. Uten sammenligningstall vises kun utgående balanse med en advarsel om at inngående tall mangler.
 

@@ -21,7 +21,7 @@ Alle AS plikter å levere tre ting hvert år:
 - **Årsregnskapet** er en oppsummering av selskapets økonomi: hva selskapet eier, hva det skylder og hva det tjente eller tapte i løpet av året. Dette er offentlig informasjon.
 - **Aksjonærregisteroppgaven (RF-1086)** forteller Skatteetaten hvem som eier aksjer i selskapet og om det er utbetalt utbytte. Brukes blant annet til å forhåndsutfylle aksjonærenes personlige skattemelding.
 - **Næringsspesifikasjonen** er en detaljert oppstilling av selskapets inntekter og kostnader for skatteformål, og er grunnlaget for skatteberegningen.
-- **Skattemeldingen for AS** er selve skattemeldingen. For holdingselskaper gjelder **fritaksmetoden**: utbytte fra datterselskaper er i praksis 97 % skattefritt.
+- **Skattemeldingen for AS** er selve skattemeldingen. For holdingselskaper gjelder **fritaksmetoden**: utbytte fra datterselskaper og gevinst ved salg av aksjer er i hovedsak skattefritt (utbytte er helt fritatt ved eierandel på minst 90 %, ellers er 3 % skattepliktig).
 
 ## Hvem passer Wenche for?
 
