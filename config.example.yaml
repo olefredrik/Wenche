@@ -180,3 +180,7 @@ aksjonaerer:
     utbytte_utbetalt: 0                 # Utbytte utbetalt til denne aksjonæren i NOK
     innbetalt_kapital_per_aksje: 30     # Aksjekapital (NOK) / antall aksjer.
                                         # Eks: 30 000 kr / 1 000 aksjer = 30 kr per aksje
+
+# Påkrevd når en aksjonær har fått utbytte: datoen generalforsamlingen vedtok utbyttet.
+# Rapporteres i aksjonærregisteroppgaven (RF-1086) og må ligge i regnskapsåret.
+# utbytte_vedtaksdato: 2025-05-20

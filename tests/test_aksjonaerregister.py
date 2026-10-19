@@ -572,3 +572,168 @@ def test_hovedskjema_faller_tilbake_paa_1_januar_uten_dato():
         ".//AksjerNyutstedteStiftelseMvTidspunkt-datadef-17671"
     )
     assert tidspunkt.text == "2025-01-01T00:00:00"
+
+
+# ---------------------------------------------------------------------------
+# Utbytte i post 8 (selskapet) og post 21 (aksjonæren), issue #177
+# ---------------------------------------------------------------------------
+#
+# Wenche leste utbytte_utbetalt, men sendte begge postene tomme. Kravene under er
+# Skatteetatens svar i SSV-6233: hendelsestype Y er påkrevd, beløp med punktum og inntil
+# to desimaler, og tidspunktet må være identisk i post 8 og post 21.
+
+_CFG_MED_UTBYTTE = {
+    "selskap": {
+        "navn": "Utbytte Holding AS",
+        "org_nummer": "123456789",
+        "daglig_leder": "Ola Nordmann",
+        "styreleder": "Ola Nordmann",
+        "forretningsadresse": "Testveien 1, 0001 Oslo",
+        "stiftelsesaar": 2018,
+        "aksjekapital": 30000,
+        "kontakt_epost": "ola@test.no",
+    },
+    "regnskapsaar": 2025,
+    "utbytte_vedtaksdato": "2025-05-20",
+    "aksjonaerer": [
+        {
+            "navn": "Ola Nordmann",
+            "fodselsnummer": "20916997389",
+            "antall_aksjer": 200,
+            "aksjeklasse": "ordinære",
+            "utbytte_utbetalt": 60000,
+            "innbetalt_kapital_per_aksje": 100,
+        },
+        {
+            "navn": "Kari Nordmann",
+            "fodselsnummer": "20916997389",
+            "antall_aksjer": 100,
+            "aksjeklasse": "ordinære",
+            "utbytte_utbetalt": 30000,
+            "innbetalt_kapital_per_aksje": 100,
+        },
+    ],
+}
+
+
+def _oppgave_med_utbytte(**overstyr):
+    from wenche.aksjonaerregister import les_config
+
+    return les_config({**_CFG_MED_UTBYTTE, **overstyr})
+
+
+def test_les_config_leser_utbytte_vedtaksdato():
+    from datetime import date
+
+    assert _oppgave_med_utbytte().utbytte_vedtaksdato == date(2025, 5, 20)
+
+
+def test_hovedskjema_post8_med_utbytte():
+    root = _parse(generer_hovedskjema_xml(_oppgave_med_utbytte()))
+    post8 = root.find(".//UtdeltSkatterettsligUtbytteILopetAvInntektsaret-grp-3451")
+    assert post8.find("AksjeUtbytteISINAksjetype-datadef-17665").text == "90000"
+    assert post8.find("AksjeUtbyttePerAksje-datadef-23946").text == "300"
+    assert post8.find("AksjeUtbytteHendelsestype-datadef-36564").text == "Y"
+    assert post8.find("AksjeUtbytteTidspunkt-datadef-17667").text == "2025-05-20T00:00:00"
+
+
+def test_underskjema_post21_med_utbytte():
+    oppgave = _oppgave_med_utbytte()
+    root = _parse(generer_underskjema_xml(oppgave.aksjonaerer[1], oppgave))
+    post21 = root.find(".//UtdeltUtbyttePerAksjonar-grp-3991")
+    assert post21.find("Aksjeutbytte-datadef-29169").text == "30000"
+    assert post21.find("AksjerUtbytteAntall-datadef-17742").text == "100"
+    assert post21.find("AutomatiskMotregningOnskerIkke-datadef-37159").text == "0"
+
+
+def test_tidspunkt_er_identisk_i_post8_og_post21():
+    oppgave = _oppgave_med_utbytte()
+    hoved = _parse(generer_hovedskjema_xml(oppgave))
+    post8_tid = hoved.find(".//AksjeUtbytteTidspunkt-datadef-17667").text
+    for a in oppgave.aksjonaerer:
+        under = _parse(generer_underskjema_xml(a, oppgave))
+        assert under.find(".//AksjerUtbytteTidspunkt-datadef-17769").text == post8_tid
+
+
+def test_utbytte_med_oere_bruker_punktum_og_to_desimaler():
+    cfg_aksjonaerer = [
+        {**_CFG_MED_UTBYTTE["aksjonaerer"][0], "antall_aksjer": 1, "utbytte_utbetalt": 10000.5},
+    ]
+    oppgave = _oppgave_med_utbytte(aksjonaerer=cfg_aksjonaerer)
+    hoved = _parse(generer_hovedskjema_xml(oppgave))
+    under = _parse(generer_underskjema_xml(oppgave.aksjonaerer[0], oppgave))
+    assert hoved.find(".//AksjeUtbytteISINAksjetype-datadef-17665").text == "10000.50"
+    assert under.find(".//Aksjeutbytte-datadef-29169").text == "10000.50"
+
+
+def test_uten_utbytte_er_post8_og_post21_tomme(eksempel_oppgave):
+    hoved = _parse(generer_hovedskjema_xml(eksempel_oppgave))
+    assert len(hoved.find(".//UtdeltSkatterettsligUtbytteILopetAvInntektsaret-grp-3451")) == 0
+    under = _parse(generer_underskjema_xml(eksempel_oppgave.aksjonaerer[0], eksempel_oppgave))
+    post21 = under.find(".//UtdeltUtbyttePerAksjonar-grp-3991")
+    assert [e.tag for e in post21] == ["AutomatiskMotregningOnskerIkke-datadef-37159"]
+
+
+def test_aksjonaer_uten_utbytte_faar_ikke_post21():
+    """Bare aksjonærer med utbytte får beløp og tidspunkt i post 21."""
+    aksjonaerer = [
+        *_CFG_MED_UTBYTTE["aksjonaerer"],
+        {**_CFG_MED_UTBYTTE["aksjonaerer"][1], "antall_aksjer": 0, "utbytte_utbetalt": 0},
+    ]
+    oppgave = _oppgave_med_utbytte(aksjonaerer=aksjonaerer)
+    under = _parse(generer_underskjema_xml(oppgave.aksjonaerer[2], oppgave))
+    assert under.find(".//Aksjeutbytte-datadef-29169") is None
+
+
+def test_valider_utbytte_ok():
+    assert valider(_oppgave_med_utbytte()) == []
+
+
+def test_valider_utbytte_krever_vedtaksdato():
+    cfg = {k: v for k, v in _CFG_MED_UTBYTTE.items() if k != "utbytte_vedtaksdato"}
+    from wenche.aksjonaerregister import les_config
+
+    feil = valider(les_config(cfg))
+    assert any("Vedtaksdato for utbytte mangler" in f for f in feil)
+
+
+def test_valider_vedtaksdato_maa_ligge_i_inntektsaaret():
+    feil = valider(_oppgave_med_utbytte(utbytte_vedtaksdato="2024-12-15"))
+    assert any("må ligge i inntektsåret (2025)" in f for f in feil)
+
+
+def test_valider_utbytte_ulikt_per_aksje_avvises():
+    aksjonaerer = [
+        _CFG_MED_UTBYTTE["aksjonaerer"][0],
+        {**_CFG_MED_UTBYTTE["aksjonaerer"][1], "utbytte_utbetalt": 50000},
+    ]
+    feil = valider(_oppgave_med_utbytte(aksjonaerer=aksjonaerer))
+    assert any("like mye per aksje" in f for f in feil)
+
+
+def test_valider_utbytte_tolererer_avrunding_til_hele_kroner():
+    """1000 kr fordelt på 3 aksjer à 1 aksje blir 333 + 333 + 334, og det skal gå gjennom."""
+    mal = _CFG_MED_UTBYTTE["aksjonaerer"][0]
+    aksjonaerer = [
+        {**mal, "antall_aksjer": 1, "utbytte_utbetalt": 333},
+        {**mal, "antall_aksjer": 1, "utbytte_utbetalt": 333},
+        {**mal, "antall_aksjer": 1, "utbytte_utbetalt": 334},
+    ]
+    assert valider(_oppgave_med_utbytte(aksjonaerer=aksjonaerer)) == []
+
+
+def test_valider_negativt_utbytte_avvises():
+    aksjonaerer = [{**_CFG_MED_UTBYTTE["aksjonaerer"][0], "utbytte_utbetalt": -1}]
+    feil = valider(_oppgave_med_utbytte(aksjonaerer=aksjonaerer))
+    assert any("kan ikke være negativt" in f for f in feil)
+
+
+def test_vedtaksdato_uten_utbytte_ignoreres(eksempel_oppgave):
+    """En vedtaksdato uten utbytte (f.eks. fra fjorårets config) skal ikke stoppe innsendingen."""
+    from dataclasses import replace
+    from datetime import date
+
+    oppgave = replace(eksempel_oppgave, utbytte_vedtaksdato=date(2020, 1, 1))
+    assert valider(oppgave) == []
+    hoved = _parse(generer_hovedskjema_xml(oppgave))
+    assert len(hoved.find(".//UtdeltSkatterettsligUtbytteILopetAvInntektsaret-grp-3451")) == 0

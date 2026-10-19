@@ -39,6 +39,31 @@ def _stiftelsestidspunkt(selskap: Selskap) -> str:
     return f"{selskap.stiftelsesaar}-01-01T00:00:00"
 
 
+def _utbyttetidspunkt(oppgave: Aksjonaerregisteroppgave) -> str:
+    """
+    Tidspunktet for utbytteutdelingen, som ISO-datetime.
+
+    Skatteetaten krever nøyaktig samme tidspunkt i post 8 (selskapet) og post 21 (hver
+    aksjonær), ellers feiler oppgaven i kontrollene (SSV-6233). Én funksjon for begge steder
+    holder dem like. Klokkeslett trengs bare for å skille flere utdelinger samme dag, og
+    Wenche rapporterer én utdeling per år.
+    """
+    return f"{oppgave.utbytte_vedtaksdato.isoformat()}T00:00:00"
+
+
+def _format_beloep(verdi: float) -> str:
+    """
+    Formater et utbyttebeløp for RF-1086-XMLen.
+
+    Skatteetaten godtar et positivt tall med inntil to desimaler og punktum som skilletegn,
+    uten mellomrom eller tusenskille (SSV-6233): hele kroner som "10000", ellers "10000.50".
+    """
+    rundet = round(float(verdi), 2)
+    if rundet.is_integer():
+        return str(int(rundet))
+    return f"{rundet:.2f}"
+
+
 def _format_paalydende(verdi: float) -> str:
     """
     Formater pålydende per aksje for RF-1086-XMLen.
@@ -85,7 +110,7 @@ def les_config(config_fil: str | dict) -> Aksjonaerregisteroppgave:
             fodselsnummer=str(a["fodselsnummer"]),
             antall_aksjer=a["antall_aksjer"],
             aksjeklasse=a["aksjeklasse"],
-            utbytte_utbetalt=a["utbytte_utbetalt"],
+            utbytte_utbetalt=_tall(a.get("utbytte_utbetalt")),
             innbetalt_kapital_per_aksje=a["innbetalt_kapital_per_aksje"],
         )
         for a in cfg["aksjonaerer"]
@@ -95,6 +120,7 @@ def les_config(config_fil: str | dict) -> Aksjonaerregisteroppgave:
         selskap=selskap,
         regnskapsaar=cfg["regnskapsaar"],
         aksjonaerer=aksjonaerer,
+        utbytte_vedtaksdato=_dato(cfg.get("utbytte_vedtaksdato")),
     )
 
 
@@ -137,6 +163,19 @@ def generer_hovedskjema_xml(
             <AksjerNyutstedteStiftelseMvPalydende-datadef-23947 orid="23947">{paalydende}</AksjerNyutstedteStiftelseMvPalydende-datadef-23947>"""
     else:
         stiftelse_innhold = ""
+
+    # Post 8: utdelt utbytte for aksjeklassen, med hendelsestype Y (utbytte). Utelates når
+    # ingen har fått utbytte. Summen er summen av aksjonærenes post 21, så de stemmer alltid.
+    totalt_utbytte = oppgave.totalt_utbytte_utbetalt
+    if totalt_utbytte > 0:
+        utbytte_innhold = f"""
+            <AksjeUtbytteISINAksjetype-datadef-17665 orid="17665">{_format_beloep(totalt_utbytte)}</AksjeUtbytteISINAksjetype-datadef-17665>
+            <AksjeUtbyttePerAksje-datadef-23946 orid="23946">{_format_paalydende(totalt_utbytte / totalt_aksjer)}</AksjeUtbyttePerAksje-datadef-23946>
+            <AksjeUtbytteHendelsestype-datadef-36564 orid="36564">Y</AksjeUtbytteHendelsestype-datadef-36564>
+            <AksjeUtbytteTidspunkt-datadef-17667 orid="17667">{_utbyttetidspunkt(oppgave)}</AksjeUtbytteTidspunkt-datadef-17667>
+        """
+    else:
+        utbytte_innhold = ""
 
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Skjema skjemanummer="890" spesifikasjonsnummer="12144"
@@ -181,7 +220,7 @@ def generer_hovedskjema_xml(
         </InnbetaltOverkursIDenneAksjeklassen-grp-3448>
     </Selskapsopplysninger-grp-2589>
     <Utbytte-grp-3449 gruppeid="3449">
-        <UtdeltSkatterettsligUtbytteILopetAvInntektsaret-grp-3451 gruppeid="3451"></UtdeltSkatterettsligUtbytteILopetAvInntektsaret-grp-3451>
+        <UtdeltSkatterettsligUtbytteILopetAvInntektsaret-grp-3451 gruppeid="3451">{utbytte_innhold}</UtdeltSkatterettsligUtbytteILopetAvInntektsaret-grp-3451>
     </Utbytte-grp-3449>
     <UtstedelseAvAksjerIfmStiftelseNyemisjonMv-grp-3452 gruppeid="3452">
         <AntallNyutstedteAksjer-grp-3453 gruppeid="3453">{stiftelse_innhold}
@@ -239,6 +278,16 @@ def generer_underskjema_xml(
     else:
         tilgang_innhold = ""
 
+    # Post 21: aksjonærens del av utdelingen i post 8, med samme tidspunkt. Antall aksjer er
+    # aksjene utdelingen gjelder, her hele beholdningen, siden Wenche har én aksjeklasse.
+    if aksjonaer.utbytte_utbetalt > 0:
+        utbytte_innhold = f"""
+            <Aksjeutbytte-datadef-29169 orid="29169">{_format_beloep(aksjonaer.utbytte_utbetalt)}</Aksjeutbytte-datadef-29169>
+            <AksjerUtbytteAntall-datadef-17742 orid="17742">{aksjonaer.antall_aksjer}</AksjerUtbytteAntall-datadef-17742>
+            <AksjerUtbytteTidspunkt-datadef-17769 orid="17769">{_utbyttetidspunkt(oppgave)}</AksjerUtbytteTidspunkt-datadef-17769>"""
+    else:
+        utbytte_innhold = ""
+
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Skjema skjemanummer="923" spesifikasjonsnummer="12232"
         blankettnummer="RF-1086-U" tittel="Aksjonærregisteroppgaven - underskjema"
@@ -259,7 +308,7 @@ def generer_underskjema_xml(
             <AksjerAntallFjoraret-datadef-29168 orid="29168">{fjoraret_aksjer}</AksjerAntallFjoraret-datadef-29168>
             <AksjonarAksjerAntall-datadef-17741 orid="17741">{aksjonaer.antall_aksjer}</AksjonarAksjerAntall-datadef-17741>
         </AntallAksjerPerAksjonar-grp-3989>
-        <UtdeltUtbyttePerAksjonar-grp-3991 gruppeid="3991">
+        <UtdeltUtbyttePerAksjonar-grp-3991 gruppeid="3991">{utbytte_innhold}
             <AutomatiskMotregningOnskerIkke-datadef-37159 orid="37159">0</AutomatiskMotregningOnskerIkke-datadef-37159>
         </UtdeltUtbyttePerAksjonar-grp-3991>
         <UtdeltUtbytteKildeskatt-grp-9347 gruppeid="9347"></UtdeltUtbytteKildeskatt-grp-9347>
@@ -362,6 +411,55 @@ def valider(oppgave: Aksjonaerregisteroppgave) -> list[str]:
                 "aksjonær slik at summen blir lik aksjekapital."
             )
 
+    feil.extend(_valider_utbytte(oppgave))
+
+    return feil
+
+
+def _valider_utbytte(oppgave: Aksjonaerregisteroppgave) -> list[str]:
+    """
+    Sjekker at utbyttet kan rapporteres slik Skatteetaten krever det.
+
+    Post 8 oppgir utbytte per aksje for hele aksjeklassen, og post 21 hver aksjonærs andel.
+    Med én aksjeklasse må alle aksjonærer derfor ha fått likt per aksje, ellers går ikke
+    postene opp mot hverandre og oppgaven avvises hos Skatteetaten.
+    """
+    feil = []
+    aar = oppgave.regnskapsaar
+
+    for a in oppgave.aksjonaerer:
+        if a.utbytte_utbetalt < 0:
+            feil.append(f"Utbytte utbetalt for {a.navn} kan ikke være negativt.")
+    totalt_utbytte = oppgave.totalt_utbytte_utbetalt
+    if totalt_utbytte <= 0 or feil:
+        return feil
+
+    dato = oppgave.utbytte_vedtaksdato
+    if dato is None:
+        feil.append(
+            "Vedtaksdato for utbytte mangler. Skatteetaten krever datoen generalforsamlingen "
+            "vedtok utbyttet når det er utbetalt utbytte (utbytte_vedtaksdato i config.yaml)."
+        )
+    elif dato.year != aar:
+        feil.append(
+            f"Vedtaksdatoen for utbytte ({dato.isoformat()}) må ligge i inntektsåret ({aar}). "
+            "Aksjonærregisteroppgaven rapporterer utbytte vedtatt i løpet av året."
+        )
+
+    totalt_aksjer = oppgave.totalt_antall_aksjer
+    if totalt_aksjer <= 0:
+        return feil
+    per_aksje = totalt_utbytte / totalt_aksjer
+    for a in oppgave.aksjonaerer:
+        forventet = per_aksje * a.antall_aksjer
+        # Én krone slingringsmonn for avrunding til hele kroner per aksjonær.
+        if abs(a.utbytte_utbetalt - forventet) > 1:
+            feil.append(
+                f"Utbyttet til {a.navn} ({a.utbytte_utbetalt:,.2f} kr) stemmer ikke med "
+                f"aksjene. Med {per_aksje:,.6f} kr per aksje og {a.antall_aksjer} aksjer "
+                f"skulle det vært {forventet:,.2f} kr. Wenche støtter én aksjeklasse, så "
+                "alle aksjonærer må ha fått like mye per aksje."
+            )
     return feil
 
 

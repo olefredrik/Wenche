@@ -174,6 +174,16 @@ interface Aksjonaer {
   innbetalt_kapital_per_aksje: number | "";
 }
 
+// Skatteetaten krever vedtakstidspunktet når det er utdelt utbytte (RF-1086 post 8 og 21).
+// Vises derfor bare når minst én aksjonær har fått utbytte, eller datoen alt er fylt inn.
+const UTBYTTE_VEDTAKSDATO_FELT: Felt = {
+  key: "utbytte_vedtaksdato",
+  label: "Vedtaksdato for utbytte",
+  type: "date",
+  valgfri: true,
+  help: "Datoen generalforsamlingen vedtok utbyttet. Påkrevd i aksjonærregisteroppgaven",
+};
+
 const AKSJONAER_TALLFELT = [
   "antall_aksjer",
   "utbytte_utbetalt",
@@ -1030,6 +1040,11 @@ export function DataSkjema({
         >
           + Legg til aksjonær
         </button>
+        {(aksjonaerer.some((a) => Number(a.utbytte_utbetalt) > 0) || hent(config, UTBYTTE_VEDTAKSDATO_FELT.key)) && (
+          <div className="mt-6">
+            <Feltrutenett felter={[UTBYTTE_VEDTAKSDATO_FELT]} config={config} oppdater={oppdater} />
+          </div>
+        )}
       </section>
 
       {ekstraSeksjon}

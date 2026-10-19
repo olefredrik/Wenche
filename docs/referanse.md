@@ -209,6 +209,16 @@ Liste over alle aksjonærer per 31.12 i regnskapsåret.
 | `utbytte_utbetalt` | heltall | nei | Utbytte utbetalt til denne aksjonæren i løpet av året (NOK). Standard: `0` |
 | `innbetalt_kapital_per_aksje` | heltall | nei | Innbetalt kapital per aksje i NOK. Beregnes som aksjekapital / antall aksjer. Standard: `0` |
 
+#### Utbytte i aksjonærregisteroppgaven
+
+Når en aksjonær har `utbytte_utbetalt` over 0, rapporterer Wenche utdelingen i RF-1086: totalt utbytte og utbytte per aksje for selskapet (post 8), og hver aksjonærs andel (post 21). Skatteetaten krever da også tidspunktet for vedtaket, i feltet under. Det ligger på toppnivå i `config.yaml`, ved siden av `regnskapsaar`.
+
+| Felt | Type | Påkrevd | Beskrivelse |
+|---|---|---|---|
+| `utbytte_vedtaksdato` | dato | når det er utbetalt utbytte | Datoen generalforsamlingen vedtok utbyttet (ÅÅÅÅ-MM-DD). Må ligge i inntektsåret |
+
+Wenche rapporterer én utdeling per år, for én aksjeklasse. Alle aksjonærer må derfor ha fått like mye per aksje (en krones avvik for avrunding godtas), ellers stopper Wenche innsendingen, fordi post 8 og post 21 da ikke ville gått opp hos Skatteetaten.
+
 ---
 
 ## Miljøvariabler (.env)

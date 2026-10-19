@@ -4,6 +4,26 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.7.0] - Ikke utgitt
+
+### Rettet
+
+- **Aksjonærregisteroppgaven (RF-1086) ble sendt uten utbytte.** Wenche leste
+  `utbytte_utbetalt` for hver aksjonær, men sendte både post 8 (selskapet) og post 21
+  (aksjonæren) tomme. Selskaper som har delt ut utbytte, har dermed rapportert oppgaven uten
+  utbyttet, og aksjonærene har trolig ikke fått det forhåndsutfylt i skattemeldingen. Nå
+  rapporteres totalt utbytte og utbytte per aksje i post 8 med hendelsestype utbytte, og
+  hver aksjonærs andel i post 21, med samme vedtakstidspunkt begge steder slik Skatteetaten
+  krever. ([#177](https://github.com/olefredrik/Wenche/issues/177))
+
+### Lagt til
+
+- **Nytt felt `utbytte_vedtaksdato`**: datoen generalforsamlingen vedtok utbyttet. Påkrevd
+  når det er utbetalt utbytte, og må ligge i inntektsåret. I webgrensesnittet vises feltet
+  under aksjonærene så snart én av dem har fått utbytte. Wenche stopper innsendingen hvis
+  aksjonærene har fått ulikt utbytte per aksje, siden Wenche rapporterer én aksjeklasse og
+  postene da ikke ville gått opp.
+
 ## [1.6.1] - 2026-10-11
 
 ### Rettet

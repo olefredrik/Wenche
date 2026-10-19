@@ -308,6 +308,10 @@ class Aksjonaerregisteroppgave:
     selskap: Selskap
     regnskapsaar: int
     aksjonaerer: list[Aksjonaer]
+    # Generalforsamlingens vedtak om utbytte. Skatteetaten krever det som tidspunkt for
+    # utdelingen, likt i post 8 (selskapet) og post 21 (aksjonæren). Påkrevd bare når det
+    # er utbetalt utbytte. Wenche rapporterer én utdeling per år.
+    utbytte_vedtaksdato: Optional[date] = None
 
     @property
     def totalt_antall_aksjer(self) -> int:

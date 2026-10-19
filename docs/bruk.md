@@ -123,6 +123,7 @@ Wenche sender RF-1086 direkte til Skatteetatens eget REST-API, ikke via Altinn-i
     - Maskinporten-klienten din må ha fått scopet `skatteetaten:innrapporteringaksjonaerregisteroppgave` innvilget. Se [steg 2f i oppsett](oppsett.md#2f-sk-om-tilgang-til-skds-api-for-aksjonrregisteroppgave).
     - Systembrukeren for din organisasjon må inkludere SKD-rettigheten. Denne settes opp automatisk når du oppretter systembruker fra Oppsett-fanen, se [steg 5 i oppsett](oppsett.md#steg-5-registrer-systembruker-i-altinn).
     - `kontakt_epost` må være utfylt under `selskap` i `config.yaml` (eller i Wenche under **Tall**).
+    - Er det utbetalt utbytte i året, må vedtaksdatoen for utbyttet være fylt inn (`utbytte_vedtaksdato`, eller feltet under aksjonærene i Wenche). Se [referansen](referanse.md#utbytte-i-aksjonrregisteroppgaven).
 
 Gå til fanen **Send** og klikk **Fortsett til innsending** ved siden av **Aksjonærregister**, og bekreft.
 
