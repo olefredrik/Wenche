@@ -36,6 +36,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
+from .auth import _grant
 from .config import settings
 
 router = APIRouter(prefix="/api/auth/idporten", tags=["idporten"])
@@ -385,8 +386,7 @@ def velg_org_altinn(body: VelgOrgBody, request: Request) -> dict:
         }
 
     # Org bekreftet av Altinn – bind sesjonen og rydd access_token
-    request.session["invited"] = True
-    request.session["invite_org"] = orgnr
+    _grant(request, orgnr)
     request.session.pop("idporten_access_token", None)
     return {"ok": True, "invite_org": orgnr}
 

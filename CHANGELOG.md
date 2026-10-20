@@ -4,6 +4,16 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.7.2] - 2026-10-20
+
+### Rettet
+
+- **Hostet Wenche: en ny invite for et annet selskap koblet ikke fra det gamle.** En
+  nettleser som var koblet til ett selskap, og som så åpnet en invite-lenke eller valgte et
+  annet selskap via ID-porten, forble koblet til det første selskapet, og appen viste og
+  sendte inn for det. Nå fjernes den gamle koblingen når økten bindes til et annet selskap.
+  Åpnes en invite på nytt for samme selskap, beholdes koblingen som før.
+
 ## [1.7.1] - 2026-10-20
 
 ### Endret

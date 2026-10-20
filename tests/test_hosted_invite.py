@@ -190,6 +190,41 @@ def test_innsending_uten_binding_gir_409(klient, monkeypatch):
     assert r.status_code == 409
 
 
+def test_invite_for_annen_org_kobler_fra_gammel_binding(klient, monkeypatch):
+    """
+    Regresjonsvern: en nettleser koblet til org A som åpner en invite for org B, skal ikke
+    fortsatt være koblet til A. Tidligere satte invite-innløsningen bare invite_org, så
+    kunde_org = A ble liggende i cookien, og appen viste og sendte inn for A (demo-orgbyttet
+    310137715 → 312463938, 2026-10-20).
+    """
+    _stub_vendor(monkeypatch)
+    monkeypatch.setattr(
+        sb.wsb, "hent_systembrukere", lambda tok, vendor: [{"reporteeOrgNo": "314273818"}]
+    )
+    klient.post("/api/auth/invite", json={"token": lag_invite_token("314273818")})
+    klient.post("/api/systembruker/request")
+    assert klient.get("/api/auth/me").json()["kunde_org"] == "314273818"
+
+    klient.post("/api/auth/invite", json={"token": lag_invite_token("312463938")})
+    me = klient.get("/api/auth/me").json()
+    assert me["invite_org"] == "312463938"
+    assert me["kunde_org"] is None
+
+
+def test_samme_invite_beholder_binding(klient, monkeypatch):
+    """Invite-lenken er recovery: åpnes den på nytt for samme org, beholdes koblingen."""
+    _stub_vendor(monkeypatch)
+    monkeypatch.setattr(
+        sb.wsb, "hent_systembrukere", lambda tok, vendor: [{"reporteeOrgNo": "314273818"}]
+    )
+    token = lag_invite_token("314273818")
+    klient.post("/api/auth/invite", json={"token": token})
+    klient.post("/api/systembruker/request")
+
+    klient.post("/api/auth/invite", json={"token": token})
+    assert klient.get("/api/auth/me").json()["kunde_org"] == "314273818"
+
+
 def test_binding_overlever_restart(klient, monkeypatch):
     """
     Regresjonsvern for utlåsingsfeilen: bindingen (kunde_org) ligger i den signerte cookien,

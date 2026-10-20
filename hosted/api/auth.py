@@ -164,7 +164,19 @@ def bruk_invite(body: InviteBody, request: Request) -> dict:
 
 
 def _grant(request: Request, orgnr: str) -> None:
-    """Bind sesjonen til orgnr: marker gate passert ('invited') og sett bundet org ('invite_org')."""
+    """Bind sesjonen til orgnr: marker gate passert ('invited') og sett bundet org ('invite_org').
+
+    Gjelder bindingen et annet selskap enn økten alt er koblet til, ryddes den gamle koblingen
+    (kunde_org og en påbegynt forespørsel). Ellers ville en ny invite for org B i en nettleser
+    som er koblet til org A vist og sendt inn for A. Samme org beholder koblingen, så en
+    invite-lenke fortsatt virker som recovery uten ny BankID.
+    """
+    for nokkel in ("kunde_org", "pending_org"):
+        if request.session.get(nokkel) not in (None, orgnr):
+            request.session.pop("kunde_org", None)
+            request.session.pop("pending_org", None)
+            request.session.pop("request_id", None)
+            break
     request.session["invited"] = True
     request.session["invite_org"] = orgnr
 
