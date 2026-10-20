@@ -15,7 +15,8 @@ selskap:
   # stiftelsesdato: 2018-03-14        # Valgfri, eksakt dato (ÅÅÅÅ-MM-DD). Hentes fra
                                       # Enhetsregisteret. Brukes i aksjonærregisteroppgaven
   aksjekapital: 30000               # NOK — fra stiftelsesdokumentene
-  kontakt_epost: ""                 # Påkrevd for aksjonærregisteroppgave (RF-1086)
+  kontakt_epost: ""                 # Påkrevd for aksjonærregisteroppgave (RF-1086). Skatteetaten
+                                    # sender godkjenning eller avvisning hit, så bruk en adresse du leser
 
 regnskapsaar: 2025                  # Året regnskapet gjelder for
 

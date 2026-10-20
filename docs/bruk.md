@@ -129,6 +129,12 @@ Gå til fanen **Send** og klikk **Fortsett til innsending** ved siden av **Aksjo
 
 Forsendelse-ID vises i grensesnittet når innsendingen er fullført.
 
+!!! info "Tilbakemelding kommer på e-post"
+    Wenche får bare bekreftet at Skatteetaten har tatt imot oppgaven. Om den blir godkjent eller avvist, sender Skatteetaten på e-post til `kontakt_epost`, gjerne en tid etter innsendingen. Bruk derfor en adresse du leser.
+
+!!! tip "Rette en innsendt oppgave"
+    Var noe feil i oppgaven, sender du en ny, komplett oppgave for samme år. Den erstatter den forrige. Det gjelder for eksempel oppgaver for 2025 med utbytte som ble sendt med Wenche før versjon 1.7.0, siden utbyttet da ikke kom med.
+
 ---
 
 ## Obligatoriske noter (rskl. §§ 7-35, 7-43, 7-45, 7-46)
