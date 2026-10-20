@@ -262,13 +262,13 @@ function grunnConfig(): any {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const EKSEMPEL: any = {
   selskap: {
-    navn: "MOTSTANDSDYKTIG ENTUSIASTISK TIGER AS",
-    org_nummer: "310137715",
+    navn: "FORSIKTIG MINKENDE TIGER AS",
+    org_nummer: "312463938",
     daglig_leder: "Daglig Leder",
     styreleder: "Daglig Leder",
-    forretningsadresse: "Bergveien 23, 1890 RAKKESTAD",
-    stiftelsesaar: 2018,
-    aksjekapital: 30000,
+    forretningsadresse: "J. M. Uglands vei 20, 4878 GRIMSTAD",
+    stiftelsesaar: 2001,
+    aksjekapital: 100000,
     kontakt_epost: "test@example.no",
   },
   regnskapsaar: 2025,
@@ -289,7 +289,7 @@ const EKSEMPEL: any = {
       omloepmidler: { kortsiktige_fordringer: 0, bankinnskudd: 30000 },
     },
     egenkapital_og_gjeld: {
-      egenkapital: { aksjekapital: 30000, overkursfond: 0, annen_egenkapital: 100000 },
+      egenkapital: { aksjekapital: 100000, overkursfond: 0, annen_egenkapital: 30000 },
       langsiktig_gjeld: { laan_fra_aksjonaer: 0, andre_langsiktige_laan: 0 },
       kortsiktig_gjeld: {
         leverandoergjeld: 0,
@@ -320,7 +320,7 @@ const EKSEMPEL: any = {
         omloepmidler: { kortsiktige_fordringer: 0, bankinnskudd: 30000 },
       },
       egenkapital_og_gjeld: {
-        egenkapital: { aksjekapital: 30000, overkursfond: 0, annen_egenkapital: 100000 },
+        egenkapital: { aksjekapital: 100000, overkursfond: 0, annen_egenkapital: 30000 },
         langsiktig_gjeld: { laan_fra_aksjonaer: 0, andre_langsiktige_laan: 0 },
         kortsiktig_gjeld: {
           leverandoergjeld: 0,
@@ -344,10 +344,10 @@ const EKSEMPEL: any = {
     {
       navn: "Daglig Leder",
       fodselsnummer: "24847799354",
-      antall_aksjer: 300,
+      antall_aksjer: 100,
       aksjeklasse: "ordinære",
       utbytte_utbetalt: 0,
-      innbetalt_kapital_per_aksje: 100,
+      innbetalt_kapital_per_aksje: 1000,
     },
   ],
 };

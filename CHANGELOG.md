@@ -4,6 +4,16 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.7.1] - 2026-10-20
+
+### Endret
+
+- **Demoen bruker en ny testorganisasjon i Skatteetatens testmiljø.** Den gamle
+  demo-orgen ble skjønnsfastsatt maskinelt for 2025 i testmiljøet fordi skattemeldingen
+  aldri ble levert, og da avviste Skatteetaten alle innsendinger fra demoen. Eksempeldataene
+  i skjemaet peker nå på den nye orgen, med navn, adresse, stiftelsesår og aksjekapital slik
+  de står i testmiljøets Enhetsregister.
+
 ## [1.7.0] - 2026-10-19
 
 ### Rettet
