@@ -18,7 +18,9 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
   feltet gir samme innsending som før. Feltet finnes også i skjemaet.
   ([#188](https://github.com/olefredrik/Wenche/issues/188))
 - **Advarsel når utbytte fra datterselskap står uten aksjer i datterselskap**, verken i år
-  eller i fjor. Det tyder på at utbyttet hører hjemme under utbytte fra andre aksjer.
+  eller i fjor. Det tyder på at utbyttet hører hjemme under utbytte fra andre aksjer. Er
+  eierandelen for fritaksmetoden 20 % eller mer, er det et tilknyttet selskap, og da gis
+  ingen advarsel: aksjene står under andre aksjer, men utbyttet står på riktig linje.
 
 ### Endret
 

@@ -175,7 +175,26 @@ def les_config(config_fil: str | dict) -> Aarsregnskap:
         utbytte_utbetalt=utbytte_utbetalt,
         regnskapsstart=_dato(cfg.get("regnskapsstart")),
         regnskapsslutt=_dato(cfg.get("regnskapsslutt")),
+        eierandel_for_utbytte=_eierandel_eller_none(
+            (cfg.get("skattemelding") or {}).get("eierandel_for_fritaksmetoden")
+        ),
     )
+
+
+def _eierandel_eller_none(verdi) -> float | None:
+    """Eierandelen som prosent, eller None når den mangler eller ikke er et tall.
+
+    Bare til advarsler. Ugyldige verdier avvises av skattemeldingens validering, så her er det
+    nok å ikke kaste.
+    """
+    if verdi is None or (isinstance(verdi, str) and not verdi.strip()):
+        return None
+    try:
+        if isinstance(verdi, str):
+            return float(verdi.replace("\u00a0", "").replace(" ", "").replace(",", "."))
+        return float(verdi)
+    except (TypeError, ValueError):
+        return None
 
 
 def valider(regnskap: Aarsregnskap) -> list[str]:
@@ -380,8 +399,10 @@ def advarsler(regnskap: Aarsregnskap) -> list[str]:
     # Utbytte fra et selskap selskapet eier under 20 % av, kommer verken fra et datterselskap
     # eller et tilknyttet selskap og skal på egen linje i årsregnskapet. Står utbyttet som
     # utbytte fra datterselskap uten at balansen har aksjer i datterselskap, verken i år eller
-    # i fjor, er det sannsynligvis feil linje. (Ikke-blokkerende: datterselskapet kan være
-    # solgt, og skatten blir den samme.)
+    # i fjor, er det sannsynligvis feil linje. Unntaket er et tilknyttet selskap (20 % eller
+    # mer): modellen har ingen egen balanselinje for det, så aksjene står under andre aksjer,
+    # mens utbyttet med rette står på linjen for datterselskap og tilknyttet selskap.
+    # (Ikke-blokkerende: datterselskapet kan være solgt, og skatten blir den samme.)
     fp = regnskap.resultatregnskap.finansposter
     am = regnskap.balanse.eiendeler.anleggsmidler
     fam = regnskap.foregaaende_aar_balanse.eiendeler.anleggsmidler
@@ -389,13 +410,15 @@ def advarsler(regnskap: Aarsregnskap) -> list[str]:
         fp.utbytte_fra_datterselskap > 0.01
         and am.aksjer_i_datterselskap < 0.01
         and fam.aksjer_i_datterselskap < 0.01
+        and (regnskap.eierandel_for_utbytte is None or regnskap.eierandel_for_utbytte < 20)
     ):
         adv.append(
             f"Det er ført utbytte fra datterselskap "
             f"({fp.utbytte_fra_datterselskap:,.0f} NOK), men balansen har ingen aksjer i "
             "datterselskap, verken i år eller i fjor. Eier selskapet under 20 % av selskapet "
             "som delte ut, er det verken datterselskap eller tilknyttet selskap, og utbyttet "
-            "skal føres som «Utbytte fra andre aksjer» (utbytte_fra_andre_aksjer)."
+            "skal føres som «Utbytte fra andre aksjer» (utbytte_fra_andre_aksjer). Er det "
+            "et tilknyttet selskap (20 % eller mer), er linjen riktig."
         )
 
     # Tinginnskuddet hører til stiftelsen. Står det igjen i en config som bæres videre til

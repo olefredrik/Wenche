@@ -261,6 +261,11 @@ class Aarsregnskap:
     # 18 måneder, fram til 31.12 året etter.
     regnskapsstart: Optional[date] = None
     regnskapsslutt: Optional[date] = None
+    # Eierandelen (prosent) fra skattemelding.eierandel_for_fritaksmetoden, eller None når den
+    # ikke er oppgitt. Brukes bare av advarselen om hvilken linje utbyttet står på: ved 20 %
+    # eller mer er det et tilknyttet selskap, og da er linjen for datterselskap riktig selv om
+    # aksjene står under andre aksjer i balansen.
+    eierandel_for_utbytte: Optional[float] = None
 
     @property
     def periode_start(self) -> date:

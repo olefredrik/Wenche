@@ -214,6 +214,33 @@ class TestAdvarsel:
         )
         assert not self._har_advarsel(regnskap)
 
+    def test_ingen_advarsel_for_tilknyttet_selskap(self, eksempel_selskap):
+        # 20-50 %: tilknyttet selskap. Aksjene står under andre aksjer, men utbyttet hører
+        # hjemme på linjen for datterselskap og tilknyttet selskap.
+        regnskap = _regnskap(eksempel_selskap, Finansposter(utbytte_fra_datterselskap=20000))
+        regnskap.eierandel_for_utbytte = 25
+        assert not self._har_advarsel(regnskap)
+
+    def test_advarsel_ved_eierandel_under_20(self, eksempel_selskap):
+        regnskap = _regnskap(eksempel_selskap, Finansposter(utbytte_fra_datterselskap=20000))
+        regnskap.eierandel_for_utbytte = 10
+        assert self._har_advarsel(regnskap)
+
+    def test_eierandelen_leses_fra_skattemelding_seksjonen(self):
+        cfg = {
+            "selskap": {
+                "navn": "X AS", "org_nummer": "123456789", "daglig_leder": "A",
+                "styreleder": "A", "forretningsadresse": "Gate 1", "stiftelsesaar": 2022,
+                "aksjekapital": 30000,
+            },
+            "regnskapsaar": 2025,
+            "resultatregnskap": {},
+            "balanse": {},
+        }
+        assert ar.les_config(cfg).eierandel_for_utbytte is None
+        cfg["skattemelding"] = {"eierandel_for_fritaksmetoden": "25,5"}
+        assert ar.les_config(cfg).eierandel_for_utbytte == 25.5
+
     def test_ingen_advarsel_naar_utbyttet_staar_paa_riktig_linje(self, eksempel_selskap):
         regnskap = _regnskap(eksempel_selskap, Finansposter(utbytte_fra_andre_aksjer=20000))
         assert not self._har_advarsel(regnskap)
