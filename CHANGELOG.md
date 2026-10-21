@@ -4,6 +4,14 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.8.0] - Ikke utgitt
+
+### Endret
+
+- **Gevinst ved realisasjon av aksjer står på linjen for annen finansinntekt i
+  årsregnskapet.** Den ble sendt sammen med andre finansinntekter som «Annen renteinntekt»,
+  men en gevinst er ingen renteinntekt. Summen av finansinntekter og skatten er uendret.
+
 ## [1.7.2] - 2026-10-20
 
 ### Rettet

@@ -273,24 +273,26 @@ class TestBakoverkompatibilitet:
         assert r.finansposter.tap_ved_realisasjon_av_aksjer == 0
         assert r.finansposter.sum_inntekter == 1000
 
-    def test_aarsregnskapet_er_uendret_av_utskillingen(self, eksempel_selskap):
-        # Gevinst og tap rapporteres sammen med andre finansinntekter og -kostnader til
-        # Brønnøysund, så XML-en er lik enten beløpet er skilt ut eller ikke.
-        foer = _regnskap(
-            eksempel_selskap,
-            Finansposter(andre_finansinntekter=210000, andre_finanskostnader=50000),
-        )
-        etter = _regnskap(
-            eksempel_selskap,
-            Finansposter(
-                andre_finansinntekter=10000,
-                gevinst_ved_realisasjon_av_aksjer=200000,
-                tap_ved_realisasjon_av_aksjer=50000,
-            ),
-        )
+    def test_tap_rapporteres_sammen_med_andre_finanskostnader(self, eksempel_selskap):
+        # Tapet rapporteres sammen med andre finanskostnader til Brønnøysund, så XML-en er
+        # lik enten beløpet er skilt ut eller ikke.
+        foer = _regnskap(eksempel_selskap, Finansposter(andre_finanskostnader=50000))
+        etter = _regnskap(eksempel_selskap, Finansposter(tap_ved_realisasjon_av_aksjer=50000))
         assert _uten_rad_id(generer_underskjema(foer)) == _uten_rad_id(
             generer_underskjema(etter)
         )
+
+    def test_gevinst_rapporteres_som_annen_finansinntekt(self, eksempel_selskap):
+        # Gevinsten er ingen renteinntekt. Den står på linjen for annen finansinntekt
+        # (orid 152), og annen renteinntekt (orid 150) har bare andre_finansinntekter.
+        regnskap = _regnskap(
+            eksempel_selskap,
+            Finansposter(andre_finansinntekter=10000, gevinst_ved_realisasjon_av_aksjer=200000),
+        )
+        xml = generer_underskjema(regnskap).decode()
+        assert '<aarets orid="152">200000</aarets>' in xml
+        assert '<aarets orid="150">10000</aarets>' in xml
+        assert '<aarets orid="153">210000</aarets>' in xml  # sum finansinntekter
 
     def test_rapporten_viser_fritatt_gevinst(self, eksempel_selskap):
         regnskap = _regnskap(
