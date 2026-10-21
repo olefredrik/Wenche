@@ -283,6 +283,7 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
       </nettoFinans>
       <finansinntekt>
         {linje("investeringDatterforetakTilknyttetSelskap", fp.utbytte_fra_datterselskap, "Utbytte fra datterselskap", "29004", "27934", "27935", ffp.utbytte_fra_datterselskap)}
+        {linje("andreInvesteringer", fp.utbytte_fra_andre_aksjer, "Utbytte fra andre aksjer", "29005", "27936", "27937", ffp.utbytte_fra_andre_aksjer)}
         {linje_enkel("annenRenteinntekt", fp.andre_finansinntekter, "150", "7030", ffp.andre_finansinntekter)}
         {linje("annenFinansinntekt", fp.gevinst_ved_realisasjon_av_aksjer, "Gevinst ved realisasjon av aksjer", "29006", "152", "7032", ffp.gevinst_ved_realisasjon_av_aksjer)}
         <sumFinansinntekter>

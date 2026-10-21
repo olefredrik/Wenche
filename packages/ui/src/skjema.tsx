@@ -28,6 +28,13 @@ const RESULTAT_FELTER: Felt[] = [
   { key: "resultatregnskap.driftskostnader.avskrivninger", label: "Avskrivninger", type: "number" },
   { key: "resultatregnskap.driftskostnader.andre_driftskostnader", label: "Andre driftskostnader", type: "number" },
   { key: "resultatregnskap.finansposter.utbytte_fra_datterselskap", label: "Utbytte fra datterselskap", type: "number" },
+  {
+    key: "resultatregnskap.finansposter.utbytte_fra_andre_aksjer",
+    label: "Utbytte fra andre aksjer",
+    type: "number",
+    valgfri: true,
+    help: "Eierandel under 20 %: verken datterselskap eller tilknyttet selskap. 3 % skattepliktig etter fritaksmetoden",
+  },
   { key: "resultatregnskap.finansposter.andre_finansinntekter", label: "Andre finansinntekter", type: "number" },
   { key: "resultatregnskap.finansposter.rentekostnader", label: "Rentekostnader", type: "number" },
   { key: "resultatregnskap.finansposter.andre_finanskostnader", label: "Andre finanskostnader", type: "number" },

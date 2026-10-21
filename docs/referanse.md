@@ -56,6 +56,7 @@ Alle beløp oppgis i hele kroner (NOK). Bruk `0` for poster som ikke er aktuelle
 | `andre_finanskostnader` | heltall | Andre finanskostnader |
 | `gevinst_ved_realisasjon_av_aksjer` | heltall | Valgfri. Gevinst ved salg av aksjer innenfor fritaksmetoden (kode 8074). Skattefri når `anvend_fritaksmetoden` er `true`, uansett eierandel |
 | `tap_ved_realisasjon_av_aksjer` | heltall | Valgfri. Tap ved salg av aksjer innenfor fritaksmetoden (kode 8174). Ikke fradragsberettiget når `anvend_fritaksmetoden` er `true` |
+| `utbytte_fra_andre_aksjer` | heltall | Valgfri. Utbytte fra selskaper som verken er datterselskap eller tilknyttet selskap, typisk en eierandel under 20 %. Egen linje i årsregnskapet («Inntekt på andre investeringer»). I skattemeldingen skattlegges det som utbytte fra datterselskap, alltid med 3 %-sjablonen når `anvend_fritaksmetoden` er `true` |
 
 #### Regnskapsperiode
 

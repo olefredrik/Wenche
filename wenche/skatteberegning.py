@@ -31,7 +31,7 @@ def har_fullt_utbyttefritak(konfig: SkattemeldingKonfig) -> bool:
 class Skatteberegning:
     """Resultatet av skatteberegningen (RF-1028). Alle beløp i kroner."""
 
-    utbytte: float                          # Utbytte fra datterselskap, før fritaksmetoden
+    utbytte: float                          # Mottatt utbytte i alt, før fritaksmetoden
     fritatt_utbytte: float                  # Del av utbyttet som er skattefritt
     skattepliktig_utbytte: float            # Del av utbyttet som er skattepliktig (3 %-sjablon)
     skattepliktig_inntekt_brutto: float     # Før fradrag for fremført underskudd
@@ -69,14 +69,18 @@ def beregn_skatt(
     # Ved eierandel på 90 % eller lavere gjelder sjablonregelen (§ 2-38 sjette ledd): 3 % er
     # skattepliktig. Ved eierandel over 90 % er hele utbyttet fritatt (0 % skattepliktig).
     # Merk: dette er basert på faglig vurdering — sjekk alltid mot gjeldende regelverk.
-    utbytte = r.finansposter.utbytte_fra_datterselskap
+    #
+    # Fullt fritak forutsetter konsern (mer enn 90 %), så det kan bare gjelde utbytte fra
+    # datterselskap. Utbytte fra andre aksjer får alltid sjablonen, også når utbyttet fra
+    # datterselskapet er helt fritatt. Uten utbytte fra andre aksjer er regnestykket som før.
+    utbytte = r.finansposter.sum_utbytte
     if konfig.anvend_fritaksmetoden and utbytte > 0:
         if har_fullt_utbyttefritak(konfig):
-            skattepliktig_utbytte = 0
-            fritatt_utbytte = utbytte
+            grunnlag_sjablon = r.finansposter.utbytte_fra_andre_aksjer
         else:
-            skattepliktig_utbytte = math.ceil(utbytte * 0.03)
-            fritatt_utbytte = utbytte - skattepliktig_utbytte
+            grunnlag_sjablon = utbytte
+        skattepliktig_utbytte = math.ceil(grunnlag_sjablon * 0.03) if grunnlag_sjablon else 0
+        fritatt_utbytte = utbytte - skattepliktig_utbytte
     else:
         skattepliktig_utbytte = utbytte
         fritatt_utbytte = 0

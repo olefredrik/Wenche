@@ -86,6 +86,7 @@ def _les_resultat(r: dict) -> Resultatregnskap:
                 fp.get("gevinst_ved_realisasjon_av_aksjer")
             ),
             tap_ved_realisasjon_av_aksjer=_tall(fp.get("tap_ved_realisasjon_av_aksjer")),
+            utbytte_fra_andre_aksjer=_tall(fp.get("utbytte_fra_andre_aksjer")),
         ),
         skattekostnad=_tall(r.get("skattekostnad")),
     )
@@ -374,6 +375,27 @@ def advarsler(regnskap: Aarsregnskap) -> list[str]:
             "Regnskapsloven § 6-6 krever sammenligningstall for selskaper som ikke "
             "er nystiftet. Fyll inn «Fjorårets tall», eller bekreft at fjoråret "
             "faktisk var null hvis selskapet var helt uten aktivitet."
+        )
+
+    # Utbytte fra et selskap selskapet eier under 20 % av, kommer verken fra et datterselskap
+    # eller et tilknyttet selskap og skal på egen linje i årsregnskapet. Står utbyttet som
+    # utbytte fra datterselskap uten at balansen har aksjer i datterselskap, verken i år eller
+    # i fjor, er det sannsynligvis feil linje. (Ikke-blokkerende: datterselskapet kan være
+    # solgt, og skatten blir den samme.)
+    fp = regnskap.resultatregnskap.finansposter
+    am = regnskap.balanse.eiendeler.anleggsmidler
+    fam = regnskap.foregaaende_aar_balanse.eiendeler.anleggsmidler
+    if (
+        fp.utbytte_fra_datterselskap > 0.01
+        and am.aksjer_i_datterselskap < 0.01
+        and fam.aksjer_i_datterselskap < 0.01
+    ):
+        adv.append(
+            f"Det er ført utbytte fra datterselskap "
+            f"({fp.utbytte_fra_datterselskap:,.0f} NOK), men balansen har ingen aksjer i "
+            "datterselskap, verken i år eller i fjor. Eier selskapet under 20 % av selskapet "
+            "som delte ut, er det verken datterselskap eller tilknyttet selskap, og utbyttet "
+            "skal føres som «Utbytte fra andre aksjer» (utbytte_fra_andre_aksjer)."
         )
 
     # Tinginnskuddet hører til stiftelsen. Står det igjen i en config som bæres videre til

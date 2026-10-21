@@ -74,6 +74,8 @@ Sammendraget inneholder:
 
     Grensen er *mer enn* ni tideler, så nøyaktig 90 % gir sjablonregelen. Eierandelen kan oppgis med desimaler, for eksempel 90,5. Loven krever i tillegg at selskapet har en tilsvarende andel av stemmene. Wenche spør bare om eierandelen, så sjekk at stemmeandelen er minst like høy.
 
+    Eier selskapet under 20 % av selskapet som deler ut, er det verken datterselskap eller tilknyttet selskap. Før da utbyttet som `utbytte_fra_andre_aksjer`, så det havner på riktig linje i årsregnskapet. Skatten er den samme, men utbytte fra andre aksjer får alltid sjablonregelen, siden fullt fritak krever over 90 %. `eierandel_for_fritaksmetoden` gjelder utbyttet fra datterselskapet.
+
     Gevinst og tap ved salg av aksjer (`gevinst_ved_realisasjon_av_aksjer` og `tap_ved_realisasjon_av_aksjer`) er også omfattet: gevinsten er skattefri og tapet gir ikke fradrag, uansett eierandel. Sjablonregelen gjelder bare utbytte. Feltene er ment for norske aksjer. Gevinst og tap på rentefond, og på aksjer i lavskatteland utenfor EØS, er skattepliktig og føres som andre finansinntekter eller andre finanskostnader.
 
     Importerer du fra SAF-T, leses gevinst (kode 8074) og tap (kode 8174) inn i disse feltene. Importen slår ikke på fritaksmetoden selv, så kontroller at **Anvend fritaksmetoden** er krysset av, og se over advarselen importen gir hvis noe av beløpet kan gjelde rentefond eller aksjer i lavskatteland.

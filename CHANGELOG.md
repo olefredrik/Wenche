@@ -6,6 +6,20 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 
 ## [1.8.0] - Ikke utgitt
 
+### Lagt til
+
+- **Nytt valgfritt felt `utbytte_fra_andre_aksjer`** for utbytte fra selskaper som verken er
+  datterselskap eller tilknyttet selskap, typisk en eierandel under 20 %. Wenche hadde bare
+  `utbytte_fra_datterselskap`, så alt mottatt utbytte ble sendt til Brønnøysund som
+  «Inntekt på investering i datterselskap og tilknyttet selskap». Nå står utbytte fra andre
+  aksjer på linjen «Inntekt på andre investeringer». I skattemeldingen skattlegges det som
+  før: samme kode (8090) og samme permanente forskjeller, og utbytte fra andre aksjer får
+  alltid 3 %-sjablonen, også når utbyttet fra datterselskapet er helt fritatt. Config uten
+  feltet gir samme innsending som før. Feltet finnes også i skjemaet.
+  ([#188](https://github.com/olefredrik/Wenche/issues/188))
+- **Advarsel når utbytte fra datterselskap står uten aksjer i datterselskap**, verken i år
+  eller i fjor. Det tyder på at utbyttet hører hjemme under utbytte fra andre aksjer.
+
 ### Endret
 
 - **Gevinst ved realisasjon av aksjer står på linjen for annen finansinntekt i

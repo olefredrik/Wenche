@@ -70,7 +70,7 @@ def _standardposter(regnskap: Aarsregnskap) -> tuple[NaeringsspesifikasjonPost, 
             "annenDriftskostnad", "7700", res.driftskostnader.andre_driftskostnader
         ),
         NaeringsspesifikasjonPost(
-            "finansinntekt", "8090", res.finansposter.utbytte_fra_datterselskap
+            "finansinntekt", "8090", res.finansposter.sum_utbytte
         ),
         NaeringsspesifikasjonPost(
             "finansinntekt", "8079", res.finansposter.andre_finansinntekter
@@ -526,7 +526,7 @@ def generer_naeringsspesifikasjon(
 
     # Bare når fritaksmetoden faktisk er anvendt: er den av, er utbyttet skattepliktig i
     # sin helhet, og et par som nullet hverandre ut ville bare vært støy i innsendingen.
-    utbytte = res.finansposter.utbytte_fra_datterselskap
+    utbytte = res.finansposter.sum_utbytte
     if konfig.anvend_fritaksmetoden and utbytte > 0:
         fradrag.append(("tilbakefoeringAvInntektsfoertUtbytte", utbytte))
         if beregning.skattepliktig_utbytte > 0:

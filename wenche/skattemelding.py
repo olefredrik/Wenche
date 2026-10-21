@@ -345,12 +345,18 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
         f"  DRIFTSRESULTAT                 {_nok(driftsresultat)}",
         "",
         "  FINANSPOSTER",
-        f"    Utbytte fra datterselskap    {_nok(utbytte)}",
+        f"    Utbytte fra datterselskap    {_nok(r.finansposter.utbytte_fra_datterselskap)}",
         f"    Andre finansinntekter        {_nok(andre_finansinntekter)}",
         f"    Rentekostnader               {_nok(r.finansposter.rentekostnader)}",
         f"    Andre finanskostnader        {_nok(r.finansposter.andre_finanskostnader)}",
     ]
     # Bare når selskapet har slike poster, så rapporten er uendret for alle andre.
+    utbytte_andre = r.finansposter.utbytte_fra_andre_aksjer
+    if utbytte_andre:
+        linjer.insert(
+            -3,
+            f"    Utbytte fra andre aksjer     {_nok(utbytte_andre)}",
+        )
     if r.finansposter.gevinst_ved_realisasjon_av_aksjer:
         linjer.insert(
             -2,
@@ -375,9 +381,16 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
     ]
 
     if konfig.anvend_fritaksmetoden and utbytte > 0:
-        if har_fullt_utbyttefritak(konfig):
+        if har_fullt_utbyttefritak(konfig) and not utbytte_andre:
             linjer += [
                 f"    Utbytte (100 % fritatt)      {_nok(fritatt_utbytte)}",
+            ]
+        elif har_fullt_utbyttefritak(konfig):
+            # Utbyttet fra datterselskapet er helt fritatt, utbyttet fra andre aksjer får
+            # 3 %-sjablonen, så andelen som er fritatt er verken 100 % eller 97 %.
+            linjer += [
+                f"    Utbytte (fritatt)            {_nok(fritatt_utbytte)}",
+                f"    Utbytte (sjablonregel, 3 %)  {_nok(skattepliktig_utbytte)}",
             ]
         else:
             linjer += [

@@ -74,11 +74,21 @@ class Finansposter:
     # kallsteder og config uten feltene gir samme resultat som før.
     gevinst_ved_realisasjon_av_aksjer: float = 0.0
     tap_ved_realisasjon_av_aksjer: float = 0.0
+    # Utbytte fra selskaper som verken er datterselskap eller tilknyttet selskap, typisk en
+    # eierandel under 20 %. Egen linje fordi årsregnskapet skiller det fra utbytte fra
+    # datterselskap og tilknyttet selskap. Skatten er den samme: fritaksmetoden med
+    # 3 %-sjablon. Står sist, så eldre kallsteder og config uten feltet gir samme resultat.
+    utbytte_fra_andre_aksjer: float = 0.0
+
+    @property
+    def sum_utbytte(self) -> float:
+        """Mottatt utbytte i alt, fra datterselskap og fra andre aksjer."""
+        return self.utbytte_fra_datterselskap + self.utbytte_fra_andre_aksjer
 
     @property
     def sum_inntekter(self) -> float:
         return (
-            self.utbytte_fra_datterselskap
+            self.sum_utbytte
             + self.andre_finansinntekter
             + self.gevinst_ved_realisasjon_av_aksjer
         )
