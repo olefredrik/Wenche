@@ -31,8 +31,10 @@ export const api = {
   selskap: () => req("/api/selskap"),
   // Config sendes i body (klienten er fasit), så en sovende/restartende server ikke kan
   // miste utfyllingen. Ingen server-side datalagring mellom kall.
-  innsending: (type: string, dryRun: boolean, config: unknown) =>
-    req(`/api/innsending/${type}?dry_run=${dryRun}`, {
+  // bekreftKlage: brukeren har bekreftet at skattemeldingen sendes som klage på
+  // skjønnsfastsetting (backend svarer krever_bekreftelse uten å sende før det).
+  innsending: (type: string, dryRun: boolean, config: unknown, bekreftKlage = false) =>
+    req(`/api/innsending/${type}?dry_run=${dryRun}${bekreftKlage ? "&bekreft_klage=true" : ""}`, {
       method: "POST",
       body: JSON.stringify(config),
     }),

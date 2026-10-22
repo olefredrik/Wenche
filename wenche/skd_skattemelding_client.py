@@ -183,6 +183,7 @@ class SkdSkattemeldingClient:
         naeringsspesifikasjon_xml: bytes | None = None,
         gjeldende_dokument_id: str | None = None,
         valider_foerst: bool = True,
+        innsendingsformaal: str = "egenfastsetting",
     ) -> str:
         """
         Klargjør skattemelding for innsending via Altinn3.
@@ -206,6 +207,11 @@ class SkdSkattemeldingClient:
             valider_foerst:           Kjør valider-tjenesten før opplasting og
                                       avbryt uten å sende hvis resultatet ikke er
                                       validertOK. Standard: True.
+            innsendingsformaal:       'klage' når gjeldende skattemelding er
+                                      skjønnsfastsatt, ellers 'egenfastsetting'.
+                                      Endringsanmodning velges aldri av Wenche;
+                                      Skatteetaten gjør om en egenfastsetting til
+                                      det selv ved behov (SSV-6235).
 
         Returns:
             URL til Altinn-inboksen der brukeren fullfører innsendingen.
@@ -220,6 +226,7 @@ class SkdSkattemeldingClient:
             orgnr=orgnr,
             naeringsspesifikasjon_xml=naeringsspesifikasjon_xml,
             gjeldende_dokument_id=gjeldende_dokument_id,
+            innsendingsformaal=innsendingsformaal,
         )
 
         if valider_foerst:

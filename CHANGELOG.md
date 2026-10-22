@@ -4,6 +4,27 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.9.0] - 2026-10-22
+
+### Lagt til
+
+- **Innsending for selskaper som er skjønnsfastsatt.** Leverer ikke selskapet skattemeldingen
+  innen fristen, kan Skatteetaten skjønnsfastsette den. Skatteetaten avviste da en senere
+  innsending fra Wenche, så selskapet kunne ikke levere via Wenche. Nå oppdager Wenche
+  skjønnsfastsettingen når den henter skattemeldingen, forklarer at innsendingen blir en
+  klage og ber om en egen bekreftelse før noe sendes. Klagen sendes med selskapets egne tall,
+  slik Skatteetaten ber om. Gjelder webgrensesnittet (hostet og self-hosted),
+  `send-skattemelding` og `valider-skattemelding`. Innsending for selskaper som ikke er
+  skjønnsfastsatt er uendret. ([#180](https://github.com/olefredrik/Wenche/issues/180))
+
+### Rettet
+
+- **Kvitteringen etter innsending av skattemelding sa at den var levert.** Skattemeldingen er
+  ikke levert før den er signert med BankID i Altinn. Webgrensesnittet viser nå «Venter på
+  signatur» med lenken «Signer i Altinn», slik det allerede gjorde for årsregnskapet, og
+  CLI-en sier det samme. Lenken til Altinn-innboksen sto før som «Instans-ID», og det var
+  ingen instans-ID. Kvitteringen for årsregnskapet har fått samme overskrift.
+
 ## [1.8.0] - 2026-10-21
 
 ### Lagt til

@@ -97,7 +97,7 @@ wenche send-skattemelding [--config FILSTI] [--dry-run]
 | `--config` | Sti til konfigurasjonsfil. Standard: `config.yaml` |
 | `--dry-run` | Henter forhåndsutfylt og genererer XML lokalt (`skattemelding.xml` og `naeringsspesifikasjon.xml`) uten å validere eller sende |
 
-Validerer mot Skatteetaten som første steg og laster ikke opp noe hvis resultatet ikke er `validertOK`. Etter opplasting skriver Wenche ut en lenke til Altinn-innboksen. Innsendingen fullføres først når en personlig bruker signerer med BankID i Altinn, det kan ikke gjøres maskinelt.
+Validerer mot Skatteetaten som første steg og laster ikke opp noe hvis resultatet ikke er `validertOK`. Er skattemeldingen skjønnsfastsatt av Skatteetaten, blir innsendingen en klage på skjønnsfastsettingen. Wenche forklarer dette og spør om du vil sende som klage (`j/N`) før noe sendes. Etter opplasting skriver Wenche ut en lenke til Altinn-innboksen. Innsendingen fullføres først når en personlig bruker signerer med BankID i Altinn, det kan ikke gjøres maskinelt.
 
 Krever at Maskinporten-klienten har fått scopet `skatteetaten:formueinntekt/skattemelding` innvilget. Se [steg 2g i oppsett](../oppsett.md#2g-sk-om-tilgang-til-skds-api-for-skattemelding).
 
@@ -115,7 +115,7 @@ wenche valider-skattemelding [--config FILSTI]
 |---|---|
 | `--config` | Sti til konfigurasjonsfil. Standard: `config.yaml` |
 
-Validering lagrer ikke data hos Skatteetaten og er ikke en innsending. `send-skattemelding` (og webgrensesnittet) kjører den samme valideringen automatisk, så denne kommandoen er mest nyttig for å inspisere avvik og merknader uten å sende. Bruker samme scope som `send-skattemelding`.
+Validering lagrer ikke data hos Skatteetaten og er ikke en innsending. `send-skattemelding` (og webgrensesnittet) kjører den samme valideringen automatisk, så denne kommandoen er mest nyttig for å inspisere avvik og merknader uten å sende. Er skattemeldingen skjønnsfastsatt, validerer Wenche den som klage, slik den vil bli sendt. Bruker samme scope som `send-skattemelding`.
 
 ---
 

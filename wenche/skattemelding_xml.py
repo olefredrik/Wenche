@@ -66,6 +66,7 @@ def generer_skattemelding_upersonlig(
     harytelse: bool | None = None,
     formue_verdi_foer_rabatt: int | None = None,
     samlet_gjeld: int | None = None,
+    gjelder_skjoennsfastsetting: bool = False,
 ) -> bytes:
     """
     Genererer skattemeldingUpersonlig XML for innsending til Skatteetaten.
@@ -95,6 +96,10 @@ def generer_skattemelding_upersonlig(
         samlet_gjeld:         Sum gjeld (heltall), settes overstyrt i formueOgGjeld.
                               Skatteetaten utleder verdi bak aksjene =
                               formue_verdi_foer_rabatt - samlet_gjeld (gulv 0).
+        gjelder_skjoennsfastsetting: Sett når gjeldende skattemelding er
+                              skjønnsfastsatt (se er_skjoennsfastsatt). Innsendingen
+                              er da en klage på skjønnet og må ha både dette flagget
+                              og innsendingsformaal=klage i konvolutten.
 
     Returns:
         XML-bytes klar for innpakking i konvolutt via generer_konvolutt().
@@ -164,6 +169,15 @@ def generer_skattemelding_upersonlig(
                 "harYtelseMellomAksjonaerEllerNaerstaaendeOgSelskapEllerSelskapetsDatterselskap",
             ).text = "true" if harytelse else "false"
 
+    # gjelderSkjoennsfastsetting. Skatteetaten avviser en innsending mot en
+    # skjønnsfastsatt skattemelding (UGYLDIG_KLAGE_PÅ_SKJØNNSFASTSETTING_UP) med mindre
+    # flagget er satt og konvolutten har innsendingsformaal=klage. Klagen er ellers en
+    # vanlig komplett skattemelding med selskapets egne tall; de myndighetsfastsatte
+    # verdiene trenger ikke gjentas (SSV-6235, verifisert i tt02 2026-10-22).
+    # XSD-pos: etter opplysningOmSkattesubjekt, før verdsettingAvAksje.
+    if gjelder_skjoennsfastsetting:
+        SubElement(root, "gjelderSkjoennsfastsetting").text = "true"
+
     # verdsettingAvAksje/samletVerdiBakAksjeneISelskapet — derivert sum SKD
     # beregner som verdiFoerRabatt - gjeld. Vi echo-er den slik at
     # tilbakemeldingen ikke flagger «manglerSkattemelding» for feltet (jf.
@@ -230,7 +244,10 @@ def beregn_verdi_bak_aksjene(
 
 
 def generer_skattemelding_fra_konfig(
-    regnskap: Aarsregnskap, konfig: SkattemeldingKonfig, partsnummer: int
+    regnskap: Aarsregnskap,
+    konfig: SkattemeldingKonfig,
+    partsnummer: int,
+    gjelder_skjoennsfastsetting: bool = False,
 ) -> bytes:
     """
     Bygger skattemeldingUpersonlig-XML fra regnskap + konfig.
@@ -261,6 +278,7 @@ def generer_skattemelding_fra_konfig(
         harytelse=harytelse,
         formue_verdi_foer_rabatt=verdi_foer_rabatt,
         samlet_gjeld=samlet_gjeld,
+        gjelder_skjoennsfastsetting=gjelder_skjoennsfastsetting,
     )
 
 
@@ -287,3 +305,18 @@ def hent_partsnummer(skattemelding_xml: bytes) -> int:
             "Fant ikke <partsnummer> i forhåndsutfylt skattemelding fra Skatteetaten."
         )
     return int(element.text)
+
+
+def er_skjoennsfastsatt(skattemelding_xml: bytes) -> bool:
+    """
+    Om gjeldende skattemelding fra Skatteetaten er skjønnsfastsatt.
+
+    Skatteetaten skjønnsfastsetter selskaper som ikke har levert innen fristen. Gjeldende
+    skattemelding (GET /api/skattemelding/v2/{år}/{orgnr}) har da
+    <gjelderSkjoennsfastsetting>true</gjelderSkjoennsfastsetting>, og en ny innsending må
+    sendes som klage på skjønnet.
+    """
+    root = fromstring(skattemelding_xml.decode("utf-8"))
+    # Namespace-agnostisk av samme grunn som hent_partsnummer.
+    element = root.find(".//{*}gjelderSkjoennsfastsetting")
+    return element is not None and (element.text or "").strip() == "true"

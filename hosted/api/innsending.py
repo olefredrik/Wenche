@@ -216,7 +216,10 @@ def innsending_aksjonaer(
 
 @router.post("/innsending/skattemelding")
 def innsending_skattemelding(
-    request: Request, config: dict[str, Any] = Body(...), dry_run: bool = False
+    request: Request,
+    config: dict[str, Any] = Body(...),
+    dry_run: bool = False,
+    bekreft_klage: bool = False,
 ) -> dict:
     krev_invitert(request)
     if dry_run:
@@ -229,6 +232,8 @@ def innsending_skattemelding(
     def _send():
         tokens = wauth.hent_tokens_for(creds, org, SKD_SKATTEMELDING_SCOPE, veksle_altinn=True)
         with SkdSkattemeldingClient(tokens["maskinporten_token"], env=s.env) as skd:
-            return tjeneste.send_skattemelding(config, skd, tokens["altinn_token"], orgnr=org)
+            return tjeneste.send_skattemelding(
+                config, skd, tokens["altinn_token"], orgnr=org, bekreft_klage=bekreft_klage
+            )
 
     return _utfor(_send, org)

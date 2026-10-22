@@ -17,7 +17,8 @@ export default function Send({ config, env }: { config: any; env: string }) {
     );
   }
 
-  const innsending: InnsendingFn = (type, dryRun, cfg) => api.innsending(type, dryRun, cfg);
+  const innsending: InnsendingFn = (type, dryRun, cfg, bekreftKlage) =>
+    api.innsending(type, dryRun, cfg, bekreftKlage);
   const o = oppsummer(config);
 
   return (

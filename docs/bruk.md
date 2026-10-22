@@ -54,6 +54,9 @@ Wenche validerer først skattemeldingen mot Skatteetaten og viser en oppsummerin
 !!! note "Signering skjer i Altinn, ikke i Wenche"
     Skatteetaten krever at en personlig bruker bekrefter skattemeldingen via ID-porten. Wenche laster opp innholdet med systembruker, men selve innsendingen fullføres først når du signerer med BankID i Altinn. Dette kan ikke gjøres maskinelt.
 
+!!! warning "Skjønnsfastsatt skattemelding"
+    Leverer ikke selskapet skattemeldingen innen fristen, kan Skatteetaten skjønnsfastsette den. Sender du etterpå via Wenche, blir innsendingen en klage på skjønnsfastsettingen. Wenche oppdager dette selv når den henter skattemeldingen fra Skatteetaten, forklarer hva det betyr og ber deg bekrefte at du vil sende som klage før noe sendes. Klagen inneholder selskapets egne tall, slik som en vanlig innsending, og Skatteetaten behandler den som en klagesak.
+
 !!! tip "Formuesverdi av aksjer (aksjeoppgaven RF-1088S)"
     Eier selskapet aksjer i andre selskap, fyll inn **formuesverdien** fra aksjeoppgaven (RF-1088S, post 209) i feltet «Formuesverdi aksjer» (Tall-fanen → Skattemelding, eller `formuesverdi_aksjer` i config.yaml). Wenche bruker den til å beregne formuesverdien bak selskapets egne aksjer, som er grunnlaget for eiernes formuesskatt. Uten den blir feltet stående tomt og Skatteetaten gir en merknad.
 

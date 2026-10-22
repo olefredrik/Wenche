@@ -654,17 +654,17 @@ function SendFane({ config, me }: { config: any; me: Me }) {
 
   // Selvhelende systembruker-binding: en 409 betyr at bindingen gikk tapt (serveren sov/
   // restartet). Den reises FØR innsending, så det er trygt å rebinde og prøve én gang til.
-  const innsending: InnsendingFn = async (type, dryRun, cfg) => {
+  const innsending: InnsendingFn = async (type, dryRun, cfg, bekreftKlage) => {
     if (dryRun) sporHendelse("send-start", { type });
     try {
-      const data = await api.innsending(type, dryRun, cfg);
-      if (!dryRun) sporHendelse("send-ok", { type });
+      const data = await api.innsending(type, dryRun, cfg, bekreftKlage);
+      if (!dryRun && data?.sendt) sporHendelse("send-ok", { type });
       return data;
     } catch (e) {
       if (!dryRun && (e as { status?: number }).status === 409) {
         await api.systembrukerRequest();
-        const data = await api.innsending(type, dryRun, cfg);
-        sporHendelse("send-ok", { type });
+        const data = await api.innsending(type, dryRun, cfg, bekreftKlage);
+        if (data?.sendt) sporHendelse("send-ok", { type });
         return data;
       }
       throw e;

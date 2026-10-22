@@ -28,12 +28,12 @@ export type InnsendingFn = (
   dryRun: boolean,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   config: any,
+  bekreftKlage?: boolean,
 ) => Promise<any>;
 
 const KVITTERING_ETIKETT: Record<string, string> = {
   forsendelseId: "Forsendelse-ID",
   dialogId: "Dialog-ID",
-  instans_id: "Instans-ID",
   oppgavegiversLeveranseReferanse: "Leveranse-referanse",
 };
 
@@ -90,26 +90,30 @@ export function Resultatpanel({
   if (data.sendt) {
     const lenkeKlasse =
       "mt-3 inline-block font-medium text-spruce underline-offset-2 hover:underline";
-    // Årsregnskap: send_inn returnerer en signeringslenke (streng) — signering i Altinn
-    // med BankID kan ikke gjøres maskinelt.
+    // Årsregnskap og skattemelding: backend returnerer en signeringslenke (streng) til
+    // Altinn-innboksen. Innsendingen er ikke levert før brukeren signerer der med BankID,
+    // og det kan ikke gjøres maskinelt.
     const signeringsUrl = typeof data.resultat === "string" ? data.resultat : null;
     if (signeringsUrl) {
       return (
-        <Panel tone="ok" tittel="Sendt inn">
-          <p>Dokumentet er lastet opp og venter på din signatur i Altinn.</p>
+        <Panel tone="ok" tittel="Venter på signatur">
+          {data.klage && <p className="mb-2">Skattemeldingen sendes som klage på skjønnsfastsettingen.</p>}
+          <p>
+            Dokumentet er lastet opp, men er ikke levert ennå. Signer med BankID i Altinn for å
+            fullføre innsendingen.
+          </p>
           <a href={signeringsUrl} target="_blank" rel="noopener noreferrer" className={lenkeKlasse}>
             Signer i Altinn →
           </a>
         </Panel>
       );
     }
-    // Aksjonær (forsendelse-ID) / skattemelding (instans): kvittering + lenke til meldingsboks.
+    // Aksjonær (forsendelse-ID): kvittering + lenke til meldingsboks.
     const kvittering: Record<string, unknown> =
       data.resultat && typeof data.resultat === "object" ? data.resultat : {};
     const linjer: [string, unknown][] = Object.entries(kvittering).filter(
       ([, v]) => typeof v === "string" || typeof v === "number",
     );
-    if (data.instans_id) linjer.unshift(["instans_id", data.instans_id]);
     const altinnBase = env === "test" ? "https://tt02.altinn.no" : "https://af.altinn.no";
     const meldingsboksUrl = org
       ? `${altinnBase}/?party=urn%3Aaltinn%3Aorganization%3Aidentifier-no%3A${org}`
@@ -149,6 +153,7 @@ function BekreftModal({
   validering,
   sender,
   samtykke,
+  klage,
   onBekreft,
   onAvbryt,
 }: {
@@ -158,10 +163,14 @@ function BekreftModal({
   validering: Validering | null;
   sender: boolean;
   samtykke: React.ReactNode;
+  // Forklaringen fra backend når skattemeldingen er skjønnsfastsatt og innsendingen blir en
+  // klage. Da kreves en egen bekreftelse i tillegg til samtykket.
+  klage: string | null;
   onBekreft: () => void;
   onAvbryt: () => void;
 }) {
   const [godtatt, setGodtatt] = useState(false);
+  const [klageGodtatt, setKlageGodtatt] = useState(false);
   const klar = validering?.ok === true;
   return (
     <div
@@ -187,7 +196,8 @@ function BekreftModal({
 
         <div className="mt-4 text-sm">
           {validering?.laster && <p className="text-muted-foreground">Kontrollerer tallene…</p>}
-          {validering && !validering.laster && klar &&
+          {/* Ved klage tar forklaringen under over; «klar til innsending» ville lest motstridende. */}
+          {validering && !validering.laster && klar && !klage &&
             ((validering.advarsler?.length ?? 0) > 0 ? (
               <p className="text-spruce">✓ Tallene er gyldige. Les merknadene under før du sender.</p>
             ) : (
@@ -216,6 +226,22 @@ function BekreftModal({
           )}
         </div>
 
+        {klage && (
+          <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+            <p className="font-medium">Skattemeldingen er skjønnsfastsatt</p>
+            <p className="mt-1">{klage}</p>
+            <label className="mt-3 flex items-start gap-2 text-xs">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 accent-[oklch(0.46_0.08_155)]"
+                checked={klageGodtatt}
+                onChange={(e) => setKlageGodtatt(e.target.checked)}
+              />
+              <span>Jeg forstår at innsendingen blir en klage på skjønnsfastsettingen.</span>
+            </label>
+          </div>
+        )}
+
         <p className="mt-4 text-xs text-muted-foreground">
           Sendes til myndighetene via Altinn, og er bindende.
         </p>
@@ -239,9 +265,9 @@ function BekreftModal({
           <button
             className={`${btnPrimar} min-w-52 text-center`}
             onClick={onBekreft}
-            disabled={!klar || sender || !godtatt}
+            disabled={!klar || sender || !godtatt || (!!klage && !klageGodtatt)}
           >
-            {sender ? "Sender…" : "Bekreft og send inn"}
+            {sender ? "Sender…" : klage ? "Send som klage" : "Bekreft og send inn"}
           </button>
         </div>
       </div>
@@ -270,6 +296,7 @@ export function SendSeksjon({
   const [validering, setValidering] = useState<Validering | null>(null);
   const [sender, setSender] = useState(false);
   const [utfall, setUtfall] = useState<Utfall | null>(null);
+  const [klage, setKlage] = useState<string | null>(null);
 
   const o = oppsummer(config);
 
@@ -295,22 +322,29 @@ export function SendSeksjon({
   const lukkBekreft = () => {
     setBekreft(null);
     setValidering(null);
+    setKlage(null);
   };
 
-  // Steg 2: brukeren har bekreftet, send inn på ekte.
+  // Steg 2: brukeren har bekreftet, send inn på ekte. Er skattemeldingen skjønnsfastsatt,
+  // sender backend ingenting første gang, men svarer krever_bekreftelse. Modalen blir da
+  // stående med forklaringen, og neste bekreftelse sender med bekreftKlage.
   const bekreftSend = async () => {
     if (!bekreft) return;
     const { type } = bekreft;
     setSender(true);
     try {
-      const data = await innsending(type, false, config);
+      const data = await innsending(type, false, config, klage !== null);
+      if (data?.krever_bekreftelse === "klage_paa_skjoennsfastsetting") {
+        setKlage(data.melding);
+        setSender(false);
+        return;
+      }
       setUtfall({ dryRun: false, type, data });
     } catch (e) {
       setUtfall({ dryRun: false, type, feil: (e as Error).message });
-    } finally {
-      setSender(false);
-      lukkBekreft();
     }
+    setSender(false);
+    lukkBekreft();
   };
 
   return (
@@ -361,6 +395,7 @@ export function SendSeksjon({
           validering={validering}
           sender={sender}
           samtykke={samtykke}
+          klage={klage}
           onBekreft={bekreftSend}
           onAvbryt={lukkBekreft}
         />
