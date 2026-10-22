@@ -33,8 +33,10 @@ export const api = {
       body: file,
     }),
 
-  innsending: (type: string, dryRun: boolean, config: unknown) =>
-    req(`/api/innsending/${type}?dry_run=${dryRun}`, {
+  // bekreftKlage: brukeren har bekreftet at skattemeldingen sendes som klage på
+  // skjønnsfastsetting (backend svarer krever_bekreftelse uten å sende før det).
+  innsending: (type: string, dryRun: boolean, config: unknown, bekreftKlage = false) =>
+    req(`/api/innsending/${type}?dry_run=${dryRun}${bekreftKlage ? "&bekreft_klage=true" : ""}`, {
       method: "POST",
       body: JSON.stringify(config),
     }),

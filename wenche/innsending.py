@@ -17,11 +17,25 @@ from wenche import aksjonaerregister as _akr
 from wenche import skattemelding as _sm
 from wenche.altinn_client import AltinnClient
 from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
-from wenche.skattemelding_xml import generer_skattemelding_fra_konfig, hent_partsnummer
+from wenche.skattemelding_xml import (
+    er_skjoennsfastsatt,
+    generer_skattemelding_fra_konfig,
+    hent_partsnummer,
+)
 from wenche.skd_client import SkdAksjonaerClient
 from wenche.skd_skattemelding_client import SkdSkattemeldingClient
 
 Config = str | dict[str, Any]
+
+# Vises før en innsending som blir klage på skjønnsfastsetting (issue #180). Delt av CLI og
+# begge SPA-ene, så brukeren får samme forklaring uansett hvor de sender fra.
+SKJOENN_KLAGE_FORKLARING = (
+    "Skatteetaten har skjønnsfastsatt skattemeldingen for {aar}, som regel fordi den ikke ble "
+    "levert innen fristen. Sender du nå, blir innsendingen en klage på skjønnsfastsettingen. "
+    "Klagen inneholder selskapets egne tall og ber Skatteetaten fastsette skatten etter dem. "
+    "Skatteetaten behandler den som en klagesak, så det kan ta lengre tid enn en vanlig "
+    "innsending."
+)
 
 
 class InnsendingValideringsfeil(Exception):
@@ -93,6 +107,7 @@ def send_skattemelding(
     orgnr: str,
     partsnummer: int | None = None,
     gjeldende_dokument_id: str | None = None,
+    bekreft_klage: bool = False,
 ) -> dict:
     """
     Bygg og send skattemelding + næringsspesifikasjon for AS via Altinn3.
@@ -100,8 +115,13 @@ def send_skattemelding(
     Henter forhåndsutfylt for å utlede partsnummer/gjeldende dokument-id, med mindre kalleren
     oppgir `partsnummer` direkte (brukes i SKDs testmiljø der forhåndsutfylt ikke finnes).
     Kan kaste `SkattemeldingValideringsfeil` fra `skd_klient.send`.
+
+    Er gjeldende skattemelding skjønnsfastsatt, blir innsendingen en klage. Uten
+    `bekreft_klage` sendes da ingenting; svaret har `krever_bekreftelse` og en forklaring
+    som kalleren viser brukeren før den prøver igjen med `bekreft_klage=True`.
     """
     regnskap, konfig = _sm.les_config(config)
+    skjoennsfastsatt = False
     if partsnummer is None:
         forhåndsutfylt, gjeldende_dokument_id = skd_klient.hent_forhåndsutfylt_med_id(
             regnskap.regnskapsaar, orgnr
@@ -120,14 +140,26 @@ def send_skattemelding(
                 "sendt inn. Skattemeldingen for dette året er kanskje ikke klargjort hos "
                 "Skatteetaten ennå. Prøv igjen senere, eller ta kontakt."
             ) from e
-    skattemelding_xml = generer_skattemelding_fra_konfig(regnskap, konfig, partsnummer)
+        skjoennsfastsatt = er_skjoennsfastsatt(forhåndsutfylt)
+    if skjoennsfastsatt and not bekreft_klage:
+        return {
+            "sendt": False,
+            "krever_bekreftelse": "klage_paa_skjoennsfastsetting",
+            "melding": SKJOENN_KLAGE_FORKLARING.format(aar=regnskap.regnskapsaar),
+        }
+    skattemelding_xml = generer_skattemelding_fra_konfig(
+        regnskap, konfig, partsnummer, gjelder_skjoennsfastsetting=skjoennsfastsatt
+    )
     naeringsspesifikasjon_xml = generer_naeringsspesifikasjon(regnskap, partsnummer, konfig)
-    instans_id = skd_klient.send(
+    # send() returnerer Altinn-lenken der brukeren signerer (som årsregnskapet), ikke en
+    # instans-ID. Legges i `resultat` slik at UI-ene viser «venter på signatur» + lenken.
+    signeringslenke = skd_klient.send(
         inntektsaar=regnskap.regnskapsaar,
         orgnr=orgnr,
         skattemelding_xml=skattemelding_xml,
         altinn_token=altinn_token,
         naeringsspesifikasjon_xml=naeringsspesifikasjon_xml,
         gjeldende_dokument_id=gjeldende_dokument_id,
+        innsendingsformaal="klage" if skjoennsfastsatt else "egenfastsetting",
     )
-    return {"sendt": True, "instans_id": instans_id}
+    return {"sendt": True, "resultat": signeringslenke, "klage": skjoennsfastsatt}

@@ -108,7 +108,9 @@ def innsending_aksjonaer(config: dict[str, Any] = Body(...), dry_run: bool = Fal
 
 
 @router.post("/skattemelding")
-def innsending_skattemelding(config: dict[str, Any] = Body(...), dry_run: bool = False) -> dict:
+def innsending_skattemelding(
+    config: dict[str, Any] = Body(...), dry_run: bool = False, bekreft_klage: bool = False
+) -> dict:
     config = miljo.med_test_org(config)
     if dry_run:
         return {"dry_run": True, **tjeneste.valider_skattemelding(config)}
@@ -119,6 +121,8 @@ def innsending_skattemelding(config: dict[str, Any] = Body(...), dry_run: bool =
     # test-org-en gir «tekniskFeil» fra SKDs validator. Samme flyt som prod.
     def _send():
         with SkdSkattemeldingClient(tokens["maskinporten_token"], env=miljo.aktiv_env()) as skd:
-            return tjeneste.send_skattemelding(config, skd, tokens["altinn_token"], orgnr=orgnr)
+            return tjeneste.send_skattemelding(
+                config, skd, tokens["altinn_token"], orgnr=orgnr, bekreft_klage=bekreft_klage
+            )
 
     return _utfor(_send)

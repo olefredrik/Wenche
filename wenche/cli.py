@@ -377,8 +377,13 @@ def send_skattemelding(config_fil: str, dry_run: bool):
     import os
     from pathlib import Path
     from wenche.skattemelding import les_config
-    from wenche.skattemelding_xml import generer_skattemelding_fra_konfig, hent_partsnummer
+    from wenche.skattemelding_xml import (
+        er_skjoennsfastsatt,
+        generer_skattemelding_fra_konfig,
+        hent_partsnummer,
+    )
     from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
+    from wenche.innsending import SKJOENN_KLAGE_FORKLARING
     from wenche.skd_skattemelding_client import (
         SkattemeldingValideringsfeil,
         SkdSkattemeldingClient,
@@ -403,6 +408,7 @@ def send_skattemelding(config_fil: str, dry_run: bool):
     with SkdSkattemeldingClient(tokens["maskinporten_token"], env=env) as skd:
         test_partsnummer = os.getenv("SKD_TEST_PARTSNUMMER") if env == "test" else None
         gjeldende_dokument_id: str | None = None
+        skjoennsfastsatt = False
         if test_partsnummer:
             click.echo(f"Bruker SKD_TEST_PARTSNUMMER={test_partsnummer} (hopper over forhåndsutfylt)")
             partsnummer = int(test_partsnummer)
@@ -412,9 +418,24 @@ def send_skattemelding(config_fil: str, dry_run: bool):
                 regnskap.regnskapsaar, orgnr
             )
             partsnummer = hent_partsnummer(forhåndsutfylt)
+            skjoennsfastsatt = er_skjoennsfastsatt(forhåndsutfylt)
         click.echo(f"Partsnummer: {partsnummer}")
 
-        skattemelding_xml = generer_skattemelding_fra_konfig(regnskap, konfig, partsnummer)
+        if skjoennsfastsatt:
+            click.echo("\n" + SKJOENN_KLAGE_FORKLARING.format(aar=regnskap.regnskapsaar) + "\n")
+            if not dry_run:
+                svar = click.prompt(
+                    "Vil du sende skattemeldingen som klage på skjønnsfastsettingen? [j/N]",
+                    default="n",
+                    show_default=False,
+                )
+                if svar.strip().lower() not in {"j", "ja"}:
+                    click.echo("Avbrutt. Ingenting er sendt.")
+                    raise SystemExit(1)
+
+        skattemelding_xml = generer_skattemelding_fra_konfig(
+            regnskap, konfig, partsnummer, gjelder_skjoennsfastsetting=skjoennsfastsatt
+        )
         naeringsspesifikasjon_xml = generer_naeringsspesifikasjon(regnskap, partsnummer, konfig)
 
         if dry_run:
@@ -430,20 +451,24 @@ def send_skattemelding(config_fil: str, dry_run: bool):
             return
 
         try:
-            instans_id = skd.send(
+            signeringslenke = skd.send(
                 inntektsaar=regnskap.regnskapsaar,
                 orgnr=orgnr,
                 skattemelding_xml=skattemelding_xml,
                 altinn_token=tokens["altinn_token"],
                 naeringsspesifikasjon_xml=naeringsspesifikasjon_xml,
                 gjeldende_dokument_id=gjeldende_dokument_id,
+                innsendingsformaal="klage" if skjoennsfastsatt else "egenfastsetting",
             )
         except SkattemeldingValideringsfeil as e:
             click.echo(f"\n{e}")
             click.echo("\nRett feilene over og kjør på nytt. Kjør «wenche valider-skattemelding» for å sjekke uten å sende.")
             raise SystemExit(1)
 
-    click.echo(f"\nSkattemelding sendt. Instans-ID: {instans_id}")
+    click.echo(
+        "\nSkattemeldingen er lastet opp og venter på signering. Den er ikke levert før du "
+        f"signerer med BankID i Altinn:\n  {signeringslenke}"
+    )
 
 
 @main.command("valider-skattemelding")
@@ -462,7 +487,11 @@ def valider_skattemelding(config_fil: str):
     """
     import os
     from wenche.skattemelding import les_config
-    from wenche.skattemelding_xml import generer_skattemelding_fra_konfig, hent_partsnummer
+    from wenche.skattemelding_xml import (
+        er_skjoennsfastsatt,
+        generer_skattemelding_fra_konfig,
+        hent_partsnummer,
+    )
     from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
     from wenche.skattemelding_konvolutt import generer_konvolutt
     from wenche.skd_skattemelding_client import (
@@ -493,6 +522,7 @@ def valider_skattemelding(config_fil: str):
     with SkdSkattemeldingClient(tokens["maskinporten_token"], env=env) as skd:
         test_partsnummer = os.getenv("SKD_TEST_PARTSNUMMER") if env == "test" else None
         gjeldende_dokument_id = None
+        skjoennsfastsatt = False
         if test_partsnummer:
             partsnummer = int(test_partsnummer)
         else:
@@ -501,9 +531,17 @@ def valider_skattemelding(config_fil: str):
                 regnskap.regnskapsaar, orgnr
             )
             partsnummer = hent_partsnummer(forhåndsutfylt)
+            skjoennsfastsatt = er_skjoennsfastsatt(forhåndsutfylt)
         click.echo(f"Partsnummer: {partsnummer}")
+        if skjoennsfastsatt:
+            click.echo(
+                "Skattemeldingen er skjønnsfastsatt. Validerer som klage på "
+                "skjønnsfastsettingen, slik den vil bli sendt."
+            )
 
-        skattemelding_xml = generer_skattemelding_fra_konfig(regnskap, konfig, partsnummer)
+        skattemelding_xml = generer_skattemelding_fra_konfig(
+            regnskap, konfig, partsnummer, gjelder_skjoennsfastsetting=skjoennsfastsatt
+        )
         naeringsspesifikasjon_xml = generer_naeringsspesifikasjon(regnskap, partsnummer, konfig)
         konvolutt = generer_konvolutt(
             skattemelding_xml=skattemelding_xml,
@@ -511,6 +549,7 @@ def valider_skattemelding(config_fil: str):
             orgnr=orgnr,
             naeringsspesifikasjon_xml=naeringsspesifikasjon_xml,
             gjeldende_dokument_id=gjeldende_dokument_id,
+            innsendingsformaal="klage" if skjoennsfastsatt else "egenfastsetting",
         )
 
         click.echo("Validerer mot Skatteetaten (lagrer ikke data)...\n")
