@@ -44,6 +44,7 @@ def _advar_om_ukjente_felt(config_fil: str) -> None:
     for a in configfelt.advarsel_om_ukjente_felt(config_fil):
         click.echo(f"ADVARSEL: {a}", err=True)
 
+
 @click.group(invoke_without_command=True)
 @click.version_option(__version__, prog_name="Wenche")
 @click.pass_context
