@@ -55,12 +55,13 @@ resultatregnskap:
 
 # --- Regnskapsperiode (valgfritt) ---
 # Normalt hele kalenderåret, og da skal begge stå urørt.
-# Oppgi dem bare ved forlenget første regnskapsår (rskl. § 1-7 andre ledd): et selskap
-# stiftet sent på året kan la det første regnskapsåret løpe i inntil 18 måneder, fram til
-# 31.12 året etter. Da skal regnskapsaar over være året perioden AVSLUTTES.
+# Oppgi regnskapsstart bare i selskapets første regnskapsår, når det ble stiftet i løpet
+# av året: perioden løper da fra stiftelsesdatoen til 31.12 samme år. Forlenget første
+# regnskapsår (rskl. § 1-7 andre ledd) støttes ikke, siden skattemeldingen leveres for
+# hvert kalenderår.
 #
 # regnskapsstart: 2025-11-20      # Stiftelsesdatoen
-# regnskapsslutt: 2026-12-31      # Alltid 31. desember
+# regnskapsslutt: 2025-12-31      # Alltid 31. desember samme år
 
 # --- Balanse ---
 # Balansen skal gå opp: sum eiendeler = sum egenkapital og gjeld.
