@@ -8,14 +8,14 @@
 selskap:
   navn: "Eksempel Holding AS"
   org_nummer: "123456789"           # 9 siffer uten mellomrom
-  daglig_leder: ""                  # Navn på daglig leder
-  styreleder: ""                    # Kan være samme person som daglig leder
+  daglig_leder: "Kari Nordmann"     # Navn på daglig leder
+  styreleder: "Kari Nordmann"       # Kan være samme person som daglig leder
   forretningsadresse: "Eksempelgata 1, 0001 Oslo"
   stiftelsesaar: 2022
   # stiftelsesdato: 2018-03-14        # Valgfri, eksakt dato (ÅÅÅÅ-MM-DD). Hentes fra
                                       # Enhetsregisteret. Brukes i aksjonærregisteroppgaven
   aksjekapital: 30000               # NOK — fra stiftelsesdokumentene
-  kontakt_epost: ""                 # Påkrevd for aksjonærregisteroppgave (RF-1086). Skatteetaten
+  kontakt_epost: "kari@example.no"  # Påkrevd for aksjonærregisteroppgave (RF-1086). Skatteetaten
                                     # sender godkjenning eller avvisning hit, så bruk en adresse du leser
 
 regnskapsaar: 2025                  # Året regnskapet gjelder for
@@ -76,7 +76,7 @@ balanse:
       langsiktige_fordringer: 0       # Lån gitt til andre med løpetid over 1 år
     omloepmidler:
       kortsiktige_fordringer: 0       # Kundefordringer og andre kortsiktige krav
-      bankinnskudd: 0                 # Saldo på driftskonto per 31.12
+      bankinnskudd: 30000             # Saldo på driftskonto per 31.12
 
   egenkapital_og_gjeld:
     egenkapital:
@@ -125,10 +125,10 @@ foregaaende_aar:
         langsiktige_fordringer: 0
       omloepmidler:
         kortsiktige_fordringer: 0
-        bankinnskudd: 0
+        bankinnskudd: 30000
     egenkapital_og_gjeld:
       egenkapital:
-        aksjekapital: 0
+        aksjekapital: 30000
         overkursfond: 0
         annen_egenkapital: 0
       langsiktig_gjeld:
@@ -180,7 +180,7 @@ skattemelding:
 
 aksjonaerer:
   - navn: "Kari Nordmann"
-    fodselsnummer: "01010112345"        # 11 siffer — personnummer
+    fodselsnummer: "24847799354"        # 11 siffer. Syntetisk testnummer, bytt til ekte
     antall_aksjer: 1000
     aksjeklasse: "ordinære"
     utbytte_utbetalt: 0                 # Utbytte utbetalt til denne aksjonæren i NOK
