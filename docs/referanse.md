@@ -8,6 +8,8 @@ Komplett dokumentasjon for konfigurasjonsfilen `config.yaml` og miljøvariabler 
 
 Alle beløp oppgis i hele kroner (NOK). Bruk `0` for poster som ikke er aktuelle.
 
+Feltnavnene må stå nøyaktig som i tabellene under. Wenche advarer om felt den ikke kjenner under `selskap`, `resultatregnskap`, `balanse`, `foregaaende_aar`, `skattemelding` og `aksjonaerer`, siden et beløp i et slikt felt ikke kommer med i innsendingen. Det skjer typisk når feltnavnet er feilstavet, eller når configen er laget for en nyere Wenche-versjon.
+
 ### `selskap`
 
 | Felt | Type | Påkrevd | Beskrivelse |

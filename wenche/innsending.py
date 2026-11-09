@@ -14,6 +14,7 @@ from typing import Any
 
 from wenche import aarsregnskap as _ar
 from wenche import aksjonaerregister as _akr
+from wenche import configfelt as _configfelt
 from wenche import skattemelding as _sm
 from wenche.altinn_client import AltinnClient
 from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
@@ -53,29 +54,37 @@ class InnsendingValideringsfeil(Exception):
 def valider_aarsregnskap(config: Config) -> dict:
     regnskap = _ar.les_config(config)
     feil = _ar.valider(regnskap)
-    return {"ok": not feil, "feil": feil, "advarsler": _ar.advarsler(regnskap)}
+    advarsler = _ar.advarsler(regnskap) + _configfelt.advarsel_om_ukjente_felt(config)
+    return {"ok": not feil, "feil": feil, "advarsler": advarsler}
 
 
 def valider_aksjonaer(config: Config) -> dict:
     oppgave = _akr.les_config(config)
     feil = _akr.valider(oppgave)
-    return {"ok": not feil, "feil": feil, "antall_aksjonaerer": len(oppgave.aksjonaerer)}
+    return {
+        "ok": not feil,
+        "feil": feil,
+        "advarsler": _configfelt.advarsel_om_ukjente_felt(config),
+        "antall_aksjonaerer": len(oppgave.aksjonaerer),
+    }
 
 
 def valider_skattemelding(config: Config) -> dict:
     # Lokal bygging uten nettverk/partsnummer. SKD-validering skjer ved ekte innsending.
     # Sjekk de påkrevde selskapsfeltene først: et ufullstendig selskap (typisk etter SAF-T-import)
     # skal bli et rettbart avvik i bekreft-modalen, ikke en naken int('')/float('')-500.
+    # Et ukjent felt kan forklare et felt som mangler, så advarselen følger også feilsvarene.
+    advarsler = _configfelt.advarsel_om_ukjente_felt(config)
     feil = _sm.valider_selskap(config)
     if feil:
-        return {"ok": False, "feil": feil}
+        return {"ok": False, "feil": feil, "advarsler": advarsler}
     regnskap, _konfig = _sm.les_config(config)
     # Skattemeldingen leveres per kalenderår og bygges fra årsregnskapets periode, så en
     # periode over to kalenderår ville gitt en skattemelding for feil periode.
     feil = _ar.valider_periode(regnskap)
     if feil:
-        return {"ok": False, "feil": feil}
-    return {"ok": True, "feil": [], "regnskapsaar": regnskap.regnskapsaar}
+        return {"ok": False, "feil": feil, "advarsler": advarsler}
+    return {"ok": True, "feil": [], "advarsler": advarsler, "regnskapsaar": regnskap.regnskapsaar}
 
 
 # ---------------------------------------------------------------------------
