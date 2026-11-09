@@ -214,7 +214,7 @@ def valider(regnskap: Aarsregnskap) -> list[str]:
     if len(regnskap.selskap.org_nummer.replace(" ", "")) != 9:
         feil.append("Organisasjonsnummeret må være 9 siffer.")
 
-    feil.extend(_valider_periode(regnskap))
+    feil.extend(valider_periode(regnskap))
     feil.extend(_valider_tinginnskudd(regnskap))
 
     return feil
@@ -259,14 +259,20 @@ def _valider_tinginnskudd(regnskap: Aarsregnskap) -> list[str]:
     return []
 
 
-def _valider_periode(regnskap: Aarsregnskap) -> list[str]:
+def valider_periode(regnskap: Aarsregnskap) -> list[str]:
     """
     Kontrollerer regnskapsperioden. Tom liste betyr OK.
 
-    Perioden er normalt kalenderåret (rskl. § 1-7 første ledd). Andre ledd åpner for et
-    forlenget første regnskapsår på inntil 18 måneder ved oppstart, og da må start- og
+    Perioden er normalt kalenderåret (rskl. § 1-7 første ledd). Et selskap stiftet i løpet
+    av året har et kort første regnskapsår fra stiftelsesdatoen, og da må start- og
     sluttdato oppgis. Reglene her er de som må holde for at både Brønnøysund og
     Skatteetaten skal kunne tolke perioden entydig.
+
+    Forlenget første regnskapsår (§ 1-7 andre ledd) støttes ikke. Det spenner over to
+    kalenderår, mens skattemeldingen leveres per inntektsår, som er kalenderåret
+    (skatteloven § 14-1). Wenche bygger årsregnskap og skattemelding fra samme periode, så
+    en periode over to år ville gitt en skattemelding for feil periode og ingen for
+    stiftelsesåret.
     """
     feil = []
     start, slutt = regnskap.periode_start, regnskap.periode_slutt
@@ -278,11 +284,12 @@ def _valider_periode(regnskap: Aarsregnskap) -> list[str]:
         )
         return feil  # De øvrige kontrollene er meningsløse på en snudd periode.
 
-    if regnskap.periode_maaneder > 18:
+    if start.year != slutt.year:
         feil.append(
-            f"Regnskapsperioden er {regnskap.periode_maaneder} måneder "
-            f"({start.isoformat()} til {slutt.isoformat()}). Regnskapsloven § 1-7 tillater "
-            "inntil 18 måneder, og bare for det første regnskapsåret."
+            f"Regnskapsperioden går over to kalenderår ({start.isoformat()} til "
+            f"{slutt.isoformat()}). Wenche støtter ikke forlenget første regnskapsår, fordi "
+            "skattemeldingen skal leveres for hvert kalenderår. Bruk et kort første "
+            "regnskapsår fra stiftelsesdatoen til 31. desember samme år."
         )
 
     if (slutt.month, slutt.day) != (12, 31):
@@ -351,27 +358,14 @@ def advarsler(regnskap: Aarsregnskap) -> list[str]:
             "som «Betalbar skatt» under kortsiktig gjeld (konto 2500)."
         )
 
-    # Et forlenget første regnskapsår skal starte på stiftelsesdatoen (rskl. § 1-7 andre
-    # ledd). Avviker de to, er sannsynligvis én av dem feil skrevet inn.
+    # Et kort første regnskapsår skal starte på stiftelsesdatoen. Avviker de to, er
+    # sannsynligvis én av dem feil skrevet inn.
     stiftet = regnskap.selskap.stiftelsesdato
     if stiftet and regnskap.regnskapsstart and regnskap.regnskapsstart != stiftet:
         adv.append(
             f"Regnskapsperioden starter {regnskap.regnskapsstart.isoformat()}, men selskapet "
-            f"ble stiftet {stiftet.isoformat()}. Et forlenget første regnskapsår løper fra "
+            f"ble stiftet {stiftet.isoformat()}. Et kort første regnskapsår løper fra "
             "stiftelsesdatoen. Kontroller datoene."
-        )
-
-    # En periode over 12 måneder er lovlig for det første regnskapsåret, og Skatteetaten
-    # godtar den (validertOK mot tt02 2026-08-05 for en 14-måneders periode, med inntektsår
-    # lik året perioden avsluttes). Advarselen står likevel: dette er et sjeldent tilfelle,
-    # og hele perioden fastsettes da i ett inntektsår.
-    if regnskap.periode_maaneder > 12:
-        adv.append(
-            f"Regnskapsperioden er {regnskap.periode_maaneder} måneder "
-            f"({regnskap.periode_start.isoformat()} til {regnskap.periode_slutt.isoformat()}), "
-            f"altså et forlenget første regnskapsår. Hele perioden fastsettes i inntektsår "
-            f"{regnskap.regnskapsaar}. Kontroller at det stemmer med det selskapet har avtalt "
-            "med Skatteetaten."
         )
 
     # Sammenligningstall for fjoråret er påkrevd etter regnskapsloven § 6-6 for
@@ -379,11 +373,6 @@ def advarsler(regnskap: Aarsregnskap) -> list[str]:
     # ha et fjorår å sammenligne med; er fjorårstallene helt tomme, mangler de
     # sannsynligvis. (Ikke-blokkerende: et genuint hvilende selskap kan ha hatt
     # reelt null i fjor, så dette er et varsku, ikke en hard feil.)
-    #
-    # Unntaket er et forlenget første regnskapsår: det spenner over to kalenderår, så
-    # stiftelsesåret er lavere enn regnskapsåret selv om dette ER det første regnskapsåret og
-    # det ikke finnes noe fjorår å sammenligne med. Uten unntaket ba Wenche om
-    # sammenligningstall som ikke eksisterer.
     stiftelsesaar = regnskap.selskap.stiftelsesaar
     fb = regnskap.foregaaende_aar_balanse
     fjoraar_tomt = abs(fb.eiendeler.sum) < 0.01 and abs(fb.egenkapital_og_gjeld.sum) < 0.01

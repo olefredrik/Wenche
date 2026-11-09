@@ -53,7 +53,7 @@ def test_selskap_forhandsfyller_fra_brreg(klient, monkeypatch):
     data = klient.get("/api/selskap").json()
     # Org kommer fra den signerte invite-bindingen, ikke fra brukerinput.
     assert data["org_nummer"] == "314273818"
-    # Eksakt stiftelsesdato, ikke bare årstall: RF-1086 oppgir datoen, og et forlenget
+    # Eksakt stiftelsesdato, ikke bare årstall: RF-1086 oppgir datoen, og et kort
     # første regnskapsår starter på den.
     assert data["stiftelsesdato"] == "2018-09-14"
     assert data["navn"] == "Test AS"

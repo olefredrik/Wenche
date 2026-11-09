@@ -4,6 +4,21 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.10.0] - 2026-11-09
+
+### Rettet
+
+- **Forlenget første regnskapsår ga feil skattemelding.** Wenche godtok et første
+  regnskapsår på inntil 18 måneder (regnskapsloven § 1-7 andre ledd) og sendte da én
+  skattemelding for hele perioden. Skattemeldingen skal leveres for hvert kalenderår, så
+  stiftelsesåret fikk ingen skattemelding, og den neste dekket for lang periode. Wenche
+  bygger årsregnskap og skattemelding fra samme periode, og støtter derfor ikke lenger
+  forlenget første regnskapsår. Et selskap stiftet i løpet av året bruker et kort første
+  regnskapsår fra stiftelsesdatoen til 31. desember, som før. En periode over to kalenderår
+  stoppes nå med en forklaring, både for årsregnskapet og skattemeldingen, i
+  webgrensesnittet og i CLI-en. Skattemeldingen kjørte ikke periodekontrollen i det hele
+  tatt, så det er også rettet. ([#193](https://github.com/olefredrik/Wenche/issues/193))
+
 ## [1.9.0] - 2026-10-22
 
 ### Lagt til

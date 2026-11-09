@@ -141,7 +141,7 @@ def test_hent_enhet_5xx_failsoft(mock_get):
 
 def test_parse_stiftelsesdato_beholder_dag_og_maaned():
     # Regresjon: oppslaget kastet før bort dag og måned, så RF-1086 oppgav 1. januar og et
-    # forlenget første regnskapsår startet på feil dato.
+    # kort første regnskapsår startet på feil dato.
     assert brreg.parse_stiftelsesdato({"stiftelsesdato": "2025-11-20"}) == "2025-11-20"
 
 

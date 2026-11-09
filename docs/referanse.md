@@ -67,9 +67,11 @@ Feltene ligger på toppnivå i `config.yaml`, ved siden av `regnskapsaar`. Begge
 | `regnskapsstart` | dato | Første dag i regnskapsperioden (ÅÅÅÅ-MM-DD). Tom = 1. januar i regnskapsåret |
 | `regnskapsslutt` | dato | Siste dag i regnskapsperioden. Tom = 31. desember i regnskapsåret |
 
-Regnskapsåret er normalt kalenderåret (regnskapsloven § 1-7 første ledd), og da skal begge stå tomme. De oppgis bare ved **forlenget første regnskapsår** etter § 1-7 andre ledd: et selskap stiftet sent på året kan la det første regnskapsåret løpe i inntil 18 måneder, fram til 31. desember året etter. Perioden starter da på stiftelsesdatoen, og `regnskapsaar` skal være året perioden avsluttes.
+Regnskapsåret er normalt kalenderåret (regnskapsloven § 1-7 første ledd), og da skal begge stå tomme. Det eneste unntaket er et **kort første regnskapsår**: et selskap stiftet i løpet av året har sitt første regnskapsår fra stiftelsesdatoen til 31. desember samme år, og da settes `regnskapsstart` til stiftelsesdatoen.
 
-Wenche stopper innsendingen hvis perioden ikke kan tolkes entydig: over 18 måneder, slutt som ikke er 31. desember, slutt før start, eller `regnskapsaar` som ikke er sluttåret. En periode over 12 måneder gir en advarsel som viser hvilket inntektsår den fastsettes i.
+**Forlenget første regnskapsår støttes ikke.** Regnskapsloven § 1-7 andre ledd lar et selskap stiftet sent på året la det første regnskapsåret løpe i inntil 18 måneder. Skattemeldingen skal likevel leveres for hvert kalenderår, og Wenche bygger årsregnskap og skattemelding fra samme periode. Et selskap som vil bruke Wenche, velger derfor et kort første regnskapsår.
+
+Wenche stopper innsendingen av både årsregnskap og skattemelding hvis perioden går over to kalenderår, slutter på en annen dag enn 31. desember, slutter før den starter, eller `regnskapsaar` ikke er året perioden slutter.
 
 #### Skattekostnad
 

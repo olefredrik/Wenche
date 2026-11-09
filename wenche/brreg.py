@@ -69,7 +69,7 @@ def parse_stiftelsesdato(data: dict) -> str:
     Hele `stiftelsesdato` (YYYY-MM-DD) fra et enhets-svar. Tom streng om ukjent eller ugyldig.
 
     Årstallet alene er ikke nok: aksjonærregisteroppgaven oppgir stiftelsesdato, og et
-    forlenget første regnskapsår starter på stiftelsesdatoen. Begge ble før satt til 1. januar
+    kort første regnskapsår starter på stiftelsesdatoen. Begge ble før satt til 1. januar
     fordi oppslaget kastet bort dag og måned.
     """
     stiftelsesdato = (data.get("stiftelsesdato") or "").strip()
