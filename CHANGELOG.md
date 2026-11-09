@@ -4,6 +4,21 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.10.1] - 2026-11-09
+
+### Rettet
+
+- **Uforklart endring i egenkapitalen ble sendt uten varsel.** Wenche kontrollerte at
+  balansen går opp, men ikke at endringen i egenkapitalen henger sammen med
+  resultatregnskapet. Det årsresultat, innskudd og utbytte ikke forklarer, ble sendt som
+  «annen endring i egenkapital» i skattemeldingen, og Skatteetaten reagerte først etter
+  innsending. Nå gir `valider-aarsregnskap` og webgrensesnittet en advarsel med beløpet og
+  de vanligste årsakene. Den bruker samme regnestykke som egenkapitalavstemmingen i
+  næringsspesifikasjonen. Et typisk tilfelle er en config med et felt denne
+  Wenche-versjonen ikke kjenner: beløpet forsvinner fra resultatet, men står igjen i
+  balansen. Advarselen stopper ikke innsendingen.
+  ([#191](https://github.com/olefredrik/Wenche/issues/191))
+
 ## [1.10.0] - 2026-11-09
 
 ### Rettet

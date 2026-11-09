@@ -24,6 +24,7 @@ from wenche.models import (
     Selskap,
 )
 from wenche.brg_xml import generer_aksjenote_vedlegg, generer_hovedskjema, generer_underskjema
+from wenche.naeringsspesifikasjon_xml import egenkapitalavstemming
 
 
 def _tall(verdi) -> float:
@@ -384,6 +385,29 @@ def advarsler(regnskap: Aarsregnskap) -> list[str]:
             "er nystiftet. Fyll inn «Fjorårets tall», eller bekreft at fjoråret "
             "faktisk var null hvis selskapet var helt uten aktivitet."
         )
+
+    # Det årsresultat, innskudd og utbytte ikke forklarer av endringen i egenkapitalen, sendes
+    # som «annen endring i egenkapital» i skattemeldingen, og Skatteetaten reagerer først etter
+    # innsending (N_AVVIK_ÅRSRESULTAT_EGENKAPITALAVSTEMMING). Bruker samme regnestykke som
+    # næringsspesifikasjonen, så advarselen og innsendingen ikke kan drifte fra hverandre.
+    # Hoppes over når fjorårstallene mangler helt: da er hele egenkapitalen uforklart, og
+    # fjorårsadvarselen over sier allerede hva som er galt. (Ikke-blokkerende: en legitim
+    # annen endring er sjelden for et passivt holdingselskap, men mulig.)
+    if regnskap.er_foerste_regnskapsaar or not fjoraar_tomt:
+        _, _, tillegg, fradrag = egenkapitalavstemming(regnskap)
+        uforklart = sum(b for k, b in tillegg if k == "annenPositivEndringIEgenkapital") - sum(
+            b for k, b in fradrag if k == "annenNegativEndringIEgenkapital"
+        )
+        if abs(uforklart) > 1:
+            retning = "økt" if uforklart > 0 else "falt"
+            adv.append(
+                f"Egenkapitalen har {retning} {abs(uforklart):,.0f} NOK mer enn årsresultatet, "
+                "innskudd og utbytte forklarer. Beløpet sendes som «annen endring i "
+                "egenkapital» i skattemeldingen, og Skatteetaten reagerer gjerne på det. "
+                "Vanlige årsaker er et resultattall som mangler eller er feil, et utbytte som "
+                "ikke er ført, fjorårstall som ikke stemmer med fjorårets årsregnskap, eller "
+                "en config med felt denne Wenche-versjonen ikke kjenner (oppgrader da Wenche)."
+            )
 
     # Utbytte fra et selskap selskapet eier under 20 % av, kommer verken fra et datterselskap
     # eller et tilknyttet selskap og skal på egen linje i årsregnskapet. Står utbyttet som

@@ -255,6 +255,112 @@ def _balanseforekomst(
     SubElement(type_el, "resultatOgBalanseregnskapstype").text = type_kode
 
 
+def egenkapitalavstemming(
+    regnskap: Aarsregnskap,
+) -> tuple[int, int, list[tuple[str, int]], list[tuple[str, int]]]:
+    """
+    Egenkapitalavstemmingen slik den sendes i næringsspesifikasjonen.
+
+    Returnerer (inngående EK, utgående EK, tillegg, fradrag), der tillegg og fradrag er
+    (egenkapitalendringstype, beløp). Inngående EK pluss tillegg minus fradrag er alltid lik
+    utgående EK. Det som ikke kan forklares, havner i `annenPositivEndringIEgenkapital` eller
+    `annenNegativEndringIEgenkapital`.
+
+    Egen funksjon fordi `aarsregnskap.advarsler` bruker samme regnestykke for å varsle om en
+    uforklart endring før innsending, så de to ikke kan drifte fra hverandre.
+    """
+    res = regnskap.resultatregnskap
+    eg = regnskap.balanse.egenkapital_og_gjeld
+    ek = eg.egenkapital
+    foregaaende_ek = (
+        regnskap.foregaaende_aar_balanse.egenkapital_og_gjeld.egenkapital
+    )
+    inngaaende_ek = round(foregaaende_ek.sum)
+    utgaaende_ek = round(eg.egenkapital.sum)
+    endring = utgaaende_ek - inngaaende_ek
+
+    tillegg: list[tuple[str, int]] = []
+    fradrag: list[tuple[str, int]] = []
+
+    # I første regnskapsår er økningen i innskutt EK stiftelsesinnskuddet. Kodelisten skiller
+    # kontantinnskudd og tinginnskudd, og modellen kan ikke utlede hvilken som gjelder, så
+    # selskapet oppgir tingdelen selv. 0 (standard) betyr alt kontant, som er det vanlige for
+    # et lite AS. Senere kapitaltransaksjoner utledes ikke som innskudd, siden modellen ikke
+    # har nok informasjon til å klassifisere dem sikkert.
+    if regnskap.er_foerste_regnskapsaar:
+        inngaaende_innskutt_ek = round(
+            foregaaende_ek.aksjekapital + foregaaende_ek.overkursfond
+        )
+        utgaaende_innskutt_ek = round(ek.aksjekapital + ek.overkursfond)
+        innskudd = utgaaende_innskutt_ek - inngaaende_innskutt_ek
+        if innskudd > 0:
+            # Klemmes mot innskuddet: valider() stopper et for stort beløp, men XML-en skal
+            # aldri kunne rapportere mer tinginnskudd enn det faktiske innskuddet.
+            tinginnskudd = min(
+                max(round(regnskap.selskap.tinginnskudd_ved_stiftelse), 0), innskudd
+            )
+            kontantinnskudd = innskudd - tinginnskudd
+            if kontantinnskudd > 0:
+                tillegg.append(("kontantinnskudd", kontantinnskudd))
+            if tinginnskudd > 0:
+                tillegg.append(("tinginnskudd", tinginnskudd))
+
+    aarsresultat = round(res.aarsresultat)
+    if aarsresultat > 0:
+        tillegg.append(("aaretsOverskudd", aarsresultat))
+    elif aarsresultat < 0:
+        fradrag.append(("aaretsUnderskudd", abs(aarsresultat)))
+
+    # Bevar avstemmingen også når modellen ikke kan klassifisere resten mer presist.
+    # Resten må aldri feilmerkes som årets resultat.
+    forklart_endring = sum(b for _, b in tillegg) - sum(b for _, b in fradrag)
+    annen_endring = endring - forklart_endring
+    if annen_endring > 0:
+        tillegg.append(("annenPositivEndringIEgenkapital", annen_endring))
+    elif annen_endring < 0:
+        rest = abs(annen_endring)
+        # Utbytte er den vanligste grunnen til at egenkapitalen faller mer enn årsresultatet,
+        # og Skatteetaten har avvist samleposten for utbytte (SSV-5813). Koden følger
+        # grunnlaget for vedtaket, og de to tilfellene Wenche kan skille kommer i denne
+        # rekkefølgen, siden et selskap som deler ut hvert år både betaler fjorårets
+        # avsetning og avsetter årets i samme regnskapsår:
+        #
+        #   1. Årets avsetning (`avsattEllerForventetUtbytte`) reduserer egenkapitalen nå.
+        #      En utbetaling av en TIDLIGERE avsetning gjør bare opp en gjeldspost og rører
+        #      ikke egenkapitalen, så avsetningen må forklare nedgangen først.
+        #   2. Er det utbetalt utbytte som IKKE gjør opp en tidligere avsetning, er
+        #      utdelingen vedtatt i året på grunnlag av sist godkjente årsregnskap:
+        #      `tilleggsutbytte`. Wenche har ingen mellombalanse, som
+        #      `ekstraordinaertUtbytte` forutsetter.
+        #
+        # Aldri en motpost: bare den delen av resten hvert beløp faktisk dekker blir
+        # omklassifisert, og en rest utover det blir liggende i samleposten.
+        avsatt = min(rest, max(round(eg.kortsiktig_gjeld.avsatt_utbytte), 0))
+        if avsatt > 0:
+            fradrag.append(("avsattEllerForventetUtbytte", avsatt))
+        rest -= avsatt
+
+        # En utbetaling som gjør opp fjorårets avsetning skal ikke stå i avstemmingen i det
+        # hele tatt (bekreftet i SSV-5813): egenkapitalen falt året avsetningen ble gjort, og
+        # utbetalingen gjør bare opp en gjeldspost. Trekkes den ikke fra, kan et fall i
+        # egenkapitalen som skyldes noe helt annet bli stemplet som utbytte i utbetalingsåret.
+        fjoraarets_avsetning = max(
+            round(
+                regnskap.foregaaende_aar_balanse.egenkapital_og_gjeld
+                .kortsiktig_gjeld.avsatt_utbytte
+            ),
+            0,
+        )
+        vedtatt_i_aar = max(max(round(regnskap.utbytte_utbetalt), 0) - fjoraarets_avsetning, 0)
+        utbytte = min(rest, vedtatt_i_aar)
+        if utbytte > 0:
+            fradrag.append(("tilleggsutbytte", utbytte))
+        if rest - utbytte > 0:
+            fradrag.append(("annenNegativEndringIEgenkapital", rest - utbytte))
+
+    return inngaaende_ek, utgaaende_ek, tillegg, fradrag
+
+
 def generer_naeringsspesifikasjon(
     regnskap: Aarsregnskap,
     partsnummer: int,
@@ -594,91 +700,7 @@ def generer_naeringsspesifikasjon(
     # Egenkapitalavstemming (XSD-pos: etter virksomhet, før andreForhold)
     # inngående EK + separate tillegg - separate fradrag = utgående (avledet).
     # -----------------------------------------------------------------------
-    foregaaende_ek = (
-        regnskap.foregaaende_aar_balanse.egenkapital_og_gjeld.egenkapital
-    )
-    inngaaende_ek = round(foregaaende_ek.sum)
-    utgaaende_ek = round(eg.egenkapital.sum)
-    endring = utgaaende_ek - inngaaende_ek
-
-    tillegg: list[tuple[str, int]] = []
-    fradrag: list[tuple[str, int]] = []
-
-    # I første regnskapsår er økningen i innskutt EK stiftelsesinnskuddet. Kodelisten skiller
-    # kontantinnskudd og tinginnskudd, og modellen kan ikke utlede hvilken som gjelder, så
-    # selskapet oppgir tingdelen selv. 0 (standard) betyr alt kontant, som er det vanlige for
-    # et lite AS. Senere kapitaltransaksjoner utledes ikke som innskudd, siden modellen ikke
-    # har nok informasjon til å klassifisere dem sikkert.
-    if regnskap.er_foerste_regnskapsaar:
-        inngaaende_innskutt_ek = round(
-            foregaaende_ek.aksjekapital + foregaaende_ek.overkursfond
-        )
-        utgaaende_innskutt_ek = round(ek.aksjekapital + ek.overkursfond)
-        innskudd = utgaaende_innskutt_ek - inngaaende_innskutt_ek
-        if innskudd > 0:
-            # Klemmes mot innskuddet: valider() stopper et for stort beløp, men XML-en skal
-            # aldri kunne rapportere mer tinginnskudd enn det faktiske innskuddet.
-            tinginnskudd = min(
-                max(round(regnskap.selskap.tinginnskudd_ved_stiftelse), 0), innskudd
-            )
-            kontantinnskudd = innskudd - tinginnskudd
-            if kontantinnskudd > 0:
-                tillegg.append(("kontantinnskudd", kontantinnskudd))
-            if tinginnskudd > 0:
-                tillegg.append(("tinginnskudd", tinginnskudd))
-
-    aarsresultat = round(res.aarsresultat)
-    if aarsresultat > 0:
-        tillegg.append(("aaretsOverskudd", aarsresultat))
-    elif aarsresultat < 0:
-        fradrag.append(("aaretsUnderskudd", abs(aarsresultat)))
-
-    # Bevar avstemmingen også når modellen ikke kan klassifisere resten mer presist.
-    # Resten må aldri feilmerkes som årets resultat.
-    forklart_endring = sum(b for _, b in tillegg) - sum(b for _, b in fradrag)
-    annen_endring = endring - forklart_endring
-    if annen_endring > 0:
-        tillegg.append(("annenPositivEndringIEgenkapital", annen_endring))
-    elif annen_endring < 0:
-        rest = abs(annen_endring)
-        # Utbytte er den vanligste grunnen til at egenkapitalen faller mer enn årsresultatet,
-        # og Skatteetaten har avvist samleposten for utbytte (SSV-5813). Koden følger
-        # grunnlaget for vedtaket, og de to tilfellene Wenche kan skille kommer i denne
-        # rekkefølgen, siden et selskap som deler ut hvert år både betaler fjorårets
-        # avsetning og avsetter årets i samme regnskapsår:
-        #
-        #   1. Årets avsetning (`avsattEllerForventetUtbytte`) reduserer egenkapitalen nå.
-        #      En utbetaling av en TIDLIGERE avsetning gjør bare opp en gjeldspost og rører
-        #      ikke egenkapitalen, så avsetningen må forklare nedgangen først.
-        #   2. Er det utbetalt utbytte som IKKE gjør opp en tidligere avsetning, er
-        #      utdelingen vedtatt i året på grunnlag av sist godkjente årsregnskap:
-        #      `tilleggsutbytte`. Wenche har ingen mellombalanse, som
-        #      `ekstraordinaertUtbytte` forutsetter.
-        #
-        # Aldri en motpost: bare den delen av resten hvert beløp faktisk dekker blir
-        # omklassifisert, og en rest utover det blir liggende i samleposten.
-        avsatt = min(rest, max(round(eg.kortsiktig_gjeld.avsatt_utbytte), 0))
-        if avsatt > 0:
-            fradrag.append(("avsattEllerForventetUtbytte", avsatt))
-        rest -= avsatt
-
-        # En utbetaling som gjør opp fjorårets avsetning skal ikke stå i avstemmingen i det
-        # hele tatt (bekreftet i SSV-5813): egenkapitalen falt året avsetningen ble gjort, og
-        # utbetalingen gjør bare opp en gjeldspost. Trekkes den ikke fra, kan et fall i
-        # egenkapitalen som skyldes noe helt annet bli stemplet som utbytte i utbetalingsåret.
-        fjoraarets_avsetning = max(
-            round(
-                regnskap.foregaaende_aar_balanse.egenkapital_og_gjeld
-                .kortsiktig_gjeld.avsatt_utbytte
-            ),
-            0,
-        )
-        vedtatt_i_aar = max(max(round(regnskap.utbytte_utbetalt), 0) - fjoraarets_avsetning, 0)
-        utbytte = min(rest, vedtatt_i_aar)
-        if utbytte > 0:
-            fradrag.append(("tilleggsutbytte", utbytte))
-        if rest - utbytte > 0:
-            fradrag.append(("annenNegativEndringIEgenkapital", rest - utbytte))
+    inngaaende_ek, utgaaende_ek, tillegg, fradrag = egenkapitalavstemming(regnskap)
 
     if inngaaende_ek or utgaaende_ek or tillegg or fradrag:
         ekavst = SubElement(root, "egenkapitalavstemming")
