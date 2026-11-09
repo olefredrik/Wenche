@@ -21,6 +21,20 @@ from wenche.altinn_client import AltinnClient
 from wenche.skd_client import SkdAksjonaerClient
 
 
+
+def _stopp_ved_periodefeil(regnskap) -> None:
+    """Stopper skattemeldingen før noe hentes eller sendes hvis regnskapsperioden er ugyldig.
+
+    Skattemeldingen leveres per kalenderår, og Wenche bygger den fra samme periode som
+    årsregnskapet. En periode over to kalenderår ville gitt en skattemelding for feil periode.
+    """
+    feil = aarsregnskap.valider_periode(regnskap)
+    if feil:
+        click.echo("Validering mislyktes:", err=True)
+        for f in feil:
+            click.echo(f"  - {f}", err=True)
+        raise SystemExit(1)
+
 @click.group(invoke_without_command=True)
 @click.version_option(__version__, prog_name="Wenche")
 @click.pass_context
@@ -399,6 +413,8 @@ def send_skattemelding(config_fil: str, dry_run: bool):
         )
         raise SystemExit(1)
 
+    _stopp_ved_periodefeil(regnskap)
+
     env = os.getenv("WENCHE_ENV", "prod")
     orgnr = os.getenv("SKD_TEST_ORG_NUMMER", regnskap.selskap.org_nummer) if env == "test" else regnskap.selskap.org_nummer
 
@@ -508,6 +524,8 @@ def valider_skattemelding(config_fil: str):
             "Kopier config.example.yaml til config.yaml og fyll inn selskapets opplysninger."
         )
         raise SystemExit(1)
+
+    _stopp_ved_periodefeil(regnskap)
 
     env = os.getenv("WENCHE_ENV", "prod")
     orgnr = (

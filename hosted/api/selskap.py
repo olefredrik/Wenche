@@ -35,6 +35,6 @@ def hent_selskap(request: Request) -> dict:
         "styreleder": roller["styreleder"],
         "stiftelsesaar": enhet["stiftelsesaar"],
         # Eksakt dato, ikke bare årstall: aksjonærregisteroppgaven oppgir stiftelsesdato, og
-        # et forlenget første regnskapsår starter på den.
+        # et kort første regnskapsår starter på den.
         "stiftelsesdato": enhet["stiftelsesdato"],
     }

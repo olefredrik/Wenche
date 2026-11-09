@@ -70,6 +70,11 @@ def valider_skattemelding(config: Config) -> dict:
     if feil:
         return {"ok": False, "feil": feil}
     regnskap, _konfig = _sm.les_config(config)
+    # Skattemeldingen leveres per kalenderår og bygges fra årsregnskapets periode, så en
+    # periode over to kalenderår ville gitt en skattemelding for feil periode.
+    feil = _ar.valider_periode(regnskap)
+    if feil:
+        return {"ok": False, "feil": feil}
     return {"ok": True, "feil": [], "regnskapsaar": regnskap.regnskapsaar}
 
 
@@ -121,6 +126,9 @@ def send_skattemelding(
     som kalleren viser brukeren før den prøver igjen med `bekreft_klage=True`.
     """
     regnskap, konfig = _sm.les_config(config)
+    feil = _ar.valider_periode(regnskap)
+    if feil:
+        raise InnsendingValideringsfeil(feil)
     skjoennsfastsatt = False
     if partsnummer is None:
         forhåndsutfylt, gjeldende_dokument_id = skd_klient.hent_forhåndsutfylt_med_id(

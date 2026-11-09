@@ -26,7 +26,7 @@ class Selskap:
     aksjekapital: float
     kontakt_epost: str = ""     # Påkrevd for aksjonærregisteroppgave (RF-1086)
     # Eksakt stiftelsesdato når den er kjent (hentes fra Enhetsregisteret). Årstallet alene
-    # holder ikke overalt: aksjonærregisteroppgaven oppgir stiftelsesdato, og et forlenget
+    # holder ikke overalt: aksjonærregisteroppgaven oppgir stiftelsesdato, og et kort
     # første regnskapsår starter på stiftelsesdatoen, ikke 1. januar.
     stiftelsesdato: Optional[date] = None
     # Den delen av stiftelsesinnskuddet som ble gjort som tinginnskudd, typisk aksjer skutt
@@ -256,9 +256,9 @@ class Aarsregnskap:
     foregaaende_aar_balanse: Balanse = field(default_factory=Balanse)
     utbytte_utbetalt: float = 0.0              # Totalt utbytte utbetalt til aksjonærer i løpet av året
     # Regnskapsperioden. Normalt hele kalenderåret (rskl. § 1-7 første ledd), og da kan begge
-    # stå tomme. Settes bare når perioden avviker, i praksis et forlenget første regnskapsår
-    # etter § 1-7 andre ledd: da starter perioden på stiftelsesdatoen og kan løpe i inntil
-    # 18 måneder, fram til 31.12 året etter.
+    # stå tomme. Settes bare når perioden avviker, i praksis et kort første regnskapsår fra
+    # stiftelsesdatoen til 31.12. Forlenget første regnskapsår (§ 1-7 andre ledd) støttes
+    # ikke, se `aarsregnskap.valider_periode`.
     regnskapsstart: Optional[date] = None
     regnskapsslutt: Optional[date] = None
     # Eierandelen (prosent) fra skattemelding.eierandel_for_fritaksmetoden, eller None når den
@@ -278,20 +278,13 @@ class Aarsregnskap:
         return self.regnskapsslutt or date(self.regnskapsaar, 12, 31)
 
     @property
-    def periode_maaneder(self) -> int:
-        """Antall kalendermåneder perioden berører. 12 for et vanlig regnskapsår."""
-        start, slutt = self.periode_start, self.periode_slutt
-        return (slutt.year * 12 + slutt.month) - (start.year * 12 + start.month) + 1
-
-    @property
     def er_foerste_regnskapsaar(self) -> bool:
         """
         Om dette er selskapets første regnskapsår.
 
-        Årstallet alene holder ikke: et forlenget første regnskapsår (rskl. § 1-7 andre ledd)
-        spenner over to kalenderår, så stiftelsesåret er lavere enn regnskapsåret selv om
-        dette ER det første året. Faller stiftelsesdatoen innenfor perioden, teller det
-        derfor også.
+        Faller stiftelsesdatoen innenfor perioden, teller det også. Det gjelder bare et
+        forlenget første regnskapsår, som `aarsregnskap.valider_periode` avviser. Uten dette
+        fikk brukeren i tillegg en misvisende advarsel om manglende fjorårstall.
 
         To kallsteder er avhengige av samme svar: fjorårsadvarselen i `aarsregnskap.valider`
         og stiftelsesinnskuddet i egenkapitalavstemmingen. Da de var to kopier rakk de å
