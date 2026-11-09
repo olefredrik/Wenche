@@ -16,7 +16,7 @@ Bruk:
 import click
 
 from wenche import __version__
-from wenche import auth, aarsregnskap, aksjonaerregister, skattemelding, systembruker
+from wenche import auth, aarsregnskap, aksjonaerregister, configfelt, skattemelding, systembruker
 from wenche.altinn_client import AltinnClient
 from wenche.skd_client import SkdAksjonaerClient
 
@@ -34,6 +34,16 @@ def _stopp_ved_periodefeil(regnskap) -> None:
         for f in feil:
             click.echo(f"  - {f}", err=True)
         raise SystemExit(1)
+
+
+def _advar_om_ukjente_felt(config_fil: str) -> None:
+    """Advarer om felt i configen Wenche ikke kjenner, og som derfor ikke kommer med.
+
+    Skrives til stderr, så det generer-skattemelding skriver til stdout forblir rent.
+    """
+    for a in configfelt.advarsel_om_ukjente_felt(config_fil):
+        click.echo(f"ADVARSEL: {a}", err=True)
+
 
 @click.group(invoke_without_command=True)
 @click.version_option(__version__, prog_name="Wenche")
@@ -159,6 +169,8 @@ def send_aarsregnskap(config_fil: str, dry_run: bool):
         )
         raise SystemExit(1)
 
+    _advar_om_ukjente_felt(config_fil)
+
     click.echo(
         f"Aarsregnskap {regnskap.regnskapsaar} for {regnskap.selskap.navn} "
         f"({regnskap.selskap.org_nummer})"
@@ -206,7 +218,7 @@ def valider_aarsregnskap(config_fil: str):
     )
 
     feil = aarsregnskap.valider(regnskap)
-    advarsler = aarsregnskap.advarsler(regnskap)
+    advarsler = aarsregnskap.advarsler(regnskap) + configfelt.advarsel_om_ukjente_felt(config_fil)
 
     for a in advarsler:
         click.echo(f"ADVARSEL: {a}")
@@ -254,6 +266,8 @@ def send_aksjonaerregister(config_fil: str, dry_run: bool):
             err=True,
         )
         raise SystemExit(1)
+
+    _advar_om_ukjente_felt(config_fil)
 
     click.echo(
         f"Aksjonaerregisteroppgave {oppgave.regnskapsaar} for {oppgave.selskap.navn} "
@@ -305,6 +319,8 @@ def generer_skattemelding(config_fil: str, ut_fil: str | None):
             err=True,
         )
         raise SystemExit(1)
+
+    _advar_om_ukjente_felt(config_fil)
 
     tekst = skattemelding.generer(regnskap, konfig)
 
@@ -412,6 +428,8 @@ def send_skattemelding(config_fil: str, dry_run: bool):
             "Kopier config.example.yaml til config.yaml og fyll inn selskapets opplysninger."
         )
         raise SystemExit(1)
+
+    _advar_om_ukjente_felt(config_fil)
 
     _stopp_ved_periodefeil(regnskap)
 
@@ -524,6 +542,8 @@ def valider_skattemelding(config_fil: str):
             "Kopier config.example.yaml til config.yaml og fyll inn selskapets opplysninger."
         )
         raise SystemExit(1)
+
+    _advar_om_ukjente_felt(config_fil)
 
     _stopp_ved_periodefeil(regnskap)
 

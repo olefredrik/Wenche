@@ -4,6 +4,19 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.10.2] - 2026-11-09
+
+### Rettet
+
+- **Felt Wenche ikke kjenner, ble ignorert uten varsel.** Et beløp i et feilstavet felt,
+  eller i et felt fra en nyere Wenche-versjon, forsvant fra innsendingen mens valideringen
+  sa OK. Nå advarer Wenche om ukjente felt under `selskap`, `resultatregnskap`, `balanse`,
+  `foregaaende_aar`, `skattemelding` og `aksjonaerer`, med full sti til hvert felt. De
+  gyldige feltene utledes fra datamodellen, så listen følger modellen automatisk.
+  Advarselen vises i valideringen av alle tre innsendingene i webgrensesnittet og i alle
+  CLI-kommandoene som leser config, og stopper ikke innsendingen. En test kontrollerer at
+  hvert felt skjemaet kan skrive, er kjent.
+
 ## [1.10.1] - 2026-11-09
 
 ### Rettet
