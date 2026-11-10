@@ -48,7 +48,8 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=s.session_secret,
     max_age=14 * 24 * 3600,
-    https_only=(s.env == "prod"),
+    # Secure også på demo: offentlig, men WENCHE_ENV=test (se Settings.er_offentlig).
+    https_only=(s.env == "prod" or s.er_offentlig),
     same_site="lax",
 )
 

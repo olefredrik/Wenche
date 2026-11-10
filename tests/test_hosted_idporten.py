@@ -151,13 +151,14 @@ def test_callback_lagrer_ikke_access_token_uten_reportees(klient_uten_reportees,
     assert s.get("idporten_navn") == "Ole Fredrik Lie"
 
 
-def _brreg_rollesvar(*navn):
-    """Fake Enhetsregister-rollesvar med gitte 'Fornavn Etternavn'-strenger som styremedlemmer."""
+def _brreg_rollesvar(*navn, rolletype="LEDE"):
+    """Fake Enhetsregister-rollesvar med gitte 'Fornavn Etternavn'-strenger i STYR-gruppen,
+    som styreleder (LEDE) med mindre `rolletype` sier noe annet."""
     roller = []
     for fullt in navn:
         deler = fullt.split()
         roller.append({
-            "type": {"kode": "MEDL"},
+            "type": {"kode": rolletype},
             "fratraadt": False,
             "avregistrert": False,
             "person": {"erDoed": False, "navn": {"fornavn": " ".join(deler[:-1]), "etternavn": deler[-1]}},
@@ -277,6 +278,19 @@ def test_velg_org_uten_match_avvises(klient, monkeypatch):
     r = klient.post("/api/auth/velg-org", json={"org": "922020523"}).json()
     assert r["ok"] is False
     assert r["kontakt"] == "mailto:test@wenche.cloud"
+    assert klient.get("/api/auth/me").json()["invite_org"] is None
+
+
+def test_velg_org_avviser_rolle_uten_lederansvar(klient, monkeypatch):
+    """
+    Bare daglig leder og styreleder kan bevise fullmakten porten skal sjekke. Et styremedlem (og
+    varamedlem, revisor, regnskapsfører, som alle står i rollesvaret) skal ikke komme forbi,
+    selv med nøyaktig samme navn som den innloggede.
+    """
+    _logg_inn(klient, monkeypatch, navn="Ole Fredrik Lie")
+    _stub_brreg(monkeypatch, _brreg_rollesvar("Ole Fredrik Lie", rolletype="MEDL"))
+    r = klient.post("/api/auth/velg-org", json={"org": "922020523"}).json()
+    assert r["ok"] is False
     assert klient.get("/api/auth/me").json()["invite_org"] is None
 
 

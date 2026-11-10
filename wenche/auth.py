@@ -15,12 +15,14 @@ import json
 import os
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import httpx
 from authlib.jose import jwt
 from dotenv import load_dotenv
+
+from wenche.filer import skriv_privat
 
 # Last credentials fra ~/.wenche/.env (fast lokasjon, brukerbundet, utenfor
 # cwd og git-trees). Faller tilbake til cwd/.env for bakoverkompatibilitet
@@ -102,7 +104,8 @@ class VendorCredentials:
     """
     client_id: str
     kid: str
-    private_key_pem: bytes
+    # repr=False: nøkkelen skal aldri bli med hvis objektet havner i en logg eller feilmelding.
+    private_key_pem: bytes = field(repr=False)
 
 
 def _token_file(env: str | None = None) -> Path:
@@ -372,10 +375,8 @@ def login(lagre_token: bool = True) -> dict:
         print("Autentisering vellykket (token ikke lagret).\n")
         return tokens
 
-    fil = _token_file(env)
-    fil.parent.mkdir(parents=True, exist_ok=True)
-    fil.write_text(json.dumps(tokens))
-    fil.chmod(0o600)
+    # 0600 fra første byte og atomisk innbytting: tokenene gir tilgang til å sende inn.
+    skriv_privat(_token_file(env), json.dumps(tokens))
 
     print("Autentisering vellykket.\n")
     return tokens

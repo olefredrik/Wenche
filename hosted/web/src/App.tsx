@@ -58,6 +58,14 @@ const FANER: Fane[] = [
 // Lenke til vilkårene (publisert på markedssiden wenche-web).
 const VILKAAR_URL = "https://www.wenche.cloud/vilkaar";
 
+// Feilkoder fra ID-porten-callbacken (hosted/api/idporten.py), oversatt her. Backend sender en
+// kode, ikke tekst, så ingen kan lage en lenke som viser en vilkårlig melding i banneret.
+const IDP_FEIL: Record<string, string> = {
+  avbrutt: "Innloggingen ble avbrutt. Prøv igjen.",
+  mislyktes: "Innloggingen kunne ikke fullføres. Prøv igjen.",
+  navn_mangler: "Fikk ikke navnet ditt fra ID-porten. Ta kontakt for manuell tilgang.",
+};
+
 // Hostet samtykke: vilkår + OFL-ansvarsfraskrivelse (operatøren er databehandler).
 const HOSTET_SAMTYKKE = (
   <span>
@@ -713,9 +721,12 @@ export default function App() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const invite = params.get("invite");
-    const handoff = params.get("handoff");
-    // ID-porten-callbacken redirecter tilbake hit, ev. med en lesbar feil (avbrutt innlogging,
+    // Tokenet ligger i URL-fragmentet (#invite=..., #handoff=...): fragmentet sendes aldri til
+    // serveren, så det havner ikke i noen access-logg. Eldre lenker med ?invite= godtas fortsatt.
+    const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const invite = fragment.get("invite") ?? params.get("invite");
+    const handoff = fragment.get("handoff") ?? params.get("handoff");
+    // ID-porten-callbacken redirecter tilbake hit, ev. med en feilkode (avbrutt innlogging,
     // teknisk svikt). Vis den som banner, og rydd den ut av URL-en som med invite/handoff.
     const idpFeil = params.get("idp_feil");
     // En invite-lenke åpner porten; en handoff-lenke (fra en alt koblet enhet) arver bindingen
@@ -741,7 +752,7 @@ export default function App() {
         });
     } else {
       if (idpFeil) {
-        setLenkeFeil(idpFeil);
+        setLenkeFeil(IDP_FEIL[idpFeil] ?? IDP_FEIL.mislyktes);
         window.history.replaceState({}, "", window.location.pathname);
       }
       refresh();

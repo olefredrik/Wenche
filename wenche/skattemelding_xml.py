@@ -18,7 +18,10 @@ resultatAvValidering blir «validertOK».
 
 from __future__ import annotations
 
-from xml.etree.ElementTree import Element, SubElement, fromstring, tostring
+from xml.etree.ElementTree import Element, SubElement, tostring
+
+# Forhåndsutfylt skattemelding kommer fra Skatteetaten, men parses defensivt (som SAF-T).
+from defusedxml.ElementTree import fromstring
 
 from wenche.models import Aarsregnskap, SkattemeldingKonfig
 from wenche.skatteberegning import beregn_skatt

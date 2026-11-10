@@ -47,5 +47,9 @@ RUN adduser --disabled-password --gecos "" wenche \
 USER wenche
 
 EXPOSE 8080
-# ÉN worker med vilje: in-memory-sesjonen forutsetter én prosess.
-CMD ["uvicorn", "hosted.api.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]
+# ÉN worker med vilje (sesjonen ligger i cookien, men rate-limit og caches er per prosess).
+# Access-loggen er av: den ville logget hver URL med query-streng, der ID-porten-callbackens
+# code/state står, og der eldre invite-/handoff-lenker bar tokenet. Feil logges fortsatt.
+# --forwarded-allow-ips="*": bare Fly-proxyen når porten, så X-Forwarded-For kan stoles på og
+# request.client.host blir sluttbrukerens adresse (rate-limit-fallback i auth.py).
+CMD ["uvicorn", "hosted.api.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1", "--no-access-log", "--proxy-headers", "--forwarded-allow-ips", "*"]

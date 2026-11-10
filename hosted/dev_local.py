@@ -68,5 +68,5 @@ if __name__ == "__main__":
         os.environ["HOSTED_INVITE_SECRET"], salt="invite"
     ).dumps({"org": _dev_org})
     print("Hosted Wenche (dev/test) -> http://127.0.0.1:8077")
-    print(f"Invite-lenke (org {_dev_org}, åpne i SPA-en): {os.environ['HOSTED_PUBLIC_URL']}/?invite={_token}")
+    print(f"Invite-lenke (org {_dev_org}, åpne i SPA-en): {os.environ['HOSTED_PUBLIC_URL']}/#invite={_token}")
     uvicorn.run("hosted.api.main:app", host="127.0.0.1", port=8077, reload=True)

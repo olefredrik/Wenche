@@ -11,6 +11,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from wenche.filer import sikre_privat_mappe, skriv_privat
+
 _WENCHE_DIR = Path.home() / ".wenche"
 _BRUKER_ENV_FIL = _WENCHE_DIR / ".env"
 _PRIVAT_NOKKEL_FIL = _WENCHE_DIR / "maskinporten_privat.pem"
@@ -100,8 +102,7 @@ def _confirm_url_fil(env: str) -> Path:
 
 
 def lagre_request_id(request_id: str, env: str | None = None) -> None:
-    _WENCHE_DIR.mkdir(exist_ok=True)
-    _request_id_fil(env or _AKTIV_ENV).write_text(request_id, encoding="utf-8")
+    skriv_privat(_request_id_fil(env or _AKTIV_ENV), request_id)
 
 
 def les_request_id(env: str | None = None) -> str:
@@ -112,8 +113,7 @@ def les_request_id(env: str | None = None) -> str:
 def lagre_confirm_url(url: str, env: str | None = None) -> None:
     if not url:
         return
-    _WENCHE_DIR.mkdir(exist_ok=True)
-    _confirm_url_fil(env or _AKTIV_ENV).write_text(url, encoding="utf-8")
+    skriv_privat(_confirm_url_fil(env or _AKTIV_ENV), url)
 
 
 def les_confirm_url(env: str | None = None) -> str:
@@ -126,18 +126,10 @@ def sikre_bruker_env_fil() -> bool:
     Sørg for at ~/.wenche/.env eksisterer og er trygt rettighetssatt. Migrerer en eventuell
     cwd/.env (oppsett fra eldre Wenche-versjoner) inn. Returnerer True hvis migrering skjedde.
     """
-    _WENCHE_DIR.mkdir(exist_ok=True)
+    sikre_privat_mappe(_WENCHE_DIR)
     if _BRUKER_ENV_FIL.exists():
         return False
-    migrert = False
     cwd_env = Path(".env")
-    if cwd_env.is_file():
-        _BRUKER_ENV_FIL.write_text(cwd_env.read_text(encoding="utf-8"), encoding="utf-8")
-        migrert = True
-    else:
-        _BRUKER_ENV_FIL.touch()
-    try:
-        _BRUKER_ENV_FIL.chmod(0o600)
-    except OSError:
-        pass
+    migrert = cwd_env.is_file()
+    skriv_privat(_BRUKER_ENV_FIL, cwd_env.read_text(encoding="utf-8") if migrert else "")
     return migrert

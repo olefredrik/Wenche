@@ -31,7 +31,8 @@ import uuid
 from urllib.parse import urlencode
 
 import httpx
-from authlib.jose import JsonWebKey, jwt
+from authlib.jose import JsonWebKey, JsonWebToken, jwt
+from authlib.jose.errors import JoseError
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
@@ -64,9 +65,16 @@ def _scope() -> str:
         else "openid profile"
     )
 
-# Well-known-metadata og JWKS per miljø (test/prod), cachet i minnet.
+# Well-known-metadata og JWKS per miljø (test/prod), cachet i minnet. JWKS fornyes etter
+# _JWKS_TTL, og i tillegg straks et id_token bærer en kid cachen ikke kjenner (nøkkelrotasjon
+# hos ID-porten), så innloggingen ikke stopper til prosessen tilfeldigvis restarter.
+_JWKS_TTL = 24 * 3600
 _metadata_cache: dict[str, dict] = {}
-_jwks_cache: dict[str, object] = {}
+_jwks_cache: dict[str, tuple[object, float]] = {}
+
+# Bare RS256: ID-porten signerer id_token med RS256, og en låst liste gjør at en annen algoritme
+# i tokenets header aldri vurderes (f.eks. HMAC med den offentlige nøkkelen som hemmelighet).
+_JWT = JsonWebToken(["RS256"])
 
 
 def _issuer(env: str) -> str:
@@ -84,13 +92,14 @@ def _metadata(env: str) -> dict:
     return md
 
 
-def _jwks(env: str):
-    jwks = _jwks_cache.get(env)
-    if jwks is None:
-        resp = httpx.get(_metadata(env)["jwks_uri"], timeout=10)
-        resp.raise_for_status()
-        jwks = JsonWebKey.import_key_set(resp.json())
-        _jwks_cache[env] = jwks
+def _jwks(env: str, *, tving_ny: bool = False):
+    cachet = _jwks_cache.get(env)
+    if cachet is not None and not tving_ny and time.time() - cachet[1] < _JWKS_TTL:
+        return cachet[0]
+    resp = httpx.get(_metadata(env)["jwks_uri"], timeout=10)
+    resp.raise_for_status()
+    jwks = JsonWebKey.import_key_set(resp.json())
+    _jwks_cache[env] = (jwks, time.time())
     return jwks
 
 
@@ -221,7 +230,11 @@ def login(request: Request) -> RedirectResponse:
 
 
 def _tilbake(feil: str | None = None) -> RedirectResponse:
-    """Redirect tilbake til SPA-en, ev. med en lesbar feil SPA-en viser som banner."""
+    """
+    Redirect tilbake til SPA-en, ev. med en feilkode (avbrutt, mislyktes, navn_mangler) som
+    SPA-en oversetter til tekst. En kode og ikke tekst, så ingen kan lage en lenke som viser en
+    vilkårlig melding i varselbanneret.
+    """
     base = settings().public_url.rstrip("/") + "/"
     if feil:
         base += "?" + urlencode({"idp_feil": feil})
@@ -246,9 +259,9 @@ def callback(
 
     if error:
         # Brukeren avbrøt eller ID-porten avviste. error_description er teknisk, vis en rolig tekst.
-        return _tilbake("Innloggingen ble avbrutt. Prøv igjen.")
+        return _tilbake("avbrutt")
     if not code or not state or state != forventet_state or not verifier:
-        return _tilbake("Innloggingen kunne ikke fullføres. Prøv igjen.")
+        return _tilbake("mislyktes")
 
     md = _metadata(s.env)
     try:
@@ -268,8 +281,11 @@ def callback(
         token_resp.raise_for_status()
         id_token = token_resp.json()["id_token"]
         claims = _valider_id_token(id_token, md, nonce)
-    except (httpx.HTTPError, KeyError, ValueError):
-        return _tilbake("Innloggingen kunne ikke fullføres. Prøv igjen.")
+    except (httpx.HTTPError, KeyError, ValueError, JoseError) as e:
+        # JoseError dekker avvist signatur, utløpt token og feil iss/aud. Logg bare
+        # unntakstypen, aldri claims eller svarkropp (personopplysninger).
+        _log.warning("ID-porten-innlogging feilet: %s", type(e).__name__)
+        return _tilbake("mislyktes")
 
     navn = _navn_fra_claims(claims)
     if not navn:
@@ -277,7 +293,7 @@ def callback(
         # claim-nøkler ID-porten faktisk sendte (kun nøklene, aldri verdiene: name/pid er
         # personopplysninger) så et tomt navn er feilsøkbart uten logghistorikk på Fly.
         _log.warning("Tomt navn fra ID-porten; claim-nøkler: %s", sorted(claims.keys()))
-        return _tilbake("Fikk ikke navnet ditt fra ID-porten. Ta kontakt for manuell tilgang.")
+        return _tilbake("navn_mangler")
 
     # Bind den verifiserte identiteten til økten. Fødselsnummeret (`pid`) lagres aldri; kun
     # navnet, som rollesjekken (velg_org) bruker. `via_idporten` skiller en ID-porten-økt fra
@@ -392,15 +408,19 @@ def velg_org_altinn(body: VelgOrgBody, request: Request) -> dict:
 
 
 def _valider_id_token(id_token: str, md: dict, nonce: str | None) -> dict:
-    """Valider signatur (JWKS), utsteder, mottaker og nonce. Kaster ved avvik."""
-    claims = jwt.decode(
-        id_token,
-        _jwks(settings().env),
-        claims_options={
-            "iss": {"essential": True, "value": md["issuer"]},
-            "aud": {"essential": True, "value": settings().idporten_client_id},
-        },
-    )
+    """Valider signatur (JWKS), utsteder, mottaker, utløp og nonce. Kaster ved avvik."""
+    env = settings().env
+    claims_options = {
+        "iss": {"essential": True, "value": md["issuer"]},
+        "aud": {"essential": True, "value": settings().idporten_client_id},
+        "exp": {"essential": True},
+    }
+    try:
+        claims = _JWT.decode(id_token, _jwks(env), claims_options=claims_options)
+    except ValueError:
+        # Ukjent kid («Key not found»): ID-porten har trolig rotert nøkler siden JWKS ble cachet.
+        # Hent på nytt én gang; feiler det igjen, er tokenet faktisk ugyldig.
+        claims = _JWT.decode(id_token, _jwks(env, tving_ny=True), claims_options=claims_options)
     claims.validate(now=int(time.time()), leeway=_LEEWAY)
     if not nonce or claims.get("nonce") != nonce:
         raise ValueError("nonce-avvik i id_token")

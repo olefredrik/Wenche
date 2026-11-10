@@ -167,7 +167,12 @@ def test_rute_sender_bekreft_klage_videre(monkeypatch):
         return {"sendt": True, "resultat": "x", "klage": bekreft_klage}
 
     monkeypatch.setattr(tjeneste, "send_skattemelding", falsk_send)
-    with TestClient(lag_app(env="test", serve_spa=False)) as klient:
+    with TestClient(
+        lag_app(env="test", serve_spa=False),
+        # Vakten i vakt.py krever loopback-Host og klientheaderen på endringskall.
+        base_url="http://127.0.0.1",
+        headers={"X-Wenche-Klient": "1"},
+    ) as klient:
         r = klient.post("/api/innsending/skattemelding?bekreft_klage=true", json=_config())
     assert r.status_code == 200, r.text
     assert kall["bekreft_klage"] is True

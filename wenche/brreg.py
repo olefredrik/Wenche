@@ -30,11 +30,14 @@ def _rolle_aktiv(rolle: dict) -> bool:
 
 def parse_roller(data: dict) -> dict:
     """
-    Plukk aktiv daglig leder og styreleder ut av et /roller-svar, pluss en flat liste med navn på
-    alle aktive rolleinnehavere (til navnematch). Tomme verdier der rollen mangler.
+    Plukk aktiv daglig leder og styreleder ut av et /roller-svar, pluss to flate navnelister:
+    `ledelse` (aktiv daglig leder og styreleder, til navnematchen i hostet) og `alle` (hver aktiv
+    rolleinnehaver, også styremedlemmer, varamedlemmer, revisor og regnskapsfører). Tomme verdier
+    der rollen mangler.
     """
     daglig_leder = ""
     styreleder = ""
+    ledelse: list[str] = []
     alle: list[str] = []
     for gruppe in data.get("rollegrupper", []):
         gruppetype = (gruppe.get("type") or {}).get("kode")
@@ -46,11 +49,20 @@ def parse_roller(data: dict) -> dict:
                 continue
             alle.append(navn)
             rolletype = (rolle.get("type") or {}).get("kode")
-            if gruppetype == "DAGL" and not daglig_leder:
+            er_daglig_leder = gruppetype == "DAGL"
+            er_styreleder = gruppetype == "STYR" and rolletype == "LEDE"
+            if er_daglig_leder or er_styreleder:
+                ledelse.append(navn)
+            if er_daglig_leder and not daglig_leder:
                 daglig_leder = navn
-            elif gruppetype == "STYR" and rolletype == "LEDE" and not styreleder:
+            elif er_styreleder and not styreleder:
                 styreleder = navn
-    return {"daglig_leder": daglig_leder, "styreleder": styreleder, "alle": alle}
+    return {
+        "daglig_leder": daglig_leder,
+        "styreleder": styreleder,
+        "ledelse": ledelse,
+        "alle": alle,
+    }
 
 
 def parse_stiftelsesaar(data: dict) -> int:
@@ -115,7 +127,9 @@ def _hent_json(url: str, timeout: float) -> dict | None:
 def hent_roller(orgnr: str, *, timeout: float = 5.0) -> dict:
     """Aktiv daglig leder og styreleder for orgnr fra Enhetsregisteret. Fail-soft (tomt ved feil)."""
     data = _hent_json(f"{_BASE}/{orgnr}/roller", timeout)
-    return parse_roller(data) if data else {"daglig_leder": "", "styreleder": "", "alle": []}
+    if not data:
+        return {"daglig_leder": "", "styreleder": "", "ledelse": [], "alle": []}
+    return parse_roller(data)
 
 
 def hent_enhet(orgnr: str, *, timeout: float = 5.0) -> dict:

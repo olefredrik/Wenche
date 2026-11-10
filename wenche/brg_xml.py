@@ -11,12 +11,19 @@ https://brreg.github.io/docs/apidokumentasjon/regnskapsregisteret/maskinell-innr
 
 import uuid
 from datetime import date
+from xml.sax.saxutils import escape
 
 from wenche.models import Aarsregnskap
 
 
 def _row_id() -> str:
     return str(uuid.uuid4())
+
+
+def _t(verdi: object) -> str:
+    """Tekst klar for innsetting i XML-malen: &, < og > escapes. Et selskapsnavn som
+    «Smith & Sønn AS» ga før ugyldig XML. Tallene i malen er alt heltall og trygge."""
+    return escape(str(verdi))
 
 
 # ---------------------------------------------------------------------------
@@ -117,9 +124,9 @@ def generer_hovedskjema(regnskap: Aarsregnskap) -> bytes:
          tjeneste="regnskap">
   <Innsender>
     <enhet>
-      <organisasjonsnummer orid="18">{s.org_nummer}</organisasjonsnummer>
+      <organisasjonsnummer orid="18">{_t(s.org_nummer)}</organisasjonsnummer>
       <organisasjonsform orid="756">AS</organisasjonsform>
-      <navn orid="1">{s.navn}</navn>
+      <navn orid="1">{_t(s.navn)}</navn>
     </enhet>
     <opplysningerInnsending>
       <noteMaskinellBehandling orid="37499">10</noteMaskinellBehandling>
@@ -143,7 +150,7 @@ def generer_hovedskjema(regnskap: Aarsregnskap) -> bytes:
     </regnskapsprinsipper>
     <fastsettelse>
       <fastsettelsedato orid="17105">{fastsettelsesdato.isoformat()}</fastsettelsedato>
-      <bekreftendeSelskapsrepresentant orid="19023">{signatar}</bekreftendeSelskapsrepresentant>
+      <bekreftendeSelskapsrepresentant orid="19023">{_t(signatar)}</bekreftendeSelskapsrepresentant>
     </fastsettelse>
     <revisjonRegnskapsfoerer>
       <aarsregnskapIkkeRevideres orid="34669">{ikke_revideres}</aarsregnskapIkkeRevideres>

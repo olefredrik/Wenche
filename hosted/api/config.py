@@ -8,6 +8,7 @@ kunde-org kommer per sesjon (ikke herfra).
 import os
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import urlparse
 
 from wenche.auth import VendorCredentials
 
@@ -27,13 +28,14 @@ class Settings:
         # Invite-only: signert invite-lenke. Roter ved å bytte denne (ugyldiggjør
         # alle utdelte lenker).
         self.invite_secret: str = os.getenv("HOSTED_INVITE_SECRET", _DEV_INVITE_SECRET)
-        self.cors_origins: list[str] = [
-            o.strip()
-            for o in os.getenv("HOSTED_CORS_ORIGINS", "http://localhost:5173").split(",")
-            if o.strip()
-        ]
         # Brukes til å bygge invite-lenken (peker på app-en der invitten løses inn).
         self.public_url: str = os.getenv("HOSTED_PUBLIC_URL", "http://localhost:5173")
+        # CORS gjelder bare Vite-dev-serveren (egen origin lokalt). I offentlig drift serveres
+        # SPA-en fra samme origin, så ingen fremmed origin skal få sende kall med cookie.
+        cors_std = "" if self.er_offentlig else "http://localhost:5173,http://127.0.0.1:5173"
+        self.cors_origins: list[str] = [
+            o.strip() for o in os.getenv("HOSTED_CORS_ORIGINS", cors_std).split(",") if o.strip()
+        ]
         # Demo-modus: viser en «dette er en demo mot tt02»-banner i SPA-en. Rent informativt,
         # endrer ikke funksjonalitet. Settes kun på demo-appen (aldri i prod).
         self.demo_mode: bool = os.getenv("HOSTED_DEMO_MODE", "").lower() in ("1", "true", "yes")
@@ -64,7 +66,19 @@ class Settings:
         self._idporten_reportees = os.getenv("HOSTED_IDPORTEN_REPORTEES", "").lower() in (
             "1", "true", "yes",
         )
-        self._fail_closed_i_prod()
+        self._fail_closed()
+
+    @property
+    def er_offentlig(self) -> bool:
+        """
+        Om appen nås fra internett: HOSTED_PUBLIC_URL peker på noe annet enn loopback.
+
+        Styrer det som må være strammere i offentlig drift uansett miljø. Demo-appen er offentlig
+        med WENCHE_ENV=test, så «prod» alene er ikke nok som kriterium for fail-closed, Secure på
+        sesjonscookien og en tom CORS-liste.
+        """
+        vert = urlparse(self.public_url).hostname or ""
+        return vert not in ("localhost", "127.0.0.1", "::1")
 
     @property
     def kontakt_tekst(self) -> str:
@@ -116,10 +130,11 @@ class Settings:
             return Path(self._idporten_key_path).read_bytes()
         return None
 
-    def _fail_closed_i_prod(self) -> None:
-        """Nekt oppstart i prod hvis hemmelighetene ikke er overstyrt fra dev-standardene."""
-        if self.env != "prod":
+    def _fail_closed(self) -> None:
+        """Nekt oppstart i prod eller offentlig drift hvis hemmelighetene er dev-standardene."""
+        if self.env != "prod" and not self.er_offentlig:
             return
+        hvor = "i prod" if self.env == "prod" else f"offentlig ({self.public_url})"
         usikre = [
             navn
             for navn, verdi, dev in (
@@ -130,13 +145,13 @@ class Settings:
         ]
         if usikre:
             raise RuntimeError(
-                "Hostet Wenche kjører i prod uten egne hemmeligheter: "
+                f"Hostet Wenche kjører {hvor} uten egne hemmeligheter: "
                 + ", ".join(usikre)
                 + ". Sett dem fra secret manager/KMS før oppstart. Dev-standardene "
                 "ligger i åpen kildekode og ville latt hvem som helst lage gyldige "
                 "invite-lenker og forfalske sesjonscookies."
             )
-        # Delvis ID-porten-config i prod er nesten alltid en feil (glemt secret), og en
+        # Delvis ID-porten-config er nesten alltid en feil (glemt secret), og en
         # halvkonfigurert OIDC-klient feiler stille ved innlogging. Krev enten alt eller intet.
         idp = {
             "HOSTED_IDPORTEN_CLIENT_ID": self._idporten_client_id,
@@ -148,7 +163,7 @@ class Settings:
         if satt and satt != set(idp):
             mangler = ", ".join(sorted(set(idp) - satt))
             raise RuntimeError(
-                "Hostet Wenche har delvis ID-porten-config i prod. Mangler: "
+                f"Hostet Wenche har delvis ID-porten-config {hvor}. Mangler: "
                 + mangler
                 + ". Sett alle eller ingen (uten = invite-only)."
             )

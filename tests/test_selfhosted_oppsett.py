@@ -37,7 +37,12 @@ def klient(tmp_path, monkeypatch):
         monkeypatch.delenv(var, raising=False)
     # Pek nøkkelstien bort fra repoets ekte PEM-fil.
     monkeypatch.setenv("MASKINPORTEN_PRIVAT_NOKKEL", str(wenche_dir / "maskinporten_privat.pem"))
-    with TestClient(lag_app(env="test", serve_spa=False)) as klient:
+    with TestClient(
+        lag_app(env="test", serve_spa=False),
+        # Vakten i vakt.py krever loopback-Host og klientheaderen på endringskall.
+        base_url="http://127.0.0.1",
+        headers={"X-Wenche-Klient": "1"},
+    ) as klient:
         yield klient
 
 

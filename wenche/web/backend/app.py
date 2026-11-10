@@ -15,6 +15,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from wenche import __version__ as WENCHE_VERSJON
 
@@ -26,6 +27,7 @@ from .ruter_frister import router as frister_router
 from .ruter_innsending import router as innsending_router
 from .ruter_oppsett import router as oppsett_router
 from .ruter_saft import router as saft_router
+from .vakt import TILLATTE_VERTER, LokalVakt
 
 _STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 _INDEX_HTML = _STATIC_DIR / "index.html"
@@ -34,6 +36,12 @@ _INDEX_HTML = _STATIC_DIR / "index.html"
 def lag_app(env: str = "prod", serve_spa: bool = True) -> FastAPI:
     miljo.sett_env(env)
     app = FastAPI(title="Wenche", version=WENCHE_VERSJON)
+
+    # Vakt mot kall fra andre nettsteder (se vakt.py). Serveren har ingen innlogging, så dette er
+    # det som hindrer at en side brukeren besøker utløser innsendinger eller leser config-fila.
+    # Vertssjekken (ytterst) stopper DNS-rebinding, vakten stopper cross-site-kall.
+    app.add_middleware(LokalVakt)
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(TILLATTE_VERTER))
 
     app.include_router(config_router)
     app.include_router(oppsett_router)
