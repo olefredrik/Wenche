@@ -13,3 +13,13 @@ site
 *.pem
 *.xml
 *.xbrl
+
+# Lokale data og hemmeligheter som aldri skal inn i byggekonteksten (flyctl laster hele
+# konteksten opp til Flys builder): config med selskapsdata og fødselsnummer, agent-innstillinger,
+# og mapper imaget ikke bruker.
+config.yaml
+config.dev.yaml
+.claude
+tests
+docs
+dist
