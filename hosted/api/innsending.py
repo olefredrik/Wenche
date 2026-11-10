@@ -6,7 +6,7 @@ Innsendings-endepunkter for hostet Wenche.
     dry_run: lokal bygging/validering, ingen nettverk, ingen disk, ingen binding kreves.
     ekte: vendor-creds + godkjent kunde-org; gjenbruker domene + klienter.
 
-Orkestreringen (bygg → valider → send) ligger i `wenche.innsending` og deles med CLI-en og
+Orkestreringen (bygg, valider, send) ligger i `wenche.innsending` og deles med CLI-en og
 self-hosted-appen. Denne modulen legger kun hostet-auth (invite + vendor + kunde-org) oppå.
 
 Personvern: innsendingsdata (inkl. fødselsnummer) lever kun i minnet i det ene kallet som
@@ -25,7 +25,7 @@ from wenche import auth as wauth
 from wenche import innsending as tjeneste
 from wenche.altinn_client import AltinnClient
 from wenche.auth import SCOPES, SKD_AKSJONAER_SCOPE, SKD_SKATTEMELDING_SCOPE
-from wenche.innsending import InnsendingValideringsfeil
+from wenche.feil import KonfigFeil, MyndighetsFeil, ValideringsFeil, brukermelding, url_fra_unntak
 from wenche.skd_client import SkdAksjonaerClient
 from wenche.skd_skattemelding_client import (
     SkattemeldingValideringsfeil,
@@ -50,21 +50,17 @@ def _sjekk_org(cfg: dict, kunde_org: str) -> None:
 
 
 def _url_fra_feil(e: Exception) -> str:
-    """Hent oppstrøms-URL-en fra en httpx-feil, trygt. httpx' `.request` kaster RuntimeError
-    hvis den ikke er satt (RequestError uten request), så vi svelger det og gir tom streng."""
-    try:
-        return str(e.request.url)  # type: ignore[attr-defined]
-    except (RuntimeError, AttributeError):
-        return ""
+    """Oppstrøms-URL-en fra en httpx-feil, trygt (tom streng når den ikke er satt)."""
+    return url_fra_unntak(e) or ""
 
 
 def _steg_av_url(url: str) -> str | None:
     """Utled et lesbart navn på innsendingssteget fra oppstrøms-URL-en.
 
-    Forteller brukeren HVOR i kjeden det stoppet (henting, validering, opplasting ...) uten
-    å avsløre den rå feilkroppen. Rekkefølgen er bevisst: de mest spesifikke mønstrene først,
-    siden f.eks. valider- og data-URL-ene også inneholder de generiske bitene. Returnerer
-    None når URL-en ikke kjennes igjen, så meldingen faller tilbake på en generisk formulering.
+    Reserveløsning for rå httpx-feil som ikke gikk gjennom en av Wenches klienter (de navngir
+    steget selv). Rekkefølgen er bevisst: de mest spesifikke mønstrene først, siden f.eks.
+    valider- og data-URL-ene også inneholder de generiske bitene. Returnerer None når URL-en
+    ikke kjennes igjen, så meldingen faller tilbake på en generisk formulering.
     """
     u = (url or "").lower()
     if "skattemelding/v2/valider" in u:
@@ -84,35 +80,35 @@ def _steg_av_url(url: str) -> str | None:
     return None
 
 
-def _tolk_http_feil(e: httpx.HTTPStatusError) -> HTTPException:
-    """Gjør en rå HTTP-feil fra Altinn/Skatteetaten om til en lesbar 502 (unngår 500 + stacktrace).
+def _fra_httpx(e: httpx.HTTPError) -> MyndighetsFeil:
+    """Rå httpx-feil som slapp forbi en klient: pakk som MyndighetsFeil med steg utledet av URL-en."""
+    url = _url_fra_feil(e)
+    tjeneste_navn = "skatteetaten" if ("skatteetaten" in url or "sits.no" in url) else "altinn"
+    steg = _steg_av_url(url) or ""
+    if isinstance(e, httpx.HTTPStatusError):
+        return MyndighetsFeil.fra_svar(tjeneste_navn, steg, e.response)
+    if isinstance(e, httpx.RequestError):
+        return MyndighetsFeil.fra_nettverksfeil(tjeneste_navn, steg, e)
+    return MyndighetsFeil(tjeneste_navn, steg, beskrivelse=type(e).__name__)
 
-    Meldingen navngir steget (utledet av URL-en) og statuskoden, men aldri den rå feilkroppen:
-    den kan inneholde interne detaljer og logges kun server-side i _utfor.
+
+def _lesbar_502(e: MyndighetsFeil, kunde_org: str | None) -> HTTPException:
     """
-    kode = e.response.status_code
-    steg = _steg_av_url(_url_fra_feil(e))
-    hvor = f" under {steg}" if steg else ""
-    if kode == 403:
-        melding = (
-            f"Tilgangen ble avslått (HTTP 403){hvor}. Vanligste årsak: systembrukeren er ikke "
-            "lenger godkjent for selskapet, eller tjenesten mangler nødvendig rettighet."
-        )
-    elif kode == 401:
-        melding = (
-            f"Tokenet ble avvist (HTTP 401){hvor}. Prøv igjen, eller koble systembrukeren på nytt."
-        )
-    elif kode >= 500:
-        melding = (
-            f"Altinn/Skatteetaten svarte med en serverfeil (HTTP {kode}){hvor}. Dette er som regel "
-            "midlertidig hos myndighetene. Ingenting er sendt inn. Prøv igjen om litt."
-        )
-    else:
-        melding = (
-            f"Altinn/Skatteetaten avviste forespørselen (HTTP {kode}){hvor}. Ingenting er sendt inn. "
-            "Detaljene er logget; prøv igjen eller ta kontakt."
-        )
-    return HTTPException(status_code=502, detail=melding)
+    Logg feilen server-side (steg, status, kode, URL; svarkroppen bare på DEBUG, den kan
+    inneholde interne detaljer) og gi brukeren en melding som navngir steget og koden.
+    `kunde_org` logges (ikke kundedata) så en operatør kan knytte feilen til riktig org.
+    """
+    logger.warning(
+        "Innsending feilet for org %s: %s (HTTP %s, kode %s, url %s)",
+        kunde_org,
+        e.steg or "ukjent steg",
+        e.status,
+        e.kode,
+        e.url,
+    )
+    if e.kropp:
+        logger.debug("Svarkropp: %s", e.kropp[:2000])
+    return HTTPException(status_code=502, detail=brukermelding(e))
 
 
 def _utfor(fn, kunde_org: str | None = None):
@@ -123,50 +119,29 @@ def _utfor(fn, kunde_org: str | None = None):
     Maskinporten (f.eks. systembruker mangler en rettighet) eller en feilet Altinn-veksling
     kaster ellers utenfor denne fellen og blir en naken 500 hos brukeren.
 
-    Domeneklientene melder feil på to måter: rå `httpx.HTTPStatusError` (Altinn) og
-    `RuntimeError` med ferdig melding (SKD-klienten / token-henting). Valideringsfeil gir
-    422; alt annet 502. `kunde_org` logges (ikke kundedata) så en operatør kan knytte en
-    feil til riktig org i loggene uten å vente på at brukeren melder fra.
+    Valideringsfeil og config-feil gir 422; alt fra myndighetene (MyndighetsFeil fra klientene,
+    eller rå httpx-feil som reserve) gir 502 med steget navngitt. Bevisst reist HTTPException
+    slipper gjennom uendret.
     """
     try:
         return fn()
-    except InnsendingValideringsfeil as e:
-        raise HTTPException(status_code=422, detail={"feil": e.feil})
-    except SkattemeldingValideringsfeil as e:  # subklasse av RuntimeError — fanges først
-        raise HTTPException(status_code=422, detail={"validering": str(e)})
-    except httpx.HTTPStatusError as e:
-        logger.warning(
-            "Innsending feilet for org %s: HTTP %s fra %s: %s",
-            kunde_org,
-            e.response.status_code,
-            e.request.url,
-            (e.response.text or "").strip()[:500] or "(tom feilkropp)",
-        )
-        raise _tolk_http_feil(e)
-    except httpx.RequestError as e:
-        # Tidsavbrudd/tilkoblingsfeil (ikke et HTTP-svar). Søsken av HTTPStatusError, så den
-        # må fanges eksplisitt — ellers blir den en naken 500. Skattemelding gjør flere
-        # oppstrøms-kall enn aksjonær og er derfor mer utsatt for et forbigående avbrudd.
-        url = _url_fra_feil(e) or "ukjent URL"
-        steg = _steg_av_url(url)
-        hvor = f" under {steg}" if steg else ""
-        logger.warning("Innsending feilet for org %s: nettverksfeil mot %s: %s", kunde_org, url, e)
-        raise HTTPException(
-            status_code=502,
-            detail=(
-                f"Fikk ikke fullført forespørselen mot Altinn/Skatteetaten{hvor} (nettverksfeil "
-                "eller tidsavbrudd). Det er som regel midlertidig. Sjekk i Altinn eller hos "
-                "Skatteetaten før du prøver på nytt, i tilfelle forespørselen likevel gikk gjennom."
-            ),
-        )
-    except RuntimeError as e:
-        logger.warning("Innsending feilet for org %s: %s", kunde_org, e)
-        # SKD-klienten/token-hentingen pakker noen ganger den rå feilkroppen etter en linjeskift
-        # (f.eks. "Feil ved henting av forhåndsutfylt skattemelding: 400\n<xml fra SKD>"). Send
-        # bare første linje (steg + statuskode) til klienten; hele teksten er logget over.
-        raise HTTPException(status_code=502, detail=str(e).split("\n", 1)[0])
+    except ValideringsFeil as e:
+        raise HTTPException(status_code=422, detail={"feil": e.feil}) from e
+    except SkattemeldingValideringsfeil as e:
+        raise HTTPException(status_code=422, detail={"validering": str(e)}) from e
+    except KonfigFeil as e:
+        raise HTTPException(status_code=422, detail={"feil": [str(e)]}) from e
+    except MyndighetsFeil as e:
+        raise _lesbar_502(e, kunde_org) from e
+    except httpx.HTTPError as e:
+        raise _lesbar_502(_fra_httpx(e), kunde_org) from e
     except HTTPException:
         raise  # alt bevisst reist (f.eks. _sjekk_org 409) skal slippe gjennom uendret
+    except RuntimeError as e:
+        # Eldre feil med ferdig melding. Bare første linje til klienten (en eventuell
+        # svarkropp etter linjeskift logges, vises ikke).
+        logger.warning("Innsending feilet for org %s: %s", kunde_org, e)
+        raise HTTPException(status_code=502, detail=str(e).split("\n", 1)[0]) from e
     except Exception:
         # Siste skanse: en uventet feiltype skal aldri bli en naken stacktrace-500 hos
         # brukeren. Logg med traceback + org så den blir attribuerbar, og gi et rent svar.
@@ -174,7 +149,7 @@ def _utfor(fn, kunde_org: str | None = None):
         raise HTTPException(
             status_code=500,
             detail="Uventet feil under innsending. Feilen er logget. Prøv igjen, eller ta kontakt.",
-        )
+        ) from None
 
 
 @router.post("/innsending/aarsregnskap")

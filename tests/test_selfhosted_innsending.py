@@ -189,3 +189,32 @@ def test_runtimeerror_blir_502():
     with pytest.raises(HTTPException) as ei:
         _utfor(_hev(RuntimeError("Feil ved henting av forhåndsutfylt skattemelding: 403")))
     assert ei.value.status_code == 502
+
+
+# ---------------------------------------------------------------------------
+# Strukturerte feil (wenche.feil) og token-henting inne i feilfellen
+# ---------------------------------------------------------------------------
+
+
+def test_tokenfeil_blir_lesbar_502_ikke_500(klient, monkeypatch):
+    """Token-hentingen ligger inne i feilfellen: et avslag fra Maskinporten skal ikke bli 500."""
+    import wenche.auth as auth_mod
+    from wenche.feil import AuthFeil
+
+    def avslag():
+        raise AuthFeil(status=400, kode="invalid_scope", beskrivelse="scope mangler")
+
+    monkeypatch.setattr(auth_mod, "get_altinn_token", avslag)
+    r = klient.post("/api/innsending/aarsregnskap", json=_gyldig_config())
+    assert r.status_code == 502, r.text
+    assert "invalid_scope" in r.json()["detail"]
+
+
+def test_403_i_testmiljo_gir_tenor_hint(klient):
+    from wenche.feil import MyndighetsFeil
+
+    feil = MyndighetsFeil("altinn", "oppretting av innsending i Altinn", status=403)
+    with pytest.raises(HTTPException) as ei:
+        _utfor(_hev(feil))
+    assert ei.value.status_code == 502
+    assert "Tenor" in str(ei.value.detail)

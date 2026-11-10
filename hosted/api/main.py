@@ -8,6 +8,7 @@ Self-hosted-appen (`wenche.web`) er upåvirket. Se hosted/README.md.
 """
 
 import html
+import logging
 import os
 from pathlib import Path
 
@@ -30,6 +31,12 @@ from .selskap import router as selskap_router
 from .systembruker import router as systembruker_router
 
 s = settings()
+
+# Loggoppsett for hele prosessen (uvicorn har sine egne loggere, de dupliseres ikke). INFO så
+# fremdrift fra kjernen (instans opprettet, hovedskjema lastet opp) og advarsler fra
+# feilhåndteringen (steg, status, kode) kommer i Fly-loggen. Svarkropper fra myndighetene logges
+# bare på DEBUG, siden de kan inneholde interne detaljer.
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
 # API-dokumentasjonen (/docs, /redoc, /openapi.json) er slått av: tjenesten har én kjent
 # klient (SPA-en på samme origin), og et åpent skjema gjør rekognosering unødvendig lett.
