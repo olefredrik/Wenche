@@ -11,6 +11,7 @@ Innsendingsflyt (SKDs eget REST-API, ikke Altinn-instansflyt):
   3. POST bekreft                   — oppgaven klar til behandling hos SKD
 """
 
+import logging
 import os
 from xml.sax.saxutils import escape
 
@@ -18,6 +19,7 @@ import httpx
 import yaml
 
 from wenche.aarsregnskap import _dato, _tall
+from wenche.feil import ValideringsFeil
 from wenche.models import Aksjonaer, Aksjonaerregisteroppgave, Selskap
 from wenche.skd_client import SkdAksjonaerClient
 
@@ -508,59 +510,66 @@ def valider_mot_brg(oppgave: Aksjonaerregisteroppgave, *, timeout: float = 5.0) 
     return []
 
 
-def send_inn(
-    oppgave: Aksjonaerregisteroppgave,
-    klient: SkdAksjonaerClient | None,
-    dry_run: bool = False,
-) -> dict | None:
+log = logging.getLogger(__name__)
+
+
+def innsending_org_for_test() -> str:
+    """
+    Org.nr. som skal stå i XML-en i testmiljø: det syntetiske Tenor-orgnr-et i
+    SKD_TEST_ORG_NUMMER. Tom streng i prod (selskapets eget org.nr. brukes).
+    """
+    if os.getenv("WENCHE_ENV", "prod") != "test":
+        return ""
+    return os.getenv("SKD_TEST_ORG_NUMMER", "")
+
+
+def bygg_filer(oppgave: Aksjonaerregisteroppgave, innsending_org: str = "") -> dict[str, bytes]:
+    """
+    XML-dokumentene oppgaven består av, med filnavn: hovedskjema (RF-1086) og ett underskjema
+    (RF-1086-U) per aksjonær. Ren bygging, uten validering, nettverk eller disk; brukes av
+    dry-run i CLI-en og av dokument-nedlastingen i begge webgrensesnittene.
+    """
+    base = f"aksjonaerregister_{oppgave.regnskapsaar}_{oppgave.selskap.org_nummer}"
+    filer = {f"{base}_hovedskjema.xml": generer_hovedskjema_xml(oppgave, innsending_org)}
+    for i, aksjonaer in enumerate(oppgave.aksjonaerer, 1):
+        filer[f"{base}_underskjema_{i}.xml"] = generer_underskjema_xml(
+            aksjonaer, oppgave, innsending_org
+        )
+    return filer
+
+
+def send_inn(oppgave: Aksjonaerregisteroppgave, klient: SkdAksjonaerClient) -> dict:
     """
     Sender inn aksjonærregisteroppgaven via SKDs REST-API.
 
-    dry_run=True genererer XML lokalt uten å sende til SKD.
-    Returnerer svar fra bekreft-endepunktet, eller None ved dry_run.
+    Returnerer svaret fra bekreft-endepunktet (forsendelse-ID og dialog-ID). Kaster
+    ValideringsFeil ved blokkerende feil, før noe sendes.
     """
     feil = valider(oppgave)
     if feil:
-        print("\nValidering mislyktes:")
-        for f in feil:
-            print(f"  - {f}")
-        raise SystemExit(1)
+        raise ValideringsFeil(feil)
+    log.info("Validering OK.")
 
-    print("Validering OK.")
-
-    env = os.getenv("WENCHE_ENV", "prod")
-    innsending_org = os.getenv("SKD_TEST_ORG_NUMMER", "") if env == "test" else ""
+    innsending_org = innsending_org_for_test()
     if innsending_org:
-        print(f"Testmodus: bruker syntetisk org.nr. {innsending_org} i XML (SKD_TEST_ORG_NUMMER).")
+        log.info(
+            "Testmodus: bruker syntetisk org.nr. %s i XML (SKD_TEST_ORG_NUMMER).", innsending_org
+        )
 
     hoved_xml = generer_hovedskjema_xml(oppgave, innsending_org)
-    print(f"RF-1086 Hovedskjema generert ({len(hoved_xml):,} bytes).")
-
+    log.info("RF-1086 Hovedskjema generert (%s bytes).", f"{len(hoved_xml):,}")
     under_xmler = [generer_underskjema_xml(a, oppgave, innsending_org) for a in oppgave.aksjonaerer]
-    print(f"RF-1086-U Underskjema generert ({len(under_xmler)} stk).")
+    log.info("RF-1086-U Underskjema generert (%d stk).", len(under_xmler))
 
-    if dry_run:
-        base = f"aksjonaerregister_{oppgave.regnskapsaar}_{oppgave.selskap.org_nummer}"
-        with open(f"{base}_hovedskjema.xml", "wb") as fil:
-            fil.write(hoved_xml)
-        for i, xml in enumerate(under_xmler, 1):
-            with open(f"{base}_underskjema_{i}.xml", "wb") as fil:
-                fil.write(xml)
-        print(f"Dry-run: XML lagret til {base}_*.xml — ingenting sendt til SKD.")
-        return None
-
-    if klient is None:
-        raise ValueError("send_inn trenger en SkdAksjonaerClient når dry_run er False.")
-    print("Sender RF-1086 Hovedskjema til SKD...")
+    log.info("Sender RF-1086 Hovedskjema til SKD...")
     hovedskjemaid = klient.send_hovedskjema(oppgave.regnskapsaar, hoved_xml)
-    print(f"Hovedskjema mottatt (ID: {hovedskjemaid}).")
+    log.info("Hovedskjema mottatt (ID: %s).", hovedskjemaid)
 
     for i, (aksjonaer, xml) in enumerate(zip(oppgave.aksjonaerer, under_xmler, strict=True), 1):
-        print(f"Sender underskjema {i}/{len(under_xmler)} ({aksjonaer.navn})...")
+        log.info("Sender underskjema %d/%d (%s)...", i, len(under_xmler), aksjonaer.navn)
         klient.send_underskjema(oppgave.regnskapsaar, hovedskjemaid, xml)
 
-    print("Bekrefter innsending...")
+    log.info("Bekrefter innsending...")
     svar = klient.bekreft(oppgave.regnskapsaar, hovedskjemaid, len(under_xmler))
-    print("Aksjonærregisteroppgave sendt inn.")
-    print(f"Forsendelse-ID: {svar.get('forsendelseId')}")
+    log.info("Aksjonærregisteroppgave sendt inn. Forsendelse-ID: %s", svar.get("forsendelseId"))
     return svar
