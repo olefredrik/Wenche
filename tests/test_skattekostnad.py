@@ -20,9 +20,9 @@ from wenche import aarsregnskap as ar
 from wenche import skattemelding as sm
 from wenche.brg_xml import generer_underskjema
 from wenche.models import (
+    Finansposter,
     KortsiktigGjeld,
     Resultatregnskap,
-    Finansposter,
     SkattemeldingKonfig,
 )
 from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
@@ -95,7 +95,7 @@ class TestConfigLesing:
 class TestBrgUnderskjema:
     def test_skattekostnad_linje_med_orid(self, regnskap_med_skattekostnad):
         xml = generer_underskjema(regnskap_med_skattekostnad).decode("utf-8")
-        assert '<skattekostnad altinnRowId=' in xml
+        assert "<skattekostnad altinnRowId=" in xml
         assert '<aarets orid="11835">11000</aarets>' in xml
         assert '<fjoraarets orid="11836">0</fjoraarets>' in xml
 
@@ -111,14 +111,14 @@ class TestBrgUnderskjema:
 
     def test_aarsresultat_er_etter_skatt_i_xml(self, regnskap_med_skattekostnad):
         xml = generer_underskjema(regnskap_med_skattekostnad).decode("utf-8")
-        assert '<aarets orid="167">50000</aarets>' in xml   # resultat før skatt
-        assert '<aarets orid="172">39000</aarets>' in xml   # årsresultat
+        assert '<aarets orid="167">50000</aarets>' in xml  # resultat før skatt
+        assert '<aarets orid="172">39000</aarets>' in xml  # årsresultat
 
     def test_betalbar_skatt_i_kortsiktig_gjeld(self, regnskap_med_skattekostnad):
         xml = generer_underskjema(regnskap_med_skattekostnad).decode("utf-8")
-        assert '<betalbarSkatt altinnRowId=' in xml
+        assert "<betalbarSkatt altinnRowId=" in xml
         assert '<aarets orid="2483">11000</aarets>' in xml
-        assert '<aarets orid="85">11000</aarets>' in xml    # sum kortsiktig gjeld
+        assert '<aarets orid="85">11000</aarets>' in xml  # sum kortsiktig gjeld
 
     def test_betalbar_skatt_staar_foer_skyldige_offentlige_avgifter(
         self, regnskap_med_skattekostnad
@@ -139,9 +139,7 @@ class TestBrgUnderskjema:
 
 class TestNaeringsspesifikasjon:
     def _root(self, regnskap):
-        return fromstring(
-            generer_naeringsspesifikasjon(regnskap, _PARTSNUMMER).decode("utf-8")
-        )
+        return fromstring(generer_naeringsspesifikasjon(regnskap, _PARTSNUMMER).decode("utf-8"))
 
     def _beloep(self, el):
         """Beløp i et avledet sum-element (BeloepMedSkattemessigeEgenskaper)."""
@@ -156,12 +154,7 @@ class TestNaeringsspesifikasjon:
         kostnad = root.find(f"{_NS}resultatregnskap/{_NS}skattekostnad/{_NS}kostnad")
         assert kostnad is not None
         assert kostnad.find(f"{_NS}id").text == "8300"
-        assert (
-            kostnad.find(
-                f"{_NS}type/{_NS}resultatOgBalanseregnskapstype"
-            ).text
-            == "8300"
-        )
+        assert kostnad.find(f"{_NS}type/{_NS}resultatOgBalanseregnskapstype").text == "8300"
         assert self._forekomst_beloep(kostnad) == "11000.00"
 
     def test_sum_skattekostnad_emitteres(self, regnskap_med_skattekostnad):
@@ -182,9 +175,7 @@ class TestNaeringsspesifikasjon:
         root = self._root(regnskap_med_skattekostnad)
         bni = root.find(f"{_NS}beregnetNaeringsinntekt")
         assert self._beloep(bni.find(f"{_NS}skattemessigResultat")) == "50000.00"
-        fordelt = bni.find(
-            f"{_NS}fordeltBeregnetNaeringsinntektForUpersonligSkattepliktig"
-        )
+        fordelt = bni.find(f"{_NS}fordeltBeregnetNaeringsinntektForUpersonligSkattepliktig")
         assert self._beloep(fordelt.find(f"{_NS}fordeltSkattemessigResultat")) == "50000.00"
         assert (
             self._beloep(fordelt.find(f"{_NS}fordeltSkattemessigResultatEtterKorreksjon"))
@@ -233,9 +224,7 @@ class TestTilbakefoertSkattekostnad:
             perm.find(f"{_NS}permanentForskjellstype/{_NS}permanentForskjellstype").text
             == "positivSkattekostnad"
         )
-        assert (
-            perm.find(f"{_NS}beloep/{_NS}beloep/{_NS}beloep").text == "11000.00"
-        )
+        assert perm.find(f"{_NS}beloep/{_NS}beloep/{_NS}beloep").text == "11000.00"
 
     def test_sum_tillegg_i_naeringsinntekt(self, regnskap_med_skattekostnad):
         forskjell = self._forskjell(self._root(regnskap_med_skattekostnad))
@@ -254,9 +243,7 @@ class TestTilbakefoertSkattekostnad:
         assert forskjell.find(f"{_NS}sumFradragINaeringsinntekt") is not None
         assert forskjell.find(f"{_NS}sumTilleggINaeringsinntekt") is None
 
-    def test_tilbakefoering_stemmer_med_skattemessig_resultat(
-        self, regnskap_med_skattekostnad
-    ):
+    def test_tilbakefoering_stemmer_med_skattemessig_resultat(self, regnskap_med_skattekostnad):
         # Invarianten SKD kryssjekker: årsresultat + tilbakeført skattekostnad
         # == skattemessig resultat.
         root = self._root(regnskap_med_skattekostnad)
@@ -270,8 +257,7 @@ class TestTilbakefoertSkattekostnad:
         )
         skattemessig = float(
             root.find(
-                f"{_NS}beregnetNaeringsinntekt/{_NS}skattemessigResultat"
-                f"/{_NS}beloep/{_NS}beloep"
+                f"{_NS}beregnetNaeringsinntekt/{_NS}skattemessigResultat/{_NS}beloep/{_NS}beloep"
             ).text
         )
         assert aars + tillegg == skattemessig == 50000.0
@@ -304,9 +290,7 @@ class TestFritaksmetoden:
         if forskjell is None:
             return {}
         return {
-            p.find(f"{_NS}id").text: float(
-                p.find(f"{_NS}beloep/{_NS}beloep/{_NS}beloep").text
-            )
+            p.find(f"{_NS}id").text: float(p.find(f"{_NS}beloep/{_NS}beloep/{_NS}beloep").text)
             for p in forskjell.findall(f"{_NS}permanentForskjell")
         }
 
@@ -372,7 +356,11 @@ class TestFritaksmetoden:
 
     def test_invariant_aarsresultat_pluss_tillegg_minus_fradrag(self, eksempel_selskap):
         # Invarianten SKD kryssjekker, for alle tre variantene.
-        for eierandel, fritak, skattekostnad in [(100, True, 0), (80, True, 6600), (0, False, 220000)]:
+        for eierandel, fritak, skattekostnad in [
+            (100, True, 0),
+            (80, True, 6600),
+            (0, False, 220000),
+        ]:
             regnskap = self._utbytteregnskap(eksempel_selskap, 1000000, skattekostnad)
             konfig = SkattemeldingKonfig(
                 anvend_fritaksmetoden=fritak, eierandel_for_fritaksmetoden=eierandel
@@ -380,14 +368,12 @@ class TestFritaksmetoden:
             root = self._root(regnskap, konfig)
             forskjell = root.find(f"{_NS}forskjellMellomRegnskapsmessigOgSkattemessigVerdi")
 
-            def _sum(tag):
+            def _sum(tag, forskjell=forskjell):  # bind løkkevariabelen ved definisjon
                 el = forskjell.find(f"{_NS}{tag}/{_NS}beloep/{_NS}beloep")
                 return float(el.text) if el is not None else 0.0
 
             aars = float(
-                root.find(
-                    f"{_NS}resultatregnskap/{_NS}aarsresultat/{_NS}beloep/{_NS}beloep"
-                ).text
+                root.find(f"{_NS}resultatregnskap/{_NS}aarsresultat/{_NS}beloep/{_NS}beloep").text
             )
             utledet = aars + _sum("sumTilleggINaeringsinntekt") - _sum("sumFradragINaeringsinntekt")
             assert utledet == self._skattemessig(root), (
@@ -439,9 +425,9 @@ class TestUnderskuddsgrunnlag:
         # ikke øke det fremførbare underskuddet, siden den ikke er fradragsberettiget.
         eksempel_regnskap.resultatregnskap.skattekostnad = 1000
         konfig = SkattemeldingKonfig()
-        xml = generer_skattemelding_fra_konfig(
-            eksempel_regnskap, konfig, _PARTSNUMMER
-        ).decode("utf-8")
+        xml = generer_skattemelding_fra_konfig(eksempel_regnskap, konfig, _PARTSNUMMER).decode(
+            "utf-8"
+        )
         root = fromstring(xml)
         samlet = root.find(
             f"{_SM_NS}inntektOgUnderskudd/{_SM_NS}samletUnderskudd/{_SM_NS}beloep"
@@ -486,9 +472,7 @@ class TestBeregning:
     def test_forslag_tar_hensyn_til_sjablonregelen(self):
         beregning, _ = sm.beregn_skatt_fra_config(
             {
-                "resultatregnskap": {
-                    "finansposter": {"utbytte_fra_datterselskap": 1000000}
-                },
+                "resultatregnskap": {"finansposter": {"utbytte_fra_datterselskap": 1000000}},
                 "skattemelding": {
                     "anvend_fritaksmetoden": True,
                     "eierandel_for_fritaksmetoden": 80,
@@ -500,9 +484,7 @@ class TestBeregning:
         assert beregning.beregnet_skatt == 6600
 
     def test_foert_skattekostnad_returneres(self):
-        _, foert = sm.beregn_skatt_fra_config(
-            {"resultatregnskap": {"skattekostnad": 11000}}
-        )
+        _, foert = sm.beregn_skatt_fra_config({"resultatregnskap": {"skattekostnad": 11000}})
         assert foert == 11000
 
 

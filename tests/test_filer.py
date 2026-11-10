@@ -1,4 +1,5 @@
 """skriv_privat: filer med hemmeligheter får 0600 fra første byte og byttes inn atomisk."""
+
 import stat
 
 from wenche.filer import sikre_privat_mappe, skriv_privat

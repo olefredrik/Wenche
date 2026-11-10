@@ -6,6 +6,7 @@ og settes også i `WENCHE_ENV` slik at hele kjernen (auth, klienter, fristsjekk)
 riktig miljø. Credentials og oppsett bor i `~/.wenche/.env` + `~/.wenche/maskinporten_privat.pem`,
 nøyaktig som før — porten fra `wenche/ui.py`.
 """
+
 from __future__ import annotations
 
 import os
@@ -92,6 +93,7 @@ def privat_nokkel_sti() -> str:
 
 
 # --- Systembruker-tilstand persistert per miljø (request-id + sist mottatt godkjenningslenke) ---
+
 
 def _request_id_fil(env: str) -> Path:
     return _WENCHE_DIR / f"systembruker_request_id_{env}.txt"

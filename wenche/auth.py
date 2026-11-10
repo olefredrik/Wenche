@@ -36,6 +36,7 @@ load_dotenv()
 # slik at brukeren kan bytte miljø i UI-et og få umiddelbar effekt uten å
 # starte Wenche på nytt.
 
+
 def _gjeldende_env() -> str:
     return os.getenv("WENCHE_ENV", "prod")
 
@@ -85,8 +86,7 @@ SKD_AKSJONAER_SCOPE = "skatteetaten:innrapporteringaksjonaerregisteroppgave"
 
 # Scopes for skattemelding: direkte mot SKDs API + Altinn3-instanser
 SKD_SKATTEMELDING_SCOPE = (
-    "skatteetaten:formueinntekt/skattemelding "
-    "altinn:instances.read altinn:instances.write"
+    "skatteetaten:formueinntekt/skattemelding altinn:instances.read altinn:instances.write"
 )
 
 # Scope for lesestatus fra SKDs skattemelding-API (ingen Altinn-instanser)
@@ -102,6 +102,7 @@ class VendorCredentials:
     tjeneste bygger dem fra server-config/KMS og sender dem eksplisitt til
     hent_tokens_for(), uten å lese .env eller skrive token-cache.
     """
+
     client_id: str
     kid: str
     # repr=False: nøkkelen skal aldri bli med hvis objektet havner i en logg eller feilmelding.
@@ -246,8 +247,11 @@ def hent_tokens_for(
     admin-scopes (systemregister/systembruker) der vendor opptrer som seg selv.
     """
     maskinporten_token = _hent_maskinporten_token(
-        creds.client_id, creds.private_key_pem, creds.kid,
-        scopes=scopes, org_nummer=org_nummer,
+        creds.client_id,
+        creds.private_key_pem,
+        creds.kid,
+        scopes=scopes,
+        org_nummer=org_nummer,
     )
     tokens = {"maskinporten_token": maskinporten_token}
     if veksle_altinn:
@@ -282,10 +286,12 @@ def _les_miljo_env(
     env: str,
     hjelpetekst: str | None = None,
     paakrevd: bool = True,
-    default: str | None = None,
-) -> str | None:
+    default: str = "",
+) -> str:
     """
     Les en credential-variabel som potensielt er miljø-spesifikk.
+
+    Påkrevde variabler gir RuntimeError når de mangler; valgfrie gir `default`.
 
     Sjekker først `{navn}_{ENV}` (f.eks. MASKINPORTEN_CLIENT_ID_TEST),
     deretter `{navn}` som fallback. Brukere som bare har én klient kan
@@ -299,8 +305,7 @@ def _les_miljo_env(
         return verdi
     if paakrevd:
         raise RuntimeError(
-            f"{navn}_{suffix} (eller {navn} som fallback) mangler.\n"
-            f"{hjelpetekst or ''}"
+            f"{navn}_{suffix} (eller {navn} som fallback) mangler.\n{hjelpetekst or ''}"
         )
     return default
 
@@ -313,19 +318,22 @@ def _les_cli_credentials(env: str) -> VendorCredentials:
     VendorCredentials eksplisitt fra server-config (se hent_tokens_for).
     """
     client_id = _les_miljo_env(
-        "MASKINPORTEN_CLIENT_ID", env,
+        "MASKINPORTEN_CLIENT_ID",
+        env,
         "Kopier .env.example til .env og fyll inn din klient-ID fra Digdirs selvbetjeningsportal.",
     )
     kid = _les_miljo_env(
-        "MASKINPORTEN_KID", env,
+        "MASKINPORTEN_KID",
+        env,
         "Finn nøkkel-ID (UUID) i Digdirs selvbetjeningsportal under klientens nøkler og legg den i .env.",
     )
     nokkel_sti = _les_miljo_env(
-        "MASKINPORTEN_PRIVAT_NOKKEL", env, paakrevd=False, default="maskinporten_privat.pem",
+        "MASKINPORTEN_PRIVAT_NOKKEL",
+        env,
+        paakrevd=False,
+        default="maskinporten_privat.pem",
     )
-    return VendorCredentials(
-        client_id=client_id, kid=kid, private_key_pem=_les_nokkel(nokkel_sti)
-    )
+    return VendorCredentials(client_id=client_id, kid=kid, private_key_pem=_les_nokkel(nokkel_sti))
 
 
 def _les_systembruker_org(env: str) -> str:
@@ -427,8 +435,11 @@ def get_skd_aksjonaer_token() -> str:
     creds = _les_cli_credentials(env)
     org_nummer = _les_systembruker_org(env)
     return _hent_maskinporten_token(
-        creds.client_id, creds.private_key_pem, creds.kid,
-        scopes=SKD_AKSJONAER_SCOPE, org_nummer=org_nummer,
+        creds.client_id,
+        creds.private_key_pem,
+        creds.kid,
+        scopes=SKD_AKSJONAER_SCOPE,
+        org_nummer=org_nummer,
     )
 
 
@@ -447,7 +458,9 @@ def get_skd_skattemelding_maskinporten_token(env: str | None = None) -> str:
     creds = _les_cli_credentials(env)
     org_nummer = _les_systembruker_org(env)
     return _hent_maskinporten_token(
-        creds.client_id, creds.private_key_pem, creds.kid,
+        creds.client_id,
+        creds.private_key_pem,
+        creds.kid,
         scopes=SKD_SKATTEMELDING_LESE_SCOPE,
         org_nummer=org_nummer,
         env=env,
@@ -469,7 +482,9 @@ def get_skd_skattemelding_tokens() -> dict:
     org_nummer = _les_systembruker_org(env)
 
     maskinporten_token = _hent_maskinporten_token(
-        creds.client_id, creds.private_key_pem, creds.kid,
+        creds.client_id,
+        creds.private_key_pem,
+        creds.kid,
         scopes=SKD_SKATTEMELDING_SCOPE,
         org_nummer=org_nummer,
     )

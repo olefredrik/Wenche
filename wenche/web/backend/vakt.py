@@ -23,6 +23,7 @@ GET er unntatt klientheaderen, så helsesjekk og /docs virker fra adresselinjen.
 dekket av same-origin-policyen (uten CORS-middleware kan en fremmed side ikke lese svaret) og av
 vertssjekken.
 """
+
 from __future__ import annotations
 
 from collections.abc import Mapping

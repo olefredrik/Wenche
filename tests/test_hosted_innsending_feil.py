@@ -6,6 +6,7 @@ valideringsfeil → 422; HTTP-feil (Altinn), nettverksfeil/tidsavbrudd (httpx.Re
 RuntimeError (SKD-klienten / token-henting) → 502; bevisst reist HTTPException slipper gjennom
 uendret; alt annet → kontrollert 500 med melding (aldri en naken stacktrace).
 """
+
 import httpx
 import pytest
 from fastapi import HTTPException
@@ -18,6 +19,7 @@ from wenche.skd_skattemelding_client import SkattemeldingValideringsfeil
 def _hev(exc):
     def fn():
         raise exc
+
     return fn
 
 
@@ -52,9 +54,13 @@ def test_aarsregnskap_valideringsfeil_blir_422():
 
 
 def test_skattemelding_valideringsfeil_blir_422():
-    resultat = {"resultat": "validertMedFeil", "aarsak": "tekniskFeil",
-                "avvik_ved_validering": [{"avvikstype": "tekniskFeil"}],
-                "avvik_etter_beregning": [], "veiledning": []}
+    resultat = {
+        "resultat": "validertMedFeil",
+        "aarsak": "tekniskFeil",
+        "avvik_ved_validering": [{"avvikstype": "tekniskFeil"}],
+        "avvik_etter_beregning": [],
+        "veiledning": [],
+    }
     with pytest.raises(HTTPException) as ei:
         _utfor(_hev(SkattemeldingValideringsfeil(resultat)))
     assert ei.value.status_code == 422
@@ -119,7 +125,9 @@ def test_feilmelding_navngir_steget_forhandsutfylt():
 
 
 def test_feilmelding_navngir_steget_validering():
-    req = httpx.Request("POST", "https://api.skatteetaten.no/api/skattemelding/v2/valider/2025/123456789")
+    req = httpx.Request(
+        "POST", "https://api.skatteetaten.no/api/skattemelding/v2/valider/2025/123456789"
+    )
     feil = httpx.HTTPStatusError("500", request=req, response=httpx.Response(500, request=req))
     with pytest.raises(HTTPException) as ei:
         _utfor(_hev(feil))
@@ -150,7 +158,10 @@ def test_401_navngir_steg_og_beholder_koden():
     [
         ("https://api.skatteetaten.no/api/skattemelding/v2/valider/2025/123", "validering"),
         ("https://api.skatteetaten.no/api/skattemelding/v2/2025/123", "forhåndsutfylt"),
-        ("https://999999999.apps.altinn.no/ttd/skattemelding/instances/abc/process/next", "fullføring"),
+        (
+            "https://999999999.apps.altinn.no/ttd/skattemelding/instances/abc/process/next",
+            "fullføring",
+        ),
         ("https://999999999.apps.altinn.no/ttd/skattemelding/instances/abc/data", "opplasting"),
         ("https://999999999.apps.altinn.no/ttd/skattemelding/instances", "oppretting"),
         ("https://platform.altinn.no/authentication/api/v1/exchange", "kommunikasjon med Altinn"),

@@ -9,6 +9,7 @@ Nøkles på den signerte øktbindingen (kunde_org, ev. invite_org), aldri bruker
 ikke kan misbrukes til å enumerere registeret. Kun offentlige data, ingenting lagres. Fail-soft:
 er registeret nede, returneres tomme felter og skjemaet forblir tomt (samme oppførsel som før).
 """
+
 from fastapi import APIRouter, HTTPException, Request
 
 from wenche import brreg

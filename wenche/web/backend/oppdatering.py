@@ -1,4 +1,5 @@
 """Versjonssjekk mot PyPI for self-hosted Wenche (porten fra `wenche/ui.py`)."""
+
 from __future__ import annotations
 
 import os

@@ -22,6 +22,7 @@ med det ekte partsnummeret, pakk konvolutten som ved ekte innsending, og kjør S
 `valider`-tjeneste (IKKE-BINDENDE, sender ingenting inn). Svarer på om v5 godtas for året eller
 avvises på skjemaversjon. Generiske tall, så ingen persondata involveres.
 """
+
 import os
 import sys
 from pathlib import Path
@@ -39,21 +40,56 @@ from wenche.skd_skattemelding_client import SkdSkattemeldingClient
 def _minimal_config(orgnr: str, aar: int) -> dict:
     """Minimal, balansert, GENERISK config — kun for å teste skjemaversjon, ikke kundens tall."""
     return {
-        "selskap": {"navn": "DIAGNOSE AS", "org_nummer": orgnr, "daglig_leder": "Test Person",
-                    "styreleder": "Test Person", "forretningsadresse": "Testveien 1, 0001 OSLO",
-                    "stiftelsesaar": 2018, "aksjekapital": 30000, "kontakt_epost": "test@example.no"},
+        "selskap": {
+            "navn": "DIAGNOSE AS",
+            "org_nummer": orgnr,
+            "daglig_leder": "Test Person",
+            "styreleder": "Test Person",
+            "forretningsadresse": "Testveien 1, 0001 OSLO",
+            "stiftelsesaar": 2018,
+            "aksjekapital": 30000,
+            "kontakt_epost": "test@example.no",
+        },
         "regnskapsaar": aar,
-        "resultatregnskap": {"driftsinntekter": {"salgsinntekter": 0, "andre_driftsinntekter": 0},
-            "driftskostnader": {"loennskostnader": 0, "avskrivninger": 0, "andre_driftskostnader": 0},
-            "finansposter": {"utbytte_fra_datterselskap": 0, "andre_finansinntekter": 0,
-                             "rentekostnader": 0, "andre_finanskostnader": 0}},
-        "balanse": {"eiendeler": {"anleggsmidler": {"aksjer_i_datterselskap": 0, "andre_aksjer": 0, "langsiktige_fordringer": 0},
-                        "omloepmidler": {"kortsiktige_fordringer": 0, "bankinnskudd": 30000}},
-            "egenkapital_og_gjeld": {"egenkapital": {"aksjekapital": 30000, "overkursfond": 0, "annen_egenkapital": 0},
+        "resultatregnskap": {
+            "driftsinntekter": {"salgsinntekter": 0, "andre_driftsinntekter": 0},
+            "driftskostnader": {
+                "loennskostnader": 0,
+                "avskrivninger": 0,
+                "andre_driftskostnader": 0,
+            },
+            "finansposter": {
+                "utbytte_fra_datterselskap": 0,
+                "andre_finansinntekter": 0,
+                "rentekostnader": 0,
+                "andre_finanskostnader": 0,
+            },
+        },
+        "balanse": {
+            "eiendeler": {
+                "anleggsmidler": {
+                    "aksjer_i_datterselskap": 0,
+                    "andre_aksjer": 0,
+                    "langsiktige_fordringer": 0,
+                },
+                "omloepmidler": {"kortsiktige_fordringer": 0, "bankinnskudd": 30000},
+            },
+            "egenkapital_og_gjeld": {
+                "egenkapital": {"aksjekapital": 30000, "overkursfond": 0, "annen_egenkapital": 0},
                 "langsiktig_gjeld": {"laan_fra_aksjonaer": 0, "andre_langsiktige_laan": 0},
-                "kortsiktig_gjeld": {"leverandoergjeld": 0, "skyldige_offentlige_avgifter": 0, "annen_kortsiktig_gjeld": 0}}},
-        "skattemelding": {"anvend_fritaksmetoden": True, "boersnotert": False,
-                          "underskudd_til_fremfoering": 0, "formuesverdi_aksjer": 0},
+                "kortsiktig_gjeld": {
+                    "leverandoergjeld": 0,
+                    "skyldige_offentlige_avgifter": 0,
+                    "annen_kortsiktig_gjeld": 0,
+                },
+            },
+        },
+        "skattemelding": {
+            "anvend_fritaksmetoden": True,
+            "boersnotert": False,
+            "underskudd_til_fremfoering": 0,
+            "formuesverdi_aksjer": 0,
+        },
         "aksjonaerer": [],
     }
 
@@ -69,7 +105,12 @@ def _creds_fra_env() -> VendorCredentials:
             "Mangler vendor-creds. Sett HOSTED_VENDOR_ORGNR/CLIENT_ID/KID og "
             "HOSTED_VENDOR_KEY_PEM (eller _PATH), og WENCHE_ENV."
         )
-    pem_bytes = pem.encode() if pem else Path(pem_path).read_bytes()
+    if pem:
+        pem_bytes = pem.encode()
+    elif pem_path:
+        pem_bytes = Path(pem_path).read_bytes()
+    else:  # dekket av sjekken over; holder typesjekken fornøyd
+        raise SystemExit("Mangler HOSTED_VENDOR_KEY_PEM (eller _PATH).")
     return VendorCredentials(client_id=client_id, kid=kid, private_key_pem=pem_bytes)
 
 
@@ -105,7 +146,9 @@ def main() -> None:
         try:
             root = fromstring(forhandsutfylt)
             print(f"  rot-tag: {_lokal(root.tag)}")
-            print(f"  namespace: {root.tag[1:root.tag.rindex('}')] if '}' in root.tag else '(ingen)'}")
+            print(
+                f"  namespace: {root.tag[1 : root.tag.rindex('}')] if '}' in root.tag else '(ingen)'}"
+            )
             print(f"  barn (struktur, uten verdier): {[_lokal(c.tag) for c in root][:25]}")
         except Exception as e:  # noqa: BLE001 - vil se at svaret ikke er gyldig XML
             print(f"  Svaret er ikke gyldig XML: {e}")
@@ -125,13 +168,16 @@ def main() -> None:
             return
 
         # Ikke-bindende: bygg en MINIMAL, GENERISK v5-skattemelding for året og valider.
-        print(f"\n--- Ikke-bindende valider (GENERISKE tall, sender ingenting inn) ---")
+        print("\n--- Ikke-bindende valider (GENERISKE tall, sender ingenting inn) ---")
         regnskap, konfig = sm.les_config(_minimal_config(orgnr, aar))
         sm_xml = generer_skattemelding_fra_konfig(regnskap, konfig, pn)
         naer_xml = generer_naeringsspesifikasjon(regnskap, pn)
         konvolutt = generer_konvolutt(
-            skattemelding_xml=sm_xml, inntektsaar=aar, orgnr=orgnr,
-            naeringsspesifikasjon_xml=naer_xml, gjeldende_dokument_id=dok_id,
+            skattemelding_xml=sm_xml,
+            inntektsaar=aar,
+            orgnr=orgnr,
+            naeringsspesifikasjon_xml=naer_xml,
+            gjeldende_dokument_id=dok_id,
         )
         try:
             res = skd.valider(aar, orgnr, konvolutt)

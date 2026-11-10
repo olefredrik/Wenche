@@ -14,6 +14,7 @@ behandler det, aldri lagret mellom requester. Robusthet: en sovende/restartende 
 ikke miste utfyllingen, klienten (re)sender den. Sikkerhet: ekte innsending krever at
 data-org == godkjent systembruker-org (kunde_org), så vi aldri sender på vegne av feil org.
 """
+
 import logging
 from typing import Any
 
@@ -136,7 +137,9 @@ def _utfor(fn, kunde_org: str | None = None):
     except httpx.HTTPStatusError as e:
         logger.warning(
             "Innsending feilet for org %s: HTTP %s fra %s: %s",
-            kunde_org, e.response.status_code, e.request.url,
+            kunde_org,
+            e.response.status_code,
+            e.request.url,
             (e.response.text or "").strip()[:500] or "(tom feilkropp)",
         )
         raise _tolk_http_feil(e)

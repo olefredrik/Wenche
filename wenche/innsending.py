@@ -8,6 +8,7 @@ ingen binding kreves — slik at dry-run er identisk i alle tre frontene.
 
 Tidligere lå denne orkestreringen duplisert i `cli.py`, `ui.py` og `hosted/api/innsending.py`.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -51,6 +52,7 @@ class InnsendingValideringsfeil(Exception):
 # Dry-run / validering — rent lokalt, ingen nettverk
 # ---------------------------------------------------------------------------
 
+
 def valider_aarsregnskap(config: Config) -> dict:
     regnskap = _ar.les_config(config)
     feil = _ar.valider(regnskap)
@@ -90,6 +92,7 @@ def valider_skattemelding(config: Config) -> dict:
 # ---------------------------------------------------------------------------
 # Ekte innsending — kalleren gir ferdig autentisert klient/token
 # ---------------------------------------------------------------------------
+
 
 def send_aarsregnskap(config: Config, altinn_klient: AltinnClient) -> dict:
     """Send årsregnskap til Brønnøysundregistrene. Returnerer signeringslenke i `resultat`."""

@@ -6,9 +6,11 @@ av aktivt miljø — test-API-ene kjenner kun syntetiske Tenor-orgnumre. Derfor 
 aktiv kun i prod-modus med et reelt konfigurert orgnr. Aksjonærregisteret har ingen automatisk
 sjekk.
 """
+
 from __future__ import annotations
 
 import dataclasses
+from typing import Any
 
 from fastapi import APIRouter
 
@@ -18,7 +20,7 @@ from . import miljo
 
 router = APIRouter(prefix="/api/frister", tags=["frister"])
 
-_FRISTER = [
+_FRISTER: list[dict[str, Any]] = [
     {
         "key": "skattemelding",
         "tittel": "Skattemelding",
@@ -93,5 +95,8 @@ def sjekk() -> dict:
             resultat = _SJEKK_FN[f["key"]](orgnr, aar)
             statuser[f["key"]] = dataclasses.asdict(resultat)
         except Exception as e:
-            statuser[f["key"]] = {"innfridd": False, "beskrivelse": f"Kunne ikke sjekke ({type(e).__name__})"}
+            statuser[f["key"]] = {
+                "innfridd": False,
+                "beskrivelse": f"Kunne ikke sjekke ({type(e).__name__})",
+            }
     return {"statuser": statuser}

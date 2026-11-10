@@ -5,6 +5,7 @@ Self-hosted lagrer utfyllingen på disk (i motsetning til hostet, der klienten e
 ingenting lagres). Skjemaet i SPA-en laster eksisterende config ved oppstart og skriver den
 tilbake ved lagring. Formen på dict-en er identisk med det domenelaget (`les_config`) leser.
 """
+
 from __future__ import annotations
 
 from typing import Any

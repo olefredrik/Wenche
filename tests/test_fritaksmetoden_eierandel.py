@@ -7,6 +7,7 @@ sjette ledd, jf. konsernvilkåret i § 10-4). Nøyaktig 90 % gir 3 %-sjablonen. 
 feilaktig skattlagt etter rettelsen. Nå leses eierandelen som desimaltall, med komma eller
 punktum, og verdier utenfor 0-100 gir en lesbar feil i stedet for en stille beregning.
 """
+
 import math
 
 import pytest

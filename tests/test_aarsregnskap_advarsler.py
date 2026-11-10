@@ -34,9 +34,7 @@ def _med_fjoraar(regnskap):
     utbytte er satt.
     """
     ek = regnskap.balanse.egenkapital_og_gjeld.egenkapital
-    inngaaende = (
-        ek.sum - regnskap.resultatregnskap.aarsresultat + regnskap.utbytte_utbetalt
-    )
+    inngaaende = ek.sum - regnskap.resultatregnskap.aarsresultat + regnskap.utbytte_utbetalt
     return replace(
         regnskap,
         foregaaende_aar_balanse=Balanse(
@@ -169,7 +167,9 @@ class TestUforklartEgenkapitalendring:
     def test_foerste_aar_forklares_av_innskudd_og_resultat(self, eksempel_regnskap):
         nystiftet = replace(
             eksempel_regnskap,
-            selskap=replace(eksempel_regnskap.selskap, stiftelsesaar=eksempel_regnskap.regnskapsaar),
+            selskap=replace(
+                eksempel_regnskap.selskap, stiftelsesaar=eksempel_regnskap.regnskapsaar
+            ),
         )
         ek = Egenkapital(
             aksjekapital=30000,
@@ -181,7 +181,9 @@ class TestUforklartEgenkapitalendring:
         # Fellesfixturen: annen egenkapital -34 300 mot årsresultat -5 500.
         nystiftet = replace(
             eksempel_regnskap,
-            selskap=replace(eksempel_regnskap.selskap, stiftelsesaar=eksempel_regnskap.regnskapsaar),
+            selskap=replace(
+                eksempel_regnskap.selskap, stiftelsesaar=eksempel_regnskap.regnskapsaar
+            ),
         )
         adv = self._uforklart(nystiftet)
         assert len(adv) == 1

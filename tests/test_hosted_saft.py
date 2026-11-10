@@ -6,6 +6,7 @@ SAF-T-import-endepunktet for hostet Wenche (HTTP-nivå).
 - foregaaende=true returnerer kun fjorårets sammenligningstall.
 - Ugyldig XML gir 422, for stor fil gir 413.
 """
+
 import importlib
 
 import pytest
@@ -49,7 +50,9 @@ def test_saft_import_med_invite(klient):
     cfg = r.json()
     assert cfg["selskap"]["navn"] == "Testholding AS"
     assert cfg["resultatregnskap"]["driftsinntekter"]["salgsinntekter"] == 100000
-    assert cfg["balanse"]["egenkapital_og_gjeld"]["langsiktig_gjeld"]["laan_fra_aksjonaer"] == 200000
+    assert (
+        cfg["balanse"]["egenkapital_og_gjeld"]["langsiktig_gjeld"]["laan_fra_aksjonaer"] == 200000
+    )
 
 
 def test_saft_foregaaende_returnerer_kun_sammenligningstall(klient):

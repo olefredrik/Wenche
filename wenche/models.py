@@ -8,12 +8,11 @@ Ved XML-generering til BRG/SKD rundes beløp til nærmeste krone (round()).
 
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Optional
-
 
 # ---------------------------------------------------------------------------
 # Felles selskapsinfo
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class Selskap:
@@ -24,11 +23,11 @@ class Selskap:
     forretningsadresse: str
     stiftelsesaar: int
     aksjekapital: float
-    kontakt_epost: str = ""     # Påkrevd for aksjonærregisteroppgave (RF-1086)
+    kontakt_epost: str = ""  # Påkrevd for aksjonærregisteroppgave (RF-1086)
     # Eksakt stiftelsesdato når den er kjent (hentes fra Enhetsregisteret). Årstallet alene
     # holder ikke overalt: aksjonærregisteroppgaven oppgir stiftelsesdato, og et kort
     # første regnskapsår starter på stiftelsesdatoen, ikke 1. januar.
-    stiftelsesdato: Optional[date] = None
+    stiftelsesdato: date | None = None
     # Den delen av stiftelsesinnskuddet som ble gjort som tinginnskudd, typisk aksjer skutt
     # inn i et nystiftet holdingselskap. Egenkapitalavstemmingen skiller kontantinnskudd og
     # tinginnskudd på hver sin kode, og modellen kan ikke utlede hvilken som gjelder. 0 betyr
@@ -40,6 +39,7 @@ class Selskap:
 # ---------------------------------------------------------------------------
 # Resultatregnskap
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class Driftsinntekter:
@@ -88,18 +88,12 @@ class Finansposter:
     @property
     def sum_inntekter(self) -> float:
         return (
-            self.sum_utbytte
-            + self.andre_finansinntekter
-            + self.gevinst_ved_realisasjon_av_aksjer
+            self.sum_utbytte + self.andre_finansinntekter + self.gevinst_ved_realisasjon_av_aksjer
         )
 
     @property
     def sum_kostnader(self) -> float:
-        return (
-            self.rentekostnader
-            + self.andre_finanskostnader
-            + self.tap_ved_realisasjon_av_aksjer
-        )
+        return self.rentekostnader + self.andre_finanskostnader + self.tap_ved_realisasjon_av_aksjer
 
 
 @dataclass
@@ -120,9 +114,7 @@ class Resultatregnskap:
     @property
     def resultat_foer_skatt(self) -> float:
         return (
-            self.driftsresultat
-            + self.finansposter.sum_inntekter
-            - self.finansposter.sum_kostnader
+            self.driftsresultat + self.finansposter.sum_inntekter - self.finansposter.sum_kostnader
         )
 
     @property
@@ -133,6 +125,7 @@ class Resultatregnskap:
 # ---------------------------------------------------------------------------
 # Balanse
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class Anleggsmidler:
@@ -220,11 +213,7 @@ class EgenkapitalOgGjeld:
 
     @property
     def sum(self) -> float:
-        return (
-            self.egenkapital.sum
-            + self.langsiktig_gjeld.sum
-            + self.kortsiktig_gjeld.sum
-        )
+        return self.egenkapital.sum + self.langsiktig_gjeld.sum + self.kortsiktig_gjeld.sum
 
 
 @dataclass
@@ -243,29 +232,30 @@ class Balanse:
 # Årsregnskap
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Aarsregnskap:
     selskap: Selskap
     regnskapsaar: int
     resultatregnskap: Resultatregnskap
     balanse: Balanse
-    fastsettelsesdato: Optional[date] = None   # Dato styret godkjente regnskapet; standard: i dag
-    signatar: Optional[str] = None              # Navn på den som signerer; standard: daglig_leder
-    revideres: bool = False                     # True hvis regnskapet er revidert
+    fastsettelsesdato: date | None = None  # Dato styret godkjente regnskapet; standard: i dag
+    signatar: str | None = None  # Navn på den som signerer; standard: daglig_leder
+    revideres: bool = False  # True hvis regnskapet er revidert
     foregaaende_aar_resultat: Resultatregnskap = field(default_factory=Resultatregnskap)
     foregaaende_aar_balanse: Balanse = field(default_factory=Balanse)
-    utbytte_utbetalt: float = 0.0              # Totalt utbytte utbetalt til aksjonærer i løpet av året
+    utbytte_utbetalt: float = 0.0  # Totalt utbytte utbetalt til aksjonærer i løpet av året
     # Regnskapsperioden. Normalt hele kalenderåret (rskl. § 1-7 første ledd), og da kan begge
     # stå tomme. Settes bare når perioden avviker, i praksis et kort første regnskapsår fra
     # stiftelsesdatoen til 31.12. Forlenget første regnskapsår (§ 1-7 andre ledd) støttes
     # ikke, se `aarsregnskap.valider_periode`.
-    regnskapsstart: Optional[date] = None
-    regnskapsslutt: Optional[date] = None
+    regnskapsstart: date | None = None
+    regnskapsslutt: date | None = None
     # Eierandelen (prosent) fra skattemelding.eierandel_for_fritaksmetoden, eller None når den
     # ikke er oppgitt. Brukes bare av advarselen om hvilken linje utbyttet står på: ved 20 %
     # eller mer er det et tilknyttet selskap, og da er linjen for datterselskap riktig selv om
     # aksjene står under andre aksjer i balansen.
-    eierandel_for_utbytte: Optional[float] = None
+    eierandel_for_utbytte: float | None = None
 
     @property
     def periode_start(self) -> date:
@@ -291,9 +281,7 @@ class Aarsregnskap:
         drive fra hverandre, derfor bor definisjonen her.
         """
         stiftet = self.selskap.stiftelsesdato
-        stiftet_i_perioden = bool(
-            stiftet and self.periode_start <= stiftet <= self.periode_slutt
-        )
+        stiftet_i_perioden = bool(stiftet and self.periode_start <= stiftet <= self.periode_slutt)
         return self.selskap.stiftelsesaar >= self.regnskapsaar or stiftet_i_perioden
 
 
@@ -301,13 +289,14 @@ class Aarsregnskap:
 # Aksjonærregisteroppgave
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Aksjonaer:
     navn: str
-    fodselsnummer: str          # 11 siffer
+    fodselsnummer: str  # 11 siffer
     antall_aksjer: int
     aksjeklasse: str
-    utbytte_utbetalt: float     # NOK utbetalt i løpet av regnskapsåret
+    utbytte_utbetalt: float  # NOK utbetalt i løpet av regnskapsåret
     innbetalt_kapital_per_aksje: float
 
 
@@ -319,7 +308,7 @@ class Aksjonaerregisteroppgave:
     # Generalforsamlingens vedtak om utbytte. Skatteetaten krever det som tidspunkt for
     # utdelingen, likt i post 8 (selskapet) og post 21 (aksjonæren). Påkrevd bare når det
     # er utbetalt utbytte. Wenche rapporterer én utdeling per år.
-    utbytte_vedtaksdato: Optional[date] = None
+    utbytte_vedtaksdato: date | None = None
 
     @property
     def totalt_antall_aksjer(self) -> int:
@@ -334,11 +323,12 @@ class Aksjonaerregisteroppgave:
 # Obligatoriske noter (rskl. §§ 7-35, 7-43, 7-45, 7-46)
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class LaanTilNaerstaaende:
-    motpart: str                    # Navn på nærstående part (aksjonær, styremedlem e.l.)
-    saldo: float                    # Utestående saldo per 31.12 (NOK)
-    retning: str = "långiver"       # "långiver" = selskapet lånte ut; "låntaker" = selskapet lånte inn
+    motpart: str  # Navn på nærstående part (aksjonær, styremedlem e.l.)
+    saldo: float  # Utestående saldo per 31.12 (NOK)
+    retning: str = "långiver"  # "långiver" = selskapet lånte ut; "låntaker" = selskapet lånte inn
     rente_prosent: float = 0.0
     sikkerhet: str = ""
 
@@ -390,17 +380,17 @@ class NaeringsspesifikasjonPost:
 
 @dataclass
 class SkattemeldingKonfig:
-    underskudd_til_fremfoering: float = 0.0   # Ubenyttet underskudd fra tidligere år
-    anvend_fritaksmetoden: bool = True         # True for holdingselskaper som eier aksjer
+    underskudd_til_fremfoering: float = 0.0  # Ubenyttet underskudd fra tidligere år
+    anvend_fritaksmetoden: bool = True  # True for holdingselskaper som eier aksjer
     eierandel_for_fritaksmetoden: float = 100.0  # Eierandel i utbyttegivende selskap (prosent,
-                                               # 0-100, desimaler tillatt). Brukes bare når
-                                               # anvend_fritaksmetoden er True.
-    boersnotert: bool = False                  # True hvis selskapet er børsnotert
-    formuesverdi_aksjer: float = 0.0           # Formuesverdi av aksjer selskapet eier
-                                               # (fra aksjeoppgaven RF-1088S, post 209)
-    samlet_verdi_bak_aksjene: Optional[float] = None  # Manuell overstyring av netto
-                                               # formuesverdi bak selskapets egne aksjer.
-                                               # None = beregnes fra formuesverdi + balanse.
+    # 0-100, desimaler tillatt). Brukes bare når
+    # anvend_fritaksmetoden er True.
+    boersnotert: bool = False  # True hvis selskapet er børsnotert
+    formuesverdi_aksjer: float = 0.0  # Formuesverdi av aksjer selskapet eier
+    # (fra aksjeoppgaven RF-1088S, post 209)
+    samlet_verdi_bak_aksjene: float | None = None  # Manuell overstyring av netto
+    # formuesverdi bak selskapets egne aksjer.
+    # None = beregnes fra formuesverdi + balanse.
     # Valgfri, komplett kodefordeling for næringsspesifikasjonen. Når den er oppgitt,
     # valideres kategorisummene mot regnskapet før XML bygges.
     naeringsspesifikasjonsposter: tuple[NaeringsspesifikasjonPost, ...] = ()

@@ -19,7 +19,6 @@ from wenche.models import (
     Omloepmidler,
     Resultatregnskap,
     Selskap,
-    SkattemeldingKonfig,
 )
 
 

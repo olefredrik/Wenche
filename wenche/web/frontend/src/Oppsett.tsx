@@ -80,7 +80,6 @@ export default function Oppsett({ env }: { env: string }) {
 
   useEffect(() => {
     last().catch((e) => setMelding({ tone: "feil", tekst: (e as Error).message }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const miljoNavn = env === "test" ? "testmiljø (tt02)" : "produksjon";

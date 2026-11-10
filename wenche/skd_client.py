@@ -55,14 +55,10 @@ class SkdAksjonaerClient:
             )
         data = resp.json()
         if "hovedskjemaId" not in data:
-            raise RuntimeError(
-                f"Uventet respons fra SKD (mangler 'hovedskjemaId'):\n{data}"
-            )
+            raise RuntimeError(f"Uventet respons fra SKD (mangler 'hovedskjemaId'):\n{data}")
         return data["hovedskjemaId"]
 
-    def send_underskjema(
-        self, regnskapsaar: int, hovedskjemaId: str, xml: bytes
-    ) -> None:
+    def send_underskjema(self, regnskapsaar: int, hovedskjemaId: str, xml: bytes) -> None:
         """Sender Underskjema (RF-1086-U) for én aksjonær."""
         resp = self._http.post(
             f"{self._base}/{regnskapsaar}/{hovedskjemaId}/1086U",
@@ -87,9 +83,7 @@ class SkdAksjonaerClient:
             headers=headers,
         )
         if not resp.is_success:
-            raise RuntimeError(
-                f"Feil ved bekreftelse: {resp.status_code}\n{resp.text}"
-            )
+            raise RuntimeError(f"Feil ved bekreftelse: {resp.status_code}\n{resp.text}")
         return resp.json()
 
     def close(self):

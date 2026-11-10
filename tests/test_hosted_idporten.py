@@ -12,6 +12,7 @@ Beviser:
 Well-known-dokument, JWKS, token-kall og id_token-signaturen mockes, så testen treffer verken
 nett, ID-porten eller ekte krypto.
 """
+
 import importlib
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlparse
@@ -83,7 +84,9 @@ def klient_uten_reportees(monkeypatch):
     config.settings.cache_clear()
 
 
-def _login(klient, *, scope: str = "openid profile altinn:accessmanagement/authorizedparties") -> str:
+def _login(
+    klient, *, scope: str = "openid profile altinn:accessmanagement/authorizedparties"
+) -> str:
     """Start innlogging og returner state-en (uten å følge redirecten til ID-porten)."""
     r = klient.get("/api/auth/idporten/login", follow_redirects=False)
     assert r.status_code in (302, 307)
@@ -96,7 +99,10 @@ def _login(klient, *, scope: str = "openid profile altinn:accessmanagement/autho
 
 
 def _logg_inn(
-    klient, monkeypatch, navn="Ole Fredrik Lie", access_token="fake-access-token",
+    klient,
+    monkeypatch,
+    navn="Ole Fredrik Lie",
+    access_token="fake-access-token",
     scope="openid profile altinn:accessmanagement/authorizedparties",
 ):
     """Fullfør login + callback med mocket token og id_token-validering."""
@@ -105,15 +111,14 @@ def _logg_inn(
         idp, "_valider_id_token", lambda id_token, md, nonce: {"name": navn, "pid": "12345678901"}
     )
     monkeypatch.setattr(
-        idp.httpx, "post",
+        idp.httpx,
+        "post",
         lambda *a, **k: SimpleNamespace(
             raise_for_status=lambda: None,
             json=lambda: {"id_token": "x", "access_token": access_token},
         ),
     )
-    r = klient.get(
-        f"/api/auth/idporten/callback?code=abc&state={state}", follow_redirects=False
-    )
+    r = klient.get(f"/api/auth/idporten/callback?code=abc&state={state}", follow_redirects=False)
     assert r.status_code in (302, 307)
     return r
 
@@ -157,12 +162,17 @@ def _brreg_rollesvar(*navn, rolletype="LEDE"):
     roller = []
     for fullt in navn:
         deler = fullt.split()
-        roller.append({
-            "type": {"kode": rolletype},
-            "fratraadt": False,
-            "avregistrert": False,
-            "person": {"erDoed": False, "navn": {"fornavn": " ".join(deler[:-1]), "etternavn": deler[-1]}},
-        })
+        roller.append(
+            {
+                "type": {"kode": rolletype},
+                "fratraadt": False,
+                "avregistrert": False,
+                "person": {
+                    "erDoed": False,
+                    "navn": {"fornavn": " ".join(deler[:-1]), "etternavn": deler[-1]},
+                },
+            }
+        )
     return SimpleNamespace(
         status_code=200,
         raise_for_status=lambda: None,
@@ -210,7 +220,8 @@ def test_me_reportees_av_naar_scope_ikke_satt(klient_uten_reportees, monkeypatch
         idp, "_valider_id_token", lambda id_token, md, nonce: {"name": "Ole Fredrik Lie"}
     )
     monkeypatch.setattr(
-        idp.httpx, "post",
+        idp.httpx,
+        "post",
         lambda *a, **k: SimpleNamespace(
             raise_for_status=lambda: None, json=lambda: {"id_token": "x", "access_token": "t"}
         ),
@@ -221,14 +232,17 @@ def test_me_reportees_av_naar_scope_ikke_satt(klient_uten_reportees, monkeypatch
     assert klient_uten_reportees.get("/api/auth/me").json()["reportees"] is False
 
 
-def test_organisasjoner_uten_reportees_gir_tom_liste_uten_altinn_kall(klient_uten_reportees, monkeypatch):
+def test_organisasjoner_uten_reportees_gir_tom_liste_uten_altinn_kall(
+    klient_uten_reportees, monkeypatch
+):
     """Uten scopet skal /organisasjoner returnere tom liste UTEN å kalle Altinn (SPA går manuelt)."""
     state = _login(klient_uten_reportees, scope="openid profile")
     monkeypatch.setattr(
         idp, "_valider_id_token", lambda id_token, md, nonce: {"name": "Ole Fredrik Lie"}
     )
     monkeypatch.setattr(
-        idp.httpx, "post",
+        idp.httpx,
+        "post",
         lambda *a, **k: SimpleNamespace(
             raise_for_status=lambda: None, json=lambda: {"id_token": "x", "access_token": "t"}
         ),
@@ -320,14 +334,13 @@ def _part(orgnr, navn, *, type="Organization", isDeleted=False, onlyHierarchy=Fa
 
 def _stub_altinn(monkeypatch, parter: list):
     """Mock Altinn token-veksling (exchange) og autoriserte-parter-kallet (status 200)."""
+
     def fake_get(url, **k):
         if "exchange" in url:
             return SimpleNamespace(
                 status_code=200, raise_for_status=lambda: None, text='"fake.altinn.token"'
             )
-        return SimpleNamespace(
-            status_code=200, raise_for_status=lambda: None, json=lambda: parter
-        )
+        return SimpleNamespace(status_code=200, raise_for_status=lambda: None, json=lambda: parter)
 
     monkeypatch.setattr(idp.httpx, "get", fake_get)
 
@@ -335,10 +348,13 @@ def _stub_altinn(monkeypatch, parter: list):
 def test_hent_organisasjoner_returnerer_liste(klient, monkeypatch):
     """Org-listen hentes fra Altinn og filtreres til kun orger (ikke personer)."""
     _logg_inn(klient, monkeypatch)
-    _stub_altinn(monkeypatch, [
-        _part("922020523", "OFL Holding AS"),
-        _part(None, "Ole Fredrik Lie", type="Person"),
-    ])
+    _stub_altinn(
+        monkeypatch,
+        [
+            _part("922020523", "OFL Holding AS"),
+            _part(None, "Ole Fredrik Lie", type="Person"),
+        ],
+    )
     r = klient.get("/api/auth/idporten/organisasjoner").json()
     assert r["organisasjoner"] == [{"orgnr": "922020523", "navn": "OFL Holding AS"}]
     assert "feil" not in r
@@ -347,11 +363,14 @@ def test_hent_organisasjoner_returnerer_liste(klient, monkeypatch):
 def test_hent_organisasjoner_filtrerer_slettet(klient, monkeypatch):
     """Slettede og hierarki-only-orger (uten reell tilgang) vises ikke."""
     _logg_inn(klient, monkeypatch)
-    _stub_altinn(monkeypatch, [
-        _part("111111111", "Slettet AS", isDeleted=True),
-        _part("222222222", "Hierarki AS", onlyHierarchy=True),
-        _part("922020523", "OFL Holding AS"),
-    ])
+    _stub_altinn(
+        monkeypatch,
+        [
+            _part("111111111", "Slettet AS", isDeleted=True),
+            _part("222222222", "Hierarki AS", onlyHierarchy=True),
+            _part("922020523", "OFL Holding AS"),
+        ],
+    )
     r = klient.get("/api/auth/idporten/organisasjoner").json()
     assert len(r["organisasjoner"]) == 1
     assert r["organisasjoner"][0]["orgnr"] == "922020523"

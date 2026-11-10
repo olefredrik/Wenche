@@ -7,6 +7,7 @@ vendor/kunde-org, siden ingenting sendes inn. Personvern: bytene leses inn i min
 forkastes. Ingenting skrives til disk eller lagres (sesjonen er fasit). Behandlingen skjer i
 EØS. Org-låsen i klienten gjør at SAF-T-ens org ikke endrer kundeidentitet.
 """
+
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from wenche.saft import importer_bytes

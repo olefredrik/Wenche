@@ -9,6 +9,7 @@ det ene kallet som behandler dem, og lagres aldri. At bindingen ligger i cookien
 prosessminnet er nettopp det som lar en sovende/restartende maskin (Fly scale-to-zero,
 deploy) slippe å låse brukeren ute av en alt etablert tilkobling.
 """
+
 from fastapi import HTTPException, Request
 
 from wenche import auth as wauth

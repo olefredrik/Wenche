@@ -2,7 +2,7 @@
 # Multi-stage: bygg SPA-ene med Node i npm-workspacet, kjør FastAPI som serverer API + SPA.
 
 # ---- Stage 1: bygg SPA-ene i workspace ----
-FROM node:20-slim AS web
+FROM node:22-slim AS web
 WORKDIR /repo
 # Workspace-manifester først for god lag-caching.
 COPY package.json package-lock.json ./
@@ -26,24 +26,27 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 WORKDIR /app
 
-# Installer wenche-kjernen (fra pyproject) + hosted-avhengighetene.
+# Låste avhengigheter først, som eget lag (endres sjeldnere enn koden). hosted/requirements.txt
+# er generert fra pyproject (kjerne + hosted-extra) med uv, se toppen av fila, så imaget bygges
+# likt hver gang i stedet for å løse nyeste versjon ved hvert bygg.
+COPY hosted/requirements.txt ./hosted/requirements.txt
+RUN pip install -r hosted/requirements.txt
+# Så wenche selv, uten at pip løser avhengigheter på nytt (alt ligger alt i låsen).
 COPY pyproject.toml README.md LICENSE ./
 COPY wenche/ ./wenche/
 # Den bygde self-hosted SPA-en må finnes ved install (force-include i pyproject).
 COPY --from=web /repo/wenche/web/static ./wenche/web/static
-RUN pip install .
-COPY hosted/requirements.txt ./hosted/requirements.txt
-RUN pip install -r hosted/requirements.txt
+RUN pip install --no-deps .
 
-# App-koden + det ferdigbygde hostede SPA-et (FastAPI monterer hosted/web/dist på "/").
-COPY hosted/ ./hosted/
+# Bare det imaget bruker: API-et, operatørskriptet som kjøres via `fly ssh console`
+# (hosted/invite.sh), og det ferdigbygde hostede SPA-et (FastAPI monterer dist på "/").
+COPY hosted/api/ ./hosted/api/
+COPY hosted/mint_invite.py ./hosted/mint_invite.py
 COPY --from=web /repo/hosted/web/dist ./hosted/web/dist
 
 # Kjør som ikke-root (laveste privilegium). Appen skriver ikke til disk i drift (session-only),
-# og operatørskriptet mint_invite.py (via fly ssh console) leser kun env, så ingen rettigheter
-# utover lesetilgang til /app trengs.
-RUN adduser --disabled-password --gecos "" wenche \
-    && chown -R wenche:wenche /app
+# og mint_invite.py leser kun env, så brukeren trenger bare lesetilgang til /app, som alle har.
+RUN adduser --disabled-password --gecos "" wenche
 USER wenche
 
 EXPOSE 8080

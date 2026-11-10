@@ -182,11 +182,7 @@ def _advarsler_om_aksjegevinst(acc: dict) -> list[str]:
 
 def _konto_id(account: ET.Element) -> str:
     """Kontoens ID slik brukeren kjenner den igjen fra regnskapssystemet."""
-    return (
-        _tekst(account, "AccountID")
-        or _tekst(account, "StandardAccountID")
-        or "(uten konto-ID)"
-    )
+    return _tekst(account, "AccountID") or _tekst(account, "StandardAccountID") or "(uten konto-ID)"
 
 
 def _har_gruppering(account: ET.Element) -> bool:
@@ -271,8 +267,7 @@ _UKLASSIFISERTE_POSTER = (
         # 1800/1810 aksjer og fond, 1830/1840 obligasjoner og sertifikater, 1880 andre
         # finansielle instrumenter, 1895 andel i selskap med deltakerfastsetting
         frozenset({"1800", "1810", "1830", "1840", "1880", "1895"}),
-        "finansielle omløpsmidler (aksjer, fond, obligasjoner og andre finansielle "
-        "instrumenter)",
+        "finansielle omløpsmidler (aksjer, fond, obligasjoner og andre finansielle instrumenter)",
         "Kortsiktige fordringer",
         "«kortsiktige fordringer» (kode 1570)",
     ),
@@ -312,9 +307,7 @@ def _advarsler_om_uklassifiserte_poster(acc: dict) -> list[str]:
 
 def _noter_uklassifisert_post(acc: dict, code: str, netto: float) -> None:
     if netto and any(code in koder for koder, *_ in _UKLASSIFISERTE_POSTER):
-        acc["uklassifiserte_poster"][code] = (
-            acc["uklassifiserte_poster"].get(code, 0.0) + netto
-        )
+        acc["uklassifiserte_poster"][code] = acc["uklassifiserte_poster"].get(code, 0.0) + netto
 
 
 def _tom_akkumulator() -> dict:
@@ -646,8 +639,8 @@ def _fra_root(root: ET.Element) -> dict:
             "eller nyere."
         )
 
-    nar = _tom_akkumulator()      # nåværende år (closing balances)
-    fjor_b = _tom_akkumulator()   # foregående år balanse (opening balances)
+    nar = _tom_akkumulator()  # nåværende år (closing balances)
+    fjor_b = _tom_akkumulator()  # foregående år balanse (opening balances)
 
     for account in kontoer:
         _akkumuler(nar, account, _netto(account))
@@ -670,13 +663,15 @@ def _fra_root(root: ET.Element) -> dict:
     # har lånt penger fra eieren (nærstående part er långiver).
     laan_til_naerstaaende: list[dict] = []
     if nar["laan_fra_aksjonaer"] > 0:
-        laan_til_naerstaaende.append({
-            "motpart": "",
-            "saldo": nar["laan_fra_aksjonaer"],
-            "retning": "låntaker",
-            "rente_prosent": 0.0,
-            "sikkerhet": "",
-        })
+        laan_til_naerstaaende.append(
+            {
+                "motpart": "",
+                "saldo": nar["laan_fra_aksjonaer"],
+                "retning": "låntaker",
+                "rente_prosent": 0.0,
+                "sikkerhet": "",
+            }
+        )
 
     advarsler = (
         _advarsler_om_versjon(_tekst(header, "AuditFileVersion"))

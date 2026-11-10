@@ -6,6 +6,7 @@ ephemeral sesjon, ingen database. Onboarding: per-org invite-lenke + Altinn syst
 godkjenning (BankID). Serverer også den bygde SPA-en (web/dist) på samme origin i prod.
 Self-hosted-appen (`wenche.web`) er upåvirket. Se hosted/README.md.
 """
+
 import html
 import os
 from pathlib import Path
@@ -52,6 +53,7 @@ app.add_middleware(
     https_only=(s.env == "prod" or s.er_offentlig),
     same_site="lax",
 )
+
 
 # Standard sikkerhetsheadere på alle svar. CSP er bevisst utelatt: den krever kartlegging av
 # SPA-ens inline styles og den env-styrte Umami-hosten, og en gal CSP knekker appen stille.

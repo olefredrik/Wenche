@@ -4,6 +4,7 @@ SAF-T-import-endepunktet for self-hosted Wenche (HTTP-nivå).
 Ingen invite/auth lokalt: ruten parser opplastet SAF-T og returnerer config for forhåndsfylling.
 Verifiserer foregaaende-grenen og størrelsesgrensen; selve mappingen dekkes av test_saft.py.
 """
+
 import pytest
 from fastapi.testclient import TestClient
 

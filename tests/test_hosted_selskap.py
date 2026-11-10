@@ -4,6 +4,7 @@ Forhåndsfyll-endepunktet /api/selskap (hostet).
 Krever invite (som alt annet), nøkler på den signerte øktbindingen (ikke brukerinput), og
 returnerer styringsdata fra Enhetsregisteret som SAF-T ikke bærer. Brreg-oppslaget mockes.
 """
+
 import importlib
 
 import pytest
@@ -38,13 +39,19 @@ def test_selskap_forhandsfyller_fra_brreg(klient, monkeypatch):
     from wenche import brreg
 
     monkeypatch.setattr(
-        brreg, "hent_roller",
+        brreg,
+        "hent_roller",
         lambda org, **k: {"daglig_leder": "Kari Nordmann", "styreleder": "Ola Lie", "alle": []},
     )
     monkeypatch.setattr(
-        brreg, "hent_enhet",
-        lambda org, **k: {"navn": "Test AS", "forretningsadresse": "Vei 1, 0001 OSLO",
-                          "stiftelsesaar": 2018, "stiftelsesdato": "2018-09-14"},
+        brreg,
+        "hent_enhet",
+        lambda org, **k: {
+            "navn": "Test AS",
+            "forretningsadresse": "Vei 1, 0001 OSLO",
+            "stiftelsesaar": 2018,
+            "stiftelsesdato": "2018-09-14",
+        },
     )
 
     token = lag_invite_token("314273818")

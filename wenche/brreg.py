@@ -7,6 +7,7 @@ ukjent org, manglende felt eller transient nettverksfeil returneres tomme verdie
 som blokkerer flyten. Parsingen er skilt ut som rene funksjoner så den kan gjenbrukes av hostet
 sin selvbetjenings-navnematch, som beholder en strengere feilkontrakt (se hosted/api/auth.py).
 """
+
 from __future__ import annotations
 
 from datetime import date

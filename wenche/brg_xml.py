@@ -30,11 +30,13 @@ def _t(verdi: object) -> str:
 # Minimal PDF-generator (ingen eksterne avhengigheter)
 # ---------------------------------------------------------------------------
 
+
 def _lag_pdf(linjer: list[str]) -> bytes:
     """
     Bygger en minimal men gyldig PDF med gitt tekstinnhold.
     Bruker WinAnsiEncoding (latin-1) som dekker norske tegn (æ, ø, å).
     """
+
     def _pdf_str(s: str) -> bytes:
         enc = s.encode("cp1252", errors="replace")
         escaped = enc.replace(b"\\", b"\\\\").replace(b"(", b"\\(").replace(b")", b"\\)")
@@ -110,9 +112,10 @@ def generer_hovedskjema(regnskap: Aarsregnskap) -> bytes:
     # ellers styrelederen. Passive holdingselskaper har ofte ingen daglig leder (aksjeloven
     # krever det ikke for små AS), og da er det styret som fastsetter.
     signatar = regnskap.signatar or s.daglig_leder or s.styreleder
-    revideres = "nei" if not regnskap.revideres else "ja"
     ikke_revideres = "ja" if not regnskap.revideres else "nei"
-    morselskap = "ja" if regnskap.balanse.eiendeler.anleggsmidler.aksjer_i_datterselskap > 0 else "nei"
+    morselskap = (
+        "ja" if regnskap.balanse.eiendeler.anleggsmidler.aksjer_i_datterselskap > 0 else "nei"
+    )
 
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <melding xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -179,8 +182,15 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
         return round(v)
 
     # Hjelpefunksjon: lager linjeelement med altinnRowId og beskrivelse (unbounded-elementer)
-    def linje(tag: str, verdi: float, besk: str, orid_besk: str,
-              orid_aarets: str, orid_fjor: str, fjor_verdi: float = 0.0) -> str:
+    def linje(
+        tag: str,
+        verdi: float,
+        besk: str,
+        orid_besk: str,
+        orid_aarets: str,
+        orid_fjor: str,
+        fjor_verdi: float = 0.0,
+    ) -> str:
         iv, ifv = _i(verdi), _i(fjor_verdi)
         if iv == 0 and ifv == 0:
             return ""
@@ -189,7 +199,7 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
             f'<beskrivelse orid="{orid_besk}">{besk}</beskrivelse>'
             f'<aarets orid="{orid_aarets}">{iv}</aarets>'
             f'<fjoraarets orid="{orid_fjor}">{ifv}</fjoraarets>'
-            f'</{tag}>'
+            f"</{tag}>"
         )
 
     # Hjelpefunksjon for single-occurrence elementer.
@@ -197,17 +207,17 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
     # elementene (f.eks. rentekostnad, langsiktigKonserngjeld, overkursfond)
     # definerer dem uten disse attributtene/barna, i motsetning til
     # repeatable-elementer som bruker linje().
-    def linje_enkel(tag: str, verdi: float,
-                    orid_aarets: str, orid_fjor: str,
-                    fjor_verdi: float = 0.0) -> str:
+    def linje_enkel(
+        tag: str, verdi: float, orid_aarets: str, orid_fjor: str, fjor_verdi: float = 0.0
+    ) -> str:
         iv, ifv = _i(verdi), _i(fjor_verdi)
         if iv == 0 and ifv == 0:
             return ""
         return (
-            f'<{tag}>'
+            f"<{tag}>"
             f'<aarets orid="{orid_aarets}">{iv}</aarets>'
             f'<fjoraarets orid="{orid_fjor}">{ifv}</fjoraarets>'
-            f'</{tag}>'
+            f"</{tag}>"
         )
 
     # Inneværende år

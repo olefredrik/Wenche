@@ -34,7 +34,11 @@ _BASE = {
     },
     "balanse": {
         "eiendeler": {
-            "anleggsmidler": {"aksjer_i_datterselskap": 0, "andre_aksjer": 0, "langsiktige_fordringer": 0},
+            "anleggsmidler": {
+                "aksjer_i_datterselskap": 0,
+                "andre_aksjer": 0,
+                "langsiktige_fordringer": 0,
+            },
             "omloepmidler": {"kortsiktige_fordringer": 0, "bankinnskudd": 30000},
         },
         "egenkapital_og_gjeld": {
@@ -51,7 +55,11 @@ _BASE = {
     "foregaaende_aar": {
         "balanse": {
             "eiendeler": {
-                "anleggsmidler": {"aksjer_i_datterselskap": 0, "andre_aksjer": 0, "langsiktige_fordringer": 0},
+                "anleggsmidler": {
+                    "aksjer_i_datterselskap": 0,
+                    "andre_aksjer": 0,
+                    "langsiktige_fordringer": 0,
+                },
                 "omloepmidler": {"kortsiktige_fordringer": 0, "bankinnskudd": 30000},
             },
             "egenkapital_og_gjeld": {

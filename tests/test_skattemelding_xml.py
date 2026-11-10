@@ -14,10 +14,7 @@ import pytest
 
 from wenche.skattemelding_xml import generer_skattemelding_upersonlig, hent_partsnummer
 
-_NS = (
-    "urn:no:skatteetaten:fastsetting:formueinntekt:"
-    "skattemelding:upersonlig:ekstern:v5"
-)
+_NS = "urn:no:skatteetaten:fastsetting:formueinntekt:skattemelding:upersonlig:ekstern:v5"
 
 
 def _parse(xml_bytes: bytes):
@@ -50,7 +47,9 @@ class TestSkattemeldingXml:
         assert beloep.text == "50000"
 
     def test_fremfoert_underskudd_rundes_til_heltall(self):
-        root = _parse(generer_skattemelding_upersonlig(12345678, 2024, fremfoert_underskudd=50000.7))
+        root = _parse(
+            generer_skattemelding_upersonlig(12345678, 2024, fremfoert_underskudd=50000.7)
+        )
         beloep = root.find(
             f".//{{{_NS}}}fremfoertUnderskuddFraTidligereAar/{{{_NS}}}beloepSomHeltall"
         )
@@ -92,9 +91,13 @@ class TestAaretsUnderskudd:
     """
 
     def test_aarets_underskudd_inkluderer_alle_avledede_summer(self):
-        root = _parse(generer_skattemelding_upersonlig(
-            12345678, 2024, aarets_underskudd=5000,
-        ))
+        root = _parse(
+            generer_skattemelding_upersonlig(
+                12345678,
+                2024,
+                aarets_underskudd=5000,
+            )
+        )
         iou = root.find(f"{{{_NS}}}inntektOgUnderskudd")
         assert iou is not None
 
@@ -118,11 +121,14 @@ class TestAaretsUnderskudd:
 
     def test_fremfoerbart_er_summen_av_aarets_og_fremfoert(self):
         # Fremført fra tidligere år 1500 + årets underskudd 5000 = 6500
-        root = _parse(generer_skattemelding_upersonlig(
-            12345678, 2024,
-            fremfoert_underskudd=1500,
-            aarets_underskudd=5000,
-        ))
+        root = _parse(
+            generer_skattemelding_upersonlig(
+                12345678,
+                2024,
+                fremfoert_underskudd=1500,
+                aarets_underskudd=5000,
+            )
+        )
         utf = root.find(f"{{{_NS}}}inntektOgUnderskudd/{{{_NS}}}underskuddTilFremfoering")
         assert utf is not None
 
@@ -132,17 +138,19 @@ class TestAaretsUnderskudd:
         assert fra_tidligere is not None and fra_tidligere.text == "1500"
 
         fremfoerbart_el = utf.find(f"{{{_NS}}}fremfoerbartUnderskuddIInntekt")
-        fremfoerbart = fremfoerbart_el.find(
-            f"{{{_NS}}}beloep/{{{_NS}}}beloepSomHeltall"
-        )
+        fremfoerbart = fremfoerbart_el.find(f"{{{_NS}}}beloep/{{{_NS}}}beloepSomHeltall")
         assert fremfoerbart is not None and fremfoerbart.text == "6500"
         # UTEN erOverstyrt, jf. SSV-5187.
         assert fremfoerbart_el.find(f"{{{_NS}}}erOverstyrt") is None
 
     def test_aarets_underskudd_uten_fremfoert_genererer_underskuddTilFremfoering(self):
-        root = _parse(generer_skattemelding_upersonlig(
-            12345678, 2024, aarets_underskudd=4000,
-        ))
+        root = _parse(
+            generer_skattemelding_upersonlig(
+                12345678,
+                2024,
+                aarets_underskudd=4000,
+            )
+        )
         utf = root.find(f"{{{_NS}}}inntektOgUnderskudd/{{{_NS}}}underskuddTilFremfoering")
         assert utf is not None
         # Uten fremført fra tidligere år, men med årets underskudd:
@@ -160,7 +168,10 @@ class TestAaretsUnderskudd:
 
     def test_output_med_underskudd_er_gyldig_xml(self):
         result = generer_skattemelding_upersonlig(
-            12345678, 2024, fremfoert_underskudd=1500, aarets_underskudd=5000,
+            12345678,
+            2024,
+            fremfoert_underskudd=1500,
+            aarets_underskudd=5000,
         )
         fromstring(result.decode("utf-8"))
 
@@ -176,25 +187,29 @@ class TestVerdsettingAvAksje:
     """
 
     def test_emit_med_positiv_netto(self):
-        root = _parse(generer_skattemelding_upersonlig(
-            12345678, 2024,
-            formue_verdi_foer_rabatt=72622,
-            samlet_gjeld=12682,
-        ))
-        sva = root.find(
-            f"{{{_NS}}}verdsettingAvAksje/{{{_NS}}}samletVerdiBakAksjeneISelskapet"
+        root = _parse(
+            generer_skattemelding_upersonlig(
+                12345678,
+                2024,
+                formue_verdi_foer_rabatt=72622,
+                samlet_gjeld=12682,
+            )
         )
+        sva = root.find(f"{{{_NS}}}verdsettingAvAksje/{{{_NS}}}samletVerdiBakAksjeneISelskapet")
         assert sva is not None
         assert sva.findtext(f"{{{_NS}}}beloep/{{{_NS}}}beloepSomHeltall") == "59940"
         # Eksplisitt: erOverstyrt skal IKKE være satt
         assert sva.find(f"{{{_NS}}}erOverstyrt") is None
 
     def test_gulv_paa_null_naar_gjeld_overstiger_formue(self):
-        root = _parse(generer_skattemelding_upersonlig(
-            12345678, 2024,
-            formue_verdi_foer_rabatt=10000,
-            samlet_gjeld=15000,
-        ))
+        root = _parse(
+            generer_skattemelding_upersonlig(
+                12345678,
+                2024,
+                formue_verdi_foer_rabatt=10000,
+                samlet_gjeld=15000,
+            )
+        )
         verdi = root.find(
             f"{{{_NS}}}verdsettingAvAksje/{{{_NS}}}samletVerdiBakAksjeneISelskapet"
             f"/{{{_NS}}}beloep/{{{_NS}}}beloepSomHeltall"
@@ -223,7 +238,7 @@ class TestHentPartsnummer:
         return (
             f'<skattemelding xmlns="{ns}"><partsnummer>826662392</partsnummer>'
             "<inntektsaar>2024</inntektsaar></skattemelding>"
-        ).encode("utf-8")
+        ).encode()
 
     def test_v5(self):
         assert hent_partsnummer(self._forhandsutfylt("v5")) == 826662392
@@ -234,8 +249,8 @@ class TestHentPartsnummer:
 
     def test_manglende_partsnummer_kaster(self):
         uten = (
-            '<skattemelding xmlns="urn:no:skatteetaten:fastsetting:formueinntekt:'
-            'skattemelding:upersonlig:ekstern:v4"><inntektsaar>2024</inntektsaar></skattemelding>'
-        ).encode("utf-8")
+            b'<skattemelding xmlns="urn:no:skatteetaten:fastsetting:formueinntekt:'
+            b'skattemelding:upersonlig:ekstern:v4"><inntektsaar>2024</inntektsaar></skattemelding>'
+        )
         with pytest.raises(ValueError):
             hent_partsnummer(uten)

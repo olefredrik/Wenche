@@ -4,6 +4,7 @@ Den delte grensen mellom standalone (CLI/NiceGUI) og den hostede appen:
 dict (hosted sender config i request-body), og gi IDENTISK resultat. Brekker noen denne
 ekvivalensen, brekker enten standalone eller webapp i stillhet, derav disse regresjonsvaktene.
 """
+
 import copy
 
 import yaml
@@ -26,7 +27,11 @@ _CFG = {
     "regnskapsaar": 2024,
     "resultatregnskap": {
         "driftsinntekter": {"salgsinntekter": 0, "andre_driftsinntekter": 0},
-        "driftskostnader": {"loennskostnader": 0, "avskrivninger": 0, "andre_driftskostnader": 5500},
+        "driftskostnader": {
+            "loennskostnader": 0,
+            "avskrivninger": 0,
+            "andre_driftskostnader": 5500,
+        },
         "finansposter": {
             "utbytte_fra_datterselskap": 100000,
             "andre_finansinntekter": 0,
@@ -36,13 +41,21 @@ _CFG = {
     },
     "balanse": {
         "eiendeler": {
-            "anleggsmidler": {"aksjer_i_datterselskap": 100000, "andre_aksjer": 0, "langsiktige_fordringer": 0},
+            "anleggsmidler": {
+                "aksjer_i_datterselskap": 100000,
+                "andre_aksjer": 0,
+                "langsiktige_fordringer": 0,
+            },
             "omloepmidler": {"kortsiktige_fordringer": 0, "bankinnskudd": 64500},
         },
         "egenkapital_og_gjeld": {
             "egenkapital": {"aksjekapital": 30000, "overkursfond": 0, "annen_egenkapital": 134500},
             "langsiktig_gjeld": {"laan_fra_aksjonaer": 0, "andre_langsiktige_laan": 0},
-            "kortsiktig_gjeld": {"leverandoergjeld": 0, "skyldige_offentlige_avgifter": 0, "annen_kortsiktig_gjeld": 0},
+            "kortsiktig_gjeld": {
+                "leverandoergjeld": 0,
+                "skyldige_offentlige_avgifter": 0,
+                "annen_kortsiktig_gjeld": 0,
+            },
         },
     },
     "skattemelding": {
@@ -126,9 +139,7 @@ def test_alle_lesere_bygger_samme_selskap():
         "skattemelding": sm.les_config(copy.deepcopy(_CFG_ALLE_FELT))[0].selskap,
         "aksjonaerregister": akr.les_config(copy.deepcopy(_CFG_ALLE_FELT)).selskap,
     }
-    felles = [
-        f.name for f in dataclasses.fields(Selskap) if f.name not in _KUN_AKSJONAERREGISTER
-    ]
+    felles = [f.name for f in dataclasses.fields(Selskap) if f.name not in _KUN_AKSJONAERREGISTER]
     for felt in felles:
         verdier = {navn: getattr(s, felt) for navn, s in selskaper.items()}
         assert len(set(verdier.values())) == 1, f"leserne er uenige om {felt}: {verdier}"
@@ -174,8 +185,10 @@ def test_delvis_fjoraar_uten_underseksjoner_kraesjer_ikke():
     # oppslaget -> «Uventet feil under innsending» (HTTP 500). Nå leses de manglende som 0.
     cfg = copy.deepcopy(_CFG)
     cfg["foregaaende_aar"] = {
-        "resultatregnskap": {"driftskostnader": {"andre_driftskostnader": 5.5},
-                             "finansposter": {"rentekostnader": 70086}},
+        "resultatregnskap": {
+            "driftskostnader": {"andre_driftskostnader": 5.5},
+            "finansposter": {"rentekostnader": 70086},
+        },
         "balanse": {"eiendeler": {"anleggsmidler": {"andre_aksjer": 2271521.28}}},
     }
     regnskap = ar.les_config(cfg)

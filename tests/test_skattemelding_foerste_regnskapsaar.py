@@ -5,11 +5,7 @@ from xml.etree.ElementTree import fromstring
 
 from wenche import innsending as tjeneste
 
-
-_NS = (
-    "{urn:no:skatteetaten:fastsetting:formueinntekt:"
-    "naeringsspesifikasjon:ekstern:v6}"
-)
+_NS = "{urn:no:skatteetaten:fastsetting:formueinntekt:naeringsspesifikasjon:ekstern:v6}"
 _ORGNR = "123456789"
 _PARTSNUMMER = 987654321
 
@@ -88,9 +84,7 @@ def test_foerste_regnskapsaar_skiller_kontantinnskudd_fra_underskudd():
     assert avstemming is not None
     endringer = []
     for endring in avstemming.findall(f"{_NS}egenkapitalendring"):
-        kode = endring.findtext(
-            f"{_NS}egenkapitalendringstype/{_NS}egenkapitalendringstype"
-        )
+        kode = endring.findtext(f"{_NS}egenkapitalendringstype/{_NS}egenkapitalendringstype")
         endringer.append((kode, _beloep(endring, "beloep")))
 
     assert endringer == [

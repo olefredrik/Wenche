@@ -3,8 +3,6 @@ Tester for skattemeldingsgenerering i wenche/skattemelding.py.
 Verifiserer skattberegning, fritaksmetoden og fremførbart underskudd.
 """
 
-import math
-
 from wenche.models import SkattemeldingKonfig
 from wenche.skattemelding import generer
 
@@ -30,7 +28,7 @@ def test_inneholder_orgnummer(eksempel_regnskap):
 
 def _skatt_linje(tekst: str) -> str:
     """Returnerer innholdet i skattelinjen, strippet for whitespace."""
-    return next(l.strip() for l in tekst.splitlines() if "Beregnet skatt" in l)
+    return next(linje.strip() for linje in tekst.splitlines() if "Beregnet skatt" in linje)
 
 
 def test_ingen_skatt_ved_underskudd(eksempel_regnskap):
@@ -102,7 +100,8 @@ def test_balansekontroll_ok(eksempel_regnskap):
 
 def test_sammenligningstall_vises_naar_tilgjengelig(eksempel_regnskap):
     """Når foregående år er fylt inn, skal sammenligningstall vises i rapporten."""
-    from wenche.models import Resultatregnskap, Driftskostnader
+    from wenche.models import Driftskostnader, Resultatregnskap
+
     eksempel_regnskap.foregaaende_aar_resultat = Resultatregnskap(
         driftskostnader=Driftskostnader(andre_driftskostnader=4000)
     )
@@ -123,6 +122,7 @@ def test_advarsel_naar_sammenligningstall_mangler(eksempel_regnskap):
 def test_egenkapitalnote_vises_med_fjoraar(eksempel_regnskap):
     """Egenkapitalnoten skal vises med bevegelsestabel når foregående år er tilgjengelig."""
     from wenche.models import Balanse, Egenkapital, EgenkapitalOgGjeld, LangsiktigGjeld
+
     eksempel_regnskap.foregaaende_aar_balanse = Balanse(
         egenkapital_og_gjeld=EgenkapitalOgGjeld(
             egenkapital=Egenkapital(aksjekapital=30000, annen_egenkapital=-28800),
@@ -149,6 +149,7 @@ def test_egenkapitalnote_advarsel_uten_fjoraar(eksempel_regnskap):
 def test_egenkapitalnote_utbytte_vises(eksempel_regnskap):
     """Utbytte utbetalt skal vises som egen linje i egenkapitalnoten."""
     from wenche.models import Balanse, Egenkapital, EgenkapitalOgGjeld, LangsiktigGjeld
+
     eksempel_regnskap.utbytte_utbetalt = 50000
     eksempel_regnskap.foregaaende_aar_balanse = Balanse(
         egenkapital_og_gjeld=EgenkapitalOgGjeld(
@@ -187,6 +188,7 @@ def test_egenkapitalnote_viser_avsetning_i_stedet_for_utbetaling(eksempel_regnsk
 def test_egenkapitalnote_ingen_utbytte_linje_naar_null(eksempel_regnskap):
     """Utbytte-linjen skal ikke vises når utbytte er 0."""
     from wenche.models import Balanse, Egenkapital, EgenkapitalOgGjeld, LangsiktigGjeld
+
     eksempel_regnskap.foregaaende_aar_balanse = Balanse(
         egenkapital_og_gjeld=EgenkapitalOgGjeld(
             egenkapital=Egenkapital(aksjekapital=30000, annen_egenkapital=-28800),
@@ -201,13 +203,24 @@ def test_egenkapitalnote_ingen_utbytte_linje_naar_null(eksempel_regnskap):
 def test_balansekontroll_advarsel():
     """Ubalansert balanse skal gi advarsel i rapporten."""
     from wenche.models import (
-        Aarsregnskap, Balanse, Eiendeler, Omloepmidler, EgenkapitalOgGjeld,
-        Egenkapital, Resultatregnskap, Selskap,
+        Aarsregnskap,
+        Balanse,
+        Egenkapital,
+        EgenkapitalOgGjeld,
+        Eiendeler,
+        Omloepmidler,
+        Resultatregnskap,
+        Selskap,
     )
+
     selskap = Selskap(
-        navn="Ubalansert AS", org_nummer="999999999",
-        daglig_leder="Test", styreleder="Test",
-        forretningsadresse="Testveien 1", stiftelsesaar=2020, aksjekapital=10000,
+        navn="Ubalansert AS",
+        org_nummer="999999999",
+        daglig_leder="Test",
+        styreleder="Test",
+        forretningsadresse="Testveien 1",
+        stiftelsesaar=2020,
+        aksjekapital=10000,
     )
     regnskap = Aarsregnskap(
         selskap=selskap,

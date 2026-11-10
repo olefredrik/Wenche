@@ -6,6 +6,7 @@ Dokument-endepunktene for hostet Wenche (HTTP-nivå).
   som base64-filer, rett fra config-en i request-body (ingen nettverk, ingenting lagres).
 - Ugyldig årsregnskap (balansen går ikke opp) gir 422 uten å generere.
 """
+
 import base64
 import importlib
 
@@ -36,28 +37,66 @@ def klient(monkeypatch):
 def _gyldig_config(org="314273818"):
     """Komplett, balansert årsregnskap-config (eiendeler = EK = 30000), med noter."""
     return {
-        "selskap": {"navn": "Test AS", "org_nummer": org, "daglig_leder": "D L",
-                    "styreleder": "D L", "forretningsadresse": "Vei 1, 0001 OSLO",
-                    "stiftelsesaar": 2018, "aksjekapital": 30000, "kontakt_epost": "a@b.no"},
+        "selskap": {
+            "navn": "Test AS",
+            "org_nummer": org,
+            "daglig_leder": "D L",
+            "styreleder": "D L",
+            "forretningsadresse": "Vei 1, 0001 OSLO",
+            "stiftelsesaar": 2018,
+            "aksjekapital": 30000,
+            "kontakt_epost": "a@b.no",
+        },
         "regnskapsaar": 2024,
         "resultatregnskap": {
             "driftsinntekter": {"salgsinntekter": 0, "andre_driftsinntekter": 0},
-            "driftskostnader": {"loennskostnader": 0, "avskrivninger": 0, "andre_driftskostnader": 0},
-            "finansposter": {"utbytte_fra_datterselskap": 0, "andre_finansinntekter": 0,
-                             "rentekostnader": 0, "andre_finanskostnader": 0}},
+            "driftskostnader": {
+                "loennskostnader": 0,
+                "avskrivninger": 0,
+                "andre_driftskostnader": 0,
+            },
+            "finansposter": {
+                "utbytte_fra_datterselskap": 0,
+                "andre_finansinntekter": 0,
+                "rentekostnader": 0,
+                "andre_finanskostnader": 0,
+            },
+        },
         "balanse": {
-            "eiendeler": {"anleggsmidler": {"aksjer_i_datterselskap": 0, "andre_aksjer": 0, "langsiktige_fordringer": 0},
-                          "omloepmidler": {"kortsiktige_fordringer": 0, "bankinnskudd": 30000}},
+            "eiendeler": {
+                "anleggsmidler": {
+                    "aksjer_i_datterselskap": 0,
+                    "andre_aksjer": 0,
+                    "langsiktige_fordringer": 0,
+                },
+                "omloepmidler": {"kortsiktige_fordringer": 0, "bankinnskudd": 30000},
+            },
             "egenkapital_og_gjeld": {
                 "egenkapital": {"aksjekapital": 30000, "overkursfond": 0, "annen_egenkapital": 0},
                 "langsiktig_gjeld": {"laan_fra_aksjonaer": 0, "andre_langsiktige_laan": 0},
-                "kortsiktig_gjeld": {"leverandoergjeld": 0, "skyldige_offentlige_avgifter": 0,
-                                     "annen_kortsiktig_gjeld": 0}}},
-        "skattemelding": {"anvend_fritaksmetoden": False, "boersnotert": False,
-                          "underskudd_til_fremfoering": 0, "formuesverdi_aksjer": 0},
-        "aksjonaerer": [{"navn": "X", "fodselsnummer": "24847799354", "antall_aksjer": 300,
-                         "aksjeklasse": "ordinære", "utbytte_utbetalt": 0,
-                         "innbetalt_kapital_per_aksje": 100}],
+                "kortsiktig_gjeld": {
+                    "leverandoergjeld": 0,
+                    "skyldige_offentlige_avgifter": 0,
+                    "annen_kortsiktig_gjeld": 0,
+                },
+            },
+        },
+        "skattemelding": {
+            "anvend_fritaksmetoden": False,
+            "boersnotert": False,
+            "underskudd_til_fremfoering": 0,
+            "formuesverdi_aksjer": 0,
+        },
+        "aksjonaerer": [
+            {
+                "navn": "X",
+                "fodselsnummer": "24847799354",
+                "antall_aksjer": 300,
+                "aksjeklasse": "ordinære",
+                "utbytte_utbetalt": 0,
+                "innbetalt_kapital_per_aksje": 100,
+            }
+        ],
         "noter": {"antall_ansatte": 0, "laan_til_naerstaaende": []},
     }
 
@@ -106,7 +145,9 @@ def test_skattemelding_tomt_stiftelsesaar_gir_422_ikke_500(klient, verdi):
 
 
 @pytest.mark.parametrize("type_", ["skattemelding", "aarsregnskap", "noter"])
-@pytest.mark.parametrize("seksjon,navn", [("resultatregnskap", "Resultatregnskapet"), ("balanse", "Balansen")])
+@pytest.mark.parametrize(
+    "seksjon,navn", [("resultatregnskap", "Resultatregnskapet"), ("balanse", "Balansen")]
+)
 def test_manglende_tall_gir_422_ikke_500(klient, type_, seksjon, navn):
     # Regresjon: et ufullstendig Tall-steg (manglende resultatregnskap eller balanse) fikk
     # les_config til å kaste KeyError -> naken HTTP 500. Nå er det et rettbart avvik som peker

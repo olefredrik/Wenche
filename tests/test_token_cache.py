@@ -20,6 +20,7 @@ TEST_ISS = "https://platform.tt02.altinn.no/authentication/api/v1/openid/"
 
 def _fake_token(exp: int, iss: str) -> str:
     """Bygger et JWT-lignende token (usignert) med gitt exp og iss."""
+
     def seg(d: dict) -> str:
         return base64.urlsafe_b64encode(json.dumps(d).encode()).decode().rstrip("=")
 
@@ -85,9 +86,7 @@ class TestGetAltinnToken:
         """Isolerer cache til tmp og erstatter login med en spion."""
         spy = _LoginSpy()
         monkeypatch.setattr(auth, "login", spy)
-        monkeypatch.setattr(
-            auth, "_token_file", lambda env=None: tmp_path / "token.json"
-        )
+        monkeypatch.setattr(auth, "_token_file", lambda env=None: tmp_path / "token.json")
         monkeypatch.setenv("WENCHE_ENV", "prod")
         return spy
 

@@ -20,6 +20,8 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Office/Business :: Financial :: Accounting",
 ]
 dependencies = [
@@ -34,7 +36,21 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "mkdocs-material>=9.5"]
+# Utvikling: tester, lint, typesjekk, dokumentasjon. lxml trengs for XSD-validering av generert
+# XML i testsuiten (tests/test_xsd_validering.py hopper stille over uten den).
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=6.0",
+    "lxml>=5.0",
+    "ruff>=0.17",
+    "mypy>=1.14",
+    "types-PyYAML>=6.0",
+    "pip-audit>=2.7",
+    "mkdocs-material>=9.5",
+]
+# Den hostede tjenesten (hosted/): signerte sesjonscookies. Resten (FastAPI, uvicorn) er alt
+# kjerneavhengigheter fordi `wenche` starter det lokale webgrensesnittet.
+hosted = ["itsdangerous>=2.0"]
 
 [project.urls]
 Homepage = "https://github.com/olefredrik/wenche"
@@ -61,3 +77,53 @@ exclude = ["wenche/web/frontend"]
 [tool.pytest.ini_options]
 # Gjør at `pytest` finner suiten uansett hvor i repoet den kjøres fra.
 testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["wenche", "hosted"]
+omit = ["hosted/web/*", "wenche/web/frontend/*", "wenche/web/static/*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E", "W",  # pycodestyle
+    "F",       # pyflakes
+    "I",       # isort
+    "UP",      # pyupgrade (f.eks. `X | None` i stedet for Optional)
+    "B",       # bugbear
+    "S",       # bandit (sikkerhet)
+]
+ignore = [
+    # Linjelengde håndteres av formatereren. Lange kommentarer og strenger får stå.
+    "E501",
+    # `raise ... from e` i except-blokker: ryddes samlet når feilhierarkiet kommer (leveranse 3
+    # i kodegjennomgangen), ikke én og én.
+    "B904",
+    # xml.etree brukes til å BYGGE XML og til å lese svar via defusedxml (saft.py,
+    # skd_skattemelding_client.py, skattemelding_xml.py, fristsjekk.py), ikke til å parse
+    # upålitelig XML med stdlib-parseren.
+    "S314",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tester bruker assert og oppdiktede hemmeligheter med vilje.
+"tests/**" = ["S101", "S105", "S106", "S107"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI-idiomet `config: dict = Body(...)` er ikke et foranderlig standardargument.
+extend-immutable-calls = ["fastapi.Body", "fastapi.Query", "fastapi.Depends"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["wenche", "hosted"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["wenche", "hosted"]
+# Sjekk også funksjoner uten typehint, så feil i dem ikke går under radaren.
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+# Tredjepartspakker uten typeinformasjon (authlib, dotenv, defusedxml) behandles som Any.
+ignore_missing_imports = true

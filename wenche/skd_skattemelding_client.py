@@ -24,12 +24,12 @@ import binascii
 import json
 from xml.etree.ElementTree import ParseError
 
+import httpx
+
 # Svarene kommer fra Skatteetaten, men parses likevel defensivt (som SAF-T): defusedxml
 # avviser entitetsekspansjon og eksterne referanser, og returnerer vanlige stdlib-Elementer.
 from defusedxml import DefusedXmlException
 from defusedxml.ElementTree import fromstring
-
-import httpx
 
 from wenche.altinn_client import AltinnClient
 from wenche.skattemelding_konvolutt import generer_konvolutt
@@ -96,9 +96,7 @@ class SkdSkattemeldingClient:
         xml, _ = self.hent_forhåndsutfylt_med_id(inntektsaar, orgnr)
         return xml
 
-    def hent_forhåndsutfylt_med_id(
-        self, inntektsaar: int, orgnr: str
-    ) -> tuple[bytes, str | None]:
+    def hent_forhåndsutfylt_med_id(self, inntektsaar: int, orgnr: str) -> tuple[bytes, str | None]:
         """
         Henter forhåndsutfylt skattemelding og dens dokument-ID.
 
@@ -114,8 +112,7 @@ class SkdSkattemeldingClient:
         resp = self._http.get(url, headers={"Accept": "application/xml"})
         if not resp.is_success:
             raise RuntimeError(
-                f"Feil ved henting av forhåndsutfylt skattemelding: "
-                f"{resp.status_code}\n{resp.text}"
+                f"Feil ved henting av forhåndsutfylt skattemelding: {resp.status_code}\n{resp.text}"
             )
         raw = resp.content
 
@@ -174,9 +171,7 @@ class SkdSkattemeldingClient:
             headers={"Content-Type": "application/xml", "Accept": "application/xml"},
         )
         if not resp.is_success:
-            raise RuntimeError(
-                f"Valideringsfeil: {resp.status_code}\n{resp.text}"
-            )
+            raise RuntimeError(f"Valideringsfeil: {resp.status_code}\n{resp.text}")
         return _parse_valideringsrespons(resp.content)
 
     def send(
@@ -281,7 +276,7 @@ def _tekst(el, tag: str) -> str | None:
 
 
 def _avvik_liste(root, container_tag: str) -> list[dict]:
-    avvik = []
+    avvik: list[dict] = []
     container = root.find(f"{{*}}{container_tag}")
     if container is None:
         return avvik

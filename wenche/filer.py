@@ -6,6 +6,7 @@ leses av eieren. `write_text` fulgt av `chmod` gir et lite vindu der fila har um
 og lar en avbrutt skriving etterlate en halv fil. Her opprettes fila med 0600 fra første byte
 og byttes inn atomisk, så andre prosesser ser enten den gamle eller den nye versjonen.
 """
+
 from __future__ import annotations
 
 import os

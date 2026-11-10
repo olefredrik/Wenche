@@ -48,9 +48,7 @@ def test_forklarer_kjent_aarsakskode():
 
 
 def test_ingen_forklaringsseksjon_ved_ukjente_koder():
-    res = _res(
-        avvik_ved_validering=[{"avvikstype": "heltUkjentKode", "oevrigInformasjon": "x"}]
-    )
+    res = _res(avvik_ved_validering=[{"avvikstype": "heltUkjentKode", "oevrigInformasjon": "x"}])
     ut = formater_valideringsresultat(res)
     assert "Hva betyr dette?" not in ut
 
@@ -76,7 +74,10 @@ def test_kodelistefeil_peker_paa_egen_postliste():
                     "Verdien er ikke definert i kodeliste 2025_resultatregnskapOgBalanse"
                 ),
             },
-            {"avvikstype": "verdiAvvikerFraKodeliste", "oevrigInformasjon": "UgyldigKodeverdi:7770"},
+            {
+                "avvikstype": "verdiAvvikerFraKodeliste",
+                "oevrigInformasjon": "UgyldigKodeverdi:7770",
+            },
         ],
     )
     ut = formater_valideringsresultat(res)
@@ -90,7 +91,10 @@ def test_kodelistefeil_forklares_bare_en_gang():
         aarsak="UgyldigKodelisteverdi",
         avvik_ved_validering=[
             {"avvikstype": "UgyldigKodelisteverdi", "oevrigInformasjon": ""},
-            {"avvikstype": "verdiAvvikerFraKodeliste", "oevrigInformasjon": "UgyldigKodeverdi:7770"},
+            {
+                "avvikstype": "verdiAvvikerFraKodeliste",
+                "oevrigInformasjon": "UgyldigKodeverdi:7770",
+            },
         ],
     )
     ut = formater_valideringsresultat(res)
@@ -101,7 +105,10 @@ def test_kodelistefeil_forklares_ogsaa_uten_aarsak():
     # SKD kan svare med avvikstypen alene. Hintet skal komme uansett.
     res = _res(
         avvik_ved_validering=[
-            {"avvikstype": "verdiAvvikerFraKodeliste", "oevrigInformasjon": "UgyldigKodeverdi:7770"},
+            {
+                "avvikstype": "verdiAvvikerFraKodeliste",
+                "oevrigInformasjon": "UgyldigKodeverdi:7770",
+            },
         ],
     )
     assert "naeringsspesifikasjon.poster" in formater_valideringsresultat(res)
@@ -112,7 +119,10 @@ def test_ulike_koder_med_ulik_forklaring_vises_hver_for_seg():
     res = _res(
         aarsak="UgyldigKodelisteverdi",
         avvik_ved_validering=[
-            {"avvikstype": "innkommendeForespoerselManglerSporTilUtfoerende", "oevrigInformasjon": ""},
+            {
+                "avvikstype": "innkommendeForespoerselManglerSporTilUtfoerende",
+                "oevrigInformasjon": "",
+            },
         ],
     )
     ut = formater_valideringsresultat(res)

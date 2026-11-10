@@ -6,7 +6,6 @@ strukturert ok/feil, valideringsfeil ved ekte innsending blir 422, og alle feilt
 domeneklientene (HTTP-feil, nettverksfeil, RuntimeError) blir lesbare 502-svar, aldri en
 naken 500. Auth mockes; ingenting treffer nett eller disk.
 """
-from unittest.mock import MagicMock
 
 import httpx
 import pytest
@@ -21,28 +20,66 @@ from wenche.web.backend.ruter_innsending import _utfor
 def _gyldig_config(org="310137715"):
     """Komplett, balansert årsregnskap-config (eiendeler = EK = 30000)."""
     return {
-        "selskap": {"navn": "Test AS", "org_nummer": org, "daglig_leder": "D L",
-                    "styreleder": "D L", "forretningsadresse": "Vei 1, 0001 OSLO",
-                    "stiftelsesaar": 2018, "aksjekapital": 30000, "kontakt_epost": "a@b.no"},
+        "selskap": {
+            "navn": "Test AS",
+            "org_nummer": org,
+            "daglig_leder": "D L",
+            "styreleder": "D L",
+            "forretningsadresse": "Vei 1, 0001 OSLO",
+            "stiftelsesaar": 2018,
+            "aksjekapital": 30000,
+            "kontakt_epost": "a@b.no",
+        },
         "regnskapsaar": 2024,
         "resultatregnskap": {
             "driftsinntekter": {"salgsinntekter": 0, "andre_driftsinntekter": 0},
-            "driftskostnader": {"loennskostnader": 0, "avskrivninger": 0, "andre_driftskostnader": 0},
-            "finansposter": {"utbytte_fra_datterselskap": 0, "andre_finansinntekter": 0,
-                             "rentekostnader": 0, "andre_finanskostnader": 0}},
+            "driftskostnader": {
+                "loennskostnader": 0,
+                "avskrivninger": 0,
+                "andre_driftskostnader": 0,
+            },
+            "finansposter": {
+                "utbytte_fra_datterselskap": 0,
+                "andre_finansinntekter": 0,
+                "rentekostnader": 0,
+                "andre_finanskostnader": 0,
+            },
+        },
         "balanse": {
-            "eiendeler": {"anleggsmidler": {"aksjer_i_datterselskap": 0, "andre_aksjer": 0, "langsiktige_fordringer": 0},
-                          "omloepmidler": {"kortsiktige_fordringer": 0, "bankinnskudd": 30000}},
+            "eiendeler": {
+                "anleggsmidler": {
+                    "aksjer_i_datterselskap": 0,
+                    "andre_aksjer": 0,
+                    "langsiktige_fordringer": 0,
+                },
+                "omloepmidler": {"kortsiktige_fordringer": 0, "bankinnskudd": 30000},
+            },
             "egenkapital_og_gjeld": {
                 "egenkapital": {"aksjekapital": 30000, "overkursfond": 0, "annen_egenkapital": 0},
                 "langsiktig_gjeld": {"laan_fra_aksjonaer": 0, "andre_langsiktige_laan": 0},
-                "kortsiktig_gjeld": {"leverandoergjeld": 0, "skyldige_offentlige_avgifter": 0,
-                                     "annen_kortsiktig_gjeld": 0}}},
-        "skattemelding": {"anvend_fritaksmetoden": False, "boersnotert": False,
-                          "underskudd_til_fremfoering": 0, "formuesverdi_aksjer": 0},
-        "aksjonaerer": [{"navn": "X", "fodselsnummer": "24847799354", "antall_aksjer": 300,
-                         "aksjeklasse": "ordinære", "utbytte_utbetalt": 0,
-                         "innbetalt_kapital_per_aksje": 100}],
+                "kortsiktig_gjeld": {
+                    "leverandoergjeld": 0,
+                    "skyldige_offentlige_avgifter": 0,
+                    "annen_kortsiktig_gjeld": 0,
+                },
+            },
+        },
+        "skattemelding": {
+            "anvend_fritaksmetoden": False,
+            "boersnotert": False,
+            "underskudd_til_fremfoering": 0,
+            "formuesverdi_aksjer": 0,
+        },
+        "aksjonaerer": [
+            {
+                "navn": "X",
+                "fodselsnummer": "24847799354",
+                "antall_aksjer": 300,
+                "aksjeklasse": "ordinære",
+                "utbytte_utbetalt": 0,
+                "innbetalt_kapital_per_aksje": 100,
+            }
+        ],
     }
 
 
@@ -64,6 +101,7 @@ def klient(monkeypatch):
 # ---------------------------------------------------------------------------
 # Dry-run: lokal validering, strukturert ok/feil
 # ---------------------------------------------------------------------------
+
 
 def test_dryrun_aarsregnskap_ok(klient):
     r = klient.post("/api/innsending/aarsregnskap?dry_run=true", json=_gyldig_config())
@@ -93,6 +131,7 @@ def test_dryrun_skattemelding_ok(klient):
 # Ekte innsending: valideringsfeil blir 422 før noe sendes
 # ---------------------------------------------------------------------------
 
+
 def test_aksjonaer_valideringsfeil_blir_422_ikke_systemexit(klient, monkeypatch):
     import wenche.auth as auth_mod
 
@@ -119,9 +158,11 @@ def test_aarsregnskap_valideringsfeil_blir_422(klient, monkeypatch):
 # _utfor: alle feiltyper fra domeneklientene blir lesbare 502, aldri naken 500
 # ---------------------------------------------------------------------------
 
+
 def _hev(e):
     def fn():
         raise e
+
     return fn
 
 

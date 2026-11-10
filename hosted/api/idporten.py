@@ -22,6 +22,7 @@ Klient-assertion signeres med operatørens egne ID-porten-nøkkel (ikke Maskinpo
 nøkkelen). Endepunkter og JWKS hentes fra ID-portens well-known-dokument (cachet i minnet, én
 worker), så vi slipper å hardkode stier som kan endres.
 """
+
 import base64
 import hashlib
 import logging
@@ -64,6 +65,7 @@ def _scope() -> str:
         if settings().idporten_reportees
         else "openid profile"
     )
+
 
 # Well-known-metadata og JWKS per miljø (test/prod), cachet i minnet. JWKS fornyes etter
 # _JWKS_TTL, og i tillegg straks et id_token bærer en kid cachen ikke kjenner (nøkkelrotasjon
@@ -169,7 +171,9 @@ def _hent_altinn_parter(altinn_token: str, env: str) -> list:
     )
     if resp.status_code != 200:
         _log.warning(
-            "Altinn authorizedparties svarte %s: %s", resp.status_code, resp.text[:500],
+            "Altinn authorizedparties svarte %s: %s",
+            resp.status_code,
+            resp.text[:500],
         )
     resp.raise_for_status()
     return resp.json()

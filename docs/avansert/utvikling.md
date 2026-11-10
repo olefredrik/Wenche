@@ -25,7 +25,7 @@ Frontend-koden er en npm-workspace (`package.json` i repo-roten). Det delte desi
 
 ## Kjøre lokalt
 
-Du trenger Python 3.11+ og Node 20+. Installer Wenche i et virtuelt miljø (`pip install -e .`) og front-end-avhengighetene med `npm install` fra repo-roten.
+Du trenger Python 3.11+ og Node 22+ (se `.nvmrc`). Installer Wenche med verktøyene i et virtuelt miljø (`pip install -e ".[dev,hosted]"`) og front-end-avhengighetene med `npm install` fra repo-roten.
 
 **Vanlig kjøring (mot testmiljøet tt02):**
 
@@ -55,13 +55,19 @@ cd wenche/web/frontend && npm run dev
 
 Den ferdigbygde SPA-en (`wenche/web/static`) pakkes inn i hjulet (wheel) fordi de fleste brukere installerer med `pip` og ikke har Node. `npm run build` for self-hosted-frontenden må derfor kjøres før `python -m build`. GitHub Actions (`publish.yml`) gjør dette automatisk når en versjons-tag pushes.
 
-## Tester
+## Tester og kvalitet
 
 ```bash
-pytest
+pytest                                   # testsuite, ingen nettverk
+pytest --cov                             # med dekningsrapport
+ruff check . && ruff format --check .    # lint og formatering (`ruff format .` retter)
+mypy                                     # typesjekk av wenche/ og hosted/
+npm run typecheck && npm run lint        # TypeScript og ESLint for alle tre workspaces
 ```
 
-Testene dekker domenelaget (validering, XML-generering, klientene). De krever ikke nettverk.
+Testene dekker domenelaget (validering, XML-generering, klientene) og begge web-backendene. De krever ikke nettverk. XSD-valideringen av generert XML bruker `lxml`, som følger med `dev`-extraen.
+
+CI kjører alt dette på hver push og pull request, på Python 3.11 til 3.14. Vil du ha ruff som git-hook før hver commit: `pip install pre-commit && pre-commit install`. Konfigurasjonen for ruff, mypy og dekning ligger i `pyproject.toml`, ESLint i `eslint.config.mjs`.
 
 ## Den hostede versjonen
 

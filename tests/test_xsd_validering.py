@@ -20,7 +20,6 @@ from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
 from wenche.skattemelding_konvolutt import generer_konvolutt
 from wenche.skattemelding_xml import (
     beregn_verdi_bak_aksjene,
-    generer_skattemelding_fra_konfig,
     generer_skattemelding_upersonlig,
 )
 
@@ -38,9 +37,7 @@ def _valider(xml_bytes: bytes, xsd_navn: str) -> None:
     schema = etree.XMLSchema(etree.parse(str(_XSD_DIR / xsd_navn)))
     doc = etree.fromstring(xml_bytes)
     if not schema.validate(doc):
-        avvik = "\n".join(
-            f"  linje {e.line}: {e.message}" for e in schema.error_log
-        )
+        avvik = "\n".join(f"  linje {e.line}: {e.message}" for e in schema.error_log)
         pytest.fail(f"XML er ugyldig mot {xsd_navn}:\n{avvik}")
 
 
@@ -81,14 +78,12 @@ class TestNaeringsspesifikasjonXsd:
         assert gek is not None
         barn = [c.tag.replace(ns, "") for c in gek]
         rekkefolge = {
-            navn: i for i, navn in enumerate(
-                ["langsiktigGjeld", "kortsiktigGjeld", "egenkapital"]
-            ) if navn in barn
+            navn: i
+            for i, navn in enumerate(["langsiktigGjeld", "kortsiktigGjeld", "egenkapital"])
+            if navn in barn
         }
         posisjoner = [barn.index(navn) for navn in rekkefolge]
-        assert posisjoner == sorted(posisjoner), (
-            f"Feil rekkefølge i gjeldOgEgenkapital: {barn}"
-        )
+        assert posisjoner == sorted(posisjoner), f"Feil rekkefølge i gjeldOgEgenkapital: {barn}"
 
     def test_validerer_med_skattekostnad(self, regnskap_med_skattekostnad):
         # Skattekostnad (8300) og betalbar skatt (2500) er nye elementer i sekvensene
@@ -112,9 +107,7 @@ class TestNaeringsspesifikasjonXsd:
         # 3 %-sjablonen) med begge de avledede summene. PermanentForskjell er unbounded,
         # men rekkefølgen forskjeller-før-summer er bundet av XSD-sekvensen.
         regnskap_med_utbytte.resultatregnskap.skattekostnad = 660
-        konfig = SkattemeldingKonfig(
-            anvend_fritaksmetoden=True, eierandel_for_fritaksmetoden=80
-        )
+        konfig = SkattemeldingKonfig(anvend_fritaksmetoden=True, eierandel_for_fritaksmetoden=80)
         xml = generer_naeringsspesifikasjon(regnskap_med_utbytte, _PARTSNUMMER, konfig)
         _valider(xml, "naeringsspesifikasjon_v6_ekstern.xsd")
         root = etree.fromstring(xml)
@@ -196,18 +189,21 @@ class TestOpplysningOgVerdsettingXsd:
         root = etree.fromstring(xml)
         opl = root.find(f"{_SM_NS}opplysningOmSkattesubjekt")
         assert opl.findtext(f"{_SM_NS}erBoersnotert") == "false"
-        assert opl.find(
-            f"{_SM_NS}harYtelseMellomAksjonaerEllerNaerstaaendeOgSelskapEllerSelskapetsDatterselskap"
-        ).text == "true"
+        assert (
+            opl.find(
+                f"{_SM_NS}harYtelseMellomAksjonaerEllerNaerstaaendeOgSelskapEllerSelskapetsDatterselskap"
+            ).text
+            == "true"
+        )
         # Formue-seksjonen settes overstyrt; Skatteetaten utleder verdi bak aksjene
         # = 72622 - 12682 = 59940.
         fog = root.find(f"{_SM_NS}formueOgGjeld")
         vfr = fog.find(f"{_SM_NS}samletVerdiFoerEventuellVerdsettingsrabatt")
         assert vfr.findtext(f"{_SM_NS}beloep/{_SM_NS}beloepSomHeltall") == "72622"
         assert vfr.find(f"{_SM_NS}erOverstyrt/{_SM_NS}boolsk").text == "true"
-        assert fog.find(
-            f"{_SM_NS}samletGjeld/{_SM_NS}beloep/{_SM_NS}beloepSomHeltall"
-        ).text == "12682"
+        assert (
+            fog.find(f"{_SM_NS}samletGjeld/{_SM_NS}beloep/{_SM_NS}beloepSomHeltall").text == "12682"
+        )
         # formueOgGjeld skal komme før opplysningOmSkattesubjekt (XSD-sekvens)
         barn = [c.tag.replace(_SM_NS, "") for c in root]
         assert barn.index("formueOgGjeld") < barn.index("opplysningOmSkattesubjekt")
@@ -244,7 +240,8 @@ class TestEgenkapitalavstemmingOgYtelseXsd:
     def _regnskap_med_foregaaende(self, eksempel_regnskap):
         # Sett inngående EK lik aksjekapital (30000) slik at endring blir
         # negativ (årets underskudd) for eksempel_regnskap (EK-sum < 30000).
-        from wenche.models import Balanse, EgenkapitalOgGjeld, Egenkapital
+        from wenche.models import Balanse, Egenkapital, EgenkapitalOgGjeld
+
         eksempel_regnskap.foregaaende_aar_balanse = Balanse(
             egenkapital_og_gjeld=EgenkapitalOgGjeld(
                 egenkapital=Egenkapital(aksjekapital=30000),
@@ -261,9 +258,10 @@ class TestEgenkapitalavstemmingOgYtelseXsd:
         ekavst = root.find(f"{_NS_NS}egenkapitalavstemming")
         assert ekavst is not None
         # inngående EK = 30000
-        assert ekavst.findtext(
-            f"{_NS_NS}inngaaendeEgenkapital/{_NS_NS}beloep/{_NS_NS}beloep"
-        ) == "30000.00"
+        assert (
+            ekavst.findtext(f"{_NS_NS}inngaaendeEgenkapital/{_NS_NS}beloep/{_NS_NS}beloep")
+            == "30000.00"
+        )
         endring = ekavst.find(f"{_NS_NS}egenkapitalendring")
         kode = endring.findtext(f"{_NS_NS}egenkapitalendringstype/{_NS_NS}egenkapitalendringstype")
         # EK-sum i eksempel_regnskap (30000 - 34300 = -4300) < 30000 → underskudd

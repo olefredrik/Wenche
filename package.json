@@ -3,9 +3,22 @@
   "private": true,
   "version": "0.0.0",
   "description": "Frontend-workspace for Wenche: delt designsystem (packages/ui) + den hostede og self-hostede SPA-en.",
+  "engines": {
+    "node": ">=22"
+  },
   "workspaces": [
     "packages/ui",
     "hosted/web",
     "wenche/web/frontend"
-  ]
+  ],
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p packages/ui && tsc --noEmit -p hosted/web && tsc --noEmit -p wenche/web/frontend"
+  },
+  "devDependencies": {
+    "eslint": "^10.14.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.14.0",
+    "typescript-eslint": "^8.72.2"
+  }
 }

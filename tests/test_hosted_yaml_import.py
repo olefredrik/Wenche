@@ -45,35 +45,52 @@ def _config(regnskapsstart, regnskapsslutt, stiftelsesdato):
     """Nystiftet selskap med forkortet første regnskapsår, balansert."""
     return {
         "selskap": {
-            "navn": "Test AS", "org_nummer": _ORG, "daglig_leder": "D L",
-            "styreleder": "D L", "forretningsadresse": "Vei 1, 0001 OSLO",
-            "stiftelsesaar": 2025, "stiftelsesdato": stiftelsesdato,
-            "aksjekapital": 30000, "kontakt_epost": "a@b.no",
+            "navn": "Test AS",
+            "org_nummer": _ORG,
+            "daglig_leder": "D L",
+            "styreleder": "D L",
+            "forretningsadresse": "Vei 1, 0001 OSLO",
+            "stiftelsesaar": 2025,
+            "stiftelsesdato": stiftelsesdato,
+            "aksjekapital": 30000,
+            "kontakt_epost": "a@b.no",
         },
         "regnskapsaar": 2025,
         "regnskapsstart": regnskapsstart,
         "regnskapsslutt": regnskapsslutt,
         "resultatregnskap": {
             "driftsinntekter": {"salgsinntekter": 0, "andre_driftsinntekter": 0},
-            "driftskostnader": {"loennskostnader": 0, "avskrivninger": 0,
-                                "andre_driftskostnader": 0},
-            "finansposter": {"utbytte_fra_datterselskap": 0, "andre_finansinntekter": 0,
-                             "rentekostnader": 0, "andre_finanskostnader": 0},
+            "driftskostnader": {
+                "loennskostnader": 0,
+                "avskrivninger": 0,
+                "andre_driftskostnader": 0,
+            },
+            "finansposter": {
+                "utbytte_fra_datterselskap": 0,
+                "andre_finansinntekter": 0,
+                "rentekostnader": 0,
+                "andre_finanskostnader": 0,
+            },
             "skattekostnad": 0,
         },
         "balanse": {
             "eiendeler": {
-                "anleggsmidler": {"aksjer_i_datterselskap": 0, "andre_aksjer": 0,
-                                  "langsiktige_fordringer": 0},
+                "anleggsmidler": {
+                    "aksjer_i_datterselskap": 0,
+                    "andre_aksjer": 0,
+                    "langsiktige_fordringer": 0,
+                },
                 "omloepmidler": {"kortsiktige_fordringer": 0, "bankinnskudd": 30000},
             },
             "egenkapital_og_gjeld": {
-                "egenkapital": {"aksjekapital": 30000, "overkursfond": 0,
-                                "annen_egenkapital": 0},
+                "egenkapital": {"aksjekapital": 30000, "overkursfond": 0, "annen_egenkapital": 0},
                 "langsiktig_gjeld": {"laan_fra_aksjonaer": 0, "andre_langsiktige_laan": 0},
-                "kortsiktig_gjeld": {"leverandoergjeld": 0, "betalbar_skatt": 0,
-                                     "skyldige_offentlige_avgifter": 0,
-                                     "annen_kortsiktig_gjeld": 0},
+                "kortsiktig_gjeld": {
+                    "leverandoergjeld": 0,
+                    "betalbar_skatt": 0,
+                    "skyldige_offentlige_avgifter": 0,
+                    "annen_kortsiktig_gjeld": 0,
+                },
             },
         },
         "skattemelding": {"underskudd_til_fremfoering": 0, "formuesverdi_aksjer": 0},
@@ -99,8 +116,8 @@ def test_dokument_genereres(klient, navn, cfg, dokument):
 @pytest.mark.parametrize("navn,cfg", [("ren dato", _REN_DATO), ("iso-datetime", _ISO_DATETIME)])
 def test_perioden_naar_frem_til_naeringsspesifikasjonen(klient, navn, cfg):
     """Begge formene skal gi den faktiske perioden, ikke hele kalenderåret."""
-    from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
     from wenche import skattemelding as sm
+    from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
 
     regnskap, _ = sm.les_config(cfg)
     assert regnskap.periode_start.isoformat() == "2025-10-24", navn

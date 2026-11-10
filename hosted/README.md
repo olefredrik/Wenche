@@ -208,6 +208,17 @@ bevisst, så merge til `main` ikke auto-deployer.
 Vil du senere ha auto-deploy ved merge til `main`, legg tilbake en `push:`-trigger i
 workflowen (fork-PR-er får uansett hverken secret eller deploy).
 
+### Avhengighetene i imaget
+
+`hosted/requirements.txt` er en lås generert fra `pyproject.toml` (kjerne + `hosted`-extra), så imaget
+bygges likt hver gang i stedet for å hente nyeste versjon ved hvert bygg. Dependabot oppdaterer den
+ukentlig. Endrer du avhengigheter i `pyproject.toml`, regenerer låsen (`pip install uv` om du mangler
+den):
+
+```sh
+uv pip compile pyproject.toml --extra hosted --python-version 3.11 --python-platform linux -o hosted/requirements.txt
+```
+
 ## Invitasjoner (prod)
 
 Per-org invite-lenker myntes med:

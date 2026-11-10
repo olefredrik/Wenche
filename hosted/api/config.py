@@ -5,6 +5,7 @@ Alle hemmeligheter kommer fra miljøvariabler (i prod: fra KMS/secret manager),
 aldri fra koden. Vendor-credentials tilhører operatørselskapet og lastes én gang;
 kunde-org kommer per sesjon (ikke herfra).
 """
+
 import os
 from functools import lru_cache
 from pathlib import Path
@@ -15,8 +16,8 @@ from wenche.auth import VendorCredentials
 # Dev-standarder som ligger i åpen kildekode. De er KUN for lokal dev (WENCHE_ENV=test).
 # I prod fail-closes vi hvis de ikke er overstyrt, ellers kunne hvem som helst som leser
 # repoet lage gyldige invite-lenker og forfalske sesjonscookies.
-_DEV_SESSION_SECRET = "dev-secret-bytt-i-prod"
-_DEV_INVITE_SECRET = "dev-invite-secret-bytt-i-prod"
+_DEV_SESSION_SECRET = "dev-secret-bytt-i-prod"  # noqa: S105
+_DEV_INVITE_SECRET = "dev-invite-secret-bytt-i-prod"  # noqa: S105
 
 
 class Settings:
@@ -64,7 +65,9 @@ class Settings:
         # ikke-tildelt scope, avviser ID-porten hele innloggingen (invalid_scope). Av som standard:
         # da logger man inn med bare openid+profile, og selskap velges ved manuell orgnr-inntasting.
         self._idporten_reportees = os.getenv("HOSTED_IDPORTEN_REPORTEES", "").lower() in (
-            "1", "true", "yes",
+            "1",
+            "true",
+            "yes",
         )
         self._fail_closed()
 

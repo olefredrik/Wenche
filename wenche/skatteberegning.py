@@ -31,24 +31,22 @@ def har_fullt_utbyttefritak(konfig: SkattemeldingKonfig) -> bool:
 class Skatteberegning:
     """Resultatet av skatteberegningen (RF-1028). Alle beløp i kroner."""
 
-    utbytte: float                          # Mottatt utbytte i alt, før fritaksmetoden
-    fritatt_utbytte: float                  # Del av utbyttet som er skattefritt
-    skattepliktig_utbytte: float            # Del av utbyttet som er skattepliktig (3 %-sjablon)
-    skattepliktig_inntekt_brutto: float     # Før fradrag for fremført underskudd
-    fradrag_underskudd: float               # Anvendt fremført underskudd
-    skattepliktig_inntekt_netto: float      # Grunnlaget for skatten
-    nytt_underskudd: float                  # Underskudd til fremføring neste år
-    beregnet_skatt: float                   # 22 % av netto skattepliktig inntekt, avrundet opp
+    utbytte: float  # Mottatt utbytte i alt, før fritaksmetoden
+    fritatt_utbytte: float  # Del av utbyttet som er skattefritt
+    skattepliktig_utbytte: float  # Del av utbyttet som er skattepliktig (3 %-sjablon)
+    skattepliktig_inntekt_brutto: float  # Før fradrag for fremført underskudd
+    fradrag_underskudd: float  # Anvendt fremført underskudd
+    skattepliktig_inntekt_netto: float  # Grunnlaget for skatten
+    nytt_underskudd: float  # Underskudd til fremføring neste år
+    beregnet_skatt: float  # 22 % av netto skattepliktig inntekt, avrundet opp
     # Gevinst og tap ved realisasjon av aksjer som fritaksmetoden holder utenfor
     # skattegrunnlaget (sktl. § 2-38). Står sist med standardverdi, så eksisterende
     # kallsteder som bygger Skatteberegning selv ikke knekker.
-    fritatt_gevinst_aksjer: float = 0.0     # Gevinst som er skattefri
+    fritatt_gevinst_aksjer: float = 0.0  # Gevinst som er skattefri
     ikke_fradragsberettiget_tap_aksjer: float = 0.0  # Tap som ikke gir fradrag
 
 
-def beregn_skatt(
-    r: Resultatregnskap, konfig: SkattemeldingKonfig
-) -> Skatteberegning:
+def beregn_skatt(r: Resultatregnskap, konfig: SkattemeldingKonfig) -> Skatteberegning:
     """
     Beregner selskapsskatten for inntektsåret (RF-1028).
 
@@ -74,6 +72,8 @@ def beregn_skatt(
     # datterselskap. Utbytte fra andre aksjer får alltid sjablonen, også når utbyttet fra
     # datterselskapet er helt fritatt. Uten utbytte fra andre aksjer er regnestykket som før.
     utbytte = r.finansposter.sum_utbytte
+    skattepliktig_utbytte: float
+    fritatt_utbytte: float
     if konfig.anvend_fritaksmetoden and utbytte > 0:
         if har_fullt_utbyttefritak(konfig):
             grunnlag_sjablon = r.finansposter.utbytte_fra_andre_aksjer
@@ -109,9 +109,7 @@ def beregn_skatt(
 
     # Fradrag for fremførbart underskudd (kun hvis positiv inntekt)
     if skattepliktig_inntekt_brutto > 0 and konfig.underskudd_til_fremfoering > 0:
-        fradrag_underskudd = min(
-            konfig.underskudd_til_fremfoering, skattepliktig_inntekt_brutto
-        )
+        fradrag_underskudd = min(konfig.underskudd_til_fremfoering, skattepliktig_inntekt_brutto)
     else:
         fradrag_underskudd = 0
 
@@ -119,9 +117,7 @@ def beregn_skatt(
 
     # Underskudd til fremføring neste år
     if skattepliktig_inntekt_brutto < 0:
-        nytt_underskudd = konfig.underskudd_til_fremfoering + abs(
-            skattepliktig_inntekt_brutto
-        )
+        nytt_underskudd = konfig.underskudd_til_fremfoering + abs(skattepliktig_inntekt_brutto)
     else:
         nytt_underskudd = konfig.underskudd_til_fremfoering - fradrag_underskudd
 

@@ -8,6 +8,7 @@ uforklart 500 og brukeren fikk aldri se feilene. Disse testene låser den nye
 atferden: strukturert feilliste ved dry-run og `InnsendingValideringsfeil` ved
 ekte innsending, samme mønster som årsregnskap.
 """
+
 from unittest.mock import MagicMock
 
 import pytest

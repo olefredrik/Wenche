@@ -7,15 +7,16 @@ from datetime import date
 import yaml
 
 from wenche.altinn_client import AltinnClient
+from wenche.brg_xml import generer_aksjenote_vedlegg, generer_hovedskjema, generer_underskjema
 from wenche.models import (
     Aarsregnskap,
     Anleggsmidler,
     Balanse,
     Driftsinntekter,
     Driftskostnader,
-    Eiendeler,
     Egenkapital,
     EgenkapitalOgGjeld,
+    Eiendeler,
     Finansposter,
     KortsiktigGjeld,
     LangsiktigGjeld,
@@ -23,7 +24,6 @@ from wenche.models import (
     Resultatregnskap,
     Selskap,
 )
-from wenche.brg_xml import generer_aksjenote_vedlegg, generer_hovedskjema, generer_underskjema
 from wenche.naeringsspesifikasjon_xml import egenkapitalavstemming
 
 
@@ -83,9 +83,7 @@ def _les_resultat(r: dict) -> Resultatregnskap:
             andre_finansinntekter=_tall(fp.get("andre_finansinntekter")),
             rentekostnader=_tall(fp.get("rentekostnader")),
             andre_finanskostnader=_tall(fp.get("andre_finanskostnader")),
-            gevinst_ved_realisasjon_av_aksjer=_tall(
-                fp.get("gevinst_ved_realisasjon_av_aksjer")
-            ),
+            gevinst_ved_realisasjon_av_aksjer=_tall(fp.get("gevinst_ved_realisasjon_av_aksjer")),
             tap_ved_realisasjon_av_aksjer=_tall(fp.get("tap_ved_realisasjon_av_aksjer")),
             utbytte_fra_andre_aksjer=_tall(fp.get("utbytte_fra_andre_aksjer")),
         ),
@@ -159,12 +157,12 @@ def les_config(config_fil: str | dict) -> Aarsregnskap:
     balanse = _les_balanse(cfg["balanse"])
 
     fa = cfg.get("foregaaende_aar", {})
-    foregaaende_resultat = _les_resultat(fa["resultatregnskap"]) if "resultatregnskap" in fa else Resultatregnskap()
+    foregaaende_resultat = (
+        _les_resultat(fa["resultatregnskap"]) if "resultatregnskap" in fa else Resultatregnskap()
+    )
     foregaaende_balanse = _les_balanse(fa["balanse"]) if "balanse" in fa else Balanse()
 
-    utbytte_utbetalt = sum(
-        float(a.get("utbytte_utbetalt", 0)) for a in cfg.get("aksjonaerer", [])
-    )
+    utbytte_utbetalt = sum(float(a.get("utbytte_utbetalt", 0)) for a in cfg.get("aksjonaerer", []))
 
     return Aarsregnskap(
         selskap=selskap,
@@ -208,8 +206,7 @@ def valider(regnskap: Aarsregnskap) -> list[str]:
     if not regnskap.balanse.er_i_balanse():
         diff = regnskap.balanse.differanse()
         feil.append(
-            f"Balansen går ikke opp: eiendeler og egenkapital+gjeld "
-            f"avviker med {diff:+,.2f} NOK."
+            f"Balansen går ikke opp: eiendeler og egenkapital+gjeld avviker med {diff:+,.2f} NOK."
         )
 
     if len(regnskap.selskap.org_nummer.replace(" ", "")) != 9:
@@ -234,10 +231,7 @@ def _valider_tinginnskudd(regnskap: Aarsregnskap) -> list[str]:
         return []
 
     if tinginnskudd < 0:
-        return [
-            f"Tinginnskudd ved stiftelse kan ikke være negativt "
-            f"({tinginnskudd:,.2f} NOK)."
-        ]
+        return [f"Tinginnskudd ved stiftelse kan ikke være negativt ({tinginnskudd:,.2f} NOK)."]
 
     if not regnskap.er_foerste_regnskapsaar:
         # Ikke en feil: en config som bæres videre fra år til år (typisk fra Bodil) tar
@@ -246,9 +240,7 @@ def _valider_tinginnskudd(regnskap: Aarsregnskap) -> list[str]:
 
     ek = regnskap.balanse.egenkapital_og_gjeld.egenkapital
     fek = regnskap.foregaaende_aar_balanse.egenkapital_og_gjeld.egenkapital
-    innskudd = (ek.aksjekapital + ek.overkursfond) - (
-        fek.aksjekapital + fek.overkursfond
-    )
+    innskudd = (ek.aksjekapital + ek.overkursfond) - (fek.aksjekapital + fek.overkursfond)
     if tinginnskudd > innskudd + 0.01:
         return [
             f"Tinginnskudd ved stiftelse ({tinginnskudd:,.2f} NOK) er større enn økningen "
@@ -447,7 +439,9 @@ def advarsler(regnskap: Aarsregnskap) -> list[str]:
     return adv
 
 
-def send_inn(regnskap: Aarsregnskap, klient: AltinnClient, dry_run: bool = False) -> str | None:
+def send_inn(
+    regnskap: Aarsregnskap, klient: AltinnClient | None, dry_run: bool = False
+) -> str | None:
     """
     Sender inn årsregnskapet til Brønnøysundregistrene via Altinn.
 
@@ -478,23 +472,28 @@ def send_inn(regnskap: Aarsregnskap, klient: AltinnClient, dry_run: bool = False
     underskjema = generer_underskjema(regnskap)
     org = regnskap.selskap.org_nummer
     aar = regnskap.regnskapsaar
-    print(f"XML generert: Hovedskjema {len(hovedskjema):,} bytes, Underskjema {len(underskjema):,} bytes.")
+    print(
+        f"XML generert: Hovedskjema {len(hovedskjema):,} bytes, Underskjema {len(underskjema):,} bytes."
+    )
 
     if dry_run:
         hoved_fil = f"aarsregnskap_{aar}_{org}_hovedskjema.xml"
         under_fil = f"aarsregnskap_{aar}_{org}_underskjema.xml"
-        with open(hoved_fil, "wb") as f:
-            f.write(hovedskjema)
-        with open(under_fil, "wb") as f:
-            f.write(underskjema)
+        with open(hoved_fil, "wb") as fil:
+            fil.write(hovedskjema)
+        with open(under_fil, "wb") as fil:
+            fil.write(underskjema)
         print(f"Dry-run: filer lagret til {hoved_fil} og {under_fil} — ingenting sendt til Altinn.")
-        return
+        return None
 
+    if klient is None:
+        raise ValueError("send_inn trenger en AltinnClient når dry_run er False.")
     print("Sender årsregnskap til Brønnøysundregistrene via Altinn...")
     instans = klient.opprett_instans("aarsregnskap", org)
 
     klient.oppdater_data_element(
-        "aarsregnskap", instans,
+        "aarsregnskap",
+        instans,
         data_type="Hovedskjema",
         data=hovedskjema,
         content_type="application/xml",
@@ -502,7 +501,8 @@ def send_inn(regnskap: Aarsregnskap, klient: AltinnClient, dry_run: bool = False
     print("Hovedskjema lastet opp.")
 
     klient.oppdater_data_element(
-        "aarsregnskap", instans,
+        "aarsregnskap",
+        instans,
         data_type="Underskjema",
         data=underskjema,
         content_type="application/xml",
@@ -512,7 +512,8 @@ def send_inn(regnskap: Aarsregnskap, klient: AltinnClient, dry_run: bool = False
     if regnskap.balanse.eiendeler.anleggsmidler.andre_aksjer > 0:
         vedlegg = generer_aksjenote_vedlegg(regnskap)
         vedlegg_element = klient.last_opp_vedlegg(
-            "aarsregnskap", instans,
+            "aarsregnskap",
+            instans,
             data=vedlegg,
             content_type="application/pdf",
             filnavn=f"aksjenote_{aar}_{org}.pdf",
@@ -523,6 +524,6 @@ def send_inn(regnskap: Aarsregnskap, klient: AltinnClient, dry_run: bool = False
 
     inbox_url = klient.fullfoor_instans("aarsregnskap", instans)
 
-    print(f"Årsregnskap lastet opp og klar for signering.")
+    print("Årsregnskap lastet opp og klar for signering.")
     print(f"Finn skjemaet i Altinn-innboksen og signer der: {inbox_url}")
     return inbox_url

@@ -5,6 +5,7 @@ Serveren lytter på 127.0.0.1 uten innlogging. Testene sender kall slik en fremm
 gjort det fra nettleseren (fremmed Origin, cross-site-flagg, fremmed Host) og slik SPA-en gjør
 det (loopback-origin pluss klientheader), og sjekker at bare det siste slipper gjennom.
 """
+
 import pytest
 from fastapi.testclient import TestClient
 

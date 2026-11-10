@@ -20,6 +20,7 @@ Read-only: henter kun tokens og lister systembrukere, sender ingenting inn og en
 ingen rettigheter. Fiks for berørte: systembruker.opprett_endringsforespørsel(...) med
 [systembruker._SKATTEMELDING_RETT], som kunden så godkjenner i Altinn.
 """
+
 import os
 from pathlib import Path
 
@@ -64,7 +65,12 @@ def _creds_fra_env() -> tuple[VendorCredentials, str]:
             "Mangler vendor-creds. Sett HOSTED_VENDOR_ORGNR/CLIENT_ID/KID og "
             "HOSTED_VENDOR_KEY_PEM (eller _PATH), og WENCHE_ENV."
         )
-    pem_bytes = pem.encode() if pem else Path(pem_path).read_bytes()
+    if pem:
+        pem_bytes = pem.encode()
+    elif pem_path:
+        pem_bytes = Path(pem_path).read_bytes()
+    else:  # dekket av sjekken over; holder typesjekken fornøyd
+        raise SystemExit("Mangler HOSTED_VENDOR_KEY_PEM (eller _PATH).")
     return VendorCredentials(client_id=client_id, kid=kid, private_key_pem=pem_bytes), orgnr
 
 

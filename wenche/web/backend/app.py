@@ -6,6 +6,7 @@ under /api/* og den ferdigbygde SPA-en (wenche/web/static) på samme origin. `kj
 inngangen CLI-en bruker (`wenche` / `wenche dev`): starter uvicorn på 127.0.0.1 og åpner
 nettleseren. Enbruker og lokalt — ingen invite/sesjon-auth, bind bevisst til loopback.
 """
+
 from __future__ import annotations
 
 import threading
@@ -58,7 +59,7 @@ def lag_app(env: str = "prod", serve_spa: bool = True) -> FastAPI:
     def update_check() -> dict:
         """Sjekk om en nyere Wenche finnes på PyPI. Faller stille tilbake ved nettverksfeil."""
         siste = hent_nyeste_pypi_versjon()
-        nyere = bool(siste) and er_nyere_versjon(siste, WENCHE_VERSJON)
+        nyere = er_nyere_versjon(siste, WENCHE_VERSJON) if siste else False
         return {
             "naavaerende": WENCHE_VERSJON,
             "siste": siste,

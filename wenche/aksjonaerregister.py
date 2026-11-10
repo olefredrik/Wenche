@@ -48,6 +48,8 @@ def _utbyttetidspunkt(oppgave: Aksjonaerregisteroppgave) -> str:
     holder dem like. Klokkeslett trengs bare for å skille flere utdelinger samme dag, og
     Wenche rapporterer én utdeling per år.
     """
+    if oppgave.utbytte_vedtaksdato is None:
+        raise ValueError("Vedtaksdato for utbytte mangler (valider() skal ha stoppet dette).")
     return f"{oppgave.utbytte_vedtaksdato.isoformat()}T00:00:00"
 
 
@@ -124,9 +126,7 @@ def les_config(config_fil: str | dict) -> Aksjonaerregisteroppgave:
     )
 
 
-def generer_hovedskjema_xml(
-    oppgave: Aksjonaerregisteroppgave, innsending_org: str = ""
-) -> bytes:
+def generer_hovedskjema_xml(oppgave: Aksjonaerregisteroppgave, innsending_org: str = "") -> bytes:
     """
     Genererer RF-1086 Hovedskjema XML for SKDs API.
 
@@ -140,11 +140,7 @@ def generer_hovedskjema_xml(
     org = innsending_org or s.org_nummer
     aar = oppgave.regnskapsaar
     totalt_aksjer = oppgave.totalt_antall_aksjer
-    paalydende = (
-        _format_paalydende(s.aksjekapital / totalt_aksjer)
-        if totalt_aksjer > 0
-        else "0"
-    )
+    paalydende = _format_paalydende(s.aksjekapital / totalt_aksjer) if totalt_aksjer > 0 else "0"
     stiftelsesdato = _stiftelsestidspunkt(s)
 
     # Fjorår-felter og stiftelsestransaksjon skal kun inkluderes i stiftelsesåret.
@@ -351,8 +347,8 @@ def _fnr_modulus11_ok(fnr: str) -> bool:
     vekter1 = [3, 7, 6, 1, 8, 9, 4, 5, 2]
     vekter2 = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2]
     siffer = [int(c) for c in fnr]
-    k1 = (11 - sum(v * d for v, d in zip(vekter1, siffer[:9])) % 11) % 11
-    k2 = (11 - sum(v * d for v, d in zip(vekter2, siffer[:10])) % 11) % 11
+    k1 = (11 - sum(v * d for v, d in zip(vekter1, siffer[:9], strict=True)) % 11) % 11
+    k2 = (11 - sum(v * d for v, d in zip(vekter2, siffer[:10], strict=True)) % 11) % 11
     return k1 < 10 and k2 < 10 and k1 == siffer[9] and k2 == siffer[10]
 
 
@@ -363,10 +359,7 @@ def valider(oppgave: Aksjonaerregisteroppgave) -> list[str]:
         feil.append("Minst én aksjonær må være registrert.")
 
     if not oppgave.selskap.kontakt_epost:
-        feil.append(
-            "kontakt_epost mangler i config.yaml under selskap. "
-            "Påkrevd av SKDs API."
-        )
+        feil.append("kontakt_epost mangler i config.yaml under selskap. Påkrevd av SKDs API.")
 
     for a in oppgave.aksjonaerer:
         fnr = a.fodselsnummer.replace(" ", "")
@@ -463,9 +456,7 @@ def _valider_utbytte(oppgave: Aksjonaerregisteroppgave) -> list[str]:
     return feil
 
 
-def valider_mot_brg(
-    oppgave: Aksjonaerregisteroppgave, *, timeout: float = 5.0
-) -> list[str]:
+def valider_mot_brg(oppgave: Aksjonaerregisteroppgave, *, timeout: float = 5.0) -> list[str]:
     """
     Sjekker stiftelsesår mot Brønnøysundregistrene som ekstra forhåndsvalidering.
 
@@ -487,8 +478,7 @@ def valider_mot_brg(
 
     if resp.status_code == 404:
         return [
-            f"Org.nr. {orgnr} ble ikke funnet i Brønnøysundregistrene. "
-            "Sjekk at org.nr. er korrekt."
+            f"Org.nr. {orgnr} ble ikke funnet i Brønnøysundregistrene. Sjekk at org.nr. er korrekt."
         ]
     if not resp.is_success:
         return []
@@ -551,28 +541,26 @@ def send_inn(
 
     if dry_run:
         base = f"aksjonaerregister_{oppgave.regnskapsaar}_{oppgave.selskap.org_nummer}"
-        with open(f"{base}_hovedskjema.xml", "wb") as f:
-            f.write(hoved_xml)
+        with open(f"{base}_hovedskjema.xml", "wb") as fil:
+            fil.write(hoved_xml)
         for i, xml in enumerate(under_xmler, 1):
-            with open(f"{base}_underskjema_{i}.xml", "wb") as f:
-                f.write(xml)
-        print(
-            f"Dry-run: XML lagret til {base}_*.xml — ingenting sendt til SKD."
-        )
+            with open(f"{base}_underskjema_{i}.xml", "wb") as fil:
+                fil.write(xml)
+        print(f"Dry-run: XML lagret til {base}_*.xml — ingenting sendt til SKD.")
         return None
 
+    if klient is None:
+        raise ValueError("send_inn trenger en SkdAksjonaerClient når dry_run er False.")
     print("Sender RF-1086 Hovedskjema til SKD...")
     hovedskjemaid = klient.send_hovedskjema(oppgave.regnskapsaar, hoved_xml)
     print(f"Hovedskjema mottatt (ID: {hovedskjemaid}).")
 
-    for i, (aksjonaer, xml) in enumerate(
-        zip(oppgave.aksjonaerer, under_xmler), 1
-    ):
+    for i, (aksjonaer, xml) in enumerate(zip(oppgave.aksjonaerer, under_xmler, strict=True), 1):
         print(f"Sender underskjema {i}/{len(under_xmler)} ({aksjonaer.navn})...")
         klient.send_underskjema(oppgave.regnskapsaar, hovedskjemaid, xml)
 
     print("Bekrefter innsending...")
     svar = klient.bekreft(oppgave.regnskapsaar, hovedskjemaid, len(under_xmler))
-    print(f"Aksjonærregisteroppgave sendt inn.")
+    print("Aksjonærregisteroppgave sendt inn.")
     print(f"Forsendelse-ID: {svar.get('forsendelseId')}")
     return svar

@@ -10,6 +10,7 @@ Beviser egenskapene:
 
 Altinn-kallene (wenche.systembruker) mockes; testen treffer verken nett eller tt02.
 """
+
 import importlib
 from types import SimpleNamespace
 

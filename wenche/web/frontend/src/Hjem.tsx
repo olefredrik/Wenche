@@ -105,7 +105,6 @@ export default function Hjem() {
         if (r.statussjekk_aktiv) sjekk();
       })
       .catch((e) => setFeil((e as Error).message));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

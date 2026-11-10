@@ -2,33 +2,97 @@ name: Tester
 
 on:
   push:
-    branches: ["main", "feature/**", "feat/**", "fix/**", "bump/**", "docs/**", "refactor/**", "chore/**", "security/**", "test/**"]
+    branches:
+      - main
+      - "feature/**"
+      - "feat/**"
+      - "fix/**"
+      - "bump/**"
+      - "docs/**"
+      - "refactor/**"
+      - "chore/**"
+      - "security/**"
+      - "test/**"
+      - "ci/**"
+      - "build/**"
+      - "style/**"
+      - "perf/**"
   pull_request:
     branches: ["main"]
 
+permissions:
+  contents: read
+
 jobs:
-  test:
+  lint:
+    name: Lint og typesjekk
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.11"
-
       - name: Installer avhengigheter
+        run: pip install -e ".[dev,hosted]"
+      - name: ruff (lint og formatering)
         run: |
-          pip install -e ".[dev]"
-          pip install -r hosted/requirements.txt   # for tests/test_hosted_invite.py (FastAPI m.m.)
+          ruff check .
+          ruff format --check .
+      - name: mypy
+        run: mypy
 
-      - name: Kjør tester
-        run: pytest tests/ -v
+  test:
+    name: Tester (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Installer avhengigheter
+        run: pip install -e ".[dev,hosted]"
+      - name: Kjør tester med dekning
+        run: pytest --cov --cov-report=term-missing:skip-covered
 
+  avhengigheter:
+    name: Kjente sårbarheter (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.11"
+      - name: Installer avhengigheter
+        run: pip install -e ".[dev,hosted]"
       # Synliggjør kjente CVE-er i avhengighetene uten å blokkere urelaterte PR-er.
-      # Strammes til blokkerende når vi har sett at den er stabil.
-      - name: Sjekk avhengigheter for kjente sårbarheter
+      # Strammes til blokkerende når den har vist seg stabil.
+      - name: pip-audit
         continue-on-error: true
+        run: pip-audit --skip-editable
+
+  frontend:
+    name: Frontend (typesjekk, lint, bygg)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Typesjekk (tsc) for alle tre workspaces
+        run: npm run typecheck
+      - name: ESLint
+        run: npm run lint
+      - name: Bygg begge SPA-ene
         run: |
-          pip install pip-audit
-          pip-audit --skip-editable
+          npm run build --workspace hosted/web
+          npm run build --workspace wenche/web/frontend
+      # Som pip-audit: synliggjør, blokkerer ikke ennå.
+      - name: npm audit
+        continue-on-error: true
+        run: npm audit --audit-level=high

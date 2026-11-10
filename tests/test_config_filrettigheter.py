@@ -5,6 +5,7 @@ config.yaml kan inneholde fødselsnummer (aksjonærer) og skal være lesbar kun 
 samme regel som token-cachen (auth.py). Og feilmeldingen ved manglende privat nøkkel
 propagerer til API-klienter via web-backendens 502-svar, så den skal ikke røpe filstien.
 """
+
 import stat
 
 import pytest

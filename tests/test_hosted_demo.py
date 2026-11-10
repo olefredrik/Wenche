@@ -4,6 +4,7 @@ Demo-flagget for hostet Wenche.
 HOSTED_DEMO_MODE styrer kun et informasjons-flagg i /api/auth/me (banner i SPA-en), ikke
 funksjonalitet. Settes på demo-appen (mot tt02), aldri i prod.
 """
+
 import importlib
 
 import pytest

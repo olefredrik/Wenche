@@ -6,6 +6,7 @@ Gjenbruker den delte orkestreringen i `wenche.innsending` (samme som hostet og C
 Config sendes i request-body, slik at endepunktene er rene og state-løse — utfyllingen lagres
 separat via /api/config.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -33,7 +34,11 @@ def _tolk_http_feil(e: httpx.HTTPStatusError) -> HTTPException:
             "Altinn avslo tilgangen (HTTP 403). Vanligste årsak: systembrukeren er ikke godkjent "
             "for dette selskapet eller tjenesten, eller organisasjonsnummeret i skjemaet matcher "
             "ikke org-en systembrukeren er godkjent for"
-            + (" (i testmiljø må selskapets org_nummer være Tenor-orgnr du har systembruker for)." if miljo.er_test() else ".")
+            + (
+                " (i testmiljø må selskapets org_nummer være Tenor-orgnr du har systembruker for)."
+                if miljo.er_test()
+                else "."
+            )
         )
     elif kode == 401:
         melding = "Altinn avviste tokenet (HTTP 401). Sjekk at klienten har riktige scopes og rettigheter."
@@ -116,6 +121,7 @@ def innsending_skattemelding(
         return {"dry_run": True, **tjeneste.valider_skattemelding(config)}
     tokens = auth.get_skd_skattemelding_tokens()
     orgnr = _orgnr(config)
+
     # Henter alltid live forhåndsutfylt (gir riktig partsnummer + gjeldende dokument-id) for org-en.
     # Bruker bevisst IKKE SKD_TEST_PARTSNUMMER-snarveien: et hardkodet partsnummer som ikke matcher
     # test-org-en gir «tekniskFeil» fra SKDs validator. Samme flyt som prod.
