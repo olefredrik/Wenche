@@ -4,6 +4,53 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.11.0] - 2026-11-10
+
+### Lagt til
+
+- **`--ut-mappe` for dry-run i CLI-en.** `send-aarsregnskap`, `send-aksjonaerregister` og
+  `send-skattemelding` med `--dry-run` skriver XML-filene til mappen du oppgir (standard:
+  mappen du står i). Filene får rettigheter 0600, siden aksjonærregisteroppgaven inneholder
+  fødselsnummer, og filnavnet bygges bare av bokstaver, sifre, punktum, bindestrek og
+  understrek.
+- **Lesbare feil i CLI-en.** Manglende config-fil, manglende eller ugyldige felt, avvist
+  innlogging og feil fra Altinn eller Skatteetaten gir én melding («Feil: ...») og
+  avslutningskode 1 i stedet for en traceback. Blokkerende valideringsfeil listes under
+  «Validering mislyktes:».
+
+### Endret
+
+- **Feil fra Altinn og Skatteetaten er strukturerte.** Klientene melder feil som
+  `MyndighetsFeil` med tjeneste, steg, HTTP-status og feilkode (nytt `wenche/feil.py`), i
+  stedet for tekst mottakerne måtte tolke. Meldingen til brukeren navngir steget som feilet
+  (for eksempel «under opplasting av data til Altinn») og tar aldri med svarkroppen fra
+  myndigheten; den logges bare.
+- **Fremdrift og advarsler går via `logging`** (loggeren `wenche`) i stedet for `print` fra
+  kjernen. CLI-en viser dem på stderr. Den hostede tjenesten setter opp logging på INFO-nivå,
+  og svarkropper fra myndighetene logges bare på DEBUG.
+- Domenelaget (`aarsregnskap.send_inn`, `aksjonaerregister.send_inn`) validerer, sender og
+  returnerer resultatet, og verken skriver filer, printer eller avslutter prosessen.
+  Dry-run-filene lages av `bygg_filer` og skrives av CLI-en. `send-skattemelding` og
+  `valider-skattemelding` bruker samme byggesteg som webgrensesnittet
+  (`wenche.innsending.bygg_skattemelding`), så partsnummer, skjønnsfastsetting og
+  innsendingsformål avgjøres ett sted.
+- Én token-funksjon, `wenche.auth.hent_tokens`, bak `login`, `get_altinn_token` og
+  SKD-variantene. De eldre navnene virker som før.
+- Fjernet ubrukt kode: `AltinnClient.hent_status` og `neste_prosesssteg`,
+  `SkdSkattemeldingClient.hent_forhåndsutfylt` og `bygg_og_valider_konvolutt`.
+
+### Rettet
+
+- **Self-hosted: en avvist Maskinporten-innlogging under innsending ga HTTP 500** («Feil
+  (HTTP 500)» i webgrensesnittet). Token-hentingen ligger nå innenfor feilhåndteringen, så
+  svaret er en lesbar 502 med årsaken. Feilmeldingene tar ikke lenger med deler av
+  svarkroppen fra Altinn eller Skatteetaten.
+- **Hostet: feil fra Altinn ved opprettelse av systembruker-forespørsel ga HTTP 500** for alt
+  annet enn «allerede opprettet» (AUTH-00004). Nå blir de en lesbar 502 med steget som
+  feilet.
+- `wenche registrer-system` leser `MASKINPORTEN_CLIENT_ID_TEST` når `WENCHE_ENV=test`, slik
+  de andre kommandoene gjør.
+
 ## [1.10.3] - 2026-11-10
 
 ### Sikkerhet
