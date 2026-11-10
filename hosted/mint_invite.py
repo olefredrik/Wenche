@@ -9,6 +9,7 @@ ugyldiggjør alle tidligere utdelte lenker.
 
 Uten satte variabler brukes dev-standardene (samme som dev_local.py).
 """
+
 import os
 import sys
 

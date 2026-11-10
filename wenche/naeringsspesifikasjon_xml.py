@@ -38,17 +38,14 @@ from __future__ import annotations
 from xml.etree.ElementTree import Element, SubElement, tostring
 
 from wenche.models import (
-    Aarsregnskap,
     NAERINGSKATEGORIER,
+    Aarsregnskap,
     NaeringsspesifikasjonPost,
     SkattemeldingKonfig,
 )
 from wenche.skatteberegning import beregn_skatt
 
-_NS = (
-    "urn:no:skatteetaten:fastsetting:formueinntekt:"
-    "naeringsspesifikasjon:ekstern:v6"
-)
+_NS = "urn:no:skatteetaten:fastsetting:formueinntekt:naeringsspesifikasjon:ekstern:v6"
 
 
 def _standardposter(regnskap: Aarsregnskap) -> tuple[NaeringsspesifikasjonPost, ...]:
@@ -63,25 +60,17 @@ def _standardposter(regnskap: Aarsregnskap) -> tuple[NaeringsspesifikasjonPost, 
             "annenDriftsinntekt", "3900", res.driftsinntekter.andre_driftsinntekter
         ),
         NaeringsspesifikasjonPost("loennskostnad", "5000", res.driftskostnader.loennskostnader),
-        NaeringsspesifikasjonPost(
-            "annenDriftskostnad", "6000", res.driftskostnader.avskrivninger
-        ),
+        NaeringsspesifikasjonPost("annenDriftskostnad", "6000", res.driftskostnader.avskrivninger),
         NaeringsspesifikasjonPost(
             "annenDriftskostnad", "7700", res.driftskostnader.andre_driftskostnader
         ),
-        NaeringsspesifikasjonPost(
-            "finansinntekt", "8090", res.finansposter.sum_utbytte
-        ),
-        NaeringsspesifikasjonPost(
-            "finansinntekt", "8079", res.finansposter.andre_finansinntekter
-        ),
+        NaeringsspesifikasjonPost("finansinntekt", "8090", res.finansposter.sum_utbytte),
+        NaeringsspesifikasjonPost("finansinntekt", "8079", res.finansposter.andre_finansinntekter),
         NaeringsspesifikasjonPost(
             "finansinntekt", "8074", res.finansposter.gevinst_ved_realisasjon_av_aksjer
         ),
         NaeringsspesifikasjonPost("finanskostnad", "8150", res.finansposter.rentekostnader),
-        NaeringsspesifikasjonPost(
-            "finanskostnad", "8179", res.finansposter.andre_finanskostnader
-        ),
+        NaeringsspesifikasjonPost("finanskostnad", "8179", res.finansposter.andre_finanskostnader),
         NaeringsspesifikasjonPost(
             "finanskostnad", "8174", res.finansposter.tap_ved_realisasjon_av_aksjer
         ),
@@ -110,18 +99,12 @@ def _standardposter(regnskap: Aarsregnskap) -> tuple[NaeringsspesifikasjonPost, 
         NaeringsspesifikasjonPost(
             "langsiktigGjeld", "2290", ekg.langsiktig_gjeld.andre_langsiktige_laan
         ),
-        NaeringsspesifikasjonPost(
-            "kortsiktigGjeld", "2400", ekg.kortsiktig_gjeld.leverandoergjeld
-        ),
-        NaeringsspesifikasjonPost(
-            "kortsiktigGjeld", "2500", ekg.kortsiktig_gjeld.betalbar_skatt
-        ),
+        NaeringsspesifikasjonPost("kortsiktigGjeld", "2400", ekg.kortsiktig_gjeld.leverandoergjeld),
+        NaeringsspesifikasjonPost("kortsiktigGjeld", "2500", ekg.kortsiktig_gjeld.betalbar_skatt),
         NaeringsspesifikasjonPost(
             "kortsiktigGjeld", "2600", ekg.kortsiktig_gjeld.skyldige_offentlige_avgifter
         ),
-        NaeringsspesifikasjonPost(
-            "kortsiktigGjeld", "2800", ekg.kortsiktig_gjeld.avsatt_utbytte
-        ),
+        NaeringsspesifikasjonPost("kortsiktigGjeld", "2800", ekg.kortsiktig_gjeld.avsatt_utbytte),
         NaeringsspesifikasjonPost(
             "kortsiktigGjeld", "2990", ekg.kortsiktig_gjeld.annen_kortsiktig_gjeld
         ),
@@ -201,7 +184,7 @@ def _beloep_element(parent: Element, tag: str, beloep: float) -> Element:
     rundes de likt og SKDs etterBeregning-kryssvalidering forblir ren.
     """
     el = SubElement(parent, tag)
-    outer = SubElement(el, "beloep")     # BeloepMedSkattemessigeEgenskaper
+    outer = SubElement(el, "beloep")  # BeloepMedSkattemessigeEgenskaper
     inner = SubElement(outer, "beloep")  # BeloepMedInnkapsling → BeloepMed2Desimaler
     inner.text = f"{round(beloep):.2f}"
     return el
@@ -272,9 +255,7 @@ def egenkapitalavstemming(
     res = regnskap.resultatregnskap
     eg = regnskap.balanse.egenkapital_og_gjeld
     ek = eg.egenkapital
-    foregaaende_ek = (
-        regnskap.foregaaende_aar_balanse.egenkapital_og_gjeld.egenkapital
-    )
+    foregaaende_ek = regnskap.foregaaende_aar_balanse.egenkapital_og_gjeld.egenkapital
     inngaaende_ek = round(foregaaende_ek.sum)
     utgaaende_ek = round(eg.egenkapital.sum)
     endring = utgaaende_ek - inngaaende_ek
@@ -288,17 +269,13 @@ def egenkapitalavstemming(
     # et lite AS. Senere kapitaltransaksjoner utledes ikke som innskudd, siden modellen ikke
     # har nok informasjon til å klassifisere dem sikkert.
     if regnskap.er_foerste_regnskapsaar:
-        inngaaende_innskutt_ek = round(
-            foregaaende_ek.aksjekapital + foregaaende_ek.overkursfond
-        )
+        inngaaende_innskutt_ek = round(foregaaende_ek.aksjekapital + foregaaende_ek.overkursfond)
         utgaaende_innskutt_ek = round(ek.aksjekapital + ek.overkursfond)
         innskudd = utgaaende_innskutt_ek - inngaaende_innskutt_ek
         if innskudd > 0:
             # Klemmes mot innskuddet: valider() stopper et for stort beløp, men XML-en skal
             # aldri kunne rapportere mer tinginnskudd enn det faktiske innskuddet.
-            tinginnskudd = min(
-                max(round(regnskap.selskap.tinginnskudd_ved_stiftelse), 0), innskudd
-            )
+            tinginnskudd = min(max(round(regnskap.selskap.tinginnskudd_ved_stiftelse), 0), innskudd)
             kontantinnskudd = innskudd - tinginnskudd
             if kontantinnskudd > 0:
                 tillegg.append(("kontantinnskudd", kontantinnskudd))
@@ -346,8 +323,7 @@ def egenkapitalavstemming(
         # egenkapitalen som skyldes noe helt annet bli stemplet som utbytte i utbetalingsåret.
         fjoraarets_avsetning = max(
             round(
-                regnskap.foregaaende_aar_balanse.egenkapital_og_gjeld
-                .kortsiktig_gjeld.avsatt_utbytte
+                regnskap.foregaaende_aar_balanse.egenkapital_og_gjeld.kortsiktig_gjeld.avsatt_utbytte
             ),
             0,
         )
@@ -582,9 +558,7 @@ def generer_naeringsspesifikasjon(
     )
     if skattemessig_resultat or har_resultatposter:
         bni_el = SubElement(root, "beregnetNaeringsinntekt")
-        fordelt_el = SubElement(
-            bni_el, "fordeltBeregnetNaeringsinntektForUpersonligSkattepliktig"
-        )
+        fordelt_el = SubElement(bni_el, "fordeltBeregnetNaeringsinntektForUpersonligSkattepliktig")
         SubElement(fordelt_el, "id").text = "1"
         _beloep_element(fordelt_el, "fordeltSkattemessigResultat", skattemessig_resultat)
         _beloep_element(
@@ -668,13 +642,9 @@ def generer_naeringsspesifikasjon(
             _beloep_element(perm_el, "beloep", beloep)
         # Avledede summer, emitteres eksplisitt som de øvrige (jf. modulens docstring).
         if tillegg:
-            _beloep_element(
-                forskjell_el, "sumTilleggINaeringsinntekt", sum(b for _, b in tillegg)
-            )
+            _beloep_element(forskjell_el, "sumTilleggINaeringsinntekt", sum(b for _, b in tillegg))
         if fradrag:
-            _beloep_element(
-                forskjell_el, "sumFradragINaeringsinntekt", sum(b for _, b in fradrag)
-            )
+            _beloep_element(forskjell_el, "sumFradragINaeringsinntekt", sum(b for _, b in fradrag))
 
     # -----------------------------------------------------------------------
     # Virksomhet (obligatorisk)
@@ -708,13 +678,9 @@ def generer_naeringsspesifikasjon(
         # sumTilleggIEgenkapital / sumFradragIEgenkapital må stå før
         # egenkapitalendring-listen per XSD-sekvensen.
         if tillegg:
-            _beloep_element(
-                ekavst, "sumTilleggIEgenkapital", sum(b for _, b in tillegg)
-            )
+            _beloep_element(ekavst, "sumTilleggIEgenkapital", sum(b for _, b in tillegg))
         if fradrag:
-            _beloep_element(
-                ekavst, "sumFradragIEgenkapital", sum(b for _, b in fradrag)
-            )
+            _beloep_element(ekavst, "sumFradragIEgenkapital", sum(b for _, b in fradrag))
         for kode, beloep in tillegg + fradrag:
             endring_el = SubElement(ekavst, "egenkapitalendring")
             # id må være lik kodeverdien (jf. idAvvikerFraKrav-regelen).
@@ -741,8 +707,6 @@ def generer_naeringsspesifikasjon(
     # -----------------------------------------------------------------------
     # skalBekreftesAvRevisor (obligatorisk)
     # -----------------------------------------------------------------------
-    SubElement(root, "skalBekreftesAvRevisor").text = (
-        "true" if regnskap.revideres else "false"
-    )
+    SubElement(root, "skalBekreftesAvRevisor").text = "true" if regnskap.revideres else "false"
 
     return tostring(root, encoding="unicode").encode("utf-8")

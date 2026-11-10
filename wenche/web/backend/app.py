@@ -6,6 +6,7 @@ under /api/* og den ferdigbygde SPA-en (wenche/web/static) på samme origin. `kj
 inngangen CLI-en bruker (`wenche` / `wenche dev`): starter uvicorn på 127.0.0.1 og åpner
 nettleseren. Enbruker og lokalt — ingen invite/sesjon-auth, bind bevisst til loopback.
 """
+
 from __future__ import annotations
 
 import threading

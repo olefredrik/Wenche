@@ -11,11 +11,7 @@ from wenche.models import (
     EgenkapitalOgGjeld,
     Eiendeler,
     Finansposter,
-    KortsiktigGjeld,
-    LangsiktigGjeld,
     Omloepmidler,
-    Resultatregnskap,
-    Anleggsmidler,
 )
 
 

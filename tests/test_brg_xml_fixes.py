@@ -40,10 +40,7 @@ def _orid(root: ET.Element, tag: str) -> dict[str, str]:
     el = root.find(f".//{{{NS}}}{tag}")
     if el is None:
         return {}
-    return {
-        child.tag.split("}")[-1]: child.attrib.get("orid", "")
-        for child in el
-    }
+    return {child.tag.split("}")[-1]: child.attrib.get("orid", "") for child in el}
 
 
 @pytest.fixture
@@ -179,9 +176,7 @@ class TestLinjeEnkel:
         for tag in self.LINJE_ENKEL_TAGS:
             el = root.find(f".//{{{NS}}}{tag}")
             if el is not None:
-                assert "altinnRowId" not in el.attrib, (
-                    f"{tag} should not have altinnRowId"
-                )
+                assert "altinnRowId" not in el.attrib, f"{tag} should not have altinnRowId"
 
     def test_no_beskrivelse_child(self, regnskap_med_alle_poster):
         root = _parse(generer_underskjema(regnskap_med_alle_poster))
@@ -189,21 +184,15 @@ class TestLinjeEnkel:
             el = root.find(f".//{{{NS}}}{tag}")
             if el is not None:
                 besk = el.find(f"{{{NS}}}beskrivelse")
-                assert besk is None, (
-                    f"{tag} should not have <beskrivelse> child"
-                )
+                assert besk is None, f"{tag} should not have <beskrivelse> child"
 
     def test_has_aarets_and_fjoraarets(self, regnskap_med_alle_poster):
         root = _parse(generer_underskjema(regnskap_med_alle_poster))
         for tag in self.LINJE_ENKEL_TAGS:
             el = root.find(f".//{{{NS}}}{tag}")
             if el is not None:
-                assert el.find(f"{{{NS}}}aarets") is not None, (
-                    f"{tag} missing <aarets>"
-                )
-                assert el.find(f"{{{NS}}}fjoraarets") is not None, (
-                    f"{tag} missing <fjoraarets>"
-                )
+                assert el.find(f"{{{NS}}}aarets") is not None, f"{tag} missing <aarets>"
+                assert el.find(f"{{{NS}}}fjoraarets") is not None, f"{tag} missing <fjoraarets>"
 
     def test_rentekostnad_value(self, regnskap_med_alle_poster):
         root = _parse(generer_underskjema(regnskap_med_alle_poster))
@@ -264,9 +253,7 @@ class TestLinjeVsLinjeEnkel:
         for tag in self.LINJE_TAGS:
             el = root.find(f".//{{{NS}}}{tag}")
             if el is not None:
-                assert "altinnRowId" in el.attrib, (
-                    f"{tag} should have altinnRowId"
-                )
+                assert "altinnRowId" in el.attrib, f"{tag} should have altinnRowId"
 
     def test_has_beskrivelse(self, regnskap_med_alle_poster):
         root = _parse(generer_underskjema(regnskap_med_alle_poster))
@@ -274,9 +261,7 @@ class TestLinjeVsLinjeEnkel:
             el = root.find(f".//{{{NS}}}{tag}")
             if el is not None:
                 besk = el.find(f"{{{NS}}}beskrivelse")
-                assert besk is not None, (
-                    f"{tag} should have <beskrivelse> child"
-                )
+                assert besk is not None, f"{tag} should have <beskrivelse> child"
 
 
 # ---------------------------------------------------------------------------
@@ -324,15 +309,10 @@ class TestBase64Dekoding:
     def _make_wrapper(self, inner_xml: bytes) -> bytes:
         encoded = base64.b64encode(inner_xml).decode()
         ns = "no:skatteetaten:fastsetting:formueinntekt:skattemeldingognaeringsspesifikasjon:forespoersel:response:v2"
-        return (
-            f'<response xmlns="{ns}">'
-            f"<content>{encoded}</content>"
-            f"</response>"
-        ).encode()
+        return (f'<response xmlns="{ns}"><content>{encoded}</content></response>').encode()
 
     def test_unwraps_base64_wrapper(self):
-        from xml.etree.ElementTree import ParseError, fromstring
-        import binascii
+        from xml.etree.ElementTree import fromstring
 
         inner = b"<skattemeldingUpersonlig>test</skattemeldingUpersonlig>"
         wrapper = self._make_wrapper(inner)
@@ -343,7 +323,11 @@ class TestBase64Dekoding:
         content_el = root.find(f".//{{{ns}}}content")
         if content_el is None:
             content_el = root.find(".//{*}content")
-        result = base64.b64decode(content_el.text) if content_el is not None and content_el.text else wrapper
+        result = (
+            base64.b64decode(content_el.text)
+            if content_el is not None and content_el.text
+            else wrapper
+        )
 
         assert result == inner
 
@@ -351,24 +335,27 @@ class TestBase64Dekoding:
         inner = b"<skattemeldingUpersonlig>data</skattemeldingUpersonlig>"
         encoded = base64.b64encode(inner).decode()
         wrapper = (
-            f'<response xmlns="some:other:namespace">'
-            f"<content>{encoded}</content>"
-            f"</response>"
+            f'<response xmlns="some:other:namespace"><content>{encoded}</content></response>'
         ).encode()
 
         from xml.etree.ElementTree import fromstring
+
         root = fromstring(wrapper)
         ns = "no:skatteetaten:fastsetting:formueinntekt:skattemeldingognaeringsspesifikasjon:forespoersel:response:v2"
         content_el = root.find(f".//{{{ns}}}content")
         if content_el is None:
             content_el = root.find(".//{*}content")
-        result = base64.b64decode(content_el.text) if content_el is not None and content_el.text else wrapper
+        result = (
+            base64.b64decode(content_el.text)
+            if content_el is not None and content_el.text
+            else wrapper
+        )
 
         assert result == inner
 
     def test_non_wrapper_xml_returned_as_is(self):
-        from xml.etree.ElementTree import ParseError, fromstring
         import binascii
+        from xml.etree.ElementTree import ParseError, fromstring
 
         raw = b"<skattemeldingUpersonlig>direkte</skattemeldingUpersonlig>"
 
@@ -389,13 +376,14 @@ class TestBase64Dekoding:
         assert result == raw
 
     def test_invalid_xml_falls_through(self):
-        from xml.etree.ElementTree import ParseError
         import binascii
+        from xml.etree.ElementTree import ParseError
 
         raw = b"this is not xml at all"
 
         try:
             from xml.etree.ElementTree import fromstring
+
             root = fromstring(raw)
             content_el = root.find(".//{*}content")
             if content_el is not None and content_el.text:

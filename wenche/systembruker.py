@@ -28,17 +28,11 @@ _SYSTEM_NAVN = "wenche2"
 # BRG årsregnskap: Altinn 3-app, ressurs-ID på format app_{org}_{appnavn}.
 # SKD aksjonærregisteroppgave: SKDs eget REST-API, ressurs-ID fra SKDs API-dokumentasjon.
 _SKATTEMELDING_RETT = {
-    "resource": [
-        {"id": "urn:altinn:resource", "value": "app_skd_formueinntekt-skattemelding-v2"}
-    ]
+    "resource": [{"id": "urn:altinn:resource", "value": "app_skd_formueinntekt-skattemelding-v2"}]
 }
 
 _RIGHTS = [
-    {
-        "resource": [
-            {"id": "urn:altinn:resource", "value": "app_brg_aarsregnskap-vanlig-202406"}
-        ]
-    },
+    {"resource": [{"id": "urn:altinn:resource", "value": "app_brg_aarsregnskap-vanlig-202406"}]},
     {
         "resource": [
             {"id": "urn:altinn:resource", "value": "ske-innrapportering-aksjonaerregisteroppgave"}
@@ -132,9 +126,7 @@ def _normaliser_svar(resp, sid: str, oppdatert: bool) -> dict:
     return {"id": data if isinstance(data, str) else sid, "oppdatert": oppdatert}
 
 
-def opprett_forespørsel(
-    maskinporten_token: str, vendor_orgnr: str, org_nummer: str
-) -> dict:
+def opprett_forespørsel(maskinporten_token: str, vendor_orgnr: str, org_nummer: str) -> dict:
     """
     Oppretter en systembrukerforespørsel for organisasjonen.
 
@@ -236,5 +228,3 @@ def hent_systembrukere(maskinporten_token: str, vendor_orgnr: str) -> list[dict]
         alle.extend(data.get("data", []))
         url = (data.get("links") or {}).get("next")
     return alle
-
-

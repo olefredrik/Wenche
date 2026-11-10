@@ -35,10 +35,7 @@ from wenche.models import (
 )
 from wenche.naeringsspesifikasjon_xml import _standardposter, generer_naeringsspesifikasjon
 
-_NS = (
-    "urn:no:skatteetaten:fastsetting:formueinntekt:"
-    "naeringsspesifikasjon:ekstern:v6"
-)
+_NS = "urn:no:skatteetaten:fastsetting:formueinntekt:naeringsspesifikasjon:ekstern:v6"
 
 _PARTSNUMMER = 3001587644
 
@@ -92,6 +89,7 @@ def _finn_kode(root, kode: str) -> bool:
 # Grunnstruktur
 # ---------------------------------------------------------------------------
 
+
 class TestGrunnstruktur:
     def test_rootelement(self):
         root = _parse(_lag_regnskap())
@@ -118,6 +116,7 @@ class TestGrunnstruktur:
 # ---------------------------------------------------------------------------
 # Resultatregnskap — inkludering og kodelister
 # ---------------------------------------------------------------------------
+
 
 class TestResultatregnskap:
     def test_salgsinntekter_kode_3200(self):
@@ -228,6 +227,7 @@ class TestResultatregnskap:
 # ---------------------------------------------------------------------------
 # Balanse — inkludering og kodelister
 # ---------------------------------------------------------------------------
+
 
 class TestBalanse:
     def test_aksjer_i_datterselskap_kode_1313(self):
@@ -464,9 +464,7 @@ class TestSekkeposterBrukerRestkoder:
             resultatregnskap=Resultatregnskap(
                 driftsinntekter=Driftsinntekter(),
                 driftskostnader=Driftskostnader(andre_driftskostnader=1000),
-                finansposter=Finansposter(
-                    andre_finansinntekter=2000, andre_finanskostnader=3000
-                ),
+                finansposter=Finansposter(andre_finansinntekter=2000, andre_finanskostnader=3000),
             ),
             balanse=Balanse(
                 eiendeler=Eiendeler(
@@ -489,6 +487,7 @@ class TestSekkeposterBrukerRestkoder:
 # ---------------------------------------------------------------------------
 # Virksomhet-seksjon
 # ---------------------------------------------------------------------------
+
 
 class TestVirksomhet:
     def test_virksomhet_er_tilstede(self):
@@ -530,6 +529,7 @@ class TestVirksomhet:
 # skalBekreftesAvRevisor
 # ---------------------------------------------------------------------------
 
+
 class TestRevisor:
     def test_ikke_revidert_gir_false(self):
         root = _parse(_lag_regnskap())
@@ -546,6 +546,7 @@ class TestRevisor:
 # ---------------------------------------------------------------------------
 # Beløpsformat
 # ---------------------------------------------------------------------------
+
 
 class TestBeloepsformat:
     def test_beloep_har_to_desimaler(self):
@@ -572,6 +573,7 @@ class TestBeloepsformat:
 # (SSV/tilbakemelding 2026-05) selv om resultatAvValidering er «validertOK».
 # ---------------------------------------------------------------------------
 
+
 class TestAvledetSummer:
     def _beloep(self, root, path: str) -> float:
         """
@@ -588,9 +590,7 @@ class TestAvledetSummer:
     def test_sumDriftsinntekt(self):
         regnskap = _lag_regnskap(
             resultatregnskap=Resultatregnskap(
-                driftsinntekter=Driftsinntekter(
-                    salgsinntekter=100000, andre_driftsinntekter=5000
-                ),
+                driftsinntekter=Driftsinntekter(salgsinntekter=100000, andre_driftsinntekter=5000),
                 driftskostnader=Driftskostnader(),
                 finansposter=Finansposter(),
             )
@@ -644,12 +644,8 @@ class TestAvledetSummer:
         regnskap = _lag_regnskap(
             balanse=Balanse(
                 eiendeler=Eiendeler(
-                    anleggsmidler=Anleggsmidler(
-                        aksjer_i_datterselskap=50000, andre_aksjer=20000
-                    ),
-                    omloepmidler=Omloepmidler(
-                        kortsiktige_fordringer=3000, bankinnskudd=10000
-                    ),
+                    anleggsmidler=Anleggsmidler(aksjer_i_datterselskap=50000, andre_aksjer=20000),
+                    omloepmidler=Omloepmidler(kortsiktige_fordringer=3000, bankinnskudd=10000),
                 ),
                 egenkapital_og_gjeld=EgenkapitalOgGjeld(
                     egenkapital=Egenkapital(aksjekapital=30000),
@@ -693,9 +689,7 @@ class TestAvledetSummer:
         # skattemessigResultat = aarsresultat = -5000
         assert self._beloep(root, "skattemessigResultat") == -5000.0
         # Fordeling på forekomst id=1
-        fordelt = root.find(
-            f".//{{{_NS}}}fordeltBeregnetNaeringsinntektForUpersonligSkattepliktig"
-        )
+        fordelt = root.find(f".//{{{_NS}}}fordeltBeregnetNaeringsinntektForUpersonligSkattepliktig")
         assert fordelt is not None
         assert fordelt.find(f"{{{_NS}}}id").text == "1"
 

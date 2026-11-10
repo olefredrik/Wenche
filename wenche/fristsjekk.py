@@ -23,10 +23,9 @@ from datetime import date
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
+import httpx
 from defusedxml import DefusedXmlException
 from defusedxml.ElementTree import fromstring as _safe_fromstring
-
-import httpx
 from dotenv import load_dotenv
 
 # Last fra ~/.wenche/.env først (fast lokasjon), så cwd/.env som fallback.
@@ -54,6 +53,7 @@ def regnskapsaar_for_frist(maaned: int, dag: int) -> int:
     F.eks. frist 31. juli 2026 → regnskapsår 2025.
     """
     return neste_frist(maaned, dag).year - 1
+
 
 # Basis-URL-er for Skatteetatens API — samme som i skd_skattemelding_client.py.
 _SKD_BASES = {
@@ -202,9 +202,7 @@ def sjekk_aarsregnskap(orgnr: str, aar: int) -> FristStatus:
         return _aarsregnskap_ikke_synlig(aar)
 
     if not resp.is_success:
-        return FristStatus(
-            beskrivelse=f"Regnskapsregisteret svarte med HTTP {resp.status_code}"
-        )
+        return FristStatus(beskrivelse=f"Regnskapsregisteret svarte med HTTP {resp.status_code}")
 
     try:
         data = resp.json()

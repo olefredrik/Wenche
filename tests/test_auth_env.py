@@ -38,7 +38,6 @@ def rensk_env():
 
 
 class TestLesMiljoEnv:
-
     def test_milj_spesifikk_prefereres_over_generisk(self):
         os.environ["MASKINPORTEN_CLIENT_ID"] = "generisk"
         os.environ["MASKINPORTEN_CLIENT_ID_PROD"] = "prod-uuid"
@@ -71,16 +70,20 @@ class TestLesMiljoEnv:
 
     def test_ikke_paakrevd_returnerer_default(self):
         verdi = _les_miljo_env(
-            "MASKINPORTEN_PRIVAT_NOKKEL", "prod",
-            paakrevd=False, default="maskinporten_privat.pem",
+            "MASKINPORTEN_PRIVAT_NOKKEL",
+            "prod",
+            paakrevd=False,
+            default="maskinporten_privat.pem",
         )
         assert verdi == "maskinporten_privat.pem"
 
     def test_ikke_paakrevd_returnerer_milj_verdi_naar_satt(self):
         os.environ["MASKINPORTEN_PRIVAT_NOKKEL_PROD"] = "prod_key.pem"
         verdi = _les_miljo_env(
-            "MASKINPORTEN_PRIVAT_NOKKEL", "prod",
-            paakrevd=False, default="maskinporten_privat.pem",
+            "MASKINPORTEN_PRIVAT_NOKKEL",
+            "prod",
+            paakrevd=False,
+            default="maskinporten_privat.pem",
         )
         assert verdi == "prod_key.pem"
 

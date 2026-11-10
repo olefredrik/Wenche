@@ -32,11 +32,11 @@ _BASES = {
 APPS = {
     "aarsregnskap": {
         "org": "brg",
-        "app": "aarsregnskap-vanlig-202406",          # RR-0002, sist oppdatert 2025-09
+        "app": "aarsregnskap-vanlig-202406",  # RR-0002, sist oppdatert 2025-09
     },
     "aksjonaerregister": {
         "org": "skd",
-        "app": "a2-1051-241111",                      # RF-1086, opprettet 2025-11
+        "app": "a2-1051-241111",  # RF-1086, opprettet 2025-11
     },
     "skattemelding": {
         "org": "skd",

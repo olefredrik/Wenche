@@ -23,7 +23,9 @@ def _formater_laan(laan: LaanTilNaerstaaende, aar: int) -> list[str]:
         linjer.append(f"  Lån fra selskapet til: {laan.motpart}")
     else:
         linjer.append(f"  Lån fra nærstående til selskapet: {laan.motpart}")
-    saldo_str = f"{laan.saldo:,.2f}" if laan.saldo != round(laan.saldo) else f"{round(laan.saldo):,}"
+    saldo_str = (
+        f"{laan.saldo:,.2f}" if laan.saldo != round(laan.saldo) else f"{round(laan.saldo):,}"
+    )
     linjer.append(f"  Saldo per 31.12.{aar}: {saldo_str} kr".replace(",", "\u202f"))
     linjer.append(f"  Rentesats:              {laan.rente_prosent:.2f} %")
     linjer.append(f"  Sikkerhet:              {laan.sikkerhet if laan.sikkerhet else 'Ingen'}")
@@ -55,16 +57,19 @@ def generer(regnskap: Aarsregnskap, noter: Noter) -> str:
         "god regnskapsskikk for små foretak."
     )
     linje()
-    linje("Eiendeler bestemt til varig eie eller bruk er klassifisert "
-          "som anleggsmidler. Øvrige eiendeler er klassifisert som "
-          "omløpsmidler.")
+    linje(
+        "Eiendeler bestemt til varig eie eller bruk er klassifisert "
+        "som anleggsmidler. Øvrige eiendeler er klassifisert som "
+        "omløpsmidler."
+    )
     linje()
-    linje("Aksjer i datterselskaper er vurdert til kostpris. "
-          "Dersom virkelig verdi er lavere enn kostpris og verdifallet "
-          "ikke er forbigående, nedskrives investeringen.")
+    linje(
+        "Aksjer i datterselskaper er vurdert til kostpris. "
+        "Dersom virkelig verdi er lavere enn kostpris og verdifallet "
+        "ikke er forbigående, nedskrives investeringen."
+    )
     linje()
-    linje("Fordringer er oppført til pålydende verdi etter fradrag "
-          "for forventede tap.")
+    linje("Fordringer er oppført til pålydende verdi etter fradrag for forventede tap.")
     linje()
     linje("Gjeld er oppført til nominell verdi.")
     linje()
@@ -85,11 +90,19 @@ def generer(regnskap: Aarsregnskap, noter: Noter) -> str:
     elif antall == 1:
         linje(f"Selskapet hadde {antall} ansatt i regnskapsåret.")
         loennskostnader = regnskap.resultatregnskap.driftskostnader.loennskostnader
-        linje(f"Lønnskostnader inkl. arbeidsgiveravgift: {loennskostnader:,} kr".replace(",", "\u202f"))
+        linje(
+            f"Lønnskostnader inkl. arbeidsgiveravgift: {loennskostnader:,} kr".replace(
+                ",", "\u202f"
+            )
+        )
     else:
         linje(f"Selskapet hadde {antall} ansatte i regnskapsåret.")
         loennskostnader = regnskap.resultatregnskap.driftskostnader.loennskostnader
-        linje(f"Lønnskostnader inkl. arbeidsgiveravgift: {loennskostnader:,} kr".replace(",", "\u202f"))
+        linje(
+            f"Lønnskostnader inkl. arbeidsgiveravgift: {loennskostnader:,} kr".replace(
+                ",", "\u202f"
+            )
+        )
     linje()
 
     # ------------------------------------------------------------------
@@ -103,10 +116,7 @@ def generer(regnskap: Aarsregnskap, noter: Noter) -> str:
             "styremedlemmer eller andre nærstående parter."
         )
     else:
-        linje(
-            f"Følgende lån mellom selskapet og nærstående parter "
-            f"er registrert per 31.12.{aar}:"
-        )
+        linje(f"Følgende lån mellom selskapet og nærstående parter er registrert per 31.12.{aar}:")
         linje()
         for laan in noter.laan_til_naerstaaende:
             for l in _formater_laan(laan, aar):

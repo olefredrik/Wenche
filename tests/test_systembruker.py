@@ -5,6 +5,7 @@ Hovedpoeng: hent_systembrukere må følge pagineringen (`links.next`). Uten det 
 første 50 systembrukerne sett, så kunde nr. 51+ ble usynlig for AlreadyApproved-sjekken og
 fikk AUTH-00004 ved ny tilkobling (regresjonen som traff org 917576661).
 """
+
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -27,7 +28,8 @@ def test_hent_systembrukere_foelger_paginering(mock_get):
         "links": {"next": "https://platform.altinn.no/.../bysystem/x?token=SIDE2"},
     }
     side2 = {
-        "data": [{"reporteeOrgNo": "917576661"}] + [{"reporteeOrgNo": f"{i:09d}"} for i in range(3)],
+        "data": [{"reporteeOrgNo": "917576661"}]
+        + [{"reporteeOrgNo": f"{i:09d}"} for i in range(3)],
         "links": {},
     }
     mock_get.side_effect = [_resp(side1), _resp(side2)]

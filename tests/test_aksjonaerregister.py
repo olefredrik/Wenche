@@ -72,6 +72,7 @@ def _parse(xml_bytes: bytes) -> ET.Element:
 # Hovedskjema — XML-struktur
 # ---------------------------------------------------------------------------
 
+
 def test_hovedskjema_er_gyldig_xml(eksempel_oppgave):
     xml_bytes = generer_hovedskjema_xml(eksempel_oppgave)
     root = _parse(xml_bytes)
@@ -97,9 +98,7 @@ def test_hovedskjema_orgnummer(eksempel_oppgave):
 
 def test_hovedskjema_inntektsaar(eksempel_oppgave):
     root = _parse(generer_hovedskjema_xml(eksempel_oppgave))
-    aar = root.find(
-        ".//GenerellInformasjon-grp-2587/Selskap-grp-2588/Inntektsar-datadef-692"
-    )
+    aar = root.find(".//GenerellInformasjon-grp-2587/Selskap-grp-2588/Inntektsar-datadef-692")
     assert aar is not None
     assert aar.text == "2024"
 
@@ -179,6 +178,7 @@ def test_hovedskjema_kontakt_epost(eksempel_oppgave):
 # ---------------------------------------------------------------------------
 # Underskjema — XML-struktur
 # ---------------------------------------------------------------------------
+
 
 def test_underskjema_er_gyldig_xml(eksempel_oppgave):
     aksjonaer = eksempel_oppgave.aksjonaerer[0]
@@ -266,6 +266,7 @@ def test_underskjema_orgnummer(eksempel_oppgave):
 # ---------------------------------------------------------------------------
 # Validering
 # ---------------------------------------------------------------------------
+
 
 def test_valider_ok(eksempel_oppgave):
     assert valider(eksempel_oppgave) == []
@@ -449,6 +450,7 @@ def test_valider_innbetalt_kapital_null_ok_etter_stiftelsesaar(eksempel_selskap)
 # valider_mot_brg
 # ---------------------------------------------------------------------------
 
+
 def _brg_mock(status_code: int = 200, json_data: dict | None = None):
     resp = MagicMock(spec=httpx.Response)
     resp.status_code = status_code
@@ -551,9 +553,7 @@ def test_hovedskjema_bruker_eksakt_stiftelsesdato():
 
     oppgave = les_config(dict(_CFG_STIFTET_I_OKTOBER))
     root = _parse(generer_hovedskjema_xml(oppgave))
-    tidspunkt = root.find(
-        ".//AksjerNyutstedteStiftelseMvTidspunkt-datadef-17671"
-    )
+    tidspunkt = root.find(".//AksjerNyutstedteStiftelseMvTidspunkt-datadef-17671")
     assert tidspunkt is not None
     assert tidspunkt.text == "2025-10-24T00:00:00"
 
@@ -563,14 +563,10 @@ def test_hovedskjema_faller_tilbake_paa_1_januar_uten_dato():
     from wenche.aksjonaerregister import les_config
 
     cfg = {**_CFG_STIFTET_I_OKTOBER}
-    cfg["selskap"] = {
-        k: v for k, v in cfg["selskap"].items() if k != "stiftelsesdato"
-    }
+    cfg["selskap"] = {k: v for k, v in cfg["selskap"].items() if k != "stiftelsesdato"}
     oppgave = les_config(cfg)
     root = _parse(generer_hovedskjema_xml(oppgave))
-    tidspunkt = root.find(
-        ".//AksjerNyutstedteStiftelseMvTidspunkt-datadef-17671"
-    )
+    tidspunkt = root.find(".//AksjerNyutstedteStiftelseMvTidspunkt-datadef-17671")
     assert tidspunkt.text == "2025-01-01T00:00:00"
 
 

@@ -4,6 +4,7 @@ som tåler tomme verdier. En SAF-T-import bærer ikke disse feltene (issue #130)
 er et reelt og vanlig tilfelle. Før ble det en naken int('')/float('')-500 i de lokale
 byggestiene (dry-run og dokumenter). Nå skal det bli et rettbart avvik med lesbar melding.
 """
+
 import pytest
 
 from wenche import aarsregnskap as ar
@@ -13,18 +14,29 @@ from wenche.innsending import valider_skattemelding
 
 def _config(stiftelsesaar=2018, aksjekapital=30000, dropp=None):
     selskap = {
-        "navn": "Galatea Invest AS", "org_nummer": "922236771",
-        "daglig_leder": "D L", "styreleder": "S L",
+        "navn": "Galatea Invest AS",
+        "org_nummer": "922236771",
+        "daglig_leder": "D L",
+        "styreleder": "S L",
         "forretningsadresse": "Vei 1, 0001 OSLO",
-        "stiftelsesaar": stiftelsesaar, "aksjekapital": aksjekapital,
+        "stiftelsesaar": stiftelsesaar,
+        "aksjekapital": aksjekapital,
     }
     if dropp:
         del selskap[dropp]
-    return {"selskap": selskap, "regnskapsaar": 2025,
-            "resultatregnskap": {"driftsinntekter": {}, "driftskostnader": {}, "finansposter": {}},
-            "balanse": {"eiendeler": {"anleggsmidler": {}, "omloepmidler": {}},
-                        "egenkapital_og_gjeld": {"egenkapital": {}, "langsiktig_gjeld": {},
-                                                 "kortsiktig_gjeld": {}}}}
+    return {
+        "selskap": selskap,
+        "regnskapsaar": 2025,
+        "resultatregnskap": {"driftsinntekter": {}, "driftskostnader": {}, "finansposter": {}},
+        "balanse": {
+            "eiendeler": {"anleggsmidler": {}, "omloepmidler": {}},
+            "egenkapital_og_gjeld": {
+                "egenkapital": {},
+                "langsiktig_gjeld": {},
+                "kortsiktig_gjeld": {},
+            },
+        },
+    }
 
 
 @pytest.mark.parametrize("verdi", ["", None])

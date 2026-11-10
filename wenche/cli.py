@@ -15,11 +15,17 @@ Bruk:
 
 import click
 
-from wenche import __version__
-from wenche import auth, aarsregnskap, aksjonaerregister, configfelt, skattemelding, systembruker
+from wenche import (
+    __version__,
+    aarsregnskap,
+    aksjonaerregister,
+    auth,
+    configfelt,
+    skattemelding,
+    systembruker,
+)
 from wenche.altinn_client import AltinnClient
 from wenche.skd_client import SkdAksjonaerClient
-
 
 
 def _stopp_ved_periodefeil(regnskap) -> None:
@@ -57,6 +63,7 @@ def main(ctx: click.Context):
     if ctx.invoked_subcommand is not None:
         return
     from wenche.web.backend import kjor
+
     kjor(env="prod")
 
 
@@ -64,6 +71,7 @@ def main(ctx: click.Context):
 def dev():
     """Start webgrensesnittet mot testmiljøet (tt02) for tørrtrening."""
     from wenche.web.backend import kjor
+
     kjor(env="test")
 
 
@@ -83,12 +91,11 @@ def logout():
 def registrer_system():
     """Registrer Wenche i Altinns systemregister (kjøres én gang per miljø)."""
     import os
+
     client_id = os.getenv("MASKINPORTEN_CLIENT_ID")
     org_nummer = os.getenv("ORG_NUMMER")
     if not client_id or not org_nummer:
-        click.echo(
-            "Feil: MASKINPORTEN_CLIENT_ID og ORG_NUMMER må være satt i .env.", err=True
-        )
+        click.echo("Feil: MASKINPORTEN_CLIENT_ID og ORG_NUMMER må være satt i .env.", err=True)
         raise SystemExit(1)
 
     click.echo("Henter Maskinporten admin-token...")
@@ -111,11 +118,12 @@ def registrer_system():
     "--org",
     default=None,
     help="Org.nr. for systembrukeren. Standard: ORG_NUMMER fra .env. "
-         "I SKDs testmiljø skal dette være et syntetisk org.nr. fra Tenor.",
+    "I SKDs testmiljø skal dette være et syntetisk org.nr. fra Tenor.",
 )
 def opprett_systembruker(org: str | None):
     """Opprett systembrukerforespørsel og få godkjenningslenke."""
     import os
+
     vendor_orgnr = os.getenv("ORG_NUMMER")
     if not vendor_orgnr:
         click.echo("Feil: ORG_NUMMER må være satt i .env.", err=True)
@@ -137,10 +145,10 @@ def opprett_systembruker(org: str | None):
         raise SystemExit(1)
 
 
-
 # ---------------------------------------------------------------------------
 # Årsregnskap
 # ---------------------------------------------------------------------------
+
 
 @main.command("send-aarsregnskap")
 @click.option(
@@ -239,6 +247,7 @@ def valider_aarsregnskap(config_fil: str):
 # Aksjonærregisteroppgave
 # ---------------------------------------------------------------------------
 
+
 @main.command("send-aksjonaerregister")
 @click.option(
     "--config",
@@ -256,6 +265,7 @@ def valider_aarsregnskap(config_fil: str):
 def send_aksjonaerregister(config_fil: str, dry_run: bool):
     """Send inn aksjonærregisteroppgave (RF-1086) til Skatteetaten."""
     import os
+
     click.echo(f"Leser konfigurasjon fra {config_fil}...")
     try:
         oppgave = aksjonaerregister.les_config(config_fil)
@@ -293,6 +303,7 @@ def send_aksjonaerregister(config_fil: str, dry_run: bool):
 # Skattemelding
 # ---------------------------------------------------------------------------
 
+
 @main.command("generer-skattemelding")
 @click.option(
     "--config",
@@ -326,6 +337,7 @@ def generer_skattemelding(config_fil: str, ut_fil: str | None):
 
     if ut_fil:
         from pathlib import Path
+
         Path(ut_fil).write_text(tekst, encoding="utf-8")
         click.echo(f"Skattemelding lagret til {ut_fil}")
     else:
@@ -335,6 +347,7 @@ def generer_skattemelding(config_fil: str, ut_fil: str | None):
 # ---------------------------------------------------------------------------
 # SAF-T import
 # ---------------------------------------------------------------------------
+
 
 @main.command("importer-saft")
 @click.argument("saft_fil", metavar="SAF-T-FIL")
@@ -356,6 +369,7 @@ def importer_saft(saft_fil: str, ut_fil: str):
     aksjonaerer) må fylles inn manuelt i config.yaml etterpå.
     """
     import yaml
+
     from wenche.saft import importer
 
     click.echo(f"Importerer SAF-T-fil: {saft_fil}")
@@ -370,6 +384,7 @@ def importer_saft(saft_fil: str, ut_fil: str):
     saft_advarsler = data.pop("_advarsler", [])
 
     from pathlib import Path
+
     Path(ut_fil).write_text(
         yaml.dump(data, allow_unicode=True, sort_keys=False),
         encoding="utf-8",
@@ -406,14 +421,15 @@ def send_skattemelding(config_fil: str, dry_run: bool):
     """Send inn skattemelding for AS til Skatteetaten via Altinn3."""
     import os
     from pathlib import Path
+
+    from wenche.innsending import SKJOENN_KLAGE_FORKLARING
+    from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
     from wenche.skattemelding import les_config
     from wenche.skattemelding_xml import (
         er_skjoennsfastsatt,
         generer_skattemelding_fra_konfig,
         hent_partsnummer,
     )
-    from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
-    from wenche.innsending import SKJOENN_KLAGE_FORKLARING
     from wenche.skd_skattemelding_client import (
         SkattemeldingValideringsfeil,
         SkdSkattemeldingClient,
@@ -434,7 +450,11 @@ def send_skattemelding(config_fil: str, dry_run: bool):
     _stopp_ved_periodefeil(regnskap)
 
     env = os.getenv("WENCHE_ENV", "prod")
-    orgnr = os.getenv("SKD_TEST_ORG_NUMMER", regnskap.selskap.org_nummer) if env == "test" else regnskap.selskap.org_nummer
+    orgnr = (
+        os.getenv("SKD_TEST_ORG_NUMMER", regnskap.selskap.org_nummer)
+        if env == "test"
+        else regnskap.selskap.org_nummer
+    )
 
     click.echo("Henter tokens for skattemelding...")
     tokens = auth.get_skd_skattemelding_tokens()
@@ -444,7 +464,9 @@ def send_skattemelding(config_fil: str, dry_run: bool):
         gjeldende_dokument_id: str | None = None
         skjoennsfastsatt = False
         if test_partsnummer:
-            click.echo(f"Bruker SKD_TEST_PARTSNUMMER={test_partsnummer} (hopper over forhåndsutfylt)")
+            click.echo(
+                f"Bruker SKD_TEST_PARTSNUMMER={test_partsnummer} (hopper over forhåndsutfylt)"
+            )
             partsnummer = int(test_partsnummer)
         else:
             click.echo("Henter forhåndsutfylt skattemelding...")
@@ -496,7 +518,9 @@ def send_skattemelding(config_fil: str, dry_run: bool):
             )
         except SkattemeldingValideringsfeil as e:
             click.echo(f"\n{e}")
-            click.echo("\nRett feilene over og kjør på nytt. Kjør «wenche valider-skattemelding» for å sjekke uten å sende.")
+            click.echo(
+                "\nRett feilene over og kjør på nytt. Kjør «wenche valider-skattemelding» for å sjekke uten å sende."
+            )
             raise SystemExit(1)
 
     click.echo(
@@ -520,14 +544,15 @@ def valider_skattemelding(config_fil: str):
     veiledning. Validering lagrer ikke data og er ikke en innsending.
     """
     import os
+
+    from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
     from wenche.skattemelding import les_config
+    from wenche.skattemelding_konvolutt import generer_konvolutt
     from wenche.skattemelding_xml import (
         er_skjoennsfastsatt,
         generer_skattemelding_fra_konfig,
         hent_partsnummer,
     )
-    from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
-    from wenche.skattemelding_konvolutt import generer_konvolutt
     from wenche.skd_skattemelding_client import (
         SkdSkattemeldingClient,
         formater_valideringsresultat,

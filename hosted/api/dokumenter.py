@@ -6,6 +6,7 @@ ingenting lagres mellom kall. Krever kun gyldig invite (`krev_invitert`), ikke v
 siden ingenting sendes inn. Notene sendes heller ikke inn, men kan lastes ned for signering og
 arkivering hos selskapet. Gjenbruker domene-genereringen, samme kode som self-hosted bruker.
 """
+
 import base64
 from typing import Any
 

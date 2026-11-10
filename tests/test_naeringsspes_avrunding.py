@@ -27,10 +27,7 @@ from wenche.models import (
 )
 from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
 
-_NS = (
-    "urn:no:skatteetaten:fastsetting:formueinntekt:"
-    "naeringsspesifikasjon:ekstern:v6"
-)
+_NS = "urn:no:skatteetaten:fastsetting:formueinntekt:naeringsspesifikasjon:ekstern:v6"
 _PARTSNUMMER = 3001587644
 
 
@@ -76,7 +73,9 @@ def _ofl_holding_2025() -> Aarsregnskap:
 
 
 def _parse():
-    return fromstring(generer_naeringsspesifikasjon(_ofl_holding_2025(), _PARTSNUMMER).decode("utf-8"))
+    return fromstring(
+        generer_naeringsspesifikasjon(_ofl_holding_2025(), _PARTSNUMMER).decode("utf-8")
+    )
 
 
 def _beloep(root, tag: str) -> float:
@@ -90,10 +89,7 @@ class TestHeleKronerAvrunding:
     def test_alle_belop_er_hele_kroner(self):
         # Ingen emittert beløp skal ha ører igjen (alt slutter på .00).
         root = _parse()
-        leafs = [
-            el.text for el in root.iter(f"{{{_NS}}}beloep")
-            if el.text and el.text.strip()
-        ]
+        leafs = [el.text for el in root.iter(f"{{{_NS}}}beloep") if el.text and el.text.strip()]
         assert leafs, "Forventet minst ett beløp"
         for verdi in leafs:
             assert verdi.endswith(".00"), f"{verdi} har ører igjen"

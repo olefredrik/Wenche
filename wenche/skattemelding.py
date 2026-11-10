@@ -12,36 +12,26 @@ import math
 
 import yaml
 
-from wenche.aarsregnskap import _dato, _les_resultat, _les_balanse, _tall as _belop
+from wenche.aarsregnskap import _dato, _les_balanse, _les_resultat
+from wenche.aarsregnskap import _tall as _belop
+from wenche.models import (
+    BALANSEKATEGORIER,
+    NAERINGSKATEGORIER,
+    Aarsregnskap,
+    Balanse,
+    NaeringsspesifikasjonPost,
+    Resultatregnskap,
+    Selskap,
+    SkattemeldingKonfig,
+)
+
 # Re-eksporteres bevisst: kallsteder (endepunkter, tester, CLI) har brukt sm.beregn_skatt
 # og sm.SKATTESATS siden før beregningen fikk egen modul.
 from wenche.skatteberegning import (
-    SKATTESATS,
     Skatteberegning,
     beregn_skatt,
     har_fullt_utbyttefritak,
 )
-from wenche.models import (
-    Aarsregnskap,
-    Balanse,
-    Resultatregnskap,
-    SkattemeldingKonfig,
-    Selskap,
-    Driftsinntekter,
-    Driftskostnader,
-    Finansposter,
-    Eiendeler,
-    Anleggsmidler,
-    Omloepmidler,
-    EgenkapitalOgGjeld,
-    Egenkapital,
-    LangsiktigGjeld,
-    KortsiktigGjeld,
-    BALANSEKATEGORIER,
-    NAERINGSKATEGORIER,
-    NaeringsspesifikasjonPost,
-)
-
 
 # Selskapsfelt skattemeldingen krever (org-nr utledes på annet vis ved innsending). I motsetning
 # til årsregnskapet konverterer skattemeldingen stiftelsesår og aksjekapital til tall, så en tom
@@ -121,7 +111,7 @@ def valider_selskap(config_fil: str | dict) -> list[str]:
 
     Kjøres lokalt før bygging, så et ufullstendig selskap (typisk rett etter en SAF-T-import som
     ikke bærer disse feltene) blir et avvik brukeren kan rette, ikke en naken HTTP 500.
-    
+
     Tar også med valider_skattekonfig, siden dette er porten alle kallsteder går gjennom før
     skattemeldingen bygges.
     """
@@ -166,12 +156,12 @@ def les_config(config_fil: str | dict) -> tuple[Aarsregnskap, SkattemeldingKonfi
     balanse = _les_balanse(raw["balanse"])
 
     fa = raw.get("foregaaende_aar", {})
-    foregaaende_resultat = _les_resultat(fa["resultatregnskap"]) if "resultatregnskap" in fa else Resultatregnskap()
+    foregaaende_resultat = (
+        _les_resultat(fa["resultatregnskap"]) if "resultatregnskap" in fa else Resultatregnskap()
+    )
     foregaaende_balanse = _les_balanse(fa["balanse"]) if "balanse" in fa else Balanse()
 
-    utbytte_utbetalt = sum(
-        float(a.get("utbytte_utbetalt", 0)) for a in raw.get("aksjonaerer", [])
-    )
+    utbytte_utbetalt = sum(float(a.get("utbytte_utbetalt", 0)) for a in raw.get("aksjonaerer", []))
 
     regnskap = Aarsregnskap(
         selskap=selskap,
@@ -225,26 +215,18 @@ def _les_naeringsspesifikasjonsposter(raw: dict) -> tuple[NaeringsspesifikasjonP
                 f"Næringsspesifikasjonspost {nummer} har ukjent kategori {kategori!r}."
             )
         if len(kode) != 4 or not kode.isdigit():
-            raise ValueError(
-                f"Næringsspesifikasjonspost {nummer} må ha en firesifret kode."
-            )
+            raise ValueError(f"Næringsspesifikasjonspost {nummer} må ha en firesifret kode.")
         try:
             beloep = float(post.get("beloep"))
         except (TypeError, ValueError):
-            raise ValueError(
-                f"Næringsspesifikasjonspost {nummer} må ha et numerisk beløp."
-            )
+            raise ValueError(f"Næringsspesifikasjonspost {nummer} må ha et numerisk beløp.")
         if not math.isfinite(beloep):
             raise ValueError(f"Næringsspesifikasjonspost {nummer} har ugyldig beløp.")
         if kategori in BALANSEKATEGORIER and beloep < 0:
-            raise ValueError(
-                f"Næringsspesifikasjonspost {nummer} må ha positivt balansebeløp."
-            )
+            raise ValueError(f"Næringsspesifikasjonspost {nummer} må ha positivt balansebeløp.")
         identitet = (kategori, kode)
         if identitet in sett:
-            raise ValueError(
-                f"Næringsspesifikasjonen har duplikat for {kategori} kode {kode}."
-            )
+            raise ValueError(f"Næringsspesifikasjonen har duplikat for {kategori} kode {kode}.")
         sett.add(identitet)
         resultat.append(NaeringsspesifikasjonPost(kategori, kode, beloep))
     return tuple(sorted(resultat, key=lambda post: (post.kategori, post.kode)))
@@ -408,7 +390,9 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
     gevinst_aksjer = r.finansposter.gevinst_ved_realisasjon_av_aksjer
     if gevinst_aksjer:
         if beregning.fritatt_gevinst_aksjer:
-            linjer.append(f"    Aksjegevinst (100 % fritatt) {_nok(beregning.fritatt_gevinst_aksjer)}")
+            linjer.append(
+                f"    Aksjegevinst (100 % fritatt) {_nok(beregning.fritatt_gevinst_aksjer)}"
+            )
         else:
             linjer.append(f"    Gevinst, realisasjon aksjer  {_nok(gevinst_aksjer)}")
     linjer += [
@@ -435,9 +419,7 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
     ]
 
     if nytt_underskudd > 0:
-        linjer.append(
-            f"  Underskudd til fremføring      {_nok(nytt_underskudd)}"
-        )
+        linjer.append(f"  Underskudd til fremføring      {_nok(nytt_underskudd)}")
         linjer.append("  (føres på skattemeldingen under «Underskudd til fremføring»)")
         linjer.append("")
 
@@ -488,7 +470,7 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
         linjer += [
             "",
             linje,
-            f"  NÆRINGSSPESIFIKASJON  SAMMENLIGNINGSTALL  (rskl. § 6-6)",
+            "  NÆRINGSSPESIFIKASJON  SAMMENLIGNINGSTALL  (rskl. § 6-6)",
             linje,
             f"                                 {år:>12}   {år - 1:>12}",
             f"  Sum driftsinntekter          {_nok2(r.driftsinntekter.sum, fr.driftsinntekter.sum)}",
@@ -504,7 +486,7 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
         linjer += [
             "",
             f"  NB: Sammenligningstall for {år - 1} er ikke lagt inn.",
-            f"  Legg til 'foregaaende_aar' i config.yaml (påkrevd, jf. rskl. § 6-6).",
+            "  Legg til 'foregaaende_aar' i config.yaml (påkrevd, jf. rskl. § 6-6).",
             "",
         ]
 
@@ -543,17 +525,27 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
         forklart_aek = ek_ib.annen_egenkapital + aarsresultat - utbytte_mot_ek
         andre_aek = ek_ub.annen_egenkapital - forklart_aek
 
-        linjer.append(_ek_rad(f"EK 01.01.{år}", ek_ib.aksjekapital, ek_ib.overkursfond, ek_ib.annen_egenkapital))
+        linjer.append(
+            _ek_rad(
+                f"EK 01.01.{år}", ek_ib.aksjekapital, ek_ib.overkursfond, ek_ib.annen_egenkapital
+            )
+        )
         linjer.append(_ek_rad("Årsresultat", 0, 0, aarsresultat))
         if utbytte_mot_ek != 0:
             linjer.append(_ek_rad(utbytte_etikett, 0, 0, -utbytte_mot_ek))
         if delta_ak != 0 or delta_ok != 0 or andre_aek != 0:
             linjer.append(_ek_rad("Andre endringer", delta_ak, delta_ok, andre_aek))
-        linjer.append(_ek_rad(f"EK 31.12.{år}", ek_ub.aksjekapital, ek_ub.overkursfond, ek_ub.annen_egenkapital))
+        linjer.append(
+            _ek_rad(
+                f"EK 31.12.{år}", ek_ub.aksjekapital, ek_ub.overkursfond, ek_ub.annen_egenkapital
+            )
+        )
     else:
         linjer += [
-            f"  NB: Egenkapitalbevegelse krever foregaaende_aar (rskl. § 7-2b).",
-            _ek_rad(f"EK 31.12.{år}", ek_ub.aksjekapital, ek_ub.overkursfond, ek_ub.annen_egenkapital),
+            "  NB: Egenkapitalbevegelse krever foregaaende_aar (rskl. § 7-2b).",
+            _ek_rad(
+                f"EK 31.12.{år}", ek_ub.aksjekapital, ek_ub.overkursfond, ek_ub.annen_egenkapital
+            ),
         ]
 
     linjer.append("  (beløp i hele kroner, NOK)")

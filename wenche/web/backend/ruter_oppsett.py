@@ -6,6 +6,7 @@ godkjenn i Altinn med BankID → sjekk status). Porten fra Oppsett-fanen i `wenc
 Miljøet er låst per kjøring (WENCHE_ENV), så vi trenger ikke flippe env per kall slik
 NiceGUI gjorde — auth-flyten peker allerede mot riktig miljø.
 """
+
 from __future__ import annotations
 
 import json
@@ -13,7 +14,7 @@ import os
 import re
 
 import httpx
-from fastapi import APIRouter, Body, HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from wenche import auth, systembruker
@@ -43,6 +44,7 @@ def _client_id() -> str:
 # ---------------------------------------------------------------------------
 # Status (kun lokale filer/env — ingen nettverk)
 # ---------------------------------------------------------------------------
+
 
 @router.get("/status")
 def status() -> dict:
@@ -80,6 +82,7 @@ def status() -> dict:
 # ---------------------------------------------------------------------------
 # Lagre credentials + nøkkel (skriver til ~/.wenche/.env)
 # ---------------------------------------------------------------------------
+
 
 class Credentials(BaseModel):
     client_id: str = ""
@@ -135,6 +138,7 @@ def lagre_nokkel(body: Nokkel) -> dict:
 # ---------------------------------------------------------------------------
 # Tilkoblingstest
 # ---------------------------------------------------------------------------
+
 
 def _tolk_feilmelding(raw: str) -> str:
     """Oversett rå auth-feilmelding til brukervennlig norsk."""
@@ -204,30 +208,53 @@ def test_tilkobling() -> dict:
     resultat = {"auth_ok": True, "melding": "Maskinporten og Altinn godtok credentials"}
     request_id = miljo.les_request_id()
     if not request_id:
-        resultat["systembruker"] = {"status": "ikke_opprettet", "melding": "Ingen forespørsel opprettet ennå"}
+        resultat["systembruker"] = {
+            "status": "ikke_opprettet",
+            "melding": "Ingen forespørsel opprettet ennå",
+        }
         return resultat
     try:
         token = auth.login_admin()
         svar = systembruker.hent_forespørsel_status(token, request_id)
         resultat["systembruker"] = _tolk_systembruker_status(svar.get("status", "ukjent"))
     except Exception as e:
-        resultat["systembruker"] = {"status": "feil", "melding": f"Kunne ikke hente status: {type(e).__name__}"}
+        resultat["systembruker"] = {
+            "status": "feil",
+            "melding": f"Kunne ikke hente status: {type(e).__name__}",
+        }
     return resultat
 
 
 def _tolk_systembruker_status(altinn_status: str) -> dict:
     if altinn_status == "Accepted":
-        return {"status": "godkjent", "melding": "Systembruker godkjent", "altinn_status": altinn_status}
+        return {
+            "status": "godkjent",
+            "melding": "Systembruker godkjent",
+            "altinn_status": altinn_status,
+        }
     if altinn_status == "New":
-        return {"status": "venter", "melding": "Forespørsel venter på godkjenning", "altinn_status": altinn_status}
+        return {
+            "status": "venter",
+            "melding": "Forespørsel venter på godkjenning",
+            "altinn_status": altinn_status,
+        }
     if altinn_status == "Rejected":
-        return {"status": "avvist", "melding": "Forespørsel avvist — opprett ny", "altinn_status": altinn_status}
-    return {"status": "ukjent", "melding": f"Status: {altinn_status}", "altinn_status": altinn_status}
+        return {
+            "status": "avvist",
+            "melding": "Forespørsel avvist — opprett ny",
+            "altinn_status": altinn_status,
+        }
+    return {
+        "status": "ukjent",
+        "melding": f"Status: {altinn_status}",
+        "altinn_status": altinn_status,
+    }
 
 
 # ---------------------------------------------------------------------------
 # Systembruker-onboarding
 # ---------------------------------------------------------------------------
+
 
 @router.post("/registrer-system")
 def registrer_system() -> dict:
@@ -256,7 +283,12 @@ def opprett_systembruker() -> dict:
         miljo.lagre_request_id(request_id)
     if confirm_url:
         miljo.lagre_confirm_url(confirm_url)
-    return {"ok": True, "request_id": request_id, "confirm_url": confirm_url, "status": svar.get("status")}
+    return {
+        "ok": True,
+        "request_id": request_id,
+        "confirm_url": confirm_url,
+        "status": svar.get("status"),
+    }
 
 
 @router.post("/systembruker/status")

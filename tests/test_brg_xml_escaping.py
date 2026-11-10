@@ -1,4 +1,5 @@
 """Tekstfelt i BRG-XML-en escapes, så et selskapsnavn med & eller < ikke gir ugyldig XML."""
+
 import dataclasses
 import xml.etree.ElementTree as ET
 

@@ -11,6 +11,7 @@ Beviser herdingen fra sikkerhetsgjennomgangen:
 
 Altinn-kallene (wenche.systembruker) mockes, så testen treffer ikke nett eller tt02.
 """
+
 import importlib
 from types import SimpleNamespace
 
@@ -61,28 +62,66 @@ def _stub_vendor(monkeypatch):
 def _gyldig_config(org="314273818"):
     """Komplett, balansert årsregnskap-config (eiendeler = EK = 30000)."""
     return {
-        "selskap": {"navn": "Test AS", "org_nummer": org, "daglig_leder": "D L",
-                    "styreleder": "D L", "forretningsadresse": "Vei 1, 0001 OSLO",
-                    "stiftelsesaar": 2018, "aksjekapital": 30000, "kontakt_epost": "a@b.no"},
+        "selskap": {
+            "navn": "Test AS",
+            "org_nummer": org,
+            "daglig_leder": "D L",
+            "styreleder": "D L",
+            "forretningsadresse": "Vei 1, 0001 OSLO",
+            "stiftelsesaar": 2018,
+            "aksjekapital": 30000,
+            "kontakt_epost": "a@b.no",
+        },
         "regnskapsaar": 2024,
         "resultatregnskap": {
             "driftsinntekter": {"salgsinntekter": 0, "andre_driftsinntekter": 0},
-            "driftskostnader": {"loennskostnader": 0, "avskrivninger": 0, "andre_driftskostnader": 0},
-            "finansposter": {"utbytte_fra_datterselskap": 0, "andre_finansinntekter": 0,
-                             "rentekostnader": 0, "andre_finanskostnader": 0}},
+            "driftskostnader": {
+                "loennskostnader": 0,
+                "avskrivninger": 0,
+                "andre_driftskostnader": 0,
+            },
+            "finansposter": {
+                "utbytte_fra_datterselskap": 0,
+                "andre_finansinntekter": 0,
+                "rentekostnader": 0,
+                "andre_finanskostnader": 0,
+            },
+        },
         "balanse": {
-            "eiendeler": {"anleggsmidler": {"aksjer_i_datterselskap": 0, "andre_aksjer": 0, "langsiktige_fordringer": 0},
-                          "omloepmidler": {"kortsiktige_fordringer": 0, "bankinnskudd": 30000}},
+            "eiendeler": {
+                "anleggsmidler": {
+                    "aksjer_i_datterselskap": 0,
+                    "andre_aksjer": 0,
+                    "langsiktige_fordringer": 0,
+                },
+                "omloepmidler": {"kortsiktige_fordringer": 0, "bankinnskudd": 30000},
+            },
             "egenkapital_og_gjeld": {
                 "egenkapital": {"aksjekapital": 30000, "overkursfond": 0, "annen_egenkapital": 0},
                 "langsiktig_gjeld": {"laan_fra_aksjonaer": 0, "andre_langsiktige_laan": 0},
-                "kortsiktig_gjeld": {"leverandoergjeld": 0, "skyldige_offentlige_avgifter": 0,
-                                     "annen_kortsiktig_gjeld": 0}}},
-        "skattemelding": {"anvend_fritaksmetoden": False, "boersnotert": False,
-                          "underskudd_til_fremfoering": 0, "formuesverdi_aksjer": 0},
-        "aksjonaerer": [{"navn": "X", "fodselsnummer": "24847799354", "antall_aksjer": 300,
-                         "aksjeklasse": "ordinære", "utbytte_utbetalt": 0,
-                         "innbetalt_kapital_per_aksje": 100}],
+                "kortsiktig_gjeld": {
+                    "leverandoergjeld": 0,
+                    "skyldige_offentlige_avgifter": 0,
+                    "annen_kortsiktig_gjeld": 0,
+                },
+            },
+        },
+        "skattemelding": {
+            "anvend_fritaksmetoden": False,
+            "boersnotert": False,
+            "underskudd_til_fremfoering": 0,
+            "formuesverdi_aksjer": 0,
+        },
+        "aksjonaerer": [
+            {
+                "navn": "X",
+                "fodselsnummer": "24847799354",
+                "antall_aksjer": 300,
+                "aksjeklasse": "ordinære",
+                "utbytte_utbetalt": 0,
+                "innbetalt_kapital_per_aksje": 100,
+            }
+        ],
     }
 
 
@@ -171,11 +210,15 @@ def test_innsending_avviser_feil_org(klient, monkeypatch):
 
     _stub_vendor(monkeypatch)
     monkeypatch.setattr(ins, "krev_vendor", lambda: (SimpleNamespace(client_id="x"), "999999999"))
-    monkeypatch.setattr(sb.wsb, "hent_systembrukere", lambda tok, vendor: [{"reporteeOrgNo": "314273818"}])
+    monkeypatch.setattr(
+        sb.wsb, "hent_systembrukere", lambda tok, vendor: [{"reporteeOrgNo": "314273818"}]
+    )
 
     klient.post("/api/auth/invite", json={"token": lag_invite_token("314273818")})
     klient.post("/api/systembruker/request")  # binder kunde_org = 314273818
-    r = klient.post("/api/innsending/aarsregnskap?dry_run=false", json=_gyldig_config(org="312223309"))
+    r = klient.post(
+        "/api/innsending/aarsregnskap?dry_run=false", json=_gyldig_config(org="312223309")
+    )
     assert r.status_code == 409
 
 

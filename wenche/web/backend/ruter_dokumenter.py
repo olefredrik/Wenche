@@ -3,6 +3,7 @@ Dokumentgenerering for forhåndsvisning/nedlasting i self-hosted Wenche (porten 
 Dokumenter-fanen i `wenche/ui.py`). Genererer lokalt, sender ingenting. Hvert svar er en liste
 filer med base64-kodet innhold som SPA-en kan tilby som nedlasting.
 """
+
 from __future__ import annotations
 
 import base64

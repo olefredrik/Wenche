@@ -70,9 +70,7 @@ def _regnskap(
 
 
 def _ns_root(regnskap, konfig=None):
-    return fromstring(
-        generer_naeringsspesifikasjon(regnskap, _PARTSNUMMER, konfig).decode("utf-8")
-    )
+    return fromstring(generer_naeringsspesifikasjon(regnskap, _PARTSNUMMER, konfig).decode("utf-8"))
 
 
 def _forskjeller(root) -> dict[str, float]:
@@ -229,8 +227,12 @@ class TestAdvarsel:
     def test_eierandelen_leses_fra_skattemelding_seksjonen(self):
         cfg = {
             "selskap": {
-                "navn": "X AS", "org_nummer": "123456789", "daglig_leder": "A",
-                "styreleder": "A", "forretningsadresse": "Gate 1", "stiftelsesaar": 2022,
+                "navn": "X AS",
+                "org_nummer": "123456789",
+                "daglig_leder": "A",
+                "styreleder": "A",
+                "forretningsadresse": "Gate 1",
+                "stiftelsesaar": 2022,
                 "aksjekapital": 30000,
             },
             "regnskapsaar": 2025,

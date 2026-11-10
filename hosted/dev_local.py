@@ -11,6 +11,7 @@ Bruk:
     # så, i en egen terminal:
     cd hosted/web && npm run dev      # http://localhost:5173
 """
+
 import os
 from pathlib import Path
 
@@ -24,9 +25,7 @@ load_dotenv(_REPO / ".env")
 def _krev(navn: str) -> str:
     verdi = os.environ.get(navn)
     if not verdi:
-        raise SystemExit(
-            f"Mangler {navn} i .env (test-oppsettet). Se docs/avansert/testing.md."
-        )
+        raise SystemExit(f"Mangler {navn} i .env (test-oppsettet). Se docs/avansert/testing.md.")
     return verdi
 
 
@@ -64,9 +63,11 @@ if __name__ == "__main__":
     # Per-org invite-lenke for dev. Default-org er test-selskapet eksempeldataene bruker;
     # overstyr med HOSTED_DEV_ORG=<orgnr> ved behov.
     _dev_org = os.environ.get("HOSTED_DEV_ORG", "314273818")
-    _token = URLSafeSerializer(
-        os.environ["HOSTED_INVITE_SECRET"], salt="invite"
-    ).dumps({"org": _dev_org})
+    _token = URLSafeSerializer(os.environ["HOSTED_INVITE_SECRET"], salt="invite").dumps(
+        {"org": _dev_org}
+    )
     print("Hosted Wenche (dev/test) -> http://127.0.0.1:8077")
-    print(f"Invite-lenke (org {_dev_org}, åpne i SPA-en): {os.environ['HOSTED_PUBLIC_URL']}/#invite={_token}")
+    print(
+        f"Invite-lenke (org {_dev_org}, åpne i SPA-en): {os.environ['HOSTED_PUBLIC_URL']}/#invite={_token}"
+    )
     uvicorn.run("hosted.api.main:app", host="127.0.0.1", port=8077, reload=True)

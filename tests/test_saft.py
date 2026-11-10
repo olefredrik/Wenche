@@ -53,22 +53,24 @@ def _saft_xml(kontoer: str, *, aar: int = 2024) -> bytes:
   <MasterFiles>
     <GeneralLedgerAccounts>{kontoer}</GeneralLedgerAccounts>
   </MasterFiles>
-</AuditFile>""".encode("utf-8")
+</AuditFile>""".encode()
 
 
 # Et lite, men representativt holdingselskap-regnskap.
 KONTOER = (
     _konto("salgsinntekt", "3000", ub_kredit=100000)
-    + _konto("finansinntekt", "8090", ub_kredit=50000)          # utbytte fra datterselskap
-    + _konto("finansinntekt", "8050", ub_kredit=5000)           # andre finansinntekter
-    + _konto("finanskostnad", "8150", ub_debet=2000)            # rentekostnader
-    + _konto("balanseverdiForAnleggsmiddel", "1313",
-             ub_debet=1000000, ib_debet=900000)                 # aksjer i datterselskap
-    + _konto("balanseverdiForOmloepsmiddel", "1920",
-             ub_debet=200000, ib_debet=150000)                  # bankinnskudd
-    + _konto("egenkapital", "2000", ub_kredit=30000, ib_kredit=30000)   # aksjekapital
-    + _konto("egenkapital", "2080", ib_debet=40000)             # udekket tap (åpning)
-    + _konto("langsiktigGjeld", "2250", ub_kredit=200000)       # lån fra aksjonær
+    + _konto("finansinntekt", "8090", ub_kredit=50000)  # utbytte fra datterselskap
+    + _konto("finansinntekt", "8050", ub_kredit=5000)  # andre finansinntekter
+    + _konto("finanskostnad", "8150", ub_debet=2000)  # rentekostnader
+    + _konto(
+        "balanseverdiForAnleggsmiddel", "1313", ub_debet=1000000, ib_debet=900000
+    )  # aksjer i datterselskap
+    + _konto(
+        "balanseverdiForOmloepsmiddel", "1920", ub_debet=200000, ib_debet=150000
+    )  # bankinnskudd
+    + _konto("egenkapital", "2000", ub_kredit=30000, ib_kredit=30000)  # aksjekapital
+    + _konto("egenkapital", "2080", ib_debet=40000)  # udekket tap (åpning)
+    + _konto("langsiktigGjeld", "2250", ub_kredit=200000)  # lån fra aksjonær
 )
 
 
@@ -147,7 +149,7 @@ def test_importer_bytes_samme_som_importer(tmp_path: Path):
 
 
 def test_manglende_header_gir_feil():
-    xml = f'<?xml version="1.0"?><AuditFile xmlns="{_NS}"></AuditFile>'.encode("utf-8")
+    xml = f'<?xml version="1.0"?><AuditFile xmlns="{_NS}"></AuditFile>'.encode()
     with pytest.raises(ValueError, match="Header"):
         importer_bytes(xml)
 
@@ -162,7 +164,7 @@ def test_xml_med_entitetsdefinisjoner_avvises():
         '<?xml version="1.0"?>'
         '<!DOCTYPE AuditFile [<!ENTITY a "x"><!ENTITY b "&a;&a;&a;&a;&a;&a;&a;&a;">]>'
         f'<AuditFile xmlns="{_NS}"><Header>&b;</Header></AuditFile>'
-    ).encode("utf-8")
+    ).encode()
     with pytest.raises(ValueError):
         importer_bytes(ondsinnet)
 
@@ -214,8 +216,16 @@ def test_saft_import_gir_balanse_som_gaar_opp_med_skatt():
     from wenche import aarsregnskap as ar
 
     regnskap = ar.les_config(
-        {**cfg, "selskap": {**cfg["selskap"], "daglig_leder": "D L", "styreleder": "D L",
-                            "stiftelsesaar": 2020, "aksjekapital": 30000}}
+        {
+            **cfg,
+            "selskap": {
+                **cfg["selskap"],
+                "daglig_leder": "D L",
+                "styreleder": "D L",
+                "stiftelsesaar": 2020,
+                "aksjekapital": 30000,
+            },
+        }
     )
     assert regnskap.resultatregnskap.resultat_foer_skatt == 50000
     assert regnskap.resultatregnskap.aarsresultat == 39000
@@ -225,6 +235,7 @@ def test_saft_import_gir_balanse_som_gaar_opp_med_skatt():
 # ---------------------------------------------------------------------------
 # Anleggsmidler Wenche ikke har en egen linje for
 # ---------------------------------------------------------------------------
+
 
 def test_immaterielle_eiendeler_gir_advarsel_om_koden_de_faar():
     """
@@ -279,9 +290,7 @@ def test_advarselsnoekkelen_skrives_ikke_til_config_yaml(tmp_path):
     )
     ut_fil = tmp_path / "config.yaml"
 
-    resultat = CliRunner().invoke(
-        main, ["importer-saft", str(saft_fil), "--ut", str(ut_fil)]
-    )
+    resultat = CliRunner().invoke(main, ["importer-saft", str(saft_fil), "--ut", str(ut_fil)])
 
     assert resultat.exit_code == 0
     assert "Advarsel:" in resultat.output
@@ -294,9 +303,7 @@ def test_avsatt_utbytte_konto_2800_faar_egen_linje():
     Konto 2800 havnet før i annen kortsiktig gjeld og ble rapportert som kode 2990.
     Avsatt utbytte har egen linje i årsregnskapet og egen kode (2800).
     """
-    cfg = importer_bytes(
-        _saft_xml(KONTOER + _konto("kortsiktigGjeld", "2800", ub_kredit=80000))
-    )
+    cfg = importer_bytes(_saft_xml(KONTOER + _konto("kortsiktigGjeld", "2800", ub_kredit=80000)))
     kg = cfg["balanse"]["egenkapital_og_gjeld"]["kortsiktig_gjeld"]
 
     assert kg["avsatt_utbytte"] == 80000
@@ -319,9 +326,7 @@ def test_utbytte_konto_8090_er_utbytte_fra_datterselskap():
 def test_aksjer_konto_1313_er_aksjer_i_datterselskap():
     """1313 er aksjer i datterselskap. Før ble 1300 lest, og 1313 havnet i fordringene."""
     cfg = importer_bytes(
-        _saft_xml(
-            _konto("balanseverdiForAnleggsmiddel", "1313", ub_debet=400000, ib_debet=300000)
-        )
+        _saft_xml(_konto("balanseverdiForAnleggsmiddel", "1313", ub_debet=400000, ib_debet=300000))
     )
     am = cfg["balanse"]["eiendeler"]["anleggsmidler"]
     fam = cfg["foregaaende_aar"]["balanse"]["eiendeler"]["anleggsmidler"]
@@ -337,9 +342,7 @@ def test_konsernlaan_konto_1320_er_langsiktig_fordring():
     datterselskap, og selskapet ble merket som morselskap i årsregnskapet.
     """
     cfg = importer_bytes(
-        _saft_xml(
-            _konto("balanseverdiForAnleggsmiddel", "1320", ub_debet=250000, ib_debet=200000)
-        )
+        _saft_xml(_konto("balanseverdiForAnleggsmiddel", "1320", ub_debet=250000, ib_debet=200000))
     )
     am = cfg["balanse"]["eiendeler"]["anleggsmidler"]
     fam = cfg["foregaaende_aar"]["balanse"]["eiendeler"]["anleggsmidler"]
@@ -392,8 +395,18 @@ def test_overkurs_konto_2020_er_overkursfond():
 # Sumkontroll: saldo som ikke blir fordelt på noen linje
 # ---------------------------------------------------------------------------
 
-def _konto_med_id(konto_id, kategori=None, kode=None, *, ub_debet=0, ub_kredit=0,
-                  ib_debet=0, ib_kredit=0, standard_konto=None):
+
+def _konto_med_id(
+    konto_id,
+    kategori=None,
+    kode=None,
+    *,
+    ub_debet=0,
+    ub_kredit=0,
+    ib_debet=0,
+    ib_kredit=0,
+    standard_konto=None,
+):
     """Som _konto, men med AccountID og valgfrie grupperingsfelt (eldre SAF-T-filer)."""
     gruppering = ""
     if standard_konto:
@@ -516,6 +529,7 @@ def test_tom_kontoplan_avvises_ikke():
 # AuditFileVersion og SAF-T 1.40
 # ---------------------------------------------------------------------------
 
+
 def _med_versjon(xml: bytes, versjon: str) -> bytes:
     return xml.replace(
         b"<Header>", f"<Header><AuditFileVersion>{versjon}</AuditFileVersion>".encode(), 1
@@ -555,6 +569,8 @@ def test_saft_versjon_140_leses():
     fa = cfg["foregaaende_aar"]["balanse"]
     assert fa["eiendeler"]["anleggsmidler"]["aksjer_i_datterselskap"] == 900000
     # Alt er fordelt, og versjonen er kjent.
+
+
 def test_kontanter_konto_1900_er_bankinnskudd():
     """
     1900 er kontanter. Før havnet de i kortsiktige fordringer. Linjen i årsregnskapet er

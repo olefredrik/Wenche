@@ -20,6 +20,7 @@ Read-only: henter kun tokens og lister systembrukere, sender ingenting inn og en
 ingen rettigheter. Fiks for berørte: systembruker.opprett_endringsforespørsel(...) med
 [systembruker._SKATTEMELDING_RETT], som kunden så godkjenner i Altinn.
 """
+
 import os
 from pathlib import Path
 

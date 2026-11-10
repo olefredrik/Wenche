@@ -7,7 +7,6 @@ import xml.etree.ElementTree as ET
 
 from wenche.brg_xml import generer_hovedskjema, generer_underskjema
 
-
 NS_HOVED = "http://schema.brreg.no/regnsys/aarsregnskap_vanlig"
 NS_UNDER = "http://schema.brreg.no/regnsys/aarsregnskap_vanlig/underskjema"
 
@@ -19,6 +18,7 @@ def _parse(xml_bytes: bytes) -> ET.Element:
 # ---------------------------------------------------------------------------
 # Hovedskjema
 # ---------------------------------------------------------------------------
+
 
 def test_hovedskjema_er_gyldig_xml(eksempel_regnskap):
     xml_bytes = generer_hovedskjema(eksempel_regnskap)
@@ -75,6 +75,7 @@ def test_hovedskjema_signatar_er_daglig_leder(eksempel_regnskap):
 # Underskjema
 # ---------------------------------------------------------------------------
 
+
 def test_underskjema_er_gyldig_xml(eksempel_regnskap):
     xml_bytes = generer_underskjema(eksempel_regnskap)
     root = _parse(xml_bytes)
@@ -93,9 +94,7 @@ def test_underskjema_dataformat_id(eksempel_regnskap):
 
 def test_underskjema_driftsresultat(eksempel_regnskap):
     root = _parse(generer_underskjema(eksempel_regnskap))
-    driftsresultat = root.find(
-        f".//{{{NS_UNDER}}}driftsresultat/{{{NS_UNDER}}}aarets"
-    )
+    driftsresultat = root.find(f".//{{{NS_UNDER}}}driftsresultat/{{{NS_UNDER}}}aarets")
     assert driftsresultat is not None
     assert int(driftsresultat.text) == -5500
 
@@ -109,9 +108,7 @@ def test_underskjema_sum_eiendeler(eksempel_regnskap):
 
 def test_underskjema_sum_egenkapital_og_gjeld(eksempel_regnskap):
     root = _parse(generer_underskjema(eksempel_regnskap))
-    sum_ekg = root.find(
-        f".//{{{NS_UNDER}}}sumEgenkapitalGjeld/{{{NS_UNDER}}}aarets"
-    )
+    sum_ekg = root.find(f".//{{{NS_UNDER}}}sumEgenkapitalGjeld/{{{NS_UNDER}}}aarets")
     assert sum_ekg is not None
     assert int(sum_ekg.text) == 101200
 
@@ -172,6 +169,7 @@ def test_underskjema_sum_overfoeringer_lik_aarsresultat(eksempel_regnskap):
 # ---------------------------------------------------------------------------
 # Avsatt utbytte (issue #167)
 # ---------------------------------------------------------------------------
+
 
 def test_underskjema_avsatt_utbytte_egen_linje(eksempel_regnskap):
     """

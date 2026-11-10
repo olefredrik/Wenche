@@ -5,6 +5,7 @@ Tar imot en opplastet SAF-T XML som rå request-body, parser den i minnet (wench
 returnerer en config-dict som SPA-en forhåndsfyller skjemaet med. Ingenting skrives til disk
 eller lagres: bytene leses inn i minnet, parses og forkastes. Brukeren ser over og lagrer selv.
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query, Request

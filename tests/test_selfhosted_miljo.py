@@ -5,6 +5,7 @@ versjonssjekken (oppdatering.py) i self-hosted Wenche.
 Alle filoperasjoner pekes om til tmp_path slik at testene aldri rører den
 ekte ~/.wenche-katalogen.
 """
+
 import os
 import stat
 
@@ -29,6 +30,7 @@ def isolert_miljo(tmp_path, monkeypatch):
 # Miljølåsing og config-fil
 # ---------------------------------------------------------------------------
 
+
 def test_sett_env_avviser_ukjent_miljo(isolert_miljo):
     with pytest.raises(ValueError):
         miljo.sett_env("staging")
@@ -52,6 +54,7 @@ def test_config_fil_skiller_test_og_prod(isolert_miljo):
 # Credential-oppslag per miljø
 # ---------------------------------------------------------------------------
 
+
 def test_miljospesifikk_variabel_vinner(isolert_miljo, monkeypatch):
     monkeypatch.setenv("MIN_VAR", "generisk")
     monkeypatch.setenv("MIN_VAR_TEST", "testverdi")
@@ -70,6 +73,7 @@ def test_eksplisitt_tom_miljovariabel_er_autoritativ(isolert_miljo, monkeypatch)
 # ---------------------------------------------------------------------------
 # med_test_org: tvinger Tenor-orgnr i testmiljø
 # ---------------------------------------------------------------------------
+
 
 def test_med_test_org_bytter_orgnr_i_test(isolert_miljo, monkeypatch):
     miljo.sett_env("test")
@@ -99,6 +103,7 @@ def test_med_test_org_noop_uten_testorgnr(isolert_miljo, monkeypatch):
 # Systembruker-tilstand på disk (per miljø)
 # ---------------------------------------------------------------------------
 
+
 def test_request_id_rundtur_per_miljo(isolert_miljo):
     miljo.lagre_request_id("req-test", env="test")
     miljo.lagre_request_id("req-prod", env="prod")
@@ -120,6 +125,7 @@ def test_confirm_url_tom_streng_lagres_ikke(isolert_miljo):
 # ---------------------------------------------------------------------------
 # ~/.wenche/.env-håndtering
 # ---------------------------------------------------------------------------
+
 
 def test_sikre_bruker_env_fil_oppretter_med_0600(isolert_miljo, tmp_path, monkeypatch):
     tom_cwd = tmp_path / "tom-katalog"
@@ -145,6 +151,7 @@ def test_sikre_bruker_env_fil_migrerer_cwd_env(isolert_miljo, tmp_path, monkeypa
 # ---------------------------------------------------------------------------
 # Versjonssjekk (oppdatering.py)
 # ---------------------------------------------------------------------------
+
 
 def test_parse_versjon():
     assert oppdatering.parse_versjon("0.25.0") == (0, 25, 0)

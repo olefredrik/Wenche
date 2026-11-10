@@ -28,9 +28,9 @@ from click.testing import CliRunner
 
 from wenche import aarsregnskap as ar
 from wenche import innsending as tjeneste
-from wenche.cli import main
 from wenche.aksjonaerregister import generer_hovedskjema_xml
 from wenche.brg_xml import generer_hovedskjema
+from wenche.cli import main
 from wenche.models import (
     Aksjonaer,
     Aksjonaerregisteroppgave,
@@ -40,7 +40,6 @@ from wenche.models import (
     Eiendeler,
     Omloepmidler,
     Resultatregnskap,
-    Selskap,
 )
 from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
 
@@ -57,9 +56,7 @@ def _regnskap(eksempel_selskap, **kwargs):
         resultatregnskap=Resultatregnskap(),
         balanse=Balanse(
             eiendeler=Eiendeler(omloepmidler=Omloepmidler(bankinnskudd=30000)),
-            egenkapital_og_gjeld=EgenkapitalOgGjeld(
-                egenkapital=Egenkapital(aksjekapital=30000)
-            ),
+            egenkapital_og_gjeld=EgenkapitalOgGjeld(egenkapital=Egenkapital(aksjekapital=30000)),
         ),
         **kwargs,
     )
@@ -118,9 +115,7 @@ class TestConfigLesing:
 
     def test_leser_periode_fra_iso_streng(self):
         # Skjemaet sender datoer som streng.
-        r = ar.les_config(
-            self._config(regnskapsstart="2025-11-20", regnskapsslutt="2026-12-31")
-        )
+        r = ar.les_config(self._config(regnskapsstart="2025-11-20", regnskapsslutt="2026-12-31"))
         assert r.periode_start == date(2025, 11, 20)
         assert r.periode_slutt == date(2026, 12, 31)
 

@@ -6,6 +6,7 @@ Maskinporten-credentials og privat nøkkel (skriver til ~/.wenche, her pekt om t
 tilkoblingstesten med oversatte feilmeldinger, og systembruker-onboardingen
 (registrer → opprett forespørsel → status → oppdater rettigheter).
 """
+
 import stat
 
 import pytest
@@ -30,9 +31,12 @@ def klient(tmp_path, monkeypatch):
     # Tøm credentials fra repoets .env (lastes ved import) og registrer restore for
     # variablene endepunktene setter, slik at ingenting lekker mellom tester.
     for var in (
-        "MASKINPORTEN_CLIENT_ID", "MASKINPORTEN_CLIENT_ID_TEST",
-        "MASKINPORTEN_KID", "MASKINPORTEN_KID_TEST",
-        "ORG_NUMMER", "SKD_TEST_ORG_NUMMER",
+        "MASKINPORTEN_CLIENT_ID",
+        "MASKINPORTEN_CLIENT_ID_TEST",
+        "MASKINPORTEN_KID",
+        "MASKINPORTEN_KID_TEST",
+        "ORG_NUMMER",
+        "SKD_TEST_ORG_NUMMER",
     ):
         monkeypatch.delenv(var, raising=False)
     # Pek nøkkelstien bort fra repoets ekte PEM-fil.
@@ -50,6 +54,7 @@ def klient(tmp_path, monkeypatch):
 # Status og lagring av credentials/nøkkel
 # ---------------------------------------------------------------------------
 
+
 def test_status_uten_oppsett_viser_mangler(klient):
     data = klient.get("/api/oppsett/status").json()
     assert data["env"] == "test"
@@ -60,9 +65,14 @@ def test_status_uten_oppsett_viser_mangler(klient):
 
 
 def test_lagre_credentials_skriver_miljosuffiks(klient):
-    r = klient.put("/api/oppsett/credentials", json={
-        "client_id": "klient-123", "kid": "kid-456", "orgnr": "310137715",
-    })
+    r = klient.put(
+        "/api/oppsett/credentials",
+        json={
+            "client_id": "klient-123",
+            "kid": "kid-456",
+            "orgnr": "310137715",
+        },
+    )
     assert r.status_code == 200 and r.json()["ok"] is True
     innhold = miljo._BRUKER_ENV_FIL.read_text(encoding="utf-8")
     assert "MASKINPORTEN_CLIENT_ID_TEST" in innhold and "klient-123" in innhold
@@ -93,11 +103,12 @@ def test_lagre_nokkel_skriver_0600_og_peker_env(klient):
 # Tilkoblingstest med oversatte feilmeldinger
 # ---------------------------------------------------------------------------
 
+
 def test_tilkobling_feil_gir_lesbar_melding(klient, monkeypatch):
     import wenche.auth as auth_mod
 
     raa = (
-        'Maskinporten svarte 401:\n'
+        "Maskinporten svarte 401:\n"
         '{"error": "invalid_grant", "error_description": "Client authentication failed"}'
     )
     monkeypatch.setattr(auth_mod, "login", lambda **kw: (_ for _ in ()).throw(RuntimeError(raa)))
@@ -122,7 +133,9 @@ def test_tilkobling_ok_med_godkjent_systembruker(klient, monkeypatch):
 
     monkeypatch.setattr(auth_mod, "login", lambda **kw: {"altinn_token": "tok"})
     monkeypatch.setattr(auth_mod, "login_admin", lambda: "admin-tok")
-    monkeypatch.setattr(sb_mod, "hent_forespørsel_status", lambda token, rid: {"status": "Accepted"})
+    monkeypatch.setattr(
+        sb_mod, "hent_forespørsel_status", lambda token, rid: {"status": "Accepted"}
+    )
     miljo.lagre_request_id("req-1")
     data = klient.post("/api/oppsett/test-tilkobling").json()
     assert data["auth_ok"] is True
@@ -132,6 +145,7 @@ def test_tilkobling_ok_med_godkjent_systembruker(klient, monkeypatch):
 # ---------------------------------------------------------------------------
 # Systembruker-onboarding
 # ---------------------------------------------------------------------------
+
 
 def test_registrer_system_uten_orgnr_gir_409(klient):
     assert klient.post("/api/oppsett/registrer-system").status_code == 409
@@ -166,15 +180,23 @@ def test_systembruker_status_uten_forespoersel(klient):
     assert data["status"] == "ikke_opprettet"
 
 
-@pytest.mark.parametrize("altinn_status,forventet", [
-    ("Accepted", "godkjent"), ("New", "venter"), ("Rejected", "avvist"), ("Borte", "ukjent"),
-])
+@pytest.mark.parametrize(
+    "altinn_status,forventet",
+    [
+        ("Accepted", "godkjent"),
+        ("New", "venter"),
+        ("Rejected", "avvist"),
+        ("Borte", "ukjent"),
+    ],
+)
 def test_systembruker_status_tolkes(klient, monkeypatch, altinn_status, forventet):
     import wenche.auth as auth_mod
     import wenche.systembruker as sb_mod
 
     monkeypatch.setattr(auth_mod, "login_admin", lambda: "admin-tok")
-    monkeypatch.setattr(sb_mod, "hent_forespørsel_status", lambda token, rid: {"status": altinn_status})
+    monkeypatch.setattr(
+        sb_mod, "hent_forespørsel_status", lambda token, rid: {"status": altinn_status}
+    )
     miljo.lagre_request_id("req-1")
     assert klient.post("/api/oppsett/systembruker/status").json()["status"] == forventet
 
@@ -196,10 +218,14 @@ def test_oppdater_systembruker_velger_riktig_rapportoer(klient, monkeypatch):
     monkeypatch.setenv("ORG_NUMMER", "922020523")
     monkeypatch.setenv("SKD_TEST_ORG_NUMMER", "310137715")
     monkeypatch.setattr(auth_mod, "login_admin", lambda: "admin-tok")
-    monkeypatch.setattr(sb_mod, "hent_systembrukere", lambda token, org: [
-        {"id": "sb-feil", "reporteeOrgNo": "999999999"},
-        {"id": "sb-riktig", "reporteeOrgNo": "310137715"},
-    ])
+    monkeypatch.setattr(
+        sb_mod,
+        "hent_systembrukere",
+        lambda token, org: [
+            {"id": "sb-feil", "reporteeOrgNo": "999999999"},
+            {"id": "sb-riktig", "reporteeOrgNo": "310137715"},
+        ],
+    )
     brukt = {}
 
     def fake_endring(token, systembruker_id, retter):
@@ -215,6 +241,7 @@ def test_oppdater_systembruker_velger_riktig_rapportoer(klient, monkeypatch):
 # ---------------------------------------------------------------------------
 # Feilmeldingsoversettelsen (enhetsnivå)
 # ---------------------------------------------------------------------------
+
 
 def test_tolk_feilmelding_invalid_scope(monkeypatch):
     monkeypatch.setattr(miljo, "_AKTIV_ENV", "test")

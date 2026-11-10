@@ -8,6 +8,7 @@ status uten aktiv forespørsel er en lesbar 400.
 
 Altinn-kallene (wenche.systembruker) mockes, så testene treffer ikke nett eller tt02.
 """
+
 import importlib
 from types import SimpleNamespace
 
@@ -61,9 +62,15 @@ def test_ny_kunde_faar_confirm_url_og_bindes_ved_accepted(klient, monkeypatch):
     _stub_vendor(monkeypatch)
     monkeypatch.setattr(sb.wsb, "hent_systembrukere", lambda token, vendor: [])
     monkeypatch.setattr(sb.wsb, "registrer_system", lambda token, vendor, cid: {})
-    monkeypatch.setattr(sb.wsb, "opprett_forespørsel", lambda token, vendor, party: {
-        "id": "req-77", "status": "New", "confirmUrl": "https://altinn.test/confirm/77",
-    })
+    monkeypatch.setattr(
+        sb.wsb,
+        "opprett_forespørsel",
+        lambda token, vendor, party: {
+            "id": "req-77",
+            "status": "New",
+            "confirmUrl": "https://altinn.test/confirm/77",
+        },
+    )
 
     r = klient.post("/api/systembruker/request")
     assert r.status_code == 200, r.text
@@ -76,7 +83,9 @@ def test_ny_kunde_faar_confirm_url_og_bindes_ved_accepted(klient, monkeypatch):
     assert data["kunde_org"] is None
 
     # Godkjent i Altinn: kunde-org bindes til sesjonen fra pending_org.
-    monkeypatch.setattr(sb.wsb, "hent_forespørsel_status", lambda token, rid: {"status": "Accepted"})
+    monkeypatch.setattr(
+        sb.wsb, "hent_forespørsel_status", lambda token, rid: {"status": "Accepted"}
+    )
     data = klient.post("/api/systembruker/status").json()
     assert data["godkjent"] is True
     assert data["kunde_org"] == org
@@ -87,11 +96,19 @@ def test_avvist_forespoersel_binder_ikke(klient, monkeypatch):
     _stub_vendor(monkeypatch)
     monkeypatch.setattr(sb.wsb, "hent_systembrukere", lambda token, vendor: [])
     monkeypatch.setattr(sb.wsb, "registrer_system", lambda token, vendor, cid: {})
-    monkeypatch.setattr(sb.wsb, "opprett_forespørsel", lambda token, vendor, party: {
-        "id": "req-78", "status": "New", "confirmUrl": "https://altinn.test/confirm/78",
-    })
+    monkeypatch.setattr(
+        sb.wsb,
+        "opprett_forespørsel",
+        lambda token, vendor, party: {
+            "id": "req-78",
+            "status": "New",
+            "confirmUrl": "https://altinn.test/confirm/78",
+        },
+    )
     klient.post("/api/systembruker/request")
-    monkeypatch.setattr(sb.wsb, "hent_forespørsel_status", lambda token, rid: {"status": "Rejected"})
+    monkeypatch.setattr(
+        sb.wsb, "hent_forespørsel_status", lambda token, rid: {"status": "Rejected"}
+    )
     data = klient.post("/api/systembruker/status").json()
     assert data["godkjent"] is False
     assert data["kunde_org"] is None

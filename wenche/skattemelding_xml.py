@@ -26,10 +26,7 @@ from defusedxml.ElementTree import fromstring
 from wenche.models import Aarsregnskap, SkattemeldingKonfig
 from wenche.skatteberegning import beregn_skatt
 
-_NS = (
-    "urn:no:skatteetaten:fastsetting:formueinntekt:"
-    "skattemelding:upersonlig:ekstern:v5"
-)
+_NS = "urn:no:skatteetaten:fastsetting:formueinntekt:skattemelding:upersonlig:ekstern:v5"
 
 
 def _overstyrt_heltall(parent: Element, tag: str, verdi: int) -> None:
@@ -117,9 +114,7 @@ def generer_skattemelding_upersonlig(
         utf = SubElement(iou, "underskuddTilFremfoering")
         if fremfoert_underskudd > 0:
             fremfoert = SubElement(utf, "fremfoertUnderskuddFraTidligereAar")
-            SubElement(fremfoert, "beloepSomHeltall").text = str(
-                int(round(fremfoert_underskudd))
-            )
+            SubElement(fremfoert, "beloepSomHeltall").text = str(int(round(fremfoert_underskudd)))
         if aarets_underskudd > 0:
             # fremfoerbartUnderskuddIInntekt = årets + fremført fra tidligere år.
             # Står sist i UnderskuddTilFremfoering-sekvensen.
@@ -236,9 +231,7 @@ def beregn_formue_inputs(
     return verdi_foer_rabatt, samlet_gjeld
 
 
-def beregn_verdi_bak_aksjene(
-    regnskap: Aarsregnskap, konfig: SkattemeldingKonfig
-) -> int | None:
+def beregn_verdi_bak_aksjene(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> int | None:
     """Netto verdi bak aksjene = verdiFoerRabatt - gjeld (gulv 0). For visning/kontroll."""
     foer, gjeld = beregn_formue_inputs(regnskap, konfig)
     if foer is None:
@@ -304,9 +297,7 @@ def hent_partsnummer(skattemelding_xml: bytes) -> int:
     if element is None:
         element = root.find(".//{*}partsnummer")
     if element is None or not element.text:
-        raise ValueError(
-            "Fant ikke <partsnummer> i forhåndsutfylt skattemelding fra Skatteetaten."
-        )
+        raise ValueError("Fant ikke <partsnummer> i forhåndsutfylt skattemelding fra Skatteetaten.")
     return int(element.text)
 
 

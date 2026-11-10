@@ -24,6 +24,7 @@ Lenken er ferskvare (HANDOFF_MAKS_ALDER), ikke engangsbruk.
 ID-porten gir oss et transient fødselsnummer (`pid`) ved innlogging; det lagres aldri. Ellers:
 ingen e-post, ingen passord, ingen database.
 """
+
 import time
 from collections import defaultdict, deque
 
@@ -200,9 +201,15 @@ def velg_org(body: TilgangBody, request: Request) -> dict:
     if not request.session.get("via_idporten") or not navn:
         raise HTTPException(status_code=401, detail="Logg inn med ID-porten først.")
 
-    klient_ip = request.headers.get("fly-client-ip") or (request.client.host if request.client else "ukjent")
+    klient_ip = request.headers.get("fly-client-ip") or (
+        request.client.host if request.client else "ukjent"
+    )
     if not _rate_ok(klient_ip):
-        return {"ok": False, "feil": "For mange forsøk. Vent litt og prøv igjen.", "kontakt": s.kontakt}
+        return {
+            "ok": False,
+            "feil": "For mange forsøk. Vent litt og prøv igjen.",
+            "kontakt": s.kontakt,
+        }
 
     orgnr = _normaliser_orgnr(body.org)
     if not _gyldig_orgnr(orgnr):
@@ -263,7 +270,10 @@ def bruk_handoff(body: HandoffBody, request: Request) -> dict:
     try:
         payload = _handoff_serializer().loads(body.token, max_age=_HANDOFF_MAKS_ALDER)
     except SignatureExpired:
-        return {"invited": False, "feil": "Overføringslenken er utløpt. Lag en ny på den andre enheten."}
+        return {
+            "invited": False,
+            "feil": "Overføringslenken er utløpt. Lag en ny på den andre enheten.",
+        }
     except BadSignature:
         return {"invited": False, "feil": "Ugyldig overføringslenke."}
     org = payload.get("org") if isinstance(payload, dict) else None

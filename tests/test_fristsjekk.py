@@ -7,8 +7,7 @@ Alle HTTP-kall er mocket — testene gjør ingen ekte nettverkskall.
 
 import os
 from datetime import date
-from unittest.mock import patch, MagicMock
-from xml.etree import ElementTree as ET
+from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
@@ -17,9 +16,9 @@ from wenche.fristsjekk import (
     FristStatus,
     neste_frist,
     regnskapsaar_for_frist,
-    sjekk_skattemelding,
     sjekk_aarsregnskap,
     sjekk_aksjonaerregister,
+    sjekk_skattemelding,
 )
 
 
@@ -65,6 +64,7 @@ def _mock_response(status_code: int = 200, text: str = "", json_data=None) -> Ma
 # Skattemelding
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def prod_env():
     """Kjør test med WENCHE_ENV=prod slik at sjekk_skattemelding går full flyt."""
@@ -73,7 +73,6 @@ def prod_env():
 
 
 class TestSjekkSkattemelding:
-
     @patch("wenche.fristsjekk.httpx.get")
     def test_fastsatt_gir_innfridd(self, mock_get, prod_env):
         """Respons med skattemeldingUpersonligFastsatt → innfridd=True."""
@@ -149,7 +148,9 @@ class TestSjekkSkattemelding:
         with patch("wenche.auth.get_skd_skattemelding_maskinporten_token", return_value="t"):
             mock_get.side_effect = [
                 _mock_response(status_code=403),  # 2026 – ikke åpnet ennå
-                _mock_response(text=_wrapper_xml("skattemeldingUpersonligFastsatt")),  # 2025 – levert
+                _mock_response(
+                    text=_wrapper_xml("skattemeldingUpersonligFastsatt")
+                ),  # 2025 – levert
             ]
             result = sjekk_skattemelding("931808869", 2026)
 
@@ -224,18 +225,20 @@ class TestSjekkSkattemelding:
 # Årsregnskap
 # ---------------------------------------------------------------------------
 
-class TestSjekkAarsregnskap:
 
+class TestSjekkAarsregnskap:
     @patch("wenche.fristsjekk.httpx.get")
     def test_regnskap_funnet_gir_innfridd(self, mock_get):
         """Regnskap for riktig år i BRG-respons → innfridd=True."""
-        mock_get.return_value = _mock_response(json_data=[
-            {
-                "regnskapsperiode": {"fraDato": "2025-01-01", "tilDato": "2025-12-31"},
-                "mottaksdag": "2026-04-15",
-                "journalnr": "2026505123",
-            },
-        ])
+        mock_get.return_value = _mock_response(
+            json_data=[
+                {
+                    "regnskapsperiode": {"fraDato": "2025-01-01", "tilDato": "2025-12-31"},
+                    "mottaksdag": "2026-04-15",
+                    "journalnr": "2026505123",
+                },
+            ]
+        )
         result = sjekk_aarsregnskap("931808869", 2025)
 
         assert result.innfridd is True
@@ -248,9 +251,11 @@ class TestSjekkAarsregnskap:
     @patch("wenche.fristsjekk.httpx.get")
     def test_manglende_journalnr_gir_none_referanse(self, mock_get):
         """BRG-svar uten journalnr → innfridd, men referanse=None (vises ikke)."""
-        mock_get.return_value = _mock_response(json_data=[
-            {"regnskapsperiode": {"fraDato": "2025-01-01", "tilDato": "2025-12-31"}},
-        ])
+        mock_get.return_value = _mock_response(
+            json_data=[
+                {"regnskapsperiode": {"fraDato": "2025-01-01", "tilDato": "2025-12-31"}},
+            ]
+        )
         result = sjekk_aarsregnskap("931808869", 2025)
 
         assert result.innfridd is True
@@ -259,11 +264,13 @@ class TestSjekkAarsregnskap:
     @patch("wenche.fristsjekk.httpx.get")
     def test_annet_aar_gir_ikke_innfridd(self, mock_get):
         """Kun regnskap for 2024 i respons, spør etter 2025 → innfridd=False."""
-        mock_get.return_value = _mock_response(json_data=[
-            {
-                "regnskapsperiode": {"fraDato": "2024-01-01", "tilDato": "2024-12-31"},
-            },
-        ])
+        mock_get.return_value = _mock_response(
+            json_data=[
+                {
+                    "regnskapsperiode": {"fraDato": "2024-01-01", "tilDato": "2024-12-31"},
+                },
+            ]
+        )
         result = sjekk_aarsregnskap("931808869", 2025)
 
         assert result.innfridd is False
@@ -327,8 +334,8 @@ class TestSjekkAarsregnskap:
 # Aksjonærregister
 # ---------------------------------------------------------------------------
 
-class TestSjekkAksjonaerregister:
 
+class TestSjekkAksjonaerregister:
     def test_returnerer_alltid_ikke_innfridd(self):
         """Ingen offentlig API — skal alltid returnere innfridd=False."""
         result = sjekk_aksjonaerregister("931808869", 2025)
@@ -341,8 +348,8 @@ class TestSjekkAksjonaerregister:
 # FristStatus dataklasse
 # ---------------------------------------------------------------------------
 
-class TestFristStatus:
 
+class TestFristStatus:
     def test_standardverdier(self):
         """FristStatus() med standardverdier skal være ikke-innfridd."""
         status = FristStatus()
@@ -366,8 +373,8 @@ class TestFristStatus:
 # Frist-dato og regnskapsår-utregning
 # ---------------------------------------------------------------------------
 
-class TestRegnskapsaarForFrist:
 
+class TestRegnskapsaarForFrist:
     def test_skattemelding_frist_31_mai_etter_idag(self):
         """18. mai 2026: neste 31. mai er 2026 → regnskapsår 2025."""
         with patch("wenche.fristsjekk.date", _freeze_today(date(2026, 5, 18))):
@@ -395,7 +402,6 @@ class TestRegnskapsaarForFrist:
 
 
 class TestNesteFrist:
-
     def test_frist_i_fremtiden_samme_aar(self):
         with patch("wenche.fristsjekk.date", _freeze_today(date(2026, 5, 18))):
             assert neste_frist(7, 31) == date(2026, 7, 31)
@@ -408,6 +414,7 @@ class TestNesteFrist:
 # ---------------------------------------------------------------------------
 # Miljøhåndtering: fristsjekken skal aldri mutere prosessens WENCHE_ENV
 # ---------------------------------------------------------------------------
+
 
 def test_sjekk_skattemelding_muterer_ikke_environ(monkeypatch):
     """

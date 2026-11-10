@@ -40,14 +40,9 @@ from wenche.models import (
 )
 from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
 
-_NS = (
-    "urn:no:skatteetaten:fastsetting:formueinntekt:"
-    "naeringsspesifikasjon:ekstern:v6"
-)
+_NS = "urn:no:skatteetaten:fastsetting:formueinntekt:naeringsspesifikasjon:ekstern:v6"
 _KODELISTE_NS = "urn:no:skatteetaten:informasjonsforvaltning:kodeliste:v2"
-_KODELISTE = (
-    Path(__file__).parent / "kodelister" / "2025_egenkapitalendringstype.xml"
-)
+_KODELISTE = Path(__file__).parent / "kodelister" / "2025_egenkapitalendringstype.xml"
 _PARTSNUMMER = 3001587644
 
 # Hver kode Wenche kan sende i egenkapitalavstemmingen, med siden den havner på.
@@ -119,9 +114,7 @@ def _resultat(*, inntekt: float = 0.0, kostnad: float = 0.0) -> Resultatregnskap
 
 def _endringer(regnskap: Aarsregnskap) -> list[tuple[str, float]]:
     """(kode, beløp) i den rekkefølgen de står i XML-en."""
-    root = fromstring(
-        generer_naeringsspesifikasjon(regnskap, _PARTSNUMMER).decode("utf-8")
-    )
+    root = fromstring(generer_naeringsspesifikasjon(regnskap, _PARTSNUMMER).decode("utf-8"))
     avstemming = root.find(f"{{{_NS}}}egenkapitalavstemming")
     assert avstemming is not None
     endringer = []
@@ -136,9 +129,7 @@ def _endringer(regnskap: Aarsregnskap) -> list[tuple[str, float]]:
 
 def _summer(regnskap: Aarsregnskap) -> tuple[float, float]:
     """(sumTilleggIEgenkapital, sumFradragIEgenkapital), 0 når elementet mangler."""
-    root = fromstring(
-        generer_naeringsspesifikasjon(regnskap, _PARTSNUMMER).decode("utf-8")
-    )
+    root = fromstring(generer_naeringsspesifikasjon(regnskap, _PARTSNUMMER).decode("utf-8"))
     avstemming = root.find(f"{{{_NS}}}egenkapitalavstemming")
     assert avstemming is not None
 
@@ -152,6 +143,7 @@ def _summer(regnskap: Aarsregnskap) -> tuple[float, float]:
 # ---------------------------------------------------------------------------
 # Tilfellene, ett per rad. Dekker til sammen alle kodene i KODER.
 # ---------------------------------------------------------------------------
+
 
 def _nystiftet_med_tinginnskudd(tinginnskudd: float = 70000) -> Aarsregnskap:
     """Stiftet i regnskapsåret med 30k kontant + 70k ting, driftsunderskudd 6 500."""
@@ -228,7 +220,6 @@ def _nedgang_stoerre_enn_utbytte() -> Aarsregnskap:
     )
 
 
-
 def _avsatt_utbytte() -> Aarsregnskap:
     """Avsetningsstien: overskudd 95 000, styret foreslår 80 000, ingenting utbetalt i året."""
     return Aarsregnskap(
@@ -264,12 +255,13 @@ def _avsatt_og_utbetalt_samme_aar() -> Aarsregnskap:
             avsatt_utbytte=50000,
         ),
         foregaaende_aar_balanse=_balanse(
-            aksjekapital=30000, annen_egenkapital=-15000, bankinnskudd=95000,
+            aksjekapital=30000,
+            annen_egenkapital=-15000,
+            bankinnskudd=95000,
             avsatt_utbytte=80000,
         ),
         utbytte_utbetalt=80000,
     )
-
 
 
 def _utbetaling_av_fjoraarets_avsetning() -> Aarsregnskap:
@@ -286,7 +278,9 @@ def _utbetaling_av_fjoraarets_avsetning() -> Aarsregnskap:
         resultatregnskap=_resultat(),
         balanse=_balanse(aksjekapital=30000, annen_egenkapital=30000, bankinnskudd=60000),
         foregaaende_aar_balanse=_balanse(
-            aksjekapital=30000, annen_egenkapital=50000, bankinnskudd=160000,
+            aksjekapital=30000,
+            annen_egenkapital=50000,
+            bankinnskudd=160000,
             avsatt_utbytte=80000,
         ),
         utbytte_utbetalt=80000,
@@ -308,6 +302,7 @@ ALLE_TILFELLER = [
 # ---------------------------------------------------------------------------
 # Tinginnskudd (punkt 1 i issue #159)
 # ---------------------------------------------------------------------------
+
 
 class TestTinginnskudd:
     def test_deler_stiftelsesinnskuddet_i_kontant_og_ting(self):
@@ -369,6 +364,7 @@ class TestTinginnskudd:
 # Utbytte (punkt 2 i issue #159)
 # ---------------------------------------------------------------------------
 
+
 class TestUtbytte:
     def test_utbytte_rapporteres_som_tilleggsutbytte(self):
         assert _endringer(_overskudd_med_utbytte()) == [
@@ -401,14 +397,13 @@ class TestUtbytte:
         ]
 
     def test_positiv_rest_er_uberoert_av_utbytte(self):
-        assert _endringer(_uforklart_oekning()) == [
-            ("annenPositivEndringIEgenkapital", 20000.0)
-        ]
+        assert _endringer(_uforklart_oekning()) == [("annenPositivEndringIEgenkapital", 20000.0)]
 
 
 # ---------------------------------------------------------------------------
 # Avsatt utbytte (issue #167)
 # ---------------------------------------------------------------------------
+
 
 class TestAvsattUtbytte:
     def test_avsetningen_faar_egen_kode(self):
@@ -453,7 +448,6 @@ class TestAvsattUtbytte:
             ("avsattEllerForventetUtbytte", 80000.0),
         ]
 
-
     def test_utbetaling_av_fjoraarets_avsetning_forklarer_ingenting(self):
         """
         Regresjon: omklassifiseringen så bare på utbetalt utbytte, så et egenkapitalfall som
@@ -467,7 +461,7 @@ class TestAvsattUtbytte:
     def test_utdeling_utover_fjoraarets_avsetning_er_vedtatt_i_aar(self):
         """Bare den delen som gjør opp avsetningen trekkes fra; resten er årets utdeling."""
         regnskap = _utbetaling_av_fjoraarets_avsetning()
-        regnskap.utbytte_utbetalt = 95000        # 80 000 gjør opp fjoråret, 15 000 er nytt
+        regnskap.utbytte_utbetalt = 95000  # 80 000 gjør opp fjoråret, 15 000 er nytt
 
         assert _endringer(regnskap) == [
             ("tilleggsutbytte", 15000.0),
@@ -479,6 +473,7 @@ class TestAvsattUtbytte:
 # Kodelistevakten
 # ---------------------------------------------------------------------------
 
+
 def _kodeliste() -> dict[str, dict]:
     """{teknisk navn: {kategori, virksomhetstyper, regnskapspliktstyper}} fra fixturen."""
     root = fromstring(_KODELISTE.read_text(encoding="utf-8"))
@@ -489,12 +484,10 @@ def _kodeliste() -> dict[str, dict]:
         koder[navn] = {
             "kategori": tillegg.findtext(f"{{{_KODELISTE_NS}}}kategori"),
             "virksomhetstyper": {
-                el.text
-                for el in tillegg.findall(f"{{{_KODELISTE_NS}}}virksomhetstype")
+                el.text for el in tillegg.findall(f"{{{_KODELISTE_NS}}}virksomhetstype")
             },
             "regnskapspliktstyper": {
-                el.text
-                for el in tillegg.findall(f"{{{_KODELISTE_NS}}}regnskapspliktstype")
+                el.text for el in tillegg.findall(f"{{{_KODELISTE_NS}}}regnskapspliktstype")
             },
         }
     return koder

@@ -10,6 +10,7 @@ Kjør sammen med Vite-dev-serveren i en egen terminal:
 backenden serverer KUN /api (serve_spa=False), så den ikke kolliderer med Vite, og auto-
 reloader ved Python-endringer.
 """
+
 import os
 
 os.environ.setdefault("WENCHE_ENV", "test")

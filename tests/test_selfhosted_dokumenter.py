@@ -5,6 +5,7 @@ Speiler test_hosted_dokumenter.py: alle fire dokumenttyper genereres som base64-
 fra config i request-body, ugyldig config gir 422. Frist-endepunktet gir statisk info uten
 nettverkskall; live-sjekken er av i testmiljø.
 """
+
 import base64
 
 import pytest
@@ -33,6 +34,7 @@ def klient(monkeypatch):
 # ---------------------------------------------------------------------------
 # Dokumenter
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.parametrize("type_", ["skattemelding", "aarsregnskap", "aksjonaer", "noter"])
 def test_dokumenter_genereres(klient, type_):
@@ -72,11 +74,16 @@ def test_aksjonaer_ugyldig_foedselsnummer_gir_422(klient):
 # Frister og helse
 # ---------------------------------------------------------------------------
 
+
 def test_frister_statisk_info(klient):
     data = klient.get("/api/frister").json()
     assert data["env"] == "test"
     assert data["statussjekk_aktiv"] is False  # aldri live-sjekk i testmiljø
-    assert {f["key"] for f in data["frister"]} == {"skattemelding", "aarsregnskap", "aksjonaerregister"}
+    assert {f["key"] for f in data["frister"]} == {
+        "skattemelding",
+        "aarsregnskap",
+        "aksjonaerregister",
+    }
     for f in data["frister"]:
         assert f["neste_frist"]  # ISO-dato satt
 

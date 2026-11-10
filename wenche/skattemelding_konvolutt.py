@@ -17,8 +17,7 @@ import base64
 from xml.etree.ElementTree import Element, SubElement, tostring
 
 _NAMESPACE = (
-    "no:skatteetaten:fastsetting:formueinntekt:"
-    "skattemeldingognaeringsspesifikasjon:request:v2"
+    "no:skatteetaten:fastsetting:formueinntekt:skattemeldingognaeringsspesifikasjon:request:v2"
 )
 
 

@@ -20,6 +20,7 @@ Argumenter: <orgnr> [inntektsår].  Standard inntektsår: 2025.  Credsene leses 
 Read-only: gjør kun en GET (henting/visning), sender ingenting inn og endrer ingenting hos
 Skatteetaten.
 """
+
 import os
 import sys
 

@@ -20,6 +20,7 @@ from xml.etree.ElementTree import fromstring
 
 import pytest
 
+from tests.test_saft import _konto, _saft_xml
 from wenche import aarsregnskap as ar
 from wenche import skattemelding as sm
 from wenche.brg_xml import generer_underskjema
@@ -37,8 +38,6 @@ from wenche.models import (
 from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
 from wenche.saft import importer_bytes
 from wenche.skatteberegning import beregn_skatt
-
-from tests.test_saft import _konto, _saft_xml
 
 _NS = "{urn:no:skatteetaten:fastsetting:formueinntekt:naeringsspesifikasjon:ekstern:v6}"
 _PARTSNUMMER = 123456789
@@ -59,9 +58,7 @@ def _regnskap(selskap, finansposter: Finansposter) -> Aarsregnskap:
                 omloepmidler=Omloepmidler(bankinnskudd=30000 + r.aarsresultat),
             ),
             egenkapital_og_gjeld=EgenkapitalOgGjeld(
-                egenkapital=Egenkapital(
-                    aksjekapital=30000, annen_egenkapital=r.aarsresultat
-                ),
+                egenkapital=Egenkapital(aksjekapital=30000, annen_egenkapital=r.aarsresultat),
             ),
         ),
     )
@@ -73,9 +70,7 @@ def _uten_rad_id(xml: bytes) -> bytes:
 
 
 def _root(regnskap, konfig=None):
-    return fromstring(
-        generer_naeringsspesifikasjon(regnskap, _PARTSNUMMER, konfig).decode("utf-8")
-    )
+    return fromstring(generer_naeringsspesifikasjon(regnskap, _PARTSNUMMER, konfig).decode("utf-8"))
 
 
 def _forskjeller(root) -> dict[str, float]:
@@ -96,9 +91,7 @@ def _skattemessig(root) -> float:
 
 
 def _aarsresultat(root) -> float:
-    return float(
-        root.find(f"{_NS}resultatregnskap/{_NS}aarsresultat/{_NS}beloep/{_NS}beloep").text
-    )
+    return float(root.find(f"{_NS}resultatregnskap/{_NS}aarsresultat/{_NS}beloep/{_NS}beloep").text)
 
 
 def _resultatkoder(root) -> dict[str, str]:
@@ -106,9 +99,7 @@ def _resultatkoder(root) -> dict[str, str]:
     koder = {}
     for seksjon in ("finansinntekt", "finanskostnad"):
         for el in root.findall(f"{_NS}resultatregnskap/{_NS}{seksjon}/*"):
-            koder[el.find(f"{_NS}id").text] = el.find(
-                f"{_NS}beloep/{_NS}beloep/{_NS}beloep"
-            ).text
+            koder[el.find(f"{_NS}id").text] = el.find(f"{_NS}beloep/{_NS}beloep/{_NS}beloep").text
     return koder
 
 
@@ -206,9 +197,7 @@ class TestNaeringsspesifikasjon:
                 gevinst_ved_realisasjon_av_aksjer=200000, tap_ved_realisasjon_av_aksjer=50000
             ),
         )
-        forskjell = _root(regnskap).find(
-            f"{_NS}forskjellMellomRegnskapsmessigOgSkattemessigVerdi"
-        )
+        forskjell = _root(regnskap).find(f"{_NS}forskjellMellomRegnskapsmessigOgSkattemessigVerdi")
         tillegg = forskjell.find(f"{_NS}sumTilleggINaeringsinntekt/{_NS}beloep/{_NS}beloep")
         fradrag = forskjell.find(f"{_NS}sumFradragINaeringsinntekt/{_NS}beloep/{_NS}beloep")
         assert tillegg.text == "50000.00"
@@ -225,9 +214,7 @@ class TestNaeringsspesifikasjon:
     def test_sammen_med_utbytte(self, eksempel_selskap):
         regnskap = _regnskap(
             eksempel_selskap,
-            Finansposter(
-                utbytte_fra_datterselskap=100000, gevinst_ved_realisasjon_av_aksjer=40000
-            ),
+            Finansposter(utbytte_fra_datterselskap=100000, gevinst_ved_realisasjon_av_aksjer=40000),
         )
         root = _root(regnskap, SkattemeldingKonfig(eierandel_for_fritaksmetoden=30))
         assert _forskjeller(root) == {
@@ -278,9 +265,7 @@ class TestBakoverkompatibilitet:
         # lik enten beløpet er skilt ut eller ikke.
         foer = _regnskap(eksempel_selskap, Finansposter(andre_finanskostnader=50000))
         etter = _regnskap(eksempel_selskap, Finansposter(tap_ved_realisasjon_av_aksjer=50000))
-        assert _uten_rad_id(generer_underskjema(foer)) == _uten_rad_id(
-            generer_underskjema(etter)
-        )
+        assert _uten_rad_id(generer_underskjema(foer)) == _uten_rad_id(generer_underskjema(etter))
 
     def test_gevinst_rapporteres_som_annen_finansinntekt(self, eksempel_selskap):
         # Gevinsten er ingen renteinntekt. Den står på linjen for annen finansinntekt

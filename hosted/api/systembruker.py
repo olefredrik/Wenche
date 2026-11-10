@@ -11,6 +11,7 @@ Gjenbruker `wenche.systembruker` (samme kode som self-hosted). Forespørsels-id 
 holdes i den signerte session-cookien, ikke i serverminnet eller filer, så en sovende/
 restartende maskin ikke mister en alt etablert tilkobling.
 """
+
 import logging
 
 from fastapi import APIRouter, HTTPException, Request
