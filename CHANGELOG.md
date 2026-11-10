@@ -4,6 +4,43 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.10.3] - 2026-11-10
+
+### Sikkerhet
+
+- **Den lokale serveren avviser nå kall fra andre nettsteder.** `wenche` lytter på 127.0.0.1
+  uten innlogging, og et nettsted du besøkte mens den kjørte, kunne sende forespørsler til den:
+  opprette systembruker-forespørsler, skrive over nøkkel og oppsett, og (med DNS-rebinding) lese
+  config-fila med aksjonærenes fødselsnummer. Serveren krever nå at vertsnavnet er loopback,
+  avviser forespørsler med fremmed opprinnelse, og krever en egen header på alle endringskall,
+  som webgrensesnittet setter selv.
+- **Rollesjekken i hostet Wenche godtar bare daglig leder og styreleder.** Navnematchen mot
+  Enhetsregisteret godtok alle aktive roller, også styremedlemmer, varamedlemmer, revisor og
+  regnskapsfører, mens tilkoblingen uten ny BankID forutsetter de to første.
+- **Invite- og overføringslenker bærer tokenet i URL-fragmentet** (`#invite=`, `#handoff=`).
+  Fragmentet sendes aldri til serveren, og access-loggen i den hostede tjenesten er skrudd av,
+  så tokenene kan ikke havne i logger. Eldre lenker med `?invite=` virker fortsatt.
+- **Hemmeligheter og personopplysninger skrives med 0600 fra første byte** og byttes inn
+  atomisk (token-cache, privat nøkkel, config, systembruker-tilstand), i stedet for å stramme
+  rettighetene etter at fila er skrevet.
+- **ID-porten:** nøkkelsettet (JWKS) hentes på nytt når ID-porten roterer nøkler og fornyes
+  daglig, bare RS256 godtas, utløpstiden er påkrevd, og en avvist token gir en melding til
+  brukeren i stedet for en serverfeil. Callbacken sender en feilkode, ikke fritekst, så ingen
+  kan lage en lenke som viser en vilkårlig melding i banneret.
+- **Demo-appen (offentlig, mot tt02) får samme vern som prod:** den nekter å starte uten egne
+  hemmeligheter, setter `Secure` på sesjonscookien, og tillater ingen fremmede CORS-origins.
+  Kriteriet er om `HOSTED_PUBLIC_URL` peker utenfor loopback, ikke bare `WENCHE_ENV=prod`.
+- `.dockerignore` holder `config.yaml` og `config.dev.yaml` utenfor byggekonteksten som sendes
+  til Flys builder ved deploy.
+- Svar fra Skatteetaten parses med defusedxml, slik SAF-T-filer alt ble.
+- Den private nøkkelen tas ikke med i `repr` av credentials-objektet.
+
+### Rettet
+
+- **Selskapsnavn med `&`, `<` eller `>` ga ugyldig XML til Brønnøysundregistrene.** Navn,
+  organisasjonsnummer og signatar i årsregnskapets hovedskjema escapes nå, som i de andre
+  skjemaene.
+
 ## [1.10.2] - 2026-11-09
 
 ### Rettet
