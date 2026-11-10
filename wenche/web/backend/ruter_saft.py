@@ -29,7 +29,7 @@ def _les_med_grense(data: bytes) -> dict:
     except HTTPException:
         raise
     except Exception as e:  # ugyldig/uventet XML
-        raise HTTPException(status_code=422, detail=f"Kunne ikke lese SAF-T-filen: {e}")
+        raise HTTPException(status_code=422, detail=f"Kunne ikke lese SAF-T-filen: {e}") from e
 
 
 @router.post("/import")

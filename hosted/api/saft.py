@@ -35,7 +35,7 @@ async def importer_saft(request: Request, foregaaende: bool = Query(False)) -> d
     try:
         config = importer_bytes(data)
     except Exception as e:  # ugyldig/uventet XML
-        raise HTTPException(status_code=422, detail=f"Kunne ikke lese SAF-T-filen: {e}")
+        raise HTTPException(status_code=422, detail=f"Kunne ikke lese SAF-T-filen: {e}") from e
     if foregaaende:
         # Fjorårets SAF-T: dens sluttsaldoer er fjorårets resultat og balanse (sammenligningstall).
         return {
