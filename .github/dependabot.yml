@@ -15,6 +15,12 @@ updates:
     schedule:
       interval: weekly
     groups:
+      # Pakker som må bumpes sammen: react-dom krever samme major som react (ellers ERESOLVE),
+      # og @vitejs/plugin-react krever bestemt vite-major. Første gruppe som passer, vinner.
+      react:
+        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
+      vite:
+        patterns: ["vite", "@vitejs/*", "@tailwindcss/vite"]
       npm-mindre:
         update-types: [minor, patch]
   - package-ecosystem: github-actions
