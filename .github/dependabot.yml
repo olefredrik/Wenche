@@ -1,0 +1,30 @@
+# Dependabot holder avhengigheter og actions oppdatert. Mindre oppdateringer (minor/patch)
+# samles i én PR per økosystem per uke, så ikke hver lille bump blir en egen PR. Major-bumper
+# kommer hver for seg, siden de kan kreve endringer.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      python-mindre:
+        update-types: [minor, patch]
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      npm-mindre:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        update-types: [minor, patch]
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
