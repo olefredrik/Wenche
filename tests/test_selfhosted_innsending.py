@@ -52,7 +52,12 @@ def klient(monkeypatch):
     monkeypatch.setattr(miljo, "_AKTIV_ENV", miljo._AKTIV_ENV)
     monkeypatch.setenv("WENCHE_ENV", "test")
     monkeypatch.setenv("SKD_TEST_ORG_NUMMER", "310137715")
-    with TestClient(lag_app(env="test", serve_spa=False)) as klient:
+    with TestClient(
+        lag_app(env="test", serve_spa=False),
+        # Vakten i vakt.py krever loopback-Host og klientheaderen på endringskall.
+        base_url="http://127.0.0.1",
+        headers={"X-Wenche-Klient": "1"},
+    ) as klient:
         yield klient
 
 

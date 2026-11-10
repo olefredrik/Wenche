@@ -8,8 +8,16 @@ export interface ApiFeil extends Error {
 export async function req(path: string, opts: RequestInit = {}): Promise<any> {
   const res = await fetch(path, {
     credentials: "same-origin",
-    headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
     ...opts,
+    headers: {
+      "Content-Type": "application/json",
+      // Self-hosted-backenden krever denne på alle endringskall (wenche/web/backend/vakt.py):
+      // en egendefinert header tvinger CORS-preflight, så et fremmed nettsted ikke kan kalle den
+      // lokale serveren. Hostet ignorerer den. Må stå etter ...opts, ellers ville et opts.headers
+      // erstatte hele objektet og miste både Content-Type og denne.
+      "X-Wenche-Klient": "1",
+      ...(opts.headers || {}),
+    },
   });
   const tekst = await res.text();
   // Tål ikke-JSON-svar (f.eks. en 500 «Internal Server Error» eller en proxy-feilside),
