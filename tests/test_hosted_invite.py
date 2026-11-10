@@ -260,6 +260,34 @@ def test_prod_uten_secrets_nekter_oppstart(monkeypatch):
         Settings()
 
 
+def test_offentlig_url_uten_secrets_nekter_oppstart(monkeypatch):
+    """Demo kjører offentlig med WENCHE_ENV=test; dev-hemmelighetene skal ikke duge der heller."""
+    monkeypatch.setenv("WENCHE_ENV", "test")
+    monkeypatch.setenv("HOSTED_PUBLIC_URL", "https://demo.example.cloud")
+    monkeypatch.delenv("HOSTED_SESSION_SECRET", raising=False)
+    monkeypatch.delenv("HOSTED_INVITE_SECRET", raising=False)
+    from hosted.api.config import Settings
+
+    with pytest.raises(RuntimeError, match="offentlig .* uten egne hemmeligheter"):
+        Settings()
+
+
+def test_offentlig_url_gir_tom_cors_liste(monkeypatch):
+    """I offentlig drift serveres SPA-en fra samme origin; dev-originen skal ikke henge igjen."""
+    monkeypatch.setenv("WENCHE_ENV", "test")
+    monkeypatch.setenv("HOSTED_SESSION_SECRET", "egen-session")
+    monkeypatch.setenv("HOSTED_INVITE_SECRET", "egen-invite")
+    monkeypatch.delenv("HOSTED_CORS_ORIGINS", raising=False)
+    from hosted.api.config import Settings
+
+    monkeypatch.setenv("HOSTED_PUBLIC_URL", "https://demo.example.cloud")
+    assert Settings().er_offentlig is True
+    assert Settings().cors_origins == []
+    monkeypatch.setenv("HOSTED_PUBLIC_URL", "http://127.0.0.1:5173")
+    assert Settings().er_offentlig is False
+    assert "http://localhost:5173" in Settings().cors_origins
+
+
 def test_api_dokumentasjon_er_slaatt_av(klient):
     """/docs, /redoc og /openapi.json skal ikke eksponere API-skjemaet offentlig."""
     for sti in ("/docs", "/redoc", "/openapi.json"):
