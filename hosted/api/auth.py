@@ -71,7 +71,8 @@ def _handoff_serializer() -> URLSafeTimedSerializer:
 
 
 def lag_invite_token(org: str) -> str:
-    """Lag invite-token for ETT bestemt selskap. Del ut som {public_url}/?invite=<token>."""
+    """Lag invite-token for ETT bestemt selskap. Del ut som {public_url}/#invite=<token>
+    (fragmentet sendes aldri til serveren, så tokenet havner ikke i logger)."""
     return _serializer().dumps({"org": str(org).strip()})
 
 
@@ -114,7 +115,9 @@ def _navn_matcher(innsendt: str, kandidater: list[str]) -> bool:
 
 def _hent_rolleinnehavere(orgnr: str) -> list[str]:
     """
-    Navn på aktive daglig leder/styre fra Enhetsregisteret, til navnematch i velg_org.
+    Navn på aktiv daglig leder og styreleder fra Enhetsregisteret, til navnematch i velg_org.
+    Bare de to: et styremedlem, en revisor eller en regnskapsfører har ikke fullmakten
+    porten skal bevise, og AlreadyApproved-snarveien i systembruker.py hviler på dette.
     Beholder en streng feilkontrakt med vilje: 404 gir tom liste, men nettverks- og serverfeil
     propageres (raise_for_status), så velg_org kan skille «fant ikke navnet» fra «fikk ikke
     kontakt med registeret». Selve parsingen deles med wenche.brreg (forhåndsfyll-stien).
@@ -127,11 +130,14 @@ def _hent_rolleinnehavere(orgnr: str) -> list[str]:
     if resp.status_code == 404:
         return []
     resp.raise_for_status()
-    return brreg.parse_roller(resp.json())["alle"]
+    return brreg.parse_roller(resp.json())["ledelse"]
 
 
 def _rate_ok(nokkel: str) -> bool:
     naa = time.monotonic()
+    # Rydd bort adresser uten forsøk i vinduet, så tabellen ikke vokser med hver nye IP.
+    for gammel in [k for k, q in _RATE.items() if not q or naa - q[-1] > _RATE_VINDU]:
+        del _RATE[gammel]
     q = _RATE[nokkel]
     while q and naa - q[0] > _RATE_VINDU:
         q.popleft()
@@ -244,7 +250,9 @@ def lag_handoff(request: Request) -> dict:
         )
     token = _handoff_serializer().dumps({"org": str(org)})
     return {
-        "lenke": f"{settings().public_url}/?handoff={token}",
+        # Fragment, ikke query: fragmentet sendes aldri til serveren, så tokenet havner ikke i
+        # noen access-logg. SPA-en leser det og rydder URL-en før den sporer sidevisningen.
+        "lenke": f"{settings().public_url}/#handoff={token}",
         "gyldig_sekunder": _HANDOFF_MAKS_ALDER,
     }
 

@@ -33,7 +33,8 @@ def klient(monkeypatch):
     from hosted.api import main as main_mod
 
     importlib.reload(main_mod)
-    with TestClient(main_mod.app) as klient:
+    # https: med offentlig HOSTED_PUBLIC_URL får sesjonscookien Secure-flagget.
+    with TestClient(main_mod.app, base_url="https://testserver") as klient:
         yield klient
     config.settings.cache_clear()
 
@@ -63,7 +64,8 @@ def test_handoff_til_ny_enhet_arver_binding(klient, monkeypatch):
     _koble(klient, monkeypatch, org="314273818")
 
     r = klient.post("/api/auth/handoff/create").json()
-    assert r["lenke"].startswith("https://app.example.cloud/?handoff=")
+    # Fragment, ikke query: tokenet skal aldri sendes til serveren (access-logg).
+    assert r["lenke"].startswith("https://app.example.cloud/#handoff=")
     assert r["gyldig_sekunder"] == 300
     token = r["lenke"].split("handoff=", 1)[1]
 
@@ -72,7 +74,8 @@ def test_handoff_til_ny_enhet_arver_binding(klient, monkeypatch):
     from hosted.api import main as main_mod
 
     importlib.reload(main_mod)
-    with TestClient(main_mod.app) as enhet2:
+    # https: med offentlig HOSTED_PUBLIC_URL får sesjonscookien Secure-flagget.
+    with TestClient(main_mod.app, base_url="https://testserver") as enhet2:
         assert enhet2.get("/api/auth/me").json()["invited"] is False
         svar = enhet2.post("/api/auth/handoff/use", json={"token": token}).json()
         assert svar == {"invited": True, "invite_org": "314273818", "kunde_org": "314273818"}

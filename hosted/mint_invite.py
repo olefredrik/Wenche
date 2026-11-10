@@ -21,4 +21,6 @@ org = sys.argv[1].strip()
 secret = os.getenv("HOSTED_INVITE_SECRET", "dev-invite-secret-bytt-i-prod")
 public = os.getenv("HOSTED_PUBLIC_URL", "http://localhost:5173")
 token = URLSafeSerializer(secret, salt="invite").dumps({"org": org})
-print(f"{public}/?invite={token}")
+# Fragment (#), ikke query (?): fragmentet sendes aldri til serveren, så tokenet havner ikke i
+# noen access-logg. Eldre lenker med ?invite= godtas fortsatt av SPA-en.
+print(f"{public}/#invite={token}")

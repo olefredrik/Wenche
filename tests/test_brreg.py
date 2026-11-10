@@ -35,6 +35,8 @@ def test_parse_roller_plukker_daglig_leder_og_styreleder():
     assert r["daglig_leder"] == "Kari Nordmann"
     assert r["styreleder"] == "Ola F Lie"  # styreleder er rolletype LEDE i STYR-gruppen, ikke MEDL
     assert r["alle"] == ["Kari Nordmann", "Ola F Lie", "Per Hansen"]
+    # Et vanlig styremedlem er med i `alle`, men ikke i `ledelse` (navnematchen i hostet).
+    assert r["ledelse"] == ["Kari Nordmann", "Ola F Lie"]
 
 
 def test_parse_roller_hopper_over_fratraadt_og_doed():
@@ -54,10 +56,11 @@ def test_parse_roller_hopper_over_fratraadt_og_doed():
     assert r["daglig_leder"] == ""
     assert r["styreleder"] == ""
     assert r["alle"] == []
+    assert r["ledelse"] == []
 
 
 def test_parse_roller_tomt_svar():
-    assert brreg.parse_roller({}) == {"daglig_leder": "", "styreleder": "", "alle": []}
+    assert brreg.parse_roller({}) == {"daglig_leder": "", "styreleder": "", "ledelse": [], "alle": []}
 
 
 def test_parse_stiftelsesaar():
@@ -111,7 +114,7 @@ def test_hent_roller_ok(mock_get):
 @patch("wenche.brreg.httpx.get")
 def test_hent_roller_404_failsoft(mock_get):
     mock_get.return_value = _resp(status_code=404)
-    assert brreg.hent_roller("999999999") == {"daglig_leder": "", "styreleder": "", "alle": []}
+    assert brreg.hent_roller("999999999") == {"daglig_leder": "", "styreleder": "", "ledelse": [], "alle": []}
 
 
 @patch("wenche.brreg.httpx.get")
