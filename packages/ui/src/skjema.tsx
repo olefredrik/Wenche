@@ -516,7 +516,10 @@ export function DataSkjema({
   // Baseline er startverdien (lastet config regnes ikke som «ulagret»).
   const pristine = useRef(JSON.stringify(startConfig()));
   const configRef = useRef(config);
-  configRef.current = config;
+  // Oppdateres etter hver render (ikke under), så beforeunload-vakten alltid ser siste config.
+  useEffect(() => {
+    configRef.current = config;
+  });
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       if (JSON.stringify(configRef.current) !== pristine.current) {

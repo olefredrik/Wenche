@@ -715,7 +715,12 @@ export default function App() {
   const [config, setConfig] = useState<any | null>(null);
   // Feil ved innløsning av en invite-/handoff-lenke. Vises som banner så en avvist lenke ikke
   // svelges stille (se useEffect under).
-  const [lenkeFeil, setLenkeFeil] = useState<string | null>(null);
+  // Startverdi fra URL-en: ID-porten-callbacken redirecter hit med ?idp_feil=<kode> ved avbrutt
+  // eller mislykket innlogging. Lest ved mount (ikke i en effekt), ryddet ut av URL-en under.
+  const [lenkeFeil, setLenkeFeil] = useState<string | null>(() => {
+    const kode = new URLSearchParams(window.location.search).get("idp_feil");
+    return kode ? (IDP_FEIL[kode] ?? IDP_FEIL.mislyktes) : null;
+  });
 
   const refresh = () => api.me().then(setMe).catch(() => setMe({ invited: false }));
 
@@ -726,8 +731,8 @@ export default function App() {
     const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ""));
     const invite = fragment.get("invite") ?? params.get("invite");
     const handoff = fragment.get("handoff") ?? params.get("handoff");
-    // ID-porten-callbacken redirecter tilbake hit, ev. med en feilkode (avbrutt innlogging,
-    // teknisk svikt). Vis den som banner, og rydd den ut av URL-en som med invite/handoff.
+    // Feilkoden fra ID-porten-callbacken er alt vist (startverdien til lenkeFeil); her ryddes
+    // den bare ut av URL-en, som med invite/handoff.
     const idpFeil = params.get("idp_feil");
     // En invite-lenke åpner porten; en handoff-lenke (fra en alt koblet enhet) arver bindingen
     // direkte. Begge løses inn FØR URL-en ryddes og analytics kjører, så tokenet aldri lekker.
@@ -752,7 +757,6 @@ export default function App() {
         });
     } else {
       if (idpFeil) {
-        setLenkeFeil(IDP_FEIL[idpFeil] ?? IDP_FEIL.mislyktes);
         window.history.replaceState({}, "", window.location.pathname);
       }
       refresh();
