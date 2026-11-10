@@ -17,6 +17,7 @@ from fastapi import APIRouter, Body, HTTPException
 from pydantic import BaseModel
 
 from wenche import auth, systembruker
+from wenche.filer import skriv_privat
 
 from . import miljo
 
@@ -124,11 +125,7 @@ def lagre_nokkel(body: Nokkel) -> dict:
     from dotenv import set_key
 
     miljo.sikre_bruker_env_fil()
-    miljo._PRIVAT_NOKKEL_FIL.write_text(body.pem, encoding="utf-8")
-    try:
-        miljo._PRIVAT_NOKKEL_FIL.chmod(0o600)
-    except OSError:
-        pass
+    skriv_privat(miljo._PRIVAT_NOKKEL_FIL, body.pem)
     abs_sti = str(miljo._PRIVAT_NOKKEL_FIL)
     set_key(str(miljo._BRUKER_ENV_FIL), "MASKINPORTEN_PRIVAT_NOKKEL", abs_sti)
     os.environ["MASKINPORTEN_PRIVAT_NOKKEL"] = abs_sti

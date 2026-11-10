@@ -12,6 +12,8 @@ from typing import Any
 import yaml
 from fastapi import APIRouter, Body
 
+from wenche.filer import skriv_privat
+
 from . import miljo
 
 router = APIRouter(prefix="/api/config", tags=["config"])
@@ -32,12 +34,8 @@ def lagre_config(config: dict[str, Any] = Body(...)) -> dict:
     """Skriv config til aktiv config-fil (config.yaml i prod, config.dev.yaml i test)."""
     fil = miljo.config_fil()
     # Config-fila kan inneholde fødselsnummer (aksjonærer): hold den lesbar kun for eier,
-    # samme regel som token-cachen. touch setter rettighetene FØR innholdet skrives, og
-    # chmod strammer også filer som ble opprettet med videre rettigheter tidligere.
-    fil.touch(mode=0o600)
-    fil.chmod(0o600)
-    fil.write_text(
-        yaml.dump(config, allow_unicode=True, sort_keys=False),
-        encoding="utf-8",
-    )
+    # samme regel som token-cachen. skriv_privat setter rettighetene FØR innholdet skrives,
+    # bytter fila inn atomisk, og strammer også filer som ble opprettet med videre
+    # rettigheter tidligere.
+    skriv_privat(fil, yaml.dump(config, allow_unicode=True, sort_keys=False))
     return {"ok": True, "fil": str(fil.resolve())}
