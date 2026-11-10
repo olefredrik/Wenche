@@ -61,11 +61,19 @@ søsterprosjektet [Bodil](https://github.com/olefredrik/Bodil), som produserer e
 
 ```bash
 python3.11 -m venv .venv && source .venv/bin/activate
-pip install -e .
-pytest                                  # testsuite
-npm ci                                  # workspace for SPA-ene
+pip install -e ".[dev,hosted]"          # kjerne + test-/lint-verktøy + hostet-extra
+pytest                                  # testsuite (pytest --cov gir dekning)
+ruff check . && ruff format --check .   # lint og formatering (ruff format . retter)
+mypy                                    # typesjekk av wenche/ og hosted/
+npm ci                                  # workspace for SPA-ene (Node 22, se .nvmrc)
+npm run typecheck && npm run lint       # tsc for alle tre workspaces + eslint
 npm run build --workspace hosted/web    # hostet SPA
 npm run build --workspace wenche/web/frontend   # self-hosted SPA
 ```
+
+CI (`.github/workflows/test.yml`) kjører det samme på Python 3.11 til 3.14; `pre-commit install`
+gir ruff som git-hook lokalt. Konfig for ruff, mypy og dekning ligger i `pyproject.toml`.
+Docker-imaget installerer fra låsen `hosted/requirements.txt`; regenerer den med kommandoen i
+toppen av fila når avhengighetene i `pyproject.toml` endres.
 
 Dokumentasjon bygges med mkdocs (`mkdocs.yml`, `docs/`).
