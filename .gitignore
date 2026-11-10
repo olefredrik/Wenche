@@ -19,6 +19,11 @@ venv/
 .idea/
 .claude/
 .nicegui/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
 
 # Genererte filer (CLI-output i repo-roten; ankret så de ikke fanger kildefiler i undermapper)
 /site/
