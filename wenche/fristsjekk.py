@@ -23,6 +23,9 @@ from datetime import date
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
+from defusedxml import DefusedXmlException
+from defusedxml.ElementTree import fromstring as _safe_fromstring
+
 import httpx
 from dotenv import load_dotenv
 
@@ -159,8 +162,8 @@ def _hent_skattemelding_status(token: str, orgnr: str, aar: int) -> tuple[FristS
         return FristStatus(beskrivelse=f"Skatteetaten svarte med HTTP {resp.status_code}"), True
 
     try:
-        root = ET.fromstring(resp.text)
-    except ET.ParseError:
+        root = _safe_fromstring(resp.text)
+    except (ET.ParseError, DefusedXmlException):
         return FristStatus(beskrivelse="Ugyldig svar fra Skatteetaten"), True
 
     # <type>-elementet i wrapper-XML-en angir dokumentstatus.

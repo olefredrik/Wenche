@@ -22,7 +22,12 @@ from __future__ import annotations
 import base64
 import binascii
 import json
-from xml.etree.ElementTree import ParseError, fromstring
+from xml.etree.ElementTree import ParseError
+
+# Svarene kommer fra Skatteetaten, men parses likevel defensivt (som SAF-T): defusedxml
+# avviser entitetsekspansjon og eksterne referanser, og returnerer vanlige stdlib-Elementer.
+from defusedxml import DefusedXmlException
+from defusedxml.ElementTree import fromstring
 
 import httpx
 
@@ -134,7 +139,7 @@ class SkdSkattemeldingClient:
                 if content_el is not None and content_el.text:
                     dok_id = id_el.text.strip() if id_el is not None and id_el.text else None
                     return base64.b64decode(content_el.text), dok_id
-        except (ParseError, binascii.Error):
+        except (ParseError, DefusedXmlException, binascii.Error):
             pass
 
         return raw, None
