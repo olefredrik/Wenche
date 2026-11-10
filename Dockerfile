@@ -2,7 +2,7 @@
 # Multi-stage: bygg SPA-ene med Node i npm-workspacet, kjør FastAPI som serverer API + SPA.
 
 # ---- Stage 1: bygg SPA-ene i workspace ----
-FROM node:22-slim AS web
+FROM node:26-slim AS web
 WORKDIR /repo
 # Workspace-manifester først for god lag-caching.
 COPY package.json package-lock.json ./
