@@ -1,36 +1,21 @@
-# Dependabot holder avhengigheter og actions oppdatert. Mindre oppdateringer (minor/patch)
-# samles i én PR per økosystem per uke, så ikke hver lille bump blir en egen PR. Major-bumper
-# kommer hver for seg, siden de kan kreve endringer.
+# Dependabot: bare det som gir verdi for et lite soloprosjekt.
+#
+# Versjonsoppdateringer (rutinebumper) er av for pip, npm og docker. De ga en PR-strøm som ikke
+# sto i forhold til nytten, og CI melder alt kjente sårbarheter (pip-audit og npm audit).
+# Sikkerhetsoppdateringer styres av repo-innstillingen (ikke denne fila) og fortsetter som før:
+# Dependabot åpner en PR når en avhengighet får en kjent sårbarhet, også for låsen i
+# hosted/requirements.txt. Større oppgraderinger (React 19, TypeScript 7, nye majorer) tas bevisst
+# og med test når de trengs, ikke som rutine.
+#
+# Actions er med, månedlig og samlet i én PR: de er pinnet til commit-SHA, og uten bumper ville
+# pinningene aldri flyttet seg.
 version: 2
 updates:
-  - package-ecosystem: pip
-    directory: /
-    schedule:
-      interval: weekly
-    groups:
-      python-mindre:
-        update-types: [minor, patch]
-  - package-ecosystem: npm
-    directory: /
-    schedule:
-      interval: weekly
-    groups:
-      # Pakker som må bumpes sammen: react-dom krever samme major som react (ellers ERESOLVE),
-      # og @vitejs/plugin-react krever bestemt vite-major. Første gruppe som passer, vinner.
-      react:
-        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
-      vite:
-        patterns: ["vite", "@vitejs/*", "@tailwindcss/vite"]
-      npm-mindre:
-        update-types: [minor, patch]
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
+    open-pull-requests-limit: 1
     groups:
       actions:
-        update-types: [minor, patch]
-  - package-ecosystem: docker
-    directory: /
-    schedule:
-      interval: weekly
+        patterns: ["*"]
