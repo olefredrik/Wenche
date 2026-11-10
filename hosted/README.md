@@ -211,8 +211,9 @@ workflowen (fork-PR-er får uansett hverken secret eller deploy).
 ### Avhengighetene i imaget
 
 `hosted/requirements.txt` er en lås generert fra `pyproject.toml` (kjerne + `hosted`-extra), så imaget
-bygges likt hver gang i stedet for å hente nyeste versjon ved hvert bygg. Dependabot oppdaterer den
-ukentlig. Endrer du avhengigheter i `pyproject.toml`, regenerer låsen (`pip install uv` om du mangler
+bygges likt hver gang i stedet for å hente nyeste versjon ved hvert bygg. Dependabot åpner en PR når
+en pakke i låsen får en kjent sårbarhet; ellers regenereres den manuelt. Endrer du avhengigheter i
+`pyproject.toml`, eller vil ha ferske versjoner før en release, regenerer låsen (`pip install uv` om du mangler
 den):
 
 ```sh
