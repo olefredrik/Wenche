@@ -215,7 +215,7 @@ def hent_systembrukere(maskinporten_token: str, vendor_orgnr: str) -> list[dict]
     ny tilkobling.
     """
     sid = system_id(vendor_orgnr)
-    url = f"{_base()}/authentication/api/v1/systemuser/vendor/bysystem/{sid}"
+    url: str | None = f"{_base()}/authentication/api/v1/systemuser/vendor/bysystem/{sid}"
     headers = {"Authorization": f"Bearer {maskinporten_token}"}
     alle: list[dict] = []
     while url:

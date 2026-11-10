@@ -119,7 +119,7 @@ def valider_selskap(config_fil: str | dict) -> list[str]:
     feil: list[str] = []
     for key, etikett in PAAKREVDE_SELSKAPSFELT:
         verdi = s.get(key)
-        if _er_tom(verdi):
+        if verdi is None or _er_tom(verdi):
             feil.append(f"{etikett} mangler. Fyll inn under selskapsopplysninger.")
         elif key in _NUMERISKE_SELSKAPSFELT:
             try:
@@ -193,7 +193,9 @@ def _les_skattekonfig(raw: dict) -> SkattemeldingKonfig:
         eierandel_for_fritaksmetoden=_eierandel(sm_raw.get("eierandel_for_fritaksmetoden")),
         boersnotert=bool(sm_raw.get("boersnotert", False)),
         formuesverdi_aksjer=_belop(sm_raw.get("formuesverdi_aksjer")),
-        samlet_verdi_bak_aksjene=None if _er_tom(_verdi_override) else float(_verdi_override),
+        samlet_verdi_bak_aksjene=(
+            None if _verdi_override is None or _er_tom(_verdi_override) else float(_verdi_override)
+        ),
         naeringsspesifikasjonsposter=_les_naeringsspesifikasjonsposter(raw),
     )
 
@@ -216,8 +218,11 @@ def _les_naeringsspesifikasjonsposter(raw: dict) -> tuple[NaeringsspesifikasjonP
             )
         if len(kode) != 4 or not kode.isdigit():
             raise ValueError(f"Næringsspesifikasjonspost {nummer} må ha en firesifret kode.")
+        beloep_raa = post.get("beloep")
+        if beloep_raa is None:
+            raise ValueError(f"Næringsspesifikasjonspost {nummer} må ha et numerisk beløp.")
         try:
-            beloep = float(post.get("beloep"))
+            beloep = float(beloep_raa)
         except (TypeError, ValueError):
             raise ValueError(f"Næringsspesifikasjonspost {nummer} må ha et numerisk beløp.")
         if not math.isfinite(beloep):
@@ -274,7 +279,6 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
     driftskostnader = r.driftskostnader.sum
     driftsresultat = r.driftsresultat
 
-    fin_inntekter = r.finansposter.sum_inntekter
     fin_kostnader = r.finansposter.sum_kostnader
     resultat_foer_skatt = r.resultat_foer_skatt
 

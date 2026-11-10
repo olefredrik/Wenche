@@ -276,7 +276,7 @@ def _tekst(el, tag: str) -> str | None:
 
 
 def _avvik_liste(root, container_tag: str) -> list[dict]:
-    avvik = []
+    avvik: list[dict] = []
     container = root.find(f"{{*}}{container_tag}")
     if container is None:
         return avvik

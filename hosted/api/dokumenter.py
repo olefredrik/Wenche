@@ -71,13 +71,13 @@ def _bygg_noter(config: dict) -> Noter:
         antall_ansatte=int(noter_cfg.get("antall_ansatte", 0)),
         laan_til_naerstaaende=[
             LaanTilNaerstaaende(
-                motpart=l.get("motpart", l.get("mottaker", "")),
-                saldo=float(l.get("saldo", l.get("beloep", 0))),
-                retning=l.get("retning", "långiver"),
-                rente_prosent=float(l.get("rente_prosent", 0.0)),
-                sikkerhet=l.get("sikkerhet", ""),
+                motpart=laan.get("motpart", laan.get("mottaker", "")),
+                saldo=float(laan.get("saldo", laan.get("beloep", 0))),
+                retning=laan.get("retning", "långiver"),
+                rente_prosent=float(laan.get("rente_prosent", 0.0)),
+                sikkerhet=laan.get("sikkerhet", ""),
             )
-            for l in noter_cfg.get("laan_til_naerstaaende", [])
+            for laan in noter_cfg.get("laan_til_naerstaaende", [])
         ],
     )
 

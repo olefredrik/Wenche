@@ -16,8 +16,8 @@ from wenche.auth import VendorCredentials
 # Dev-standarder som ligger i åpen kildekode. De er KUN for lokal dev (WENCHE_ENV=test).
 # I prod fail-closes vi hvis de ikke er overstyrt, ellers kunne hvem som helst som leser
 # repoet lage gyldige invite-lenker og forfalske sesjonscookies.
-_DEV_SESSION_SECRET = "dev-secret-bytt-i-prod"
-_DEV_INVITE_SECRET = "dev-invite-secret-bytt-i-prod"
+_DEV_SESSION_SECRET = "dev-secret-bytt-i-prod"  # noqa: S105
+_DEV_INVITE_SECRET = "dev-invite-secret-bytt-i-prod"  # noqa: S105
 
 
 class Settings:

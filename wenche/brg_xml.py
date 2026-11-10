@@ -112,7 +112,6 @@ def generer_hovedskjema(regnskap: Aarsregnskap) -> bytes:
     # ellers styrelederen. Passive holdingselskaper har ofte ingen daglig leder (aksjeloven
     # krever det ikke for små AS), og da er det styret som fastsetter.
     signatar = regnskap.signatar or s.daglig_leder or s.styreleder
-    revideres = "nei" if not regnskap.revideres else "ja"
     ikke_revideres = "ja" if not regnskap.revideres else "nei"
     morselskap = (
         "ja" if regnskap.balanse.eiendeler.anleggsmidler.aksjer_i_datterselskap > 0 else "nei"

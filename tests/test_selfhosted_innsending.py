@@ -7,7 +7,6 @@ domeneklientene (HTTP-feil, nettverksfeil, RuntimeError) blir lesbare 502-svar, 
 naken 500. Auth mockes; ingenting treffer nett eller disk.
 """
 
-
 import httpx
 import pytest
 from fastapi import HTTPException

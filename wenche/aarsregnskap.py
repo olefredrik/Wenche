@@ -439,7 +439,9 @@ def advarsler(regnskap: Aarsregnskap) -> list[str]:
     return adv
 
 
-def send_inn(regnskap: Aarsregnskap, klient: AltinnClient, dry_run: bool = False) -> str | None:
+def send_inn(
+    regnskap: Aarsregnskap, klient: AltinnClient | None, dry_run: bool = False
+) -> str | None:
     """
     Sender inn årsregnskapet til Brønnøysundregistrene via Altinn.
 
@@ -477,13 +479,15 @@ def send_inn(regnskap: Aarsregnskap, klient: AltinnClient, dry_run: bool = False
     if dry_run:
         hoved_fil = f"aarsregnskap_{aar}_{org}_hovedskjema.xml"
         under_fil = f"aarsregnskap_{aar}_{org}_underskjema.xml"
-        with open(hoved_fil, "wb") as f:
-            f.write(hovedskjema)
-        with open(under_fil, "wb") as f:
-            f.write(underskjema)
+        with open(hoved_fil, "wb") as fil:
+            fil.write(hovedskjema)
+        with open(under_fil, "wb") as fil:
+            fil.write(underskjema)
         print(f"Dry-run: filer lagret til {hoved_fil} og {under_fil} — ingenting sendt til Altinn.")
-        return
+        return None
 
+    if klient is None:
+        raise ValueError("send_inn trenger en AltinnClient når dry_run er False.")
     print("Sender årsregnskap til Brønnøysundregistrene via Altinn...")
     instans = klient.opprett_instans("aarsregnskap", org)
 

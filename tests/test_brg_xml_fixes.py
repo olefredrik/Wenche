@@ -229,7 +229,7 @@ class TestLinjeEnkel:
                 assert aarets is not None
                 assert int(aarets.text) == 300000
                 return
-        assert False, "Fant ikke oevrigLangsiktigGjeld med 'Lån fra aksjonær'-beskrivelse"
+        pytest.fail("Fant ikke oevrigLangsiktigGjeld med 'Lån fra aksjonær'-beskrivelse")
 
     def test_zero_values_omitted(self, eksempel_regnskap):
         """linje_enkel with 0 for both years should produce no element."""

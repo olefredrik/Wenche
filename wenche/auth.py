@@ -286,10 +286,12 @@ def _les_miljo_env(
     env: str,
     hjelpetekst: str | None = None,
     paakrevd: bool = True,
-    default: str | None = None,
-) -> str | None:
+    default: str = "",
+) -> str:
     """
     Les en credential-variabel som potensielt er miljø-spesifikk.
+
+    Påkrevde variabler gir RuntimeError når de mangler; valgfrie gir `default`.
 
     Sjekker først `{navn}_{ENV}` (f.eks. MASKINPORTEN_CLIENT_ID_TEST),
     deretter `{navn}` som fallback. Brukere som bare har én klient kan

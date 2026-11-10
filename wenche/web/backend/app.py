@@ -59,7 +59,7 @@ def lag_app(env: str = "prod", serve_spa: bool = True) -> FastAPI:
     def update_check() -> dict:
         """Sjekk om en nyere Wenche finnes på PyPI. Faller stille tilbake ved nettverksfeil."""
         siste = hent_nyeste_pypi_versjon()
-        nyere = bool(siste) and er_nyere_versjon(siste, WENCHE_VERSJON)
+        nyere = er_nyere_versjon(siste, WENCHE_VERSJON) if siste else False
         return {
             "naavaerende": WENCHE_VERSJON,
             "siste": siste,

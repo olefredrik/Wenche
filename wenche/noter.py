@@ -119,8 +119,8 @@ def generer(regnskap: Aarsregnskap, noter: Noter) -> str:
         linje(f"Følgende lån mellom selskapet og nærstående parter er registrert per 31.12.{aar}:")
         linje()
         for laan in noter.laan_til_naerstaaende:
-            for l in _formater_laan(laan, aar):
-                linje(l)
+            for tekst in _formater_laan(laan, aar):
+                linje(tekst)
             linje()
     linje()
 

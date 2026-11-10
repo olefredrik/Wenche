@@ -670,18 +670,20 @@ def generer_naeringsspesifikasjon(
     # Egenkapitalavstemming (XSD-pos: etter virksomhet, før andreForhold)
     # inngående EK + separate tillegg - separate fradrag = utgående (avledet).
     # -----------------------------------------------------------------------
-    inngaaende_ek, utgaaende_ek, tillegg, fradrag = egenkapitalavstemming(regnskap)
+    # Egne navn: `tillegg`/`fradrag` over er de permanente forskjellene (float), disse er
+    # egenkapitalendringene (hele kroner).
+    inngaaende_ek, utgaaende_ek, ek_tillegg, ek_fradrag = egenkapitalavstemming(regnskap)
 
-    if inngaaende_ek or utgaaende_ek or tillegg or fradrag:
+    if inngaaende_ek or utgaaende_ek or ek_tillegg or ek_fradrag:
         ekavst = SubElement(root, "egenkapitalavstemming")
         _beloep_element(ekavst, "inngaaendeEgenkapital", inngaaende_ek)
         # sumTilleggIEgenkapital / sumFradragIEgenkapital må stå før
         # egenkapitalendring-listen per XSD-sekvensen.
-        if tillegg:
-            _beloep_element(ekavst, "sumTilleggIEgenkapital", sum(b for _, b in tillegg))
-        if fradrag:
-            _beloep_element(ekavst, "sumFradragIEgenkapital", sum(b for _, b in fradrag))
-        for kode, beloep in tillegg + fradrag:
+        if ek_tillegg:
+            _beloep_element(ekavst, "sumTilleggIEgenkapital", sum(b for _, b in ek_tillegg))
+        if ek_fradrag:
+            _beloep_element(ekavst, "sumFradragIEgenkapital", sum(b for _, b in ek_fradrag))
+        for kode, beloep in ek_tillegg + ek_fradrag:
             endring_el = SubElement(ekavst, "egenkapitalendring")
             # id må være lik kodeverdien (jf. idAvvikerFraKrav-regelen).
             SubElement(endring_el, "id").text = kode

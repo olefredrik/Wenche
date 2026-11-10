@@ -48,6 +48,8 @@ def _utbyttetidspunkt(oppgave: Aksjonaerregisteroppgave) -> str:
     holder dem like. Klokkeslett trengs bare for å skille flere utdelinger samme dag, og
     Wenche rapporterer én utdeling per år.
     """
+    if oppgave.utbytte_vedtaksdato is None:
+        raise ValueError("Vedtaksdato for utbytte mangler (valider() skal ha stoppet dette).")
     return f"{oppgave.utbytte_vedtaksdato.isoformat()}T00:00:00"
 
 
@@ -345,8 +347,8 @@ def _fnr_modulus11_ok(fnr: str) -> bool:
     vekter1 = [3, 7, 6, 1, 8, 9, 4, 5, 2]
     vekter2 = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2]
     siffer = [int(c) for c in fnr]
-    k1 = (11 - sum(v * d for v, d in zip(vekter1, siffer[:9])) % 11) % 11
-    k2 = (11 - sum(v * d for v, d in zip(vekter2, siffer[:10])) % 11) % 11
+    k1 = (11 - sum(v * d for v, d in zip(vekter1, siffer[:9], strict=True)) % 11) % 11
+    k2 = (11 - sum(v * d for v, d in zip(vekter2, siffer[:10], strict=True)) % 11) % 11
     return k1 < 10 and k2 < 10 and k1 == siffer[9] and k2 == siffer[10]
 
 
@@ -539,19 +541,21 @@ def send_inn(
 
     if dry_run:
         base = f"aksjonaerregister_{oppgave.regnskapsaar}_{oppgave.selskap.org_nummer}"
-        with open(f"{base}_hovedskjema.xml", "wb") as f:
-            f.write(hoved_xml)
+        with open(f"{base}_hovedskjema.xml", "wb") as fil:
+            fil.write(hoved_xml)
         for i, xml in enumerate(under_xmler, 1):
-            with open(f"{base}_underskjema_{i}.xml", "wb") as f:
-                f.write(xml)
+            with open(f"{base}_underskjema_{i}.xml", "wb") as fil:
+                fil.write(xml)
         print(f"Dry-run: XML lagret til {base}_*.xml — ingenting sendt til SKD.")
         return None
 
+    if klient is None:
+        raise ValueError("send_inn trenger en SkdAksjonaerClient når dry_run er False.")
     print("Sender RF-1086 Hovedskjema til SKD...")
     hovedskjemaid = klient.send_hovedskjema(oppgave.regnskapsaar, hoved_xml)
     print(f"Hovedskjema mottatt (ID: {hovedskjemaid}).")
 
-    for i, (aksjonaer, xml) in enumerate(zip(oppgave.aksjonaerer, under_xmler), 1):
+    for i, (aksjonaer, xml) in enumerate(zip(oppgave.aksjonaerer, under_xmler, strict=True), 1):
         print(f"Sender underskjema {i}/{len(under_xmler)} ({aksjonaer.navn})...")
         klient.send_underskjema(oppgave.regnskapsaar, hovedskjemaid, xml)
 

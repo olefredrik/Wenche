@@ -132,7 +132,7 @@ class AltinnClient:
         """
         instance_id = instans["id"]
         inst_url = f"{self._app_base(app_key)}/instances/{instance_id}"
-        for forsok in range(maks_forsok):
+        for _ in range(maks_forsok):
             resp = self._http.get(inst_url)
             resp.raise_for_status()
             data_elementer = resp.json().get("data", [])

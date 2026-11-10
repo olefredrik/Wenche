@@ -10,6 +10,7 @@ sjekk.
 from __future__ import annotations
 
 import dataclasses
+from typing import Any
 
 from fastapi import APIRouter
 
@@ -19,7 +20,7 @@ from . import miljo
 
 router = APIRouter(prefix="/api/frister", tags=["frister"])
 
-_FRISTER = [
+_FRISTER: list[dict[str, Any]] = [
     {
         "key": "skattemelding",
         "tittel": "Skattemelding",

@@ -344,6 +344,9 @@ class TestBalanse:
                 kortsiktig_gjeld=KortsiktigGjeld(leverandoergjeld=1500),
             ),
         )
+        # Uten leverandørgjeld skal koden ikke sendes; med beløp skal den. Den første
+        # balansen sto ubrukt, så halve påstanden manglet.
+        assert not _finn_kode(_parse(_lag_regnskap(balanse=balanse)), "2400")
         assert _finn_kode(_parse(_lag_regnskap(balanse=balanse2)), "2400")
 
     def test_skyldige_offentlige_avgifter_kode_2600(self):

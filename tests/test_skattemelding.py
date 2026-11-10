@@ -3,7 +3,6 @@ Tester for skattemeldingsgenerering i wenche/skattemelding.py.
 Verifiserer skattberegning, fritaksmetoden og fremførbart underskudd.
 """
 
-
 from wenche.models import SkattemeldingKonfig
 from wenche.skattemelding import generer
 
@@ -29,7 +28,7 @@ def test_inneholder_orgnummer(eksempel_regnskap):
 
 def _skatt_linje(tekst: str) -> str:
     """Returnerer innholdet i skattelinjen, strippet for whitespace."""
-    return next(l.strip() for l in tekst.splitlines() if "Beregnet skatt" in l)
+    return next(linje.strip() for linje in tekst.splitlines() if "Beregnet skatt" in linje)
 
 
 def test_ingen_skatt_ved_underskudd(eksempel_regnskap):

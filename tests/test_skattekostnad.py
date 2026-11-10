@@ -368,7 +368,7 @@ class TestFritaksmetoden:
             root = self._root(regnskap, konfig)
             forskjell = root.find(f"{_NS}forskjellMellomRegnskapsmessigOgSkattemessigVerdi")
 
-            def _sum(tag):
+            def _sum(tag, forskjell=forskjell):  # bind løkkevariabelen ved definisjon
                 el = forskjell.find(f"{_NS}{tag}/{_NS}beloep/{_NS}beloep")
                 return float(el.text) if el is not None else 0.0
 

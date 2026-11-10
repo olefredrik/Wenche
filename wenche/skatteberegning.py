@@ -72,6 +72,8 @@ def beregn_skatt(r: Resultatregnskap, konfig: SkattemeldingKonfig) -> Skattebere
     # datterselskap. Utbytte fra andre aksjer får alltid sjablonen, også når utbyttet fra
     # datterselskapet er helt fritatt. Uten utbytte fra andre aksjer er regnestykket som før.
     utbytte = r.finansposter.sum_utbytte
+    skattepliktig_utbytte: float
+    fritatt_utbytte: float
     if konfig.anvend_fritaksmetoden and utbytte > 0:
         if har_fullt_utbyttefritak(konfig):
             grunnlag_sjablon = r.finansposter.utbytte_fra_andre_aksjer

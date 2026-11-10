@@ -1,5 +1,7 @@
 """Wenche — enkel innsending til Altinn for holdingselskaper."""
 
+import tomllib
+from contextlib import suppress
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
@@ -14,15 +16,10 @@ def _les_versjon() -> str:
     """
     pyproject = Path(__file__).resolve().parent.parent / "pyproject.toml"
     if pyproject.is_file():
-        try:
-            try:
-                import tomllib
-            except ModuleNotFoundError:
-                import tomli as tomllib  # type: ignore[no-redef]
+        # En ødelagt eller ufullstendig pyproject skal ikke stoppe importen; fall videre.
+        with suppress(OSError, KeyError, TypeError, ValueError):
             with pyproject.open("rb") as f:
                 return tomllib.load(f)["project"]["version"]
-        except Exception:
-            pass
     try:
         return version("wenche")
     except PackageNotFoundError:
