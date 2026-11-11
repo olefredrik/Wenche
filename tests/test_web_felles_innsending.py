@@ -1,7 +1,8 @@
 """
-Feilhåndtering i hostet innsending: Altinn/SKD-feil skal aldri bli en rå 500 til brukeren.
+Feilhåndtering i det delte web-laget (wenche/web/felles/innsending.py), brukt av både hostet og
+self-hosted: Altinn/SKD-feil skal aldri bli en rå 500 til brukeren.
 
-`_utfor` pakker innsendingen og gjør feilene domeneklientene melder om til lesbare HTTP-svar:
+`kjoer` pakker innsendingen og gjør feilene domeneklientene melder om til lesbare HTTP-svar:
 valideringsfeil → 422; HTTP-feil (Altinn), nettverksfeil/tidsavbrudd (httpx.RequestError) og
 RuntimeError (SKD-klienten / token-henting) → 502; bevisst reist HTTPException slipper gjennom
 uendret; alt annet → kontrollert 500 med melding (aldri en naken stacktrace).
@@ -11,9 +12,9 @@ import httpx
 import pytest
 from fastapi import HTTPException
 
-from hosted.api.innsending import _steg_av_url, _utfor
 from wenche.innsending import InnsendingValideringsfeil
 from wenche.skd_skattemelding_client import SkattemeldingValideringsfeil
+from wenche.web.felles.innsending import kjoer, steg_av_url
 
 
 def _hev(exc):
@@ -27,7 +28,7 @@ def test_altinn_serverfeil_blir_502_ikke_500():
     req = httpx.Request("POST", "https://brg.apps.tt02.altinn.no/brg/x/instances")
     feil = httpx.HTTPStatusError("500", request=req, response=httpx.Response(500, request=req))
     with pytest.raises(HTTPException) as ei:
-        _utfor(_hev(feil))
+        kjoer(_hev(feil))
     assert ei.value.status_code == 502
     assert "serverfeil" in str(ei.value.detail).lower()
 
@@ -36,19 +37,19 @@ def test_altinn_403_blir_lesbar_502():
     req = httpx.Request("POST", "https://brg.apps.tt02.altinn.no/brg/x/instances")
     feil = httpx.HTTPStatusError("403", request=req, response=httpx.Response(403, request=req))
     with pytest.raises(HTTPException) as ei:
-        _utfor(_hev(feil))
+        kjoer(_hev(feil))
     assert ei.value.status_code == 502
 
 
 def test_skd_runtimeerror_blir_502():
     with pytest.raises(HTTPException) as ei:
-        _utfor(_hev(RuntimeError("Feil ved henting av forhåndsutfylt skattemelding: 403")))
+        kjoer(_hev(RuntimeError("Feil ved henting av forhåndsutfylt skattemelding: 403")))
     assert ei.value.status_code == 502
 
 
 def test_aarsregnskap_valideringsfeil_blir_422():
     with pytest.raises(HTTPException) as ei:
-        _utfor(_hev(InnsendingValideringsfeil(["Balansen går ikke opp"])))
+        kjoer(_hev(InnsendingValideringsfeil(["Balansen går ikke opp"])))
     assert ei.value.status_code == 422
     assert ei.value.detail == {"feil": ["Balansen går ikke opp"]}
 
@@ -62,7 +63,7 @@ def test_skattemelding_valideringsfeil_blir_422():
         "veiledning": [],
     }
     with pytest.raises(HTTPException) as ei:
-        _utfor(_hev(SkattemeldingValideringsfeil(resultat)))
+        kjoer(_hev(SkattemeldingValideringsfeil(resultat)))
     assert ei.value.status_code == 422
     assert "validering" in ei.value.detail
 
@@ -73,7 +74,7 @@ def test_nettverksfeil_timeout_blir_502_ikke_500():
     req = httpx.Request("POST", "https://skatt.skatteetaten.no/api/skattemelding/v2/valider")
     feil = httpx.ConnectTimeout("timed out", request=req)
     with pytest.raises(HTTPException) as ei:
-        _utfor(_hev(feil))
+        kjoer(_hev(feil))
     assert ei.value.status_code == 502
     assert "tidsavbrudd" in str(ei.value.detail).lower()
 
@@ -82,14 +83,14 @@ def test_nettverksfeil_uten_request_kaster_ikke_i_handteringen():
     # httpx' .request kaster RuntimeError hvis den ikke er satt — håndteringen må ikke selv
     # kaste når den logger URL-en.
     with pytest.raises(HTTPException) as ei:
-        _utfor(_hev(httpx.ConnectError("ingen request satt")))
+        kjoer(_hev(httpx.ConnectError("ingen request satt")))
     assert ei.value.status_code == 502
 
 
 def test_uventet_feiltype_blir_kontrollert_500():
     # Siste skanse: en uventet feiltype skal bli en ren 500 med melding, ikke en stacktrace.
     with pytest.raises(HTTPException) as ei:
-        _utfor(_hev(ValueError("noe uventet")))
+        kjoer(_hev(ValueError("noe uventet")))
     assert ei.value.status_code == 500
     assert "uventet" in str(ei.value.detail).lower()
 
@@ -97,7 +98,7 @@ def test_uventet_feiltype_blir_kontrollert_500():
 def test_bevisst_httpexception_slipper_gjennom_uendret():
     # F.eks. _sjekk_org sin 409 skal ikke pakkes om til 502/500.
     with pytest.raises(HTTPException) as ei:
-        _utfor(_hev(HTTPException(status_code=409, detail="org matcher ikke")))
+        kjoer(_hev(HTTPException(status_code=409, detail="org matcher ikke")))
     assert ei.value.status_code == 409
     assert ei.value.detail == "org matcher ikke"
 
@@ -108,7 +109,7 @@ def test_upstream_feilkropp_lekker_ikke_til_klient():
     svar = httpx.Response(400, text="intern-altinn-detalj-xyz stacktrace", request=req)
     feil = httpx.HTTPStatusError("400", request=req, response=svar)
     with pytest.raises(HTTPException) as ei:
-        _utfor(_hev(feil))
+        kjoer(_hev(feil))
     assert ei.value.status_code == 502
     assert "intern-altinn-detalj-xyz" not in str(ei.value.detail)
     assert "400" in str(ei.value.detail)  # statuskoden er fortsatt synlig for brukeren
@@ -120,7 +121,7 @@ def test_feilmelding_navngir_steget_forhandsutfylt():
     req = httpx.Request("GET", "https://api.skatteetaten.no/api/skattemelding/v2/2025/123456789")
     feil = httpx.HTTPStatusError("400", request=req, response=httpx.Response(400, request=req))
     with pytest.raises(HTTPException) as ei:
-        _utfor(_hev(feil))
+        kjoer(_hev(feil))
     assert "forhåndsutfylt" in str(ei.value.detail).lower()
 
 
@@ -130,7 +131,7 @@ def test_feilmelding_navngir_steget_validering():
     )
     feil = httpx.HTTPStatusError("500", request=req, response=httpx.Response(500, request=req))
     with pytest.raises(HTTPException) as ei:
-        _utfor(_hev(feil))
+        kjoer(_hev(feil))
     assert "validering" in str(ei.value.detail).lower()
     assert "serverfeil" in str(ei.value.detail).lower()
 
@@ -139,7 +140,7 @@ def test_feilmelding_navngir_steget_altinn_instans():
     req = httpx.Request("POST", "https://999999999.apps.altinn.no/ttd/skattemelding/instances")
     feil = httpx.HTTPStatusError("403", request=req, response=httpx.Response(403, request=req))
     with pytest.raises(HTTPException) as ei:
-        _utfor(_hev(feil))
+        kjoer(_hev(feil))
     assert "altinn" in str(ei.value.detail).lower()
 
 
@@ -147,7 +148,7 @@ def test_401_navngir_steg_og_beholder_koden():
     req = httpx.Request("POST", "https://999999999.apps.altinn.no/ttd/skattemelding/instances")
     feil = httpx.HTTPStatusError("401", request=req, response=httpx.Response(401, request=req))
     with pytest.raises(HTTPException) as ei:
-        _utfor(_hev(feil))
+        kjoer(_hev(feil))
     assert ei.value.status_code == 502
     assert "401" in str(ei.value.detail)
     assert "altinn" in str(ei.value.detail).lower()
@@ -169,14 +170,14 @@ def test_401_navngir_steg_og_beholder_koden():
     ],
 )
 def test_steg_av_url_kartlegger_alle_kjente_steg(url, forventet):
-    assert forventet in _steg_av_url(url)
+    assert forventet in steg_av_url(url)
 
 
 def test_steg_av_url_ukjent_url_gir_none():
     # Ukjent URL skal gi None, slik at meldingen faller tilbake på generisk formulering uten
     # å henge på et villedende stegnavn.
-    assert _steg_av_url("https://eksempel.no/ukjent") is None
-    assert _steg_av_url("") is None
+    assert steg_av_url("https://eksempel.no/ukjent") is None
+    assert steg_av_url("") is None
 
 
 def test_runtimeerror_med_kropp_etter_linjeskift_stripper_kroppen():
@@ -186,7 +187,7 @@ def test_runtimeerror_med_kropp_etter_linjeskift_stripper_kroppen():
         "Feil ved henting av forhåndsutfylt skattemelding: 400\n<feil>intern-kropp-hemmelig</feil>"
     )
     with pytest.raises(HTTPException) as ei:
-        _utfor(_hev(feil))
+        kjoer(_hev(feil))
     assert ei.value.status_code == 502
     assert "intern-kropp-hemmelig" not in str(ei.value.detail)
     assert "forhåndsutfylt skattemelding: 400" in str(ei.value.detail)
@@ -204,7 +205,7 @@ def test_myndighetsfeil_fra_klient_blir_502_med_steg_uten_kropp():
     svar = httpx.Response(500, text="intern-kropp-hemmelig", request=req)
     feil = MyndighetsFeil.fra_svar("altinn", "oppretting av innsending i Altinn", svar)
     with pytest.raises(HTTPException) as ei:
-        _utfor(_hev(feil))
+        kjoer(_hev(feil))
     assert ei.value.status_code == 502
     detail = str(ei.value.detail)
     assert "oppretting av innsending i Altinn" in detail and "500" in detail
@@ -215,7 +216,7 @@ def test_konfigfeil_blir_422_med_feilliste():
     from wenche.feil import KonfigFeil
 
     with pytest.raises(HTTPException) as ei:
-        _utfor(_hev(KonfigFeil("Stiftelsesår mangler")))
+        kjoer(_hev(KonfigFeil("Stiftelsesår mangler")))
     assert ei.value.status_code == 422
     assert ei.value.detail == {"feil": ["Stiftelsesår mangler"]}
 
@@ -224,6 +225,6 @@ def test_authfeil_fra_tokenhenting_blir_502():
     from wenche.feil import AuthFeil
 
     with pytest.raises(HTTPException) as ei:
-        _utfor(_hev(AuthFeil(status=400, kode="invalid_scope", beskrivelse="x")))
+        kjoer(_hev(AuthFeil(status=400, kode="invalid_scope", beskrivelse="x")))
     assert ei.value.status_code == 502
     assert "invalid_scope" in str(ei.value.detail)

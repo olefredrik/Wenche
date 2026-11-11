@@ -1,20 +1,19 @@
 """
 Innsendings-endepunktene for self-hosted Wenche (HTTP-nivå, ingen nettverk).
 
-Speiler test_hosted_innsending_feil.py for den self-hostede backenden: dry-run gir
-strukturert ok/feil, valideringsfeil ved ekte innsending blir 422, og alle feiltyper fra
-domeneklientene (HTTP-feil, nettverksfeil, RuntimeError) blir lesbare 502-svar, aldri en
-naken 500. Auth mockes; ingenting treffer nett eller disk.
+Dry-run gir strukturert ok/feil, valideringsfeil ved ekte innsending blir 422, token-hentingen
+ligger inne i feilfellen, og 403 i testmiljø får Tenor-hintet. Selve feilfellen (`kjoer`) er
+delt med hostet og dekkes i test_web_felles_innsending.py. Auth mockes; ingenting treffer nett
+eller disk.
 """
 
-import httpx
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from wenche.web.backend import miljo
+from wenche.web.backend import miljo, ruter_innsending
 from wenche.web.backend.app import lag_app
-from wenche.web.backend.ruter_innsending import _utfor
+from wenche.web.felles.innsending import kjoer
 
 
 def _gyldig_config(org="310137715"):
@@ -154,41 +153,11 @@ def test_aarsregnskap_valideringsfeil_blir_422(klient, monkeypatch):
     assert "feil" in r.json()["detail"]
 
 
-# ---------------------------------------------------------------------------
-# _utfor: alle feiltyper fra domeneklientene blir lesbare 502, aldri naken 500
-# ---------------------------------------------------------------------------
-
-
 def _hev(e):
     def fn():
         raise e
 
     return fn
-
-
-def test_altinn_403_blir_lesbar_502():
-    req = httpx.Request("POST", "https://brg.apps.tt02.altinn.no/brg/x/instances")
-    feil = httpx.HTTPStatusError("403", request=req, response=httpx.Response(403, request=req))
-    with pytest.raises(HTTPException) as ei:
-        _utfor(_hev(feil))
-    assert ei.value.status_code == 502
-    assert "403" in str(ei.value.detail)
-
-
-def test_nettverksfeil_timeout_blir_502_ikke_500():
-    # Samme hull som hostet tettet i PR #131: httpx.RequestError er søsken av
-    # HTTPStatusError og ble en naken 500 i self-hosted.
-    req = httpx.Request("POST", "https://skatt.skatteetaten.no/api/skattemelding/v2/valider")
-    with pytest.raises(HTTPException) as ei:
-        _utfor(_hev(httpx.ConnectTimeout("timed out", request=req)))
-    assert ei.value.status_code == 502
-    assert "tidsavbrudd" in str(ei.value.detail).lower()
-
-
-def test_runtimeerror_blir_502():
-    with pytest.raises(HTTPException) as ei:
-        _utfor(_hev(RuntimeError("Feil ved henting av forhåndsutfylt skattemelding: 403")))
-    assert ei.value.status_code == 502
 
 
 # ---------------------------------------------------------------------------
@@ -215,6 +184,11 @@ def test_403_i_testmiljo_gir_tenor_hint(klient):
 
     feil = MyndighetsFeil("altinn", "oppretting av innsending i Altinn", status=403)
     with pytest.raises(HTTPException) as ei:
-        _utfor(_hev(feil))
+        kjoer(_hev(feil), hint_403=ruter_innsending.hint_403())
     assert ei.value.status_code == 502
     assert "Tenor" in str(ei.value.detail)
+
+
+def test_403_i_prod_gir_ikke_tenor_hint(monkeypatch):
+    monkeypatch.setattr(miljo, "_AKTIV_ENV", "prod")
+    assert ruter_innsending.hint_403() is None

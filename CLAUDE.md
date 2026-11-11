@@ -25,6 +25,10 @@ Repoet inneholder tre ting som henger sammen via et npm-workspace + en Python-pa
   (`hosted/web`). Pakkes som Docker-image (multi-stage, se [Dockerfile](Dockerfile)) og
   kjøres på Fly. Session-only (in-memory), **én worker** med vilje. Brukeren kobler til via
   invite-token; operatøren har satt opp Maskinporten på forhånd.
+- **`wenche/web/felles`** — web-laget begge backendene deler: dokumentgenerering, SAF-T-import,
+  innsending med én feilfelle (`kjoer`), svar-modellene (pydantic, i OpenAPI) og `Kroppsgrense`
+  (413 før noe parses). Rutefabrikkene (`lag_router`) tar vakt, transform og token-kilde som
+  parametre, så `hosted/api` og `wenche/web/backend` bare legger auth oppå.
 - **`packages/ui`** — delt designsystem (React + Tailwind, OKLCH-palett, se
   `packages/ui/src/theme.css`). Konsumeres som *kildekode* av begge SPA-ene via alias, ikke
   som bygd pakke.
