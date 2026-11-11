@@ -68,7 +68,7 @@ def request_systembruker(request: Request) -> dict:
             return {"status": "AlreadyApproved", "godkjent": True, "kunde_org": org}
         # Ny kunde: sikre at systemet er registrert (idempotent), så opprett forespørselen.
         wsb.registrer_system(token, vendor_orgnr, creds.client_id)
-        svar = wsb.opprett_forespørsel(token, vendor_orgnr, org)
+        svar = wsb.opprett_forespoersel(token, vendor_orgnr, org)
     except MyndighetsFeil as e:
         # AUTH-00004: Altinn har allerede en systembruker/forespørsel for dette org-et for
         # systemet vårt. Godkjente systembrukere fanges normalt av AlreadyApproved-sjekken over;
@@ -100,7 +100,7 @@ def status_systembruker(request: Request) -> dict:
         raise HTTPException(status_code=400, detail="Ingen aktiv systembruker-forespørsel.")
     try:
         token = admin_token(creds)
-        svar = wsb.hent_forespørsel_status(token, request_id)
+        svar = wsb.hent_forespoersel_status(token, request_id)
     except MyndighetsFeil as e:
         raise _lesbar_502(e, request.session.get("pending_org")) from e
     status = svar.get("status")

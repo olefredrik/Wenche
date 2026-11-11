@@ -132,7 +132,7 @@ def test_tilkobling_ok_med_godkjent_systembruker(klient, monkeypatch):
     monkeypatch.setattr(auth_mod, "login", lambda **kw: {"altinn_token": "tok"})
     monkeypatch.setattr(auth_mod, "login_admin", lambda: "admin-tok")
     monkeypatch.setattr(
-        sb_mod, "hent_forespørsel_status", lambda token, rid: {"status": "Accepted"}
+        sb_mod, "hent_forespoersel_status", lambda token, rid: {"status": "Accepted"}
     )
     miljo.lagre_request_id("req-1")
     data = klient.post("/api/oppsett/test-tilkobling").json()
@@ -163,7 +163,7 @@ def test_opprett_systembruker_persisterer_forespoersel(klient, monkeypatch):
         opprettet["vendor"], opprettet["party"] = vendor, party
         return {"id": "req-42", "confirmUrl": "https://altinn.test/confirm/42", "status": "New"}
 
-    monkeypatch.setattr(sb_mod, "opprett_forespørsel", fake_opprett)
+    monkeypatch.setattr(sb_mod, "opprett_forespoersel", fake_opprett)
     data = klient.post("/api/oppsett/systembruker").json()
     assert data["request_id"] == "req-42"
     assert data["confirm_url"] == "https://altinn.test/confirm/42"
@@ -193,7 +193,7 @@ def test_systembruker_status_tolkes(klient, monkeypatch, altinn_status, forvente
 
     monkeypatch.setattr(auth_mod, "login_admin", lambda: "admin-tok")
     monkeypatch.setattr(
-        sb_mod, "hent_forespørsel_status", lambda token, rid: {"status": altinn_status}
+        sb_mod, "hent_forespoersel_status", lambda token, rid: {"status": altinn_status}
     )
     miljo.lagre_request_id("req-1")
     assert klient.post("/api/oppsett/systembruker/status").json()["status"] == forventet
@@ -230,7 +230,7 @@ def test_oppdater_systembruker_velger_riktig_rapportoer(klient, monkeypatch):
         brukt["id"] = systembruker_id
         return {"confirmUrl": "https://altinn.test/confirm/endring", "status": "New"}
 
-    monkeypatch.setattr(sb_mod, "opprett_endringsforespørsel", fake_endring)
+    monkeypatch.setattr(sb_mod, "opprett_endringsforespoersel", fake_endring)
     data = klient.post("/api/oppsett/systembruker/oppdater").json()
     assert brukt["id"] == "sb-riktig"
     assert data["confirm_url"] == "https://altinn.test/confirm/endring"

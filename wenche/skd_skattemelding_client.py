@@ -81,7 +81,7 @@ class SkdSkattemeldingClient(HttpKlient):
             self._forhaandsutfylt_url(inntektsaar, orgnr), headers={"Accept": "application/xml"}
         )
 
-    def hent_forhåndsutfylt_med_id(self, inntektsaar: int, orgnr: str) -> tuple[bytes, str | None]:
+    def hent_forhaandsutfylt_med_id(self, inntektsaar: int, orgnr: str) -> tuple[bytes, str | None]:
         """
         Henter forhåndsutfylt skattemelding (skattemeldingUpersonlig v5) og dens dokument-ID.
 

@@ -89,10 +89,10 @@ def sjekk_skattemelding(orgnr: str, aar: int) -> FristStatus:
         token = get_skd_skattemelding_maskinporten_token(env="prod")
     except RuntimeError:
         return FristStatus(beskrivelse="Maskinporten ikke konfigurert for prod")
-    return _utfør_skattemelding_sjekk(token, orgnr, aar)
+    return _utfoer_skattemelding_sjekk(token, orgnr, aar)
 
 
-def _utfør_skattemelding_sjekk(token: str, orgnr: str, aar: int) -> FristStatus:
+def _utfoer_skattemelding_sjekk(token: str, orgnr: str, aar: int) -> FristStatus:
     status, tilgjengelig = _hent_skattemelding_status(token, orgnr, aar)
 
     # Så snart årets frist har passert ruller Hjem-fanen fram til neste frist og

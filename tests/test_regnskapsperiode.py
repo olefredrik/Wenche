@@ -346,7 +346,7 @@ class TestSkattemeldingStopperForlengetAar:
             tjeneste.send_skattemelding(
                 copy.deepcopy(self._CONFIG), skd, "altinn-token", orgnr="123456789"
             )
-        skd.hent_forhåndsutfylt_med_id.assert_not_called()
+        skd.hent_forhaandsutfylt_med_id.assert_not_called()
         skd.send.assert_not_called()
 
     @pytest.mark.parametrize("kommando", ["send-skattemelding", "valider-skattemelding"])

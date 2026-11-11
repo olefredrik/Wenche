@@ -17,7 +17,7 @@ innsendingsruten gjør. Feiler token-hentingen, ville innsendingen gitt samme fe
       ./.venv/bin/python hosted/list_systembrukere.py
 
 Read-only: henter kun tokens og lister systembrukere, sender ingenting inn og endrer
-ingen rettigheter. Fiks for berørte: systembruker.opprett_endringsforespørsel(...) med
+ingen rettigheter. Fiks for berørte: systembruker.opprett_endringsforespoersel(...) med
 [systembruker.SKATTEMELDING_RETT], som kunden så godkjenner i Altinn.
 """
 

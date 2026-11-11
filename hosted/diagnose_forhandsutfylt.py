@@ -133,7 +133,7 @@ def main() -> None:
 
     with SkdSkattemeldingClient(token, env=env) as skd:
         try:
-            forhandsutfylt, dok_id = skd.hent_forhåndsutfylt_med_id(aar, orgnr)
+            forhandsutfylt, dok_id = skd.hent_forhaandsutfylt_med_id(aar, orgnr)
         except RuntimeError as e:
             # Ikke-2xx fra SKD (f.eks. 403/404 = ikke klargjort, eller en feilkode som SMEVB-005).
             print("HENTING FEILET (ikke-2xx fra Skatteetaten):")

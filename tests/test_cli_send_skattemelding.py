@@ -38,7 +38,7 @@ def test_send_skattemelding_sender_gjeldende_dokument_id(monkeypatch):
         patch("wenche.skd_skattemelding_client.SkdSkattemeldingClient") as Client,
     ):
         skd = Client.return_value.__enter__.return_value
-        skd.hent_forhåndsutfylt_med_id.return_value = (
+        skd.hent_forhaandsutfylt_med_id.return_value = (
             _FORHANDSUTFYLT,
             "SKI:755:970817908",
         )
