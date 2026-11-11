@@ -16,6 +16,21 @@ from xml.sax.saxutils import escape
 from wenche.models import Aarsregnskap
 from wenche.xml_hjelp import heltall
 
+# ---------------------------------------------------------------------------
+# Valg som følger av scopet: passive holdingselskaper og små AS uten drift (se «Scope-rekkverk»
+# i CLAUDE.md). Skal Wenche en gang støtte andre selskapsformer, autorisert regnskapsfører
+# eller ansatte, er det disse som må bli config-felt.
+# ---------------------------------------------------------------------------
+SCOPE_ORGANISASJONSFORM = "AS"
+SCOPE_SMAA_FORETAK = "ja"  # små foretak etter regnskapsloven, med forenklingene det gir
+SCOPE_KONSERNREGNSKAP = "nei"  # små foretak kan la være å utarbeide konsernregnskap
+SCOPE_REGNSKAPSREGLER_SELSKAP = "nei"  # ikke de ordinære reglene for større selskap
+SCOPE_FORENKLET_IFRS = "nei"
+SCOPE_AUTORISERT_REGNSKAPSFOERER = "nei"  # Wenche er et innsendingsverktøy, ikke regnskapsfører
+SCOPE_BISTAND_REGNSKAPSFOERER = "nei"
+# Ingen ansatte. `Noter.antall_ansatte` styrer bare teksten i note 2, ikke dette feltet.
+SCOPE_ANTALL_AARSVERK = 0
+
 
 def _row_id() -> str:
     return str(uuid.uuid4())
@@ -129,7 +144,7 @@ def generer_hovedskjema(regnskap: Aarsregnskap) -> bytes:
   <Innsender>
     <enhet>
       <organisasjonsnummer orid="18">{_t(s.org_nummer)}</organisasjonsnummer>
-      <organisasjonsform orid="756">AS</organisasjonsform>
+      <organisasjonsform orid="756">{SCOPE_ORGANISASJONSFORM}</organisasjonsform>
       <navn orid="1">{_t(s.navn)}</navn>
     </enhet>
     <opplysningerInnsending>
@@ -145,12 +160,12 @@ def generer_hovedskjema(regnskap: Aarsregnskap) -> bytes:
     </regnskapsperiode>
     <konsern>
       <morselskap orid="4168">{morselskap}</morselskap>
-      <konsernregnskap orid="25943">nei</konsernregnskap>
+      <konsernregnskap orid="25943">{SCOPE_KONSERNREGNSKAP}</konsernregnskap>
     </konsern>
     <regnskapsprinsipper>
-      <smaaForetak orid="8079">ja</smaaForetak>
-      <regnskapsreglerSelskap orid="25021">nei</regnskapsreglerSelskap>
-      <forenkletIFRS orid="36639">nei</forenkletIFRS>
+      <smaaForetak orid="8079">{SCOPE_SMAA_FORETAK}</smaaForetak>
+      <regnskapsreglerSelskap orid="25021">{SCOPE_REGNSKAPSREGLER_SELSKAP}</regnskapsreglerSelskap>
+      <forenkletIFRS orid="36639">{SCOPE_FORENKLET_IFRS}</forenkletIFRS>
     </regnskapsprinsipper>
     <fastsettelse>
       <fastsettelsedato orid="17105">{fastsettelsesdato.isoformat()}</fastsettelsedato>
@@ -158,8 +173,8 @@ def generer_hovedskjema(regnskap: Aarsregnskap) -> bytes:
     </fastsettelse>
     <revisjonRegnskapsfoerer>
       <aarsregnskapIkkeRevideres orid="34669">{ikke_revideres}</aarsregnskapIkkeRevideres>
-      <aarsregnskapUtarbeidetAutorisertRegnskapsfoerer orid="34670">nei</aarsregnskapUtarbeidetAutorisertRegnskapsfoerer>
-      <tjenestebistandEksternAutorisertRegnskapsfoerer orid="34671">nei</tjenestebistandEksternAutorisertRegnskapsfoerer>
+      <aarsregnskapUtarbeidetAutorisertRegnskapsfoerer orid="34670">{SCOPE_AUTORISERT_REGNSKAPSFOERER}</aarsregnskapUtarbeidetAutorisertRegnskapsfoerer>
+      <tjenestebistandEksternAutorisertRegnskapsfoerer orid="34671">{SCOPE_BISTAND_REGNSKAPSFOERER}</tjenestebistandEksternAutorisertRegnskapsfoerer>
     </revisjonRegnskapsfoerer>
     <aarsberetning/>
   </Skjemainnhold>
@@ -450,7 +465,7 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
 
     <noter>
       <noteAarsverkTjenestePensjon>
-        <antallAarsverk orid="37467">0</antallAarsverk>
+        <antallAarsverk orid="37467">{SCOPE_ANTALL_AARSVERK}</antallAarsverk>
       </noteAarsverkTjenestePensjon>
     </noter>
 
