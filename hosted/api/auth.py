@@ -60,8 +60,10 @@ _RATE_MAKS = 20
 _MOD11_VEKTER = (3, 2, 7, 6, 5, 4, 3, 2)
 
 
-def _serializer() -> URLSafeSerializer:
-    return URLSafeSerializer(settings().invite_secret, salt=_SALT)
+def _serializer(secret: str | None = None) -> URLSafeSerializer:
+    """Signerer og leser invite-tokens. Secret-en er appens, med mindre et driftsskript
+    (mint_invite.py, dev_local.py) sender sin egen; saltet finnes bare her."""
+    return URLSafeSerializer(secret or settings().invite_secret, salt=_SALT)
 
 
 def _handoff_serializer() -> URLSafeTimedSerializer:
@@ -71,10 +73,10 @@ def _handoff_serializer() -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(settings().session_secret, salt=_HANDOFF_SALT)
 
 
-def lag_invite_token(org: str) -> str:
+def lag_invite_token(org: str, *, secret: str | None = None) -> str:
     """Lag invite-token for ETT bestemt selskap. Del ut som {public_url}/#invite=<token>
     (fragmentet sendes aldri til serveren, så tokenet havner ikke i logger)."""
-    return _serializer().dumps({"org": str(org).strip()})
+    return _serializer(secret).dumps({"org": str(org).strip()})
 
 
 def _normaliser_orgnr(raa: str) -> str:

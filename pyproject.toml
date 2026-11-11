@@ -118,6 +118,9 @@ known-first-party = ["wenche", "hosted"]
 [tool.mypy]
 python_version = "3.11"
 files = ["wenche", "hosted"]
+# `hosted/` er en navnerompakke (ingen __init__.py); uten dette fant mypy hosted/api/auth.py både
+# som `api.auth` og `hosted.api.auth` når et skript importerer `hosted.api.auth`.
+explicit_package_bases = true
 # Sjekk også funksjoner uten typehint, så feil i dem ikke går under radaren.
 check_untyped_defs = true
 warn_unused_ignores = true

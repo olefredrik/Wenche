@@ -6,7 +6,7 @@ Skatteetaten. Operatør-verktøy: kjøres lokalt og leser Maskinporten-credsene 
 Bakgrunn: den ekte skattemelding-innsendingen (dry_run=false) gjør som aller første steg
 en GET mot Skatteetatens forhåndsutfylt-API for å utlede partsnummer og
 dokumentreferanseTilGjeldendeDokument (se wenche/innsending.py send_skattemelding og
-wenche/skd_skattemelding_client.py hent_forhåndsutfylt_med_id). Feiler den GET-en, stopper
+wenche/skd_skattemelding_client.py hent_forhaandsutfylt_med_id). Feiler den GET-en, stopper
 innsendingen før tallene i det hele tatt brukes, og hostet-API-et pakker det som en HTTP 502
 med Skatteetatens statuskode i teksten («Feil ved henting av forhåndsutfylt skattemelding:
 400»). Dette skriptet gjør nøyaktig den GET-en og viser hele svaret, så vi ser den eksakte
@@ -14,8 +14,10 @@ med Skatteetatens statuskode i teksten («Feil ved henting av forhåndsutfylt sk
 
   WENCHE_ENV=prod ./.venv/bin/python hosted/hent_forhandsutfylt.py 999999999 2025
 
-Argumenter: <orgnr> [inntektsår].  Standard inntektsår: 2025.  Credsene leses fra .env
-(MASKINPORTEN_CLIENT_ID_PROD / _KID_PROD / MASKINPORTEN_PRIVAT_NOKKEL), valgt av WENCHE_ENV.
+Argumenter: <orgnr> [inntektsår] [--vis-svar].  Standard inntektsår: 2025.  Credsene leses fra
+.env (MASKINPORTEN_CLIENT_ID_PROD / _KID_PROD / MASKINPORTEN_PRIVAT_NOKKEL), valgt av WENCHE_ENV.
+Svarkroppen (hele den forhåndsutfylte skattemeldingen) skrives bare ut når kallet feiler, eller
+med --vis-svar; ellers vises status, lengde og om partsnummer og dokument-id ble funnet.
 
 Read-only: gjør kun en GET (henting/visning), sender ingenting inn og endrer ingenting hos
 Skatteetaten.
@@ -30,10 +32,12 @@ from wenche.skd_skattemelding_client import SkdSkattemeldingClient
 
 
 def main() -> None:
-    if len(sys.argv) < 2:
-        raise SystemExit("Bruk: hent_forhandsutfylt.py <orgnr> [inntektsår]")
-    org = sys.argv[1].strip()
-    inntektsaar = int(sys.argv[2]) if len(sys.argv) > 2 else 2025
+    vis_svar = "--vis-svar" in sys.argv
+    argv = [a for a in sys.argv[1:] if a != "--vis-svar"]
+    if not argv:
+        raise SystemExit("Bruk: hent_forhandsutfylt.py <orgnr> [inntektsår] [--vis-svar]")
+    org = argv[0].strip()
+    inntektsaar = int(argv[1]) if len(argv) > 1 else 2025
 
     miljoer.last_env_filer()
     env = miljoer.gjeldende_navn()
@@ -47,14 +51,17 @@ def main() -> None:
         resp = skd.hent_forhaandsutfylt_svar(inntektsaar, org)
         print(f"GET {resp.request.url}\n")
         print(f"HTTP {resp.status_code}   Content-Type: {resp.headers.get('content-type', '?')}")
-        print("--- svar fra Skatteetaten ---")
-        print(resp.text or "(tom kropp)")
-        print("--- slutt ---")
+        if vis_svar or not resp.is_success:
+            print("--- svar fra Skatteetaten ---")
+            print(resp.text or "(tom kropp)")
+            print("--- slutt ---")
+        else:
+            print(f"Svarkropp: {len(resp.text)} tegn (skjult, --vis-svar viser den)")
 
         if resp.is_success:
-            # Samme tolkning som hent_forhåndsutfylt_med_id, for å se om partsnummer finnes.
+            # Samme tolkning som hent_forhaandsutfylt_med_id, for å se om partsnummer finnes.
             try:
-                _, dok_id = skd.hent_forhåndsutfylt_med_id(inntektsaar, org)
+                _, dok_id = skd.hent_forhaandsutfylt_med_id(inntektsaar, org)
                 print(f"\nForhåndsutfylt hentet OK. dokument-id: {dok_id or '(ikke funnet)'}")
             except Exception as e:  # noqa: BLE001
                 print(f"\nKunne ikke tolke forhåndsutfylt-svaret: {e}")

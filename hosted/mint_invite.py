@@ -7,21 +7,32 @@ ugyldiggjør alle tidligere utdelte lenker.
   HOSTED_INVITE_SECRET=... HOSTED_PUBLIC_URL=https://wenche... \
       ./.venv/bin/python hosted/mint_invite.py <orgnr>
 
-Uten satte variabler brukes dev-standardene (samme som dev_local.py).
+Begge variablene må være satt. På Fly-maskinen er de det alt (secrets), så kjør skriptet der
+(`flyctl ssh console`). Uten dem stopper skriptet i stedet for å falle stille tilbake til
+dev-verdiene, som ville gitt en lenke prod avviser.
 """
 
 import os
 import sys
+from pathlib import Path
 
-from itsdangerous import URLSafeSerializer
+# Kjøres som `python hosted/mint_invite.py`, så repo-roten (der `hosted`-pakken ligger) må på
+# stien selv; sys.path[0] er skriptets egen mappe.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from hosted.api.auth import lag_invite_token  # noqa: E402
 
 if len(sys.argv) < 2 or not sys.argv[1].strip():
     raise SystemExit("Bruk: python hosted/mint_invite.py <orgnr>")
 
 org = sys.argv[1].strip()
-secret = os.getenv("HOSTED_INVITE_SECRET", "dev-invite-secret-bytt-i-prod")
-public = os.getenv("HOSTED_PUBLIC_URL", "http://localhost:5173")
-token = URLSafeSerializer(secret, salt="invite").dumps({"org": org})
+secret = os.environ.get("HOSTED_INVITE_SECRET", "")
+public = os.environ.get("HOSTED_PUBLIC_URL", "")
+if not secret or not public:
+    raise SystemExit(
+        "Sett HOSTED_INVITE_SECRET og HOSTED_PUBLIC_URL (samme verdier som appen kjører med). "
+        "Lokalt mot dev_local.py: bruk verdiene den setter."
+    )
 # Fragment (#), ikke query (?): fragmentet sendes aldri til serveren, så tokenet havner ikke i
 # noen access-logg. Eldre lenker med ?invite= godtas fortsatt av SPA-en.
-print(f"{public}/#invite={token}")
+print(f"{public.rstrip('/')}/#invite={lag_invite_token(org, secret=secret)}")
