@@ -217,262 +217,237 @@ def beregn_skatt_fra_config(config_fil: str | dict) -> tuple[Skatteberegning, fl
     return beregn_skatt(resultat, _les_skattekonfig(raw)), resultat.skattekostnad
 
 
-def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
-    """
-    Genererer et ferdig utfylt sammendrag for RF-1167 og RF-1028.
-    Returnerer teksten som streng.
-    """
-    r = regnskap.resultatregnskap
-    b = regnskap.balanse
-    s = regnskap.selskap
-    år = regnskap.regnskapsaar
-    fr = regnskap.foregaaende_aar_resultat
-    fb = regnskap.foregaaende_aar_balanse
-    har_fjoraar = fr != Resultatregnskap() or fb != Balanse()
+_LINJE = "─" * 60
+_BRED = "═" * 60
 
-    # --- RF-1167: Næringsoppgave ---
 
-    driftsinntekter = r.driftsinntekter.sum
-    driftskostnader = r.driftskostnader.sum
-    driftsresultat = r.driftsresultat
+def _ekk(v: float) -> str:
+    return f"{round(v):>12,}".replace(",", " ")
 
-    fin_kostnader = r.finansposter.sum_kostnader
-    resultat_foer_skatt = r.resultat_foer_skatt
 
-    # --- RF-1028: Skatteberegning ---
+def _ek_rad(label: str, ak: float, ok: float, aek: float) -> str:
+    """Rad i egenkapitalnoten: aksjekapital, overkursfond, annen egenkapital og sum."""
+    return f"  {label:<20}{_ekk(ak)}{_ekk(ok)}{_ekk(aek)}{_ekk(ak + ok + aek)}"
 
-    beregning = beregn_skatt(r, konfig)
-    utbytte = beregning.utbytte
-    fritatt_utbytte = beregning.fritatt_utbytte
-    skattepliktig_utbytte = beregning.skattepliktig_utbytte
-    skattepliktig_inntekt_brutto = beregning.skattepliktig_inntekt_brutto
-    fradrag_underskudd = beregning.fradrag_underskudd
-    skattepliktig_inntekt_netto = beregning.skattepliktig_inntekt_netto
-    nytt_underskudd = beregning.nytt_underskudd
-    beregnet_skatt = beregning.beregnet_skatt
-    andre_finansinntekter = r.finansposter.andre_finansinntekter
 
-    # Skattekostnaden som faktisk er ført i regnskapet (rskl. § 6-1 nr. 19). Den, ikke
-    # beregningen, er det som sendes inn; avvik mellom de to varsles nedenfor.
-    skattekostnad = r.skattekostnad
-
-    # --- Balansesjekk ---
-    i_balanse = b.er_i_balanse()
-    differanse = b.differanse()
-
-    # --- Bygg rapport ---
-    linje = "─" * 60
-    bred = "═" * 60
-
-    linjer = [
-        bred,
-        f"  SKATTEMELDING FOR AS — {år}",
-        f"  {s.navn}  |  Org.nr. {s.org_nummer}",
-        bred,
-        "",
-        linje,
+def _del_resultat(r: Resultatregnskap) -> list[str]:
+    """Næringsspesifikasjonens resultatdel, slik regnskapet er ført."""
+    fp = r.finansposter
+    finansposter = [f"    Utbytte fra datterselskap    {_nok(fp.utbytte_fra_datterselskap)}"]
+    # Linjene for utbytte fra andre aksjer og realisasjon av aksjer vises bare når selskapet
+    # har slike poster, så rapporten er uendret for alle andre.
+    if fp.utbytte_fra_andre_aksjer:
+        finansposter.append(f"    Utbytte fra andre aksjer     {_nok(fp.utbytte_fra_andre_aksjer)}")
+    finansposter.append(f"    Andre finansinntekter        {_nok(fp.andre_finansinntekter)}")
+    if fp.gevinst_ved_realisasjon_av_aksjer:
+        finansposter.append(
+            f"    Gevinst, realisasjon aksjer  {_nok(fp.gevinst_ved_realisasjon_av_aksjer)}"
+        )
+    finansposter += [
+        f"    Rentekostnader               {_nok(fp.rentekostnader)}",
+        f"    Andre finanskostnader        {_nok(fp.andre_finanskostnader)}",
+    ]
+    if fp.tap_ved_realisasjon_av_aksjer:
+        finansposter.append(
+            f"    Tap, realisasjon aksjer      {_nok(fp.tap_ved_realisasjon_av_aksjer)}"
+        )
+    return [
+        _LINJE,
         "  NÆRINGSSPESIFIKASJON",
-        linje,
+        _LINJE,
         "",
         "  DRIFTSINNTEKTER",
         f"    Salgsinntekter               {_nok(r.driftsinntekter.salgsinntekter)}",
         f"    Andre driftsinntekter        {_nok(r.driftsinntekter.andre_driftsinntekter)}",
-        f"  Sum driftsinntekter            {_nok(driftsinntekter)}",
+        f"  Sum driftsinntekter            {_nok(r.driftsinntekter.sum)}",
         "",
         "  DRIFTSKOSTNADER",
         f"    Lønnskostnader               {_nok(r.driftskostnader.loennskostnader)}",
         f"    Avskrivninger                {_nok(r.driftskostnader.avskrivninger)}",
         f"    Andre driftskostnader        {_nok(r.driftskostnader.andre_driftskostnader)}",
-        f"  Sum driftskostnader            {_nok(driftskostnader)}",
+        f"  Sum driftskostnader            {_nok(r.driftskostnader.sum)}",
         "",
-        f"  DRIFTSRESULTAT                 {_nok(driftsresultat)}",
+        f"  DRIFTSRESULTAT                 {_nok(r.driftsresultat)}",
         "",
         "  FINANSPOSTER",
-        f"    Utbytte fra datterselskap    {_nok(r.finansposter.utbytte_fra_datterselskap)}",
-        f"    Andre finansinntekter        {_nok(andre_finansinntekter)}",
-        f"    Rentekostnader               {_nok(r.finansposter.rentekostnader)}",
-        f"    Andre finanskostnader        {_nok(r.finansposter.andre_finanskostnader)}",
-    ]
-    # Bare når selskapet har slike poster, så rapporten er uendret for alle andre.
-    utbytte_andre = r.finansposter.utbytte_fra_andre_aksjer
-    if utbytte_andre:
-        linjer.insert(
-            -3,
-            f"    Utbytte fra andre aksjer     {_nok(utbytte_andre)}",
-        )
-    if r.finansposter.gevinst_ved_realisasjon_av_aksjer:
-        linjer.insert(
-            -2,
-            f"    Gevinst, realisasjon aksjer  {_nok(r.finansposter.gevinst_ved_realisasjon_av_aksjer)}",
-        )
-    if r.finansposter.tap_ved_realisasjon_av_aksjer:
-        linjer.append(
-            f"    Tap, realisasjon aksjer      {_nok(r.finansposter.tap_ved_realisasjon_av_aksjer)}",
-        )
-    linjer += [
+        *finansposter,
         "",
-        f"  RESULTAT FØR SKATT             {_nok(resultat_foer_skatt)}",
-        f"  Skattekostnad                  {_nok(-skattekostnad)}",
+        f"  RESULTAT FØR SKATT             {_nok(r.resultat_foer_skatt)}",
+        f"  Skattekostnad                  {_nok(-r.skattekostnad)}",
         f"  ÅRSRESULTAT                    {_nok(r.aarsresultat)}",
         "",
-        linje,
-        "  SKATTEMELDING FOR AS",
-        linje,
-        "",
-        "  INNTEKTER OG FRADRAG",
-        f"    Driftsresultat               {_nok(driftsresultat)}",
     ]
 
-    if konfig.anvend_fritaksmetoden and utbytte > 0:
-        if har_fullt_utbyttefritak(konfig) and not utbytte_andre:
-            linjer += [
-                f"    Utbytte (100 % fritatt)      {_nok(fritatt_utbytte)}",
-            ]
+
+def _del_skattemelding(
+    r: Resultatregnskap, konfig: SkattemeldingKonfig, beregning: Skatteberegning
+) -> list[str]:
+    """Skattemeldingens inntekter og fradrag, fram til beregnet skatt og eventuelt underskudd."""
+    fp = r.finansposter
+    linjer = [
+        _LINJE,
+        "  SKATTEMELDING FOR AS",
+        _LINJE,
+        "",
+        "  INNTEKTER OG FRADRAG",
+        f"    Driftsresultat               {_nok(r.driftsresultat)}",
+    ]
+
+    if konfig.anvend_fritaksmetoden and beregning.utbytte > 0:
+        if har_fullt_utbyttefritak(konfig) and not fp.utbytte_fra_andre_aksjer:
+            linjer.append(f"    Utbytte (100 % fritatt)      {_nok(beregning.fritatt_utbytte)}")
         elif har_fullt_utbyttefritak(konfig):
             # Utbyttet fra datterselskapet er helt fritatt, utbyttet fra andre aksjer får
             # 3 %-sjablonen, så andelen som er fritatt er verken 100 % eller 97 %.
             linjer += [
-                f"    Utbytte (fritatt)            {_nok(fritatt_utbytte)}",
-                f"    Utbytte (sjablonregel, 3 %)  {_nok(skattepliktig_utbytte)}",
+                f"    Utbytte (fritatt)            {_nok(beregning.fritatt_utbytte)}",
+                f"    Utbytte (sjablonregel, 3 %)  {_nok(beregning.skattepliktig_utbytte)}",
             ]
         else:
             linjer += [
-                f"    Utbytte (fritatt, 97 %)      {_nok(fritatt_utbytte)}",
-                f"    Utbytte (sjablonregel, 3 %)  {_nok(skattepliktig_utbytte)}",
+                f"    Utbytte (fritatt, 97 %)      {_nok(beregning.fritatt_utbytte)}",
+                f"    Utbytte (sjablonregel, 3 %)  {_nok(beregning.skattepliktig_utbytte)}",
             ]
     else:
-        linjer += [
-            f"    Utbytte                      {_nok(utbytte)}",
-        ]
+        linjer.append(f"    Utbytte                      {_nok(beregning.utbytte)}")
 
-    linjer += [
-        f"    Andre finansinntekter        {_nok(andre_finansinntekter)}",
-    ]
-    gevinst_aksjer = r.finansposter.gevinst_ved_realisasjon_av_aksjer
-    if gevinst_aksjer:
+    linjer.append(f"    Andre finansinntekter        {_nok(fp.andre_finansinntekter)}")
+    if fp.gevinst_ved_realisasjon_av_aksjer:
         if beregning.fritatt_gevinst_aksjer:
             linjer.append(
                 f"    Aksjegevinst (100 % fritatt) {_nok(beregning.fritatt_gevinst_aksjer)}"
             )
         else:
-            linjer.append(f"    Gevinst, realisasjon aksjer  {_nok(gevinst_aksjer)}")
-    linjer += [
-        f"    Finanskostnader             -{_nok(fin_kostnader - beregning.ikke_fradragsberettiget_tap_aksjer)}",
-    ]
+            linjer.append(
+                f"    Gevinst, realisasjon aksjer  {_nok(fp.gevinst_ved_realisasjon_av_aksjer)}"
+            )
+    linjer.append(
+        f"    Finanskostnader             -{_nok(fp.sum_kostnader - beregning.ikke_fradragsberettiget_tap_aksjer)}"
+    )
     if beregning.ikke_fradragsberettiget_tap_aksjer:
         linjer.append(
             f"    Aksjetap (ikke fradrag)      {_nok(beregning.ikke_fradragsberettiget_tap_aksjer)}"
         )
+    linjer.append(
+        f"  Skattepliktig inntekt (brutto) {_nok(beregning.skattepliktig_inntekt_brutto)}"
+    )
+    if beregning.fradrag_underskudd > 0:
+        linjer.append(f"  Fradrag: fremf. underskudd  -{_nok(beregning.fradrag_underskudd)}")
     linjer += [
-        f"  Skattepliktig inntekt (brutto) {_nok(skattepliktig_inntekt_brutto)}",
+        f"  SKATTEPLIKTIG INNTEKT (NETTO)  {_nok(beregning.skattepliktig_inntekt_netto)}",
+        "",
+        f"  Beregnet skatt (22 %)          {_nok(beregning.beregnet_skatt)}",
+        "",
     ]
-
-    if fradrag_underskudd > 0:
+    if beregning.nytt_underskudd > 0:
         linjer += [
-            f"  Fradrag: fremf. underskudd  -{_nok(fradrag_underskudd)}",
+            f"  Underskudd til fremføring      {_nok(beregning.nytt_underskudd)}",
+            "  (føres på skattemeldingen under «Underskudd til fremføring»)",
+            "",
         ]
+    return linjer
 
-    linjer += [
-        f"  SKATTEPLIKTIG INNTEKT (NETTO)  {_nok(skattepliktig_inntekt_netto)}",
-        "",
-        f"  Beregnet skatt (22 %)          {_nok(beregnet_skatt)}",
-        "",
-    ]
 
-    if nytt_underskudd > 0:
-        linjer.append(f"  Underskudd til fremføring      {_nok(nytt_underskudd)}")
-        linjer.append("  (føres på skattemeldingen under «Underskudd til fremføring»)")
-        linjer.append("")
-
-    linjer += [
-        linje,
+def _del_balanse(b: Balanse) -> list[str]:
+    """Balansen slik den er ført, eiendeler og egenkapital og gjeld."""
+    am, om = b.eiendeler.anleggsmidler, b.eiendeler.omloepmidler
+    eg = b.egenkapital_og_gjeld
+    ek, lg, kg = eg.egenkapital, eg.langsiktig_gjeld, eg.kortsiktig_gjeld
+    return [
+        _LINJE,
         "  NÆRINGSSPESIFIKASJON  BALANSE",
-        linje,
+        _LINJE,
         "",
         "  EIENDELER",
         "    Anleggsmidler:",
-        f"      Aksjer i datterselskap      {_nok(b.eiendeler.anleggsmidler.aksjer_i_datterselskap)}",
-        f"      Andre aksjer                {_nok(b.eiendeler.anleggsmidler.andre_aksjer)}",
-        f"      Langsiktige fordringer      {_nok(b.eiendeler.anleggsmidler.langsiktige_fordringer)}",
-        f"    Sum anleggsmidler             {_nok(b.eiendeler.anleggsmidler.sum)}",
+        f"      Aksjer i datterselskap      {_nok(am.aksjer_i_datterselskap)}",
+        f"      Andre aksjer                {_nok(am.andre_aksjer)}",
+        f"      Langsiktige fordringer      {_nok(am.langsiktige_fordringer)}",
+        f"    Sum anleggsmidler             {_nok(am.sum)}",
         "",
         "    Omløpsmidler:",
-        f"      Kortsiktige fordringer      {_nok(b.eiendeler.omloepmidler.kortsiktige_fordringer)}",
-        f"      Bankinnskudd                {_nok(b.eiendeler.omloepmidler.bankinnskudd)}",
-        f"    Sum omløpsmidler              {_nok(b.eiendeler.omloepmidler.sum)}",
+        f"      Kortsiktige fordringer      {_nok(om.kortsiktige_fordringer)}",
+        f"      Bankinnskudd                {_nok(om.bankinnskudd)}",
+        f"    Sum omløpsmidler              {_nok(om.sum)}",
         "",
         f"  SUM EIENDELER                  {_nok(b.eiendeler.sum)}",
         "",
         "  EGENKAPITAL OG GJELD",
         "    Egenkapital:",
-        f"      Aksjekapital                {_nok(b.egenkapital_og_gjeld.egenkapital.aksjekapital)}",
-        f"      Overkursfond                {_nok(b.egenkapital_og_gjeld.egenkapital.overkursfond)}",
-        f"      Annen egenkapital           {_nok(b.egenkapital_og_gjeld.egenkapital.annen_egenkapital)}",
-        f"    Sum egenkapital               {_nok(b.egenkapital_og_gjeld.egenkapital.sum)}",
+        f"      Aksjekapital                {_nok(ek.aksjekapital)}",
+        f"      Overkursfond                {_nok(ek.overkursfond)}",
+        f"      Annen egenkapital           {_nok(ek.annen_egenkapital)}",
+        f"    Sum egenkapital               {_nok(ek.sum)}",
         "",
         "    Langsiktig gjeld:",
-        f"      Lån fra aksjonær            {_nok(b.egenkapital_og_gjeld.langsiktig_gjeld.laan_fra_aksjonaer)}",
-        f"      Andre langsiktige lån       {_nok(b.egenkapital_og_gjeld.langsiktig_gjeld.andre_langsiktige_laan)}",
-        f"    Sum langsiktig gjeld          {_nok(b.egenkapital_og_gjeld.langsiktig_gjeld.sum)}",
+        f"      Lån fra aksjonær            {_nok(lg.laan_fra_aksjonaer)}",
+        f"      Andre langsiktige lån       {_nok(lg.andre_langsiktige_laan)}",
+        f"    Sum langsiktig gjeld          {_nok(lg.sum)}",
         "",
         "    Kortsiktig gjeld:",
-        f"      Leverandørgjeld             {_nok(b.egenkapital_og_gjeld.kortsiktig_gjeld.leverandoergjeld)}",
-        f"      Betalbar skatt              {_nok(b.egenkapital_og_gjeld.kortsiktig_gjeld.betalbar_skatt)}",
-        f"      Skyldige offentlige avgifter {_nok(b.egenkapital_og_gjeld.kortsiktig_gjeld.skyldige_offentlige_avgifter)}",
-        f"      Annen kortsiktig gjeld      {_nok(b.egenkapital_og_gjeld.kortsiktig_gjeld.annen_kortsiktig_gjeld)}",
-        f"    Sum kortsiktig gjeld          {_nok(b.egenkapital_og_gjeld.kortsiktig_gjeld.sum)}",
+        f"      Leverandørgjeld             {_nok(kg.leverandoergjeld)}",
+        f"      Betalbar skatt              {_nok(kg.betalbar_skatt)}",
+        f"      Skyldige offentlige avgifter {_nok(kg.skyldige_offentlige_avgifter)}",
+        f"      Annen kortsiktig gjeld      {_nok(kg.annen_kortsiktig_gjeld)}",
+        f"    Sum kortsiktig gjeld          {_nok(kg.sum)}",
         "",
-        f"  SUM EGENKAPITAL OG GJELD       {_nok(b.egenkapital_og_gjeld.sum)}",
+        f"  SUM EGENKAPITAL OG GJELD       {_nok(eg.sum)}",
         "",
     ]
 
-    if har_fjoraar:
-        netto_finans_fjor = fr.finansposter.sum_inntekter - fr.finansposter.sum_kostnader
-        linjer += [
+
+def _del_sammenligning(
+    r: Resultatregnskap,
+    b: Balanse,
+    fr: Resultatregnskap,
+    fb: Balanse,
+    aar: int,
+    har_fjoraar: bool,
+) -> list[str]:
+    """Sammenligningstall (rskl. § 6-6), eller en påminnelse når fjoråret ikke er lagt inn."""
+    if not har_fjoraar:
+        return [
             "",
-            linje,
-            "  NÆRINGSSPESIFIKASJON  SAMMENLIGNINGSTALL  (rskl. § 6-6)",
-            linje,
-            f"                                 {år:>12}   {år - 1:>12}",
-            f"  Sum driftsinntekter          {_nok2(r.driftsinntekter.sum, fr.driftsinntekter.sum)}",
-            f"  Sum driftskostnader          {_nok2(r.driftskostnader.sum, fr.driftskostnader.sum)}",
-            f"  Driftsresultat               {_nok2(r.driftsresultat, fr.driftsresultat)}",
-            f"  Netto finansposter           {_nok2(r.finansposter.sum_inntekter - r.finansposter.sum_kostnader, netto_finans_fjor)}",
-            f"  RESULTAT FØR SKATT           {_nok2(r.resultat_foer_skatt, fr.resultat_foer_skatt)}",
-            f"  SUM EIENDELER                {_nok2(b.eiendeler.sum, fb.eiendeler.sum)}",
-            f"  SUM EGENKAPITAL OG GJELD     {_nok2(b.egenkapital_og_gjeld.sum, fb.egenkapital_og_gjeld.sum)}",
-            "",
-        ]
-    else:
-        linjer += [
-            "",
-            f"  NB: Sammenligningstall for {år - 1} er ikke lagt inn.",
+            f"  NB: Sammenligningstall for {aar - 1} er ikke lagt inn.",
             "  Legg til 'foregaaende_aar' i config.yaml (påkrevd, jf. rskl. § 6-6).",
             "",
         ]
-
-    # --- Egenkapitalnote (rskl. § 7-2b) ---
-
-    def _ekk(v: float) -> str:
-        return f"{round(v):>12,}".replace(",", " ")
-
-    def _ek_rad(label: str, ak: float, ok: float, aek: float) -> str:
-        s = ak + ok + aek
-        return f"  {label:<20}{_ekk(ak)}{_ekk(ok)}{_ekk(aek)}{_ekk(s)}"
-
-    aarsresultat = r.aarsresultat
-    ek_ub = b.egenkapital_og_gjeld.egenkapital
-
-    linjer += [
+    netto_finans = r.finansposter.sum_inntekter - r.finansposter.sum_kostnader
+    netto_finans_fjor = fr.finansposter.sum_inntekter - fr.finansposter.sum_kostnader
+    return [
         "",
-        linje,
-        "  NOTE: EGENKAPITAL  (rskl. § 7-2b)",
-        linje,
-        f"  {'':20}{'AK-kapital':>12}{'Overkursfond':>12}{'Annen EK':>12}{'Sum':>12}",
+        _LINJE,
+        "  NÆRINGSSPESIFIKASJON  SAMMENLIGNINGSTALL  (rskl. § 6-6)",
+        _LINJE,
+        f"                                 {aar:>12}   {aar - 1:>12}",
+        f"  Sum driftsinntekter          {_nok2(r.driftsinntekter.sum, fr.driftsinntekter.sum)}",
+        f"  Sum driftskostnader          {_nok2(r.driftskostnader.sum, fr.driftskostnader.sum)}",
+        f"  Driftsresultat               {_nok2(r.driftsresultat, fr.driftsresultat)}",
+        f"  Netto finansposter           {_nok2(netto_finans, netto_finans_fjor)}",
+        f"  RESULTAT FØR SKATT           {_nok2(r.resultat_foer_skatt, fr.resultat_foer_skatt)}",
+        f"  SUM EIENDELER                {_nok2(b.eiendeler.sum, fb.eiendeler.sum)}",
+        f"  SUM EGENKAPITAL OG GJELD     {_nok2(b.egenkapital_og_gjeld.sum, fb.egenkapital_og_gjeld.sum)}",
+        "",
     ]
 
+
+def _del_egenkapitalnote(regnskap: Aarsregnskap, har_fjoraar: bool, aar: int) -> list[str]:
+    """Egenkapitalnoten (rskl. § 7-2b): bevegelsen fra 01.01 til 31.12 når fjoråret finnes."""
+    ek_ub = regnskap.balanse.egenkapital_og_gjeld.egenkapital
+    linjer = [
+        "",
+        _LINJE,
+        "  NOTE: EGENKAPITAL  (rskl. § 7-2b)",
+        _LINJE,
+        f"  {'':20}{'AK-kapital':>12}{'Overkursfond':>12}{'Annen EK':>12}{'Sum':>12}",
+    ]
+    ub_rad = _ek_rad(
+        f"EK 31.12.{aar}", ek_ub.aksjekapital, ek_ub.overkursfond, ek_ub.annen_egenkapital
+    )
+
     if har_fjoraar:
-        ek_ib = fb.egenkapital_og_gjeld.egenkapital
+        aarsresultat = regnskap.resultatregnskap.aarsresultat
+        ek_ib = regnskap.foregaaende_aar_balanse.egenkapital_og_gjeld.egenkapital
         delta_ak = ek_ub.aksjekapital - ek_ib.aksjekapital
         delta_ok = ek_ub.overkursfond - ek_ib.overkursfond
         # Det er årets avsetning som reduserer egenkapitalen. Er utbyttet avsatt, gjør
@@ -488,7 +463,7 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
 
         linjer.append(
             _ek_rad(
-                f"EK 01.01.{år}", ek_ib.aksjekapital, ek_ib.overkursfond, ek_ib.annen_egenkapital
+                f"EK 01.01.{aar}", ek_ib.aksjekapital, ek_ib.overkursfond, ek_ib.annen_egenkapital
             )
         )
         linjer.append(_ek_rad("Årsresultat", 0, 0, aarsresultat))
@@ -496,30 +471,25 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
             linjer.append(_ek_rad(utbytte_etikett, 0, 0, -utbytte_mot_ek))
         if delta_ak != 0 or delta_ok != 0 or andre_aek != 0:
             linjer.append(_ek_rad("Andre endringer", delta_ak, delta_ok, andre_aek))
-        linjer.append(
-            _ek_rad(
-                f"EK 31.12.{år}", ek_ub.aksjekapital, ek_ub.overkursfond, ek_ub.annen_egenkapital
-            )
-        )
+        linjer.append(ub_rad)
     else:
-        linjer += [
-            "  NB: Egenkapitalbevegelse krever foregaaende_aar (rskl. § 7-2b).",
-            _ek_rad(
-                f"EK 31.12.{år}", ek_ub.aksjekapital, ek_ub.overkursfond, ek_ub.annen_egenkapital
-            ),
-        ]
+        linjer += ["  NB: Egenkapitalbevegelse krever foregaaende_aar (rskl. § 7-2b).", ub_rad]
 
-    linjer.append("  (beløp i hele kroner, NOK)")
-    linjer.append("")
+    linjer += ["  (beløp i hele kroner, NOK)", ""]
+    return linjer
 
-    if i_balanse:
-        linjer.append("  Balansekontroll: OK")
+
+def _del_kontroller(b: Balanse, skattekostnad: float, beregnet_skatt: float) -> list[str]:
+    """Balansekontroll, og kontroll av ført skattekostnad mot beregningen."""
+    if b.er_i_balanse():
+        linjer = ["  Balansekontroll: OK"]
     else:
-        linjer.append(f"  ADVARSEL: Balansen stemmer ikke! Differanse: {_nok(differanse)}")
+        linjer = [f"  ADVARSEL: Balansen stemmer ikke! Differanse: {_nok(b.differanse())}"]
 
-    # Kontroll av ført skattekostnad mot beregningen. Wenche fastsetter ikke tallet
-    # (beregningen modellerer ikke utsatt skatt eller andre permanente forskjeller enn
-    # fritaksmetoden), men et sprik er verdt å se før innsending.
+    # Skattekostnaden som faktisk er ført i regnskapet (rskl. § 6-1 nr. 19) er det som sendes
+    # inn, ikke beregningen. Wenche fastsetter ikke tallet (beregningen modellerer ikke utsatt
+    # skatt eller andre permanente forskjeller enn fritaksmetoden), men et sprik er verdt å se
+    # før innsending.
     avvik_skatt = round(skattekostnad) - round(beregnet_skatt)
     if beregnet_skatt > 0 and round(skattekostnad) == 0:
         linjer += [
@@ -538,20 +508,49 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
             "  Avvik er ikke nødvendigvis feil: beregningen dekker ikke utsatt skatt eller",
             "  andre permanente forskjeller enn fritaksmetoden.",
         ]
+    return linjer
 
-    linjer += [
+
+def _del_neste_steg(aar: int) -> list[str]:
+    return [
         "",
-        bred,
+        _BRED,
         "  NESTE STEG",
-        bred,
+        _BRED,
         "",
         "  1. Gå til https://www.skatteetaten.no/ og logg inn med BankID.",
-        "  2. Åpne skattemeldingen for AS for " + str(år) + ".",
+        f"  2. Åpne skattemeldingen for AS for {aar}.",
         "  3. Fyll inn tallene fra næringsspesifikasjonen og skattemeldingen ovenfor.",
         "  4. Kontroller at skatteetaten beregner samme skatt.",
         "  5. Send inn innen 31. mai.",
         "",
-        bred,
+        _BRED,
     ]
 
+
+def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
+    """
+    Genererer et ferdig utfylt sammendrag for RF-1167 og RF-1028, som tekst.
+    Hver del av rapporten bygges av sin egen funksjon, i den rekkefølgen de står.
+    """
+    r, b, s = regnskap.resultatregnskap, regnskap.balanse, regnskap.selskap
+    aar = regnskap.regnskapsaar
+    fr, fb = regnskap.foregaaende_aar_resultat, regnskap.foregaaende_aar_balanse
+    har_fjoraar = fr != Resultatregnskap() or fb != Balanse()
+    beregning = beregn_skatt(r, konfig)
+
+    linjer = [
+        _BRED,
+        f"  SKATTEMELDING FOR AS — {aar}",
+        f"  {s.navn}  |  Org.nr. {s.org_nummer}",
+        _BRED,
+        "",
+        *_del_resultat(r),
+        *_del_skattemelding(r, konfig, beregning),
+        *_del_balanse(b),
+        *_del_sammenligning(r, b, fr, fb, aar, har_fjoraar),
+        *_del_egenkapitalnote(regnskap, har_fjoraar, aar),
+        *_del_kontroller(b, r.skattekostnad, beregning.beregnet_skatt),
+        *_del_neste_steg(aar),
+    ]
     return "\n".join(linjer) + "\n"
