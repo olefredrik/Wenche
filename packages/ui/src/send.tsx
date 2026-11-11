@@ -1,7 +1,10 @@
 import { useState } from "react";
-import { btnPrimar, btnOutline, monoLabel } from "./styles";
-import { Kort, Panel, Liste, SeksjonsNav } from "./komponenter";
-import { kr, oppsummer } from "./skjema";
+import { feilmelding } from "./api";
+import { Kort, Liste, Panel, SeksjonsNav } from "./komponenter";
+import { Modal } from "./modal";
+import { kr, oppsummer, type Oppsummering } from "./skjemadata";
+import { btnOutline, btnPrimar, monoLabel } from "./styles";
+import { erValidering, type Config, type InnsendingResultat, type InnsendingSvar, type ValideringSvar } from "./typer";
 
 // Delt se-over-og-send-flyt: dry-run-kontroll i en bekreft-modal, deretter ekte innsending.
 // Auth/onboarding holdes utenfor: hver app injiserer `innsending`-funksjonen (hostet legger
@@ -10,8 +13,7 @@ import { kr, oppsummer } from "./skjema";
 export interface Utfall {
   dryRun: boolean;
   type: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  data?: any;
+  data?: InnsendingResultat;
   feil?: string;
 }
 
@@ -26,10 +28,9 @@ export interface Validering {
 export type InnsendingFn = (
   type: string,
   dryRun: boolean,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  config: any,
+  config: Config,
   bekreftKlage?: boolean,
-) => Promise<any>;
+) => Promise<InnsendingResultat>;
 
 const KVITTERING_ETIKETT: Record<string, string> = {
   forsendelseId: "Forsendelse-ID",
@@ -50,6 +51,75 @@ const STANDARD_SAMTYKKE = (
   </span>
 );
 
+const lenkeKlasse = "mt-3 inline-block font-medium text-spruce underline-offset-2 hover:underline";
+
+function DryRunPanel({ data }: { data: ValideringSvar }) {
+  const feilListe = data.feil ?? [];
+  const advarsler = data.advarsler ?? [];
+  if (data.ok && feilListe.length === 0) {
+    return (
+      <Panel tone="ok" tittel="Validering OK, klar til innsending">
+        <Liste tittel="Merknader" items={advarsler} />
+      </Panel>
+    );
+  }
+  return (
+    <Panel tone="advarsel" tittel="Avvik som må rettes">
+      <Liste items={feilListe} />
+      <Liste tittel="Merknader" items={advarsler} />
+    </Panel>
+  );
+}
+
+function SendtPanel({ data, env, org }: { data: InnsendingSvar; env?: string; org?: string }) {
+  // Årsregnskap og skattemelding: backend returnerer en signeringslenke (streng) til
+  // Altinn-innboksen. Innsendingen er ikke levert før brukeren signerer der med BankID,
+  // og det kan ikke gjøres maskinelt.
+  if (typeof data.resultat === "string") {
+    return (
+      <Panel tone="ok" tittel="Venter på signatur">
+        {data.klage && <p className="mb-2">Skattemeldingen sendes som klage på skjønnsfastsettingen.</p>}
+        <p>
+          Dokumentet er lastet opp, men er ikke levert ennå. Signer med BankID i Altinn for å
+          fullføre innsendingen.
+        </p>
+        <a href={data.resultat} target="_blank" rel="noopener noreferrer" className={lenkeKlasse}>
+          Signer i Altinn →
+        </a>
+      </Panel>
+    );
+  }
+  // Aksjonær (forsendelse-ID): kvittering + lenke til meldingsboks.
+  const kvittering = data.resultat && typeof data.resultat === "object" ? data.resultat : {};
+  const linjer = Object.entries(kvittering).filter(
+    ([, v]) => typeof v === "string" || typeof v === "number",
+  );
+  const altinnBase = env === "test" ? "https://tt02.altinn.no" : "https://af.altinn.no";
+  const meldingsboksUrl = org
+    ? `${altinnBase}/?party=urn%3Aaltinn%3Aorganization%3Aidentifier-no%3A${org}`
+    : null;
+  return (
+    <Panel tone="ok" tittel="Sendt inn">
+      <p>Innsendingen er levert. Kvittering og status finner du i Altinn.</p>
+      {linjer.length > 0 && (
+        <dl className="mt-3 space-y-1">
+          {linjer.map(([k, v]) => (
+            <div key={k} className="flex gap-2 font-mono text-xs">
+              <dt className="text-muted-foreground">{KVITTERING_ETIKETT[k] ?? k}:</dt>
+              <dd className="break-all">{String(v)}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {meldingsboksUrl && (
+        <a href={meldingsboksUrl} target="_blank" rel="noopener noreferrer" className={lenkeKlasse}>
+          Åpne Altinn meldingsboks →
+        </a>
+      )}
+    </Panel>
+  );
+}
+
 export function Resultatpanel({
   utfall,
   env,
@@ -68,78 +138,8 @@ export function Resultatpanel({
     );
   }
   if (!data) return null;
-
-  if (dryRun) {
-    const feilListe: string[] = data.feil ?? [];
-    const advarsler: string[] = data.advarsler ?? [];
-    if (data.ok && feilListe.length === 0) {
-      return (
-        <Panel tone="ok" tittel="Validering OK, klar til innsending">
-          <Liste tittel="Merknader" items={advarsler} />
-        </Panel>
-      );
-    }
-    return (
-      <Panel tone="advarsel" tittel="Avvik som må rettes">
-        <Liste items={feilListe} />
-        <Liste tittel="Merknader" items={advarsler} />
-      </Panel>
-    );
-  }
-
-  if (data.sendt) {
-    const lenkeKlasse =
-      "mt-3 inline-block font-medium text-spruce underline-offset-2 hover:underline";
-    // Årsregnskap og skattemelding: backend returnerer en signeringslenke (streng) til
-    // Altinn-innboksen. Innsendingen er ikke levert før brukeren signerer der med BankID,
-    // og det kan ikke gjøres maskinelt.
-    const signeringsUrl = typeof data.resultat === "string" ? data.resultat : null;
-    if (signeringsUrl) {
-      return (
-        <Panel tone="ok" tittel="Venter på signatur">
-          {data.klage && <p className="mb-2">Skattemeldingen sendes som klage på skjønnsfastsettingen.</p>}
-          <p>
-            Dokumentet er lastet opp, men er ikke levert ennå. Signer med BankID i Altinn for å
-            fullføre innsendingen.
-          </p>
-          <a href={signeringsUrl} target="_blank" rel="noopener noreferrer" className={lenkeKlasse}>
-            Signer i Altinn →
-          </a>
-        </Panel>
-      );
-    }
-    // Aksjonær (forsendelse-ID): kvittering + lenke til meldingsboks.
-    const kvittering: Record<string, unknown> =
-      data.resultat && typeof data.resultat === "object" ? data.resultat : {};
-    const linjer: [string, unknown][] = Object.entries(kvittering).filter(
-      ([, v]) => typeof v === "string" || typeof v === "number",
-    );
-    const altinnBase = env === "test" ? "https://tt02.altinn.no" : "https://af.altinn.no";
-    const meldingsboksUrl = org
-      ? `${altinnBase}/?party=urn%3Aaltinn%3Aorganization%3Aidentifier-no%3A${org}`
-      : null;
-    return (
-      <Panel tone="ok" tittel="Sendt inn">
-        <p>Innsendingen er levert. Kvittering og status finner du i Altinn.</p>
-        {linjer.length > 0 && (
-          <dl className="mt-3 space-y-1">
-            {linjer.map(([k, v]) => (
-              <div key={k} className="flex gap-2 font-mono text-xs">
-                <dt className="text-muted-foreground">{KVITTERING_ETIKETT[k] ?? k}:</dt>
-                <dd className="break-all">{String(v)}</dd>
-              </div>
-            ))}
-          </dl>
-        )}
-        {meldingsboksUrl && (
-          <a href={meldingsboksUrl} target="_blank" rel="noopener noreferrer" className={lenkeKlasse}>
-            Åpne Altinn meldingsboks →
-          </a>
-        )}
-      </Panel>
-    );
-  }
-
+  if (dryRun && erValidering(data)) return <DryRunPanel data={data} />;
+  if (!dryRun && "sendt" in data && data.sendt) return <SendtPanel data={data} env={env} org={org} />;
   return (
     <Panel tone="advarsel" tittel="Uventet svar">
       {JSON.stringify(data)}
@@ -158,8 +158,7 @@ function BekreftModal({
   onAvbryt,
 }: {
   navn: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  o: any;
+  o: Oppsummering;
   validering: Validering | null;
   sender: boolean;
   samtykke: React.ReactNode;
@@ -173,105 +172,94 @@ function BekreftModal({
   const [klageGodtatt, setKlageGodtatt] = useState(false);
   const klar = validering?.ok === true;
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4"
-      onClick={onAvbryt}
-    >
-      <div
-        className="w-full max-w-md rounded-sm border border-border bg-background p-6 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <p className={monoLabel}>Bekreft innsending</p>
-        <h3 className="mt-2 font-display text-xl font-normal">{navn}</h3>
+    <Modal etikett="Bekreft innsending" tittel={navn} onLukk={onAvbryt}>
+      <div className="mt-4 rounded-sm border border-border bg-paper p-4 text-sm">
+        <p className="font-medium">
+          {o.navn || "Selskap"} · org {o.org}
+        </p>
+        <p className="mt-1 text-muted-foreground">
+          Regnskapsår {o.aar} · {o.antallAksjonaerer} aksjonær(er) ·{" "}
+          {o.balansererOk ? "balansen går opp" : `balanse-differanse ${kr(o.balanseDiff)}`}
+        </p>
+      </div>
 
-        <div className="mt-4 rounded-sm border border-border bg-paper p-4 text-sm">
-          <p className="font-medium">
-            {o.navn || "Selskap"} · org {o.org}
-          </p>
-          <p className="mt-1 text-muted-foreground">
-            Regnskapsår {o.aar} · {o.antallAksjonaerer} aksjonær(er) ·{" "}
-            {o.balansererOk ? "balansen går opp" : `balanse-differanse ${kr(o.balanseDiff)}`}
-          </p>
-        </div>
-
-        <div className="mt-4 text-sm">
-          {validering?.laster && <p className="text-muted-foreground">Kontrollerer tallene…</p>}
-          {/* Ved klage tar forklaringen under over; «klar til innsending» ville lest motstridende. */}
-          {validering && !validering.laster && klar && !klage &&
-            ((validering.advarsler?.length ?? 0) > 0 ? (
-              <p className="text-spruce">✓ Tallene er gyldige. Les merknadene under før du sender.</p>
-            ) : (
-              <p className="text-spruce">✓ Alt ser bra ut. Klar til innsending.</p>
-            ))}
-          {validering && !validering.laster && !klar && (
-            <div className="text-amber-800">
-              <p className="font-medium">Noen ting bør rettes først:</p>
-              <ul className="mt-1 list-disc space-y-1 pl-5">
-                {(validering.feil ?? []).map((t, i) => (
-                  <li key={i}>{t}</li>
-                ))}
-                {validering.melding && <li>{validering.melding}</li>}
-              </ul>
-            </div>
-          )}
-          {klar && (validering?.advarsler?.length ?? 0) > 0 && (
-            <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800">
-              <p className="font-medium">Merknader (ikke-blokkerende):</p>
-              <ul className="mt-1 list-disc space-y-1 pl-5">
-                {validering!.advarsler!.map((t, i) => (
-                  <li key={i}>{t}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-
-        {klage && (
-          <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-            <p className="font-medium">Skattemeldingen er skjønnsfastsatt</p>
-            <p className="mt-1">{klage}</p>
-            <label className="mt-3 flex items-start gap-2 text-xs">
-              <input
-                type="checkbox"
-                className="mt-0.5 h-4 w-4 accent-[oklch(0.46_0.08_155)]"
-                checked={klageGodtatt}
-                onChange={(e) => setKlageGodtatt(e.target.checked)}
-              />
-              <span>Jeg forstår at innsendingen blir en klage på skjønnsfastsettingen.</span>
-            </label>
+      <div className="mt-4 text-sm" aria-live="polite">
+        {validering?.laster && <p className="text-muted-foreground">Kontrollerer tallene…</p>}
+        {/* Ved klage tar forklaringen under over; «klar til innsending» ville lest motstridende. */}
+        {validering && !validering.laster && klar && !klage &&
+          ((validering.advarsler?.length ?? 0) > 0 ? (
+            <p className="text-spruce">✓ Tallene er gyldige. Les merknadene under før du sender.</p>
+          ) : (
+            <p className="text-spruce">✓ Alt ser bra ut. Klar til innsending.</p>
+          ))}
+        {validering && !validering.laster && !klar && (
+          <div className="text-amber-800">
+            <p className="font-medium">Noen ting bør rettes først:</p>
+            <ul className="mt-1 list-disc space-y-1 pl-5">
+              {(validering.feil ?? []).map((t, i) => (
+                <li key={i}>{t}</li>
+              ))}
+              {validering.melding && <li>{validering.melding}</li>}
+            </ul>
           </div>
         )}
+        {klar && (validering?.advarsler?.length ?? 0) > 0 && (
+          <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800">
+            <p className="font-medium">Merknader (ikke-blokkerende):</p>
+            <ul className="mt-1 list-disc space-y-1 pl-5">
+              {validering!.advarsler!.map((t, i) => (
+                <li key={i}>{t}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
 
-        <p className="mt-4 text-xs text-muted-foreground">
-          Sendes til myndighetene via Altinn, og er bindende.
-        </p>
-
-        {klar && (
-          <label className="mt-4 flex items-start gap-2 text-xs text-muted-foreground">
+      {klage && (
+        <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+          <p className="font-medium">Skattemeldingen er skjønnsfastsatt</p>
+          <p className="mt-1">{klage}</p>
+          <label className="mt-3 flex items-start gap-2 text-xs">
             <input
               type="checkbox"
               className="mt-0.5 h-4 w-4 accent-[oklch(0.46_0.08_155)]"
-              checked={godtatt}
-              onChange={(e) => setGodtatt(e.target.checked)}
+              checked={klageGodtatt}
+              onChange={(e) => setKlageGodtatt(e.target.checked)}
             />
-            {samtykke}
+            <span>Jeg forstår at innsendingen blir en klage på skjønnsfastsettingen.</span>
           </label>
-        )}
-
-        <div className="mt-5 flex items-center justify-end gap-3">
-          <button className={btnOutline} onClick={onAvbryt} disabled={sender}>
-            Avbryt
-          </button>
-          <button
-            className={`${btnPrimar} min-w-52 text-center`}
-            onClick={onBekreft}
-            disabled={!klar || sender || !godtatt || (!!klage && !klageGodtatt)}
-          >
-            {sender ? "Sender…" : klage ? "Send som klage" : "Bekreft og send inn"}
-          </button>
         </div>
+      )}
+
+      <p className="mt-4 text-xs text-muted-foreground">
+        Sendes til myndighetene via Altinn, og er bindende.
+      </p>
+
+      {klar && (
+        <label className="mt-4 flex items-start gap-2 text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 accent-[oklch(0.46_0.08_155)]"
+            checked={godtatt}
+            onChange={(e) => setGodtatt(e.target.checked)}
+          />
+          {samtykke}
+        </label>
+      )}
+
+      <div className="mt-5 flex items-center justify-end gap-3">
+        <button className={btnOutline} onClick={onAvbryt} disabled={sender}>
+          Avbryt
+        </button>
+        <button
+          className={`${btnPrimar} min-w-52 text-center`}
+          onClick={onBekreft}
+          disabled={!klar || sender || !godtatt || (!!klage && !klageGodtatt)}
+        >
+          {sender ? "Sender…" : klage ? "Send som klage" : "Bekreft og send inn"}
+        </button>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -284,8 +272,7 @@ export function SendSeksjon({
   samtykke = STANDARD_SAMTYKKE,
   typer = STANDARD_TYPER,
 }: {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  config: any;
+  config: Config;
   innsending: InnsendingFn;
   env?: string;
   org?: string;
@@ -307,15 +294,15 @@ export function SendSeksjon({
     setValidering({ laster: true });
     try {
       const data = await innsending(type, true, config);
-      const feil: string[] = data.feil ?? [];
+      const v = erValidering(data) ? data : { ok: false, feil: [], advarsler: [] };
       setValidering({
         laster: false,
-        ok: !!data.ok && feil.length === 0,
-        feil,
-        advarsler: data.advarsler ?? [],
+        ok: !!v.ok && v.feil.length === 0,
+        feil: v.feil,
+        advarsler: v.advarsler ?? [],
       });
     } catch (e) {
-      setValidering({ laster: false, ok: false, melding: (e as Error).message });
+      setValidering({ laster: false, ok: false, melding: feilmelding(e) });
     }
   };
 
@@ -334,14 +321,14 @@ export function SendSeksjon({
     setSender(true);
     try {
       const data = await innsending(type, false, config, klage !== null);
-      if (data?.krever_bekreftelse === "klage_paa_skjoennsfastsetting") {
-        setKlage(data.melding);
+      if ("krever_bekreftelse" in data && data.krever_bekreftelse === "klage_paa_skjoennsfastsetting") {
+        setKlage(data.melding ?? "");
         setSender(false);
         return;
       }
       setUtfall({ dryRun: false, type, data });
     } catch (e) {
-      setUtfall({ dryRun: false, type, feil: (e as Error).message });
+      setUtfall({ dryRun: false, type, feil: feilmelding(e) });
     }
     setSender(false);
     lukkBekreft();

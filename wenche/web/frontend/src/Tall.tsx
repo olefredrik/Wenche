@@ -1,23 +1,30 @@
 import { useState } from "react";
-import { DataSkjema, Kort, NoterSeksjon, noterFraConfig, type NoterData } from "@wenche/ui";
+import {
+  DataSkjema,
+  Kort,
+  NoterSeksjon,
+  StegTittel,
+  noterFraConfig,
+  type Config,
+  type NoterData,
+} from "@wenche/ui";
 import { api } from "./api";
 
 export default function Tall({
   config,
   env,
   onLagret,
+  onUlagret,
 }: {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  config: any;
+  config: Config | null;
   env: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onLagret: (c: any) => void;
+  onLagret: (c: Config) => void;
+  onUlagret: (ulagret: boolean) => void;
 }) {
   const [noter, setNoter] = useState<NoterData>(() => noterFraConfig(config));
   const [kvittering, setKvittering] = useState<string | null>(null);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const lagre = async (formConfig: any) => {
+  const lagre = async (formConfig: Config) => {
     const full = { ...formConfig, noter };
     const r = await api.lagreConfig(full);
     onLagret(full);
@@ -26,27 +33,30 @@ export default function Tall({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="font-display text-2xl font-normal">Tall</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Fyll inn selskapsopplysninger, regnskap, balanse, skattemelding og aksjonærer. Trykk
-          «Lagre data» for å skrive til {env === "test" ? "config.dev.yaml" : "config.yaml"}.
-        </p>
-      </div>
+      <StegTittel tittel="Tall">
+        Fyll inn selskapsopplysninger, regnskap, balanse, skattemelding og aksjonærer. Trykk
+        «Lagre data» for å skrive til {env === "test" ? "config.dev.yaml" : "config.yaml"}.
+      </StegTittel>
 
       <Kort>
         <DataSkjema
           onLagre={lagre}
           visEksempel={env === "test"}
           initial={config ?? undefined}
+          stegEtikett="Steg 2 · Årets tall"
           importerSaft={api.importerSaft}
-          beregnSkatt={(c) => api.dokument("skatteberegning", c)}
+          beregnSkatt={api.skatteberegning}
           saftMerknad="SAF-T-filen behandles lokalt på din egen maskin og lagres ikke."
           ekstraSeksjon={<NoterSeksjon noter={noter} setNoter={setNoter} />}
+          onUlagret={onUlagret}
         />
       </Kort>
 
-      {kvittering && <p className="text-sm text-spruce">✓ {kvittering}</p>}
+      {kvittering && (
+        <p role="status" className="text-sm text-spruce">
+          ✓ {kvittering}
+        </p>
+      )}
     </div>
   );
 }

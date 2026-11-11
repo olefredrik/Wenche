@@ -88,6 +88,8 @@ jobs:
         run: npm run typecheck
       - name: ESLint
         run: npm run lint
+      - name: Vitest
+        run: npm test
       - name: Bygg begge SPA-ene
         run: |
           npm run build --workspace hosted/web

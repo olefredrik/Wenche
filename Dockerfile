@@ -11,6 +11,8 @@ COPY hosted/web/package.json hosted/web/package.json
 COPY wenche/web/frontend/package.json wenche/web/frontend/package.json
 RUN npm ci
 # Kildekode for det delte designsystemet + begge appene.
+# Alle tre tsconfig-ene extends denne, så tsc i byggene under trenger den i /repo.
+COPY tsconfig.base.json ./
 COPY packages ./packages
 COPY hosted/web ./hosted/web
 COPY wenche/web/frontend ./wenche/web/frontend

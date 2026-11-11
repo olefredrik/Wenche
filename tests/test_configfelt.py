@@ -81,7 +81,7 @@ class TestIngenFalskeTreff:
     def test_alle_skjemafelt_er_kjente(self):
         # Vakt mot drift mellom skjemaet og modellen: hvert felt skjemaet kan skrive, skal
         # Wenche kjenne. Feiler denne, har skjemaet fått et felt modellen ikke leser.
-        skjema = (_ROT / "packages/ui/src/skjema.tsx").read_text()
+        skjema = (_ROT / "packages/ui/src/felter.ts").read_text()
         nokler = set(re.findall(r'key: "([a-z_.]+)"', skjema))
         assert len(nokler) > 40  # Fanger at mønsteret slutter å treffe.
         for sti in sorted(nokler):

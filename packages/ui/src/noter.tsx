@@ -1,8 +1,10 @@
 // Delt noter-redigering (antall ansatte + lån til nærstående). Notene sendes ikke inn, men
 // brukes til å generere notedokumentet under «Dokumenter» og lagres i config under `noter`.
 // Rendres som en seksjon (ikke eget kort) slik at den passer sist i datainntastings-skjemaet.
+import { useEffect, useRef, useState } from "react";
 import { Inn } from "./komponenter";
 import { btnOutlineLett } from "./styles";
+import type { Config } from "./typer";
 
 export interface Laan {
   motpart: string;
@@ -21,8 +23,7 @@ export function tomtLaan(): Laan {
 }
 
 // Bygg NoterData fra en config-dict (tåler manglende/delvise felt).
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function noterFraConfig(config: any): NoterData {
+export function noterFraConfig(config: Config | null | undefined): NoterData {
   return {
     antall_ansatte: config?.noter?.antall_ansatte ?? 0,
     laan_til_naerstaaende: (config?.noter?.laan_til_naerstaaende ?? []).map((l: Partial<Laan>) => ({
@@ -39,13 +40,36 @@ export function NoterSeksjon({
   noter: NoterData;
   setNoter: (n: NoterData) => void;
 }) {
+  const laan = noter.laan_til_naerstaaende;
+  // Stabile radnøkler (ikke indeks), så feltene ikke blandes når et lån midt i lista fjernes.
+  // Byttes lista ut utenfra (ny config), får radene nye nøkler.
+  const teller = useRef(laan.length);
+  const [nokler, setNokler] = useState<number[]>(() => Array.from({ length: laan.length }, (_, i) => i));
+  const nye = (n: number) => {
+    const fra = teller.current;
+    teller.current += n;
+    return Array.from({ length: n }, (_, i) => fra + i);
+  };
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNokler((n) => (n.length === laan.length ? n : nye(laan.length)));
+     
+  }, [laan.length]);
+
   const settLaan = (i: number, felt: keyof Laan, val: string | number) =>
     setNoter({
       ...noter,
-      laan_til_naerstaaende: noter.laan_til_naerstaaende.map((l, j) =>
-        j === i ? { ...l, [felt]: val } : l,
-      ),
+      laan_til_naerstaaende: laan.map((l, j) => (j === i ? { ...l, [felt]: val } : l)),
     });
+  const fjern = (i: number) => {
+    setNokler((n) => n.filter((_, j) => j !== i));
+    setNoter({ ...noter, laan_til_naerstaaende: laan.filter((_, j) => j !== i) });
+  };
+  const leggTil = () => {
+    setNokler((n) => [...n, teller.current++]);
+    setNoter({ ...noter, laan_til_naerstaaende: [...laan, tomtLaan()] });
+  };
+
   return (
     <section className="border-t border-border pt-6">
       <h3 className="mb-1 font-display text-xl font-normal">Obligatoriske noter</h3>
@@ -63,8 +87,8 @@ export function NoterSeksjon({
       </div>
 
       <div className="mt-6 space-y-4">
-        {noter.laan_til_naerstaaende.map((l, i) => (
-          <div key={i} className="rounded-sm border border-border bg-background p-4">
+        {laan.map((l, i) => (
+          <div key={nokler[i] ?? i} className="rounded-sm border border-border bg-background p-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Inn label="Motpart (nærstående)" value={l.motpart} onChange={(v) => settLaan(i, "motpart", v)} />
               <Inn label="Saldo per 31.12 (kr)" type="number" value={l.saldo} onChange={(v) => settLaan(i, "saldo", Number(v) || 0)} />
@@ -84,19 +108,14 @@ export function NoterSeksjon({
             </div>
             <button
               className="mt-3 text-xs text-muted-foreground underline-offset-2 hover:text-red-700 hover:underline"
-              onClick={() =>
-                setNoter({ ...noter, laan_til_naerstaaende: noter.laan_til_naerstaaende.filter((_, j) => j !== i) })
-              }
+              onClick={() => fjern(i)}
             >
               Fjern lån
             </button>
           </div>
         ))}
       </div>
-      <button
-        className={`${btnOutlineLett} mt-4`}
-        onClick={() => setNoter({ ...noter, laan_til_naerstaaende: [...noter.laan_til_naerstaaende, tomtLaan()] })}
-      >
+      <button className={`${btnOutlineLett} mt-4`} onClick={leggTil}>
         + Legg til lån til nærstående
       </button>
     </section>
