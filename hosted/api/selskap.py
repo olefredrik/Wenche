@@ -10,18 +10,17 @@ ikke kan misbrukes til å enumerere registeret. Kun offentlige data, ingenting l
 er registeret nede, returneres tomme felter og skjemaet forblir tomt (samme oppførsel som før).
 """
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from wenche import brreg
 
 from .deps import krev_invitert
 
-router = APIRouter(prefix="/api/selskap", tags=["selskap"])
+router = APIRouter(prefix="/api/selskap", tags=["selskap"], dependencies=[Depends(krev_invitert)])
 
 
 @router.get("")
 def hent_selskap(request: Request) -> dict:
-    krev_invitert(request)
     org = request.session.get("kunde_org") or request.session.get("invite_org")
     if not org:
         raise HTTPException(status_code=409, detail="Ingen koblet org å hente opplysninger for.")

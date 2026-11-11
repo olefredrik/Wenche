@@ -70,6 +70,12 @@ class Settings:
             "yes",
         )
         self._fail_closed()
+        # Nøklene leses lat og én gang per Settings-instans (settings() er alt cachet), så en
+        # PEM-fil på disk ikke leses på nytt for hvert kall.
+        self._vendor_creds: VendorCredentials | None = None
+        self._vendor_creds_lest = False
+        self._idporten_key_cache: bytes | None = None
+        self._idporten_key_lest = False
 
     @property
     def er_offentlig(self) -> bool:
@@ -127,11 +133,13 @@ class Settings:
 
     def idporten_key(self) -> bytes | None:
         """Privat ID-porten-nøkkel (client_assertion), fra PEM-env eller filsti. None om ukonfigurert."""
-        if self._idporten_key_pem:
-            return self._idporten_key_pem.encode()
-        if self._idporten_key_path:
-            return Path(self._idporten_key_path).read_bytes()
-        return None
+        if not self._idporten_key_lest:
+            if self._idporten_key_pem:
+                self._idporten_key_cache = self._idporten_key_pem.encode()
+            elif self._idporten_key_path:
+                self._idporten_key_cache = Path(self._idporten_key_path).read_bytes()
+            self._idporten_key_lest = True
+        return self._idporten_key_cache
 
     def _fail_closed(self) -> None:
         """Nekt oppstart i prod eller offentlig drift hvis hemmelighetene er dev-standardene."""
@@ -178,6 +186,9 @@ class Settings:
         Nøkkelen tas fra HOSTED_VENDOR_KEY_PEM (PEM-innhold, foretrukket i prod/container,
         f.eks. fra KMS/Fly-secret) eller HOSTED_VENDOR_KEY_PATH (fil, dev).
         """
+        if self._vendor_creds_lest:
+            return self._vendor_creds
+        self._vendor_creds_lest = True
         if not (self._vendor_client_id and self._vendor_kid):
             return None
         if self._vendor_key_pem:
@@ -186,11 +197,12 @@ class Settings:
             pem = Path(self._vendor_key_path).read_bytes()
         else:
             return None
-        return VendorCredentials(
+        self._vendor_creds = VendorCredentials(
             client_id=self._vendor_client_id,
             kid=self._vendor_kid,
             private_key_pem=pem,
         )
+        return self._vendor_creds
 
 
 @lru_cache
