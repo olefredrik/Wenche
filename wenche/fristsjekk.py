@@ -20,20 +20,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from pathlib import Path
 from xml.etree import ElementTree as ET
 
 import httpx
 from defusedxml import DefusedXmlException
 from defusedxml.ElementTree import fromstring as _safe_fromstring
-from dotenv import load_dotenv
 
-# Last fra ~/.wenche/.env først (fast lokasjon), så cwd/.env som fallback.
-# Matcher load-rekkefølgen i wenche.auth.
-_BRUKER_ENV_FIL = Path.home() / ".wenche" / ".env"
-if _BRUKER_ENV_FIL.is_file():
-    load_dotenv(_BRUKER_ENV_FIL)
-load_dotenv()
+from wenche import miljoer
+from wenche.xml_hjelp import lokalnavn
 
 
 def neste_frist(maaned: int, dag: int) -> date:
@@ -54,12 +48,6 @@ def regnskapsaar_for_frist(maaned: int, dag: int) -> int:
     """
     return neste_frist(maaned, dag).year - 1
 
-
-# Basis-URL-er for Skatteetatens API — samme som i skd_skattemelding_client.py.
-_SKD_BASES = {
-    "test": "https://api-test.sits.no",
-    "prod": "https://api.skatteetaten.no",
-}
 
 # Brønnøysundregistrenes Regnskapsregister-API.
 # Åpent API uten autentisering.
@@ -130,7 +118,7 @@ def _hent_skattemelding_status(token: str, orgnr: str, aar: int) -> tuple[FristS
     ugyldig svar) gir `tilgjengelig=True` slik at de ikke trigger fallback som
     ville skjult den reelle feilen.
     """
-    base = _SKD_BASES["prod"]
+    base = miljoer.PROD.skd_api
 
     try:
         resp = httpx.get(
@@ -171,7 +159,7 @@ def _hent_skattemelding_status(token: str, orgnr: str, aar: int) -> tuple[FristS
     # ville falskt slå inn hvis Skatteetaten innfører nye typer som inneholder
     # "Fastsatt" uten å bety "innsendt og godkjent".
     for elem in root.iter():
-        tag = elem.tag.split("}")[-1] if "}" in elem.tag else elem.tag
+        tag = lokalnavn(elem.tag)
         if tag == "type" and elem.text and elem.text.strip() in _FASTSATT_DOKUMENTTYPER:
             return FristStatus(
                 innfridd=True,
