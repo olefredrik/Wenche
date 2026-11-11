@@ -1,43 +1,38 @@
-// Endepunkt-bindinger for self-hosted Wenche oppå den delte fetch-wrapperen.
-import { req } from "@wenche/ui";
+// Endepunkt-bindinger for self-hosted Wenche oppå den delte fetch-wrapperen og de delte
+// endepunktene (lagFellesApi).
+import { lagFellesApi, req, type Config, type HelseSvar } from "@wenche/ui";
+import type {
+  ConfigSvar,
+  FristerSvar,
+  LagreConfigSvar,
+  OppsettStatus,
+  SjekkSvar,
+  SystembrukerSvar,
+  TestTilkoblingSvar,
+  UpdateInfo,
+} from "./typer";
 
 export const api = {
-  health: () => req("/api/health"),
-  updateCheck: () => req("/api/update-check"),
+  ...lagFellesApi(),
+  health: () => req<HelseSvar>("/api/health"),
+  updateCheck: () => req<UpdateInfo>("/api/update-check"),
 
-  hentConfig: () => req("/api/config"),
-  lagreConfig: (config: unknown) =>
-    req("/api/config", { method: "PUT", body: JSON.stringify(config) }),
+  hentConfig: () => req<ConfigSvar>("/api/config"),
+  lagreConfig: (config: Config) =>
+    req<LagreConfigSvar>("/api/config", { method: "PUT", body: JSON.stringify(config) }),
 
-  oppsettStatus: () => req("/api/oppsett/status"),
+  oppsettStatus: () => req<OppsettStatus>("/api/oppsett/status"),
   lagreCredentials: (body: { client_id: string; kid: string; orgnr: string }) =>
-    req("/api/oppsett/credentials", { method: "PUT", body: JSON.stringify(body) }),
+    req<{ ok: boolean }>("/api/oppsett/credentials", { method: "PUT", body: JSON.stringify(body) }),
   lagreNokkel: (pem: string) =>
-    req("/api/oppsett/nokkel", { method: "POST", body: JSON.stringify({ pem }) }),
-  testTilkobling: () => req("/api/oppsett/test-tilkobling", { method: "POST" }),
-  registrerSystem: () => req("/api/oppsett/registrer-system", { method: "POST" }),
-  opprettSystembruker: () => req("/api/oppsett/systembruker", { method: "POST" }),
-  systembrukerStatus: () => req("/api/oppsett/systembruker/status", { method: "POST" }),
-  oppdaterSystembruker: () => req("/api/oppsett/systembruker/oppdater", { method: "POST" }),
+    req<{ ok: boolean }>("/api/oppsett/nokkel", { method: "POST", body: JSON.stringify({ pem }) }),
+  testTilkobling: () => req<TestTilkoblingSvar>("/api/oppsett/test-tilkobling", { method: "POST" }),
+  registrerSystem: () => req<SystembrukerSvar>("/api/oppsett/registrer-system", { method: "POST" }),
+  opprettSystembruker: () => req<SystembrukerSvar>("/api/oppsett/systembruker", { method: "POST" }),
+  systembrukerStatus: () => req<SystembrukerSvar>("/api/oppsett/systembruker/status", { method: "POST" }),
+  oppdaterSystembruker: () =>
+    req<SystembrukerSvar>("/api/oppsett/systembruker/oppdater", { method: "POST" }),
 
-  frister: () => req("/api/frister"),
-  sjekkFrister: () => req("/api/frister/sjekk", { method: "POST" }),
-
-  dokument: (type: string, config: unknown) =>
-    req(`/api/dokumenter/${type}`, { method: "POST", body: JSON.stringify(config) }),
-
-  importerSaft: (file: File, foregaaende: boolean) =>
-    req(`/api/saft/import?foregaaende=${foregaaende}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/xml" },
-      body: file,
-    }),
-
-  // bekreftKlage: brukeren har bekreftet at skattemeldingen sendes som klage på
-  // skjønnsfastsetting (backend svarer krever_bekreftelse uten å sende før det).
-  innsending: (type: string, dryRun: boolean, config: unknown, bekreftKlage = false) =>
-    req(`/api/innsending/${type}?dry_run=${dryRun}${bekreftKlage ? "&bekreft_klage=true" : ""}`, {
-      method: "POST",
-      body: JSON.stringify(config),
-    }),
+  frister: () => req<FristerSvar>("/api/frister"),
+  sjekkFrister: () => req<SjekkSvar>("/api/frister/sjekk", { method: "POST" }),
 };

@@ -1,10 +1,7 @@
 // Last ned base64-kodede filer fra dokument-endepunktene (delt mellom hostet og self-hosted).
+import type { NedlastFil } from "./typer";
 
-export interface NedlastFil {
-  filnavn: string;
-  mime: string;
-  base64: string;
-}
+export type { NedlastFil };
 
 export function lastNed(filer: NedlastFil[]): void {
   for (const f of filer) {

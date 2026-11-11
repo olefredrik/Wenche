@@ -1,4 +1,12 @@
-import { SendSeksjon, SeksjonsNav, Panel, oppsummer, type InnsendingFn } from "@wenche/ui";
+import {
+  IngenDataPanel,
+  SeksjonsNav,
+  SendSeksjon,
+  StegTittel,
+  oppsummer,
+  type Config,
+  type InnsendingFn,
+} from "@wenche/ui";
 import { api } from "./api";
 
 const SAMTYKKE = (
@@ -8,13 +16,9 @@ const SAMTYKKE = (
   </span>
 );
 
-export default function Send({ config, env }: { config: any; env: string }) {
+export default function Send({ config, env }: { config: Config | null; env: string }) {
   if (!config) {
-    return (
-      <Panel tone="advarsel" tittel="Ingen data ennå">
-        Fyll inn og lagre tallene under «Tall» før du sender inn.
-      </Panel>
-    );
+    return <IngenDataPanel>Fyll inn og lagre tallene under «Tall» før du sender inn.</IngenDataPanel>;
   }
 
   const innsending: InnsendingFn = (type, dryRun, cfg, bekreftKlage) =>
@@ -23,13 +27,10 @@ export default function Send({ config, env }: { config: any; env: string }) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="font-display text-2xl font-normal">Send inn</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Wenche kontrollerer tallene (dry-run) og viser en oppsummering før noe sendes til
-          myndighetene. Du bekrefter selv før innsending.
-        </p>
-      </div>
+      <StegTittel tittel="Send inn">
+        Wenche kontrollerer tallene (dry-run) og viser en oppsummering før noe sendes til
+        myndighetene. Du bekrefter selv før innsending.
+      </StegTittel>
       <SeksjonsNav lenker={[["#send", "Send"]]} top="top-0" />
       <SendSeksjon config={config} innsending={innsending} env={env} org={o.org} samtykke={SAMTYKKE} />
     </div>

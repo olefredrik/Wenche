@@ -1,16 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Kort, Inn, monoLabel, btnPrimar, btnOutlineLett } from "@wenche/ui";
+import { Inn, Kort, StegTittel, btnOutlineLett, btnPrimar, feilmelding, monoLabel } from "@wenche/ui";
 import { api } from "./api";
-
-interface Status {
-  env: string;
-  credentials: { client_id: string; kid: string; orgnr: string; mangler: string[]; komplett: boolean };
-  nokkel: { ok: boolean; sti: string };
-  systembruker: { har_forespoersel: boolean; confirm_url: string | null };
-}
-
-// Tilstanden til systembruker-koblingen, utledet av status-kallet mot Altinn.
-type SysState = "laster" | "godkjent" | "venter" | "avvist" | "ikke_opprettet" | "ukjent";
+import type { OppsettStatus, SysState, SystembrukerSvar, TestTilkoblingSvar } from "./typer";
 
 function Merke({ ok }: { ok: boolean | null }) {
   if (ok === null) return <span className="text-xs text-muted-foreground">sjekker…</span>;
@@ -47,21 +38,20 @@ function Steg({
 }
 
 export default function Oppsett({ env }: { env: string }) {
-  const [status, setStatus] = useState<Status | null>(null);
+  const [status, setStatus] = useState<OppsettStatus | null>(null);
   const [cred, setCred] = useState({ client_id: "", kid: "", orgnr: "" });
   const [sysState, setSysState] = useState<SysState>("laster");
   const [confirmUrl, setConfirmUrl] = useState<string | null>(null);
   const [melding, setMelding] = useState<{ tone: "ok" | "feil"; tekst: string } | null>(null);
   const [lagrer, setLagrer] = useState(false);
   const [tester, setTester] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [testResultat, setTestResultat] = useState<any | null>(null);
+  const [testResultat, setTestResultat] = useState<TestTilkoblingSvar | null>(null);
   const [jobber, setJobber] = useState<string | null>(null);
   const [visAvansert, setVisAvansert] = useState(false);
   const filRef = useRef<HTMLInputElement>(null);
 
   const last = async () => {
-    const s: Status = await api.oppsettStatus();
+    const s = await api.oppsettStatus();
     setStatus(s);
     setCred({ client_id: s.credentials.client_id, kid: s.credentials.kid, orgnr: s.credentials.orgnr });
     setConfirmUrl(s.systembruker.confirm_url);
@@ -79,7 +69,7 @@ export default function Oppsett({ env }: { env: string }) {
   };
 
   useEffect(() => {
-    last().catch((e) => setMelding({ tone: "feil", tekst: (e as Error).message }));
+    last().catch((e) => setMelding({ tone: "feil", tekst: feilmelding(e) }));
   }, []);
 
   const miljoNavn = env === "test" ? "testmiljø (tt02)" : "produksjon";
@@ -104,7 +94,7 @@ export default function Oppsett({ env }: { env: string }) {
       await last();
       setMelding({ tone: "ok", tekst: "Konfigurasjon lagret." });
     } catch (e) {
-      setMelding({ tone: "feil", tekst: (e as Error).message });
+      setMelding({ tone: "feil", tekst: feilmelding(e) });
     } finally {
       setLagrer(false);
     }
@@ -117,7 +107,7 @@ export default function Oppsett({ env }: { env: string }) {
       await last();
       setMelding({ tone: "ok", tekst: "Privat nøkkel lagret." });
     } catch (e) {
-      setMelding({ tone: "feil", tekst: (e as Error).message });
+      setMelding({ tone: "feil", tekst: feilmelding(e) });
     }
   };
 
@@ -129,14 +119,13 @@ export default function Oppsett({ env }: { env: string }) {
       setTestResultat(r);
       if (r.systembruker?.status) setSysState(r.systembruker.status as SysState);
     } catch (e) {
-      setTestResultat({ auth_ok: false, melding: (e as Error).message });
+      setTestResultat({ auth_ok: false, melding: feilmelding(e) });
     } finally {
       setTester(false);
     }
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const kjorSys = async (navn: string, fn: () => Promise<any>) => {
+  const kjorSys = async (navn: string, fn: () => Promise<SystembrukerSvar>) => {
     setJobber(navn);
     setMelding(null);
     try {
@@ -145,9 +134,9 @@ export default function Oppsett({ env }: { env: string }) {
       if (navn === "opprett") setSysState("venter");
       if (navn === "status" && r.status) setSysState(r.status as SysState);
       if (navn === "registrer") setMelding({ tone: "ok", tekst: r.oppdatert ? "System oppdatert." : "System registrert." });
-      await api.oppsettStatus().then((s: Status) => setStatus(s));
+      setStatus(await api.oppsettStatus());
     } catch (e) {
-      setMelding({ tone: "feil", tekst: (e as Error).message });
+      setMelding({ tone: "feil", tekst: feilmelding(e) });
     } finally {
       setJobber(null);
     }
@@ -155,13 +144,10 @@ export default function Oppsett({ env }: { env: string }) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="font-display text-2xl font-normal">Oppsett</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Koble Wenche til Altinn for {miljoNavn} i tre steg. Verdiene lagres lokalt i{" "}
-          <code className="font-mono">~/.wenche/.env</code> og sendes aldri til noen server.
-        </p>
-      </div>
+      <StegTittel tittel="Oppsett">
+        Koble Wenche til Altinn for {miljoNavn} i tre steg. Verdiene lagres lokalt i{" "}
+        <code className="font-mono">~/.wenche/.env</code> og sendes aldri til noen server.
+      </StegTittel>
 
       {/* Statusbanner: hvor er jeg, og hva er neste steg? */}
       <div
@@ -184,23 +170,26 @@ export default function Oppsett({ env }: { env: string }) {
             {tester ? "Tester…" : "Test tilkobling"}
           </button>
           {testResultat && (
-            <span className={testResultat.auth_ok ? "text-spruce" : "text-red-700"}>
+            <span role="status" className={testResultat.auth_ok ? "text-spruce" : "text-red-700"}>
               {testResultat.auth_ok ? "✓ " : "✗ "}
               {testResultat.melding}
-              {testResultat.systembruker ? ` · ${testResultat.systembruker.melding}` : ""}
+              {testResultat.systembruker?.melding ? ` · ${testResultat.systembruker.melding}` : ""}
             </span>
           )}
         </div>
       </div>
 
       {melding && (
-        <p className={`text-sm ${melding.tone === "ok" ? "text-spruce" : "text-red-700"}`}>
+        <p
+          role={melding.tone === "feil" ? "alert" : "status"}
+          className={`text-sm ${melding.tone === "ok" ? "text-spruce" : "text-red-700"}`}
+        >
           {melding.tone === "ok" ? "✓ " : ""}
           {melding.tekst}
         </p>
       )}
 
-      {/* Steg 1 — Maskinporten */}
+      {/* Steg 1: Maskinporten */}
       <Steg n={1} tittel="Maskinporten-klient og organisasjon" ok={credsOk}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Inn label="Maskinporten klient-ID" value={cred.client_id} onChange={(v) => setCred({ ...cred, client_id: v })} />
@@ -216,7 +205,7 @@ export default function Oppsett({ env }: { env: string }) {
         </button>
       </Steg>
 
-      {/* Steg 2 — Privat nøkkel */}
+      {/* Steg 2: Privat nøkkel */}
       <Steg n={2} tittel="Privat RSA-nøkkel" ok={nokkelOk}>
         {nokkelOk ? (
           <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -252,7 +241,7 @@ export default function Oppsett({ env }: { env: string }) {
         />
       </Steg>
 
-      {/* Steg 3 — Systembruker */}
+      {/* Steg 3: Systembruker */}
       <Steg n={3} tittel="Koble Wenche til Altinn" ok={sysOk ? true : sysState === "laster" ? null : false}>
         <Systembruker
           sysState={sysState}
@@ -283,8 +272,7 @@ function Systembruker({
   klar: boolean;
   visAvansert: boolean;
   setVisAvansert: (v: boolean) => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  kjorSys: (navn: string, fn: () => Promise<any>) => Promise<void>;
+  kjorSys: (navn: string, fn: () => Promise<SystembrukerSvar>) => Promise<void>;
 }) {
   const opprett = (
     <button className={btnPrimar} onClick={() => kjorSys("opprett", api.opprettSystembruker)} disabled={!!jobber || !klar}>
@@ -342,13 +330,13 @@ function Systembruker({
         </>
       )}
 
-      {/* Sjelden brukte handlinger, skjult bak Avansert (jf. NiceGUI-en). */}
+      {/* Sjelden brukte handlinger, skjult bak Avansert. */}
       <details open={visAvansert} onToggle={(e) => setVisAvansert((e.target as HTMLDetailsElement).open)}>
         <summary className="cursor-pointer font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground">
           Avansert
         </summary>
         <p className="mt-2 text-xs text-muted-foreground">
-          Trengs sjelden — bruk disse hvis du må re-registrere systemet, sjekke status manuelt
+          Trengs sjelden. Bruk disse hvis du må re-registrere systemet, sjekke status manuelt
           eller legge til nye rettigheter på en allerede godkjent systembruker.
         </p>
         <div className="mt-3 flex flex-wrap gap-3">
