@@ -37,6 +37,9 @@ s = settings()
 # feilhåndteringen (steg, status, kode) kommer i Fly-loggen. Svarkropper fra myndighetene logges
 # bare på DEBUG, siden de kan inneholde interne detaljer.
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+# httpx logger hver oppstrøms-URL på INFO. Feil logges alt med steg, status og url der de
+# fanges, så den linjen er bare støy (og URL-er bærer instans- og forsendelses-ID-er).
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 # API-dokumentasjonen (/docs, /redoc, /openapi.json) er slått av: tjenesten har én kjent
 # klient (SPA-en på samme origin), og et åpent skjema gjør rekognosering unødvendig lett.
