@@ -161,13 +161,14 @@ wenche opprett-systembruker [--org ORGNR]
 Importerer en SAF-T Financial XML-fil og genererer `config.yaml` automatisk.
 
 ```bash
-wenche importer-saft SAF-T-FIL [--ut FILSTI]
+wenche importer-saft SAF-T-FIL [--ut FILSTI] [--overskriv]
 ```
 
 | Argument/alternativ | Beskrivelse |
 |---|---|
 | `SAF-T-FIL` | Sti til SAF-T Financial XML-filen eksportert fra regnskapssystemet (påkrevd) |
 | `--ut` | Sti til `config.yaml` som skal skrives. Standard: `config.yaml` |
+| `--overskriv` | Erstatt en fil som alt finnes. Uten flagget stopper kommandoen, så felt du har fylt inn for hånd ikke går tapt |
 
 Importen leser SAF-T Financial versjon 1.10 til 1.40, og plasserer kontoene ut fra
 grupperingskodene (`GroupingCategory` og `GroupingCode`) fra Skatteetatens kodeliste. En fil
