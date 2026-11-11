@@ -4,10 +4,37 @@ Fylles ut fra config.yaml og valideres før innsending.
 
 Monetære beløpsfelter bruker float for å bevare desimaler fra SAF-T-import.
 Ved XML-generering til BRG/SKD rundes beløp til nærmeste krone (round()).
+
+Feltene som kommer fra config.yaml er annotert med `Dok` (tekst, om feltet er påkrevd, typenavn
+og lovlige verdier), og `Konfig` nederst beskriver formen på hele fila. Det er den ene kilden
+`wenche.skjema` lager JSON Schema, TypeScript-typen og referansetabellene i dokumentasjonen
+fra, og `wenche.configfelt` bruker den til å varsle om ukjente felt. Beskrivelsene her ER
+dokumentasjonen, så skriv dem for brukeren.
 """
 
 from dataclasses import dataclass, field
 from datetime import date
+from typing import Annotated
+
+
+@dataclass(frozen=True)
+class Dok:
+    """Dokumentasjon av et config-felt, brukt i `Annotated[type, Dok(...)]`."""
+
+    tekst: str
+    # "ja", "nei", "delvis", "for RF-1086", ... slik det skal stå i referansen. None betyr at
+    # det utledes: påkrevd når feltet ikke har standardverdi.
+    paakrevd: str | None = None
+    # Typenavnet i referansen når det vanlige (heltall for beløp, tekst, dato ...) ikke passer.
+    typenavn: str | None = None
+    valg: tuple[str, ...] = ()  # lovlige verdier
+
+
+class IkkeIConfig:
+    """Markør for et modellfelt som ikke står i config.yaml (fylles fra et annet sted)."""
+
+
+NOK = "Beløp i hele kroner."
 
 # ---------------------------------------------------------------------------
 # Felles selskapsinfo
@@ -16,24 +43,60 @@ from datetime import date
 
 @dataclass
 class Selskap:
-    navn: str
-    org_nummer: str
-    daglig_leder: str
-    styreleder: str
-    forretningsadresse: str
-    stiftelsesaar: int
-    aksjekapital: float
-    kontakt_epost: str = ""  # Påkrevd for aksjonærregisteroppgave (RF-1086)
+    navn: Annotated[str, Dok("Selskapets registrerte navn")]
+    org_nummer: Annotated[str, Dok("Organisasjonsnummer, 9 siffer uten mellomrom")]
+    daglig_leder: Annotated[
+        str,
+        Dok(
+            "Fullt navn på daglig leder. Minst én av `daglig_leder` og `styreleder` må være "
+            "fylt ut",
+            paakrevd="delvis",
+        ),
+    ]
+    styreleder: Annotated[
+        str,
+        Dok(
+            "Fullt navn på styreleder (kan være samme som daglig leder). Minst én av "
+            "`daglig_leder` og `styreleder` må være fylt ut",
+            paakrevd="delvis",
+        ),
+    ]
+    forretningsadresse: Annotated[str, Dok("Gateadresse, postnummer og poststed")]
+    stiftelsesaar: Annotated[int, Dok("Året selskapet ble stiftet")]
+    aksjekapital: Annotated[float, Dok("Innbetalt aksjekapital i NOK, fra stiftelsesdokumentene")]
+    kontakt_epost: Annotated[
+        str,
+        Dok(
+            "E-postadressen Skatteetaten sender tilbakemeldingen på aksjonærregisteroppgaven "
+            "til, altså om den er godkjent eller avvist. Bruk en adresse du leser",
+            paakrevd="for RF-1086",
+        ),
+    ] = ""
     # Eksakt stiftelsesdato når den er kjent (hentes fra Enhetsregisteret). Årstallet alene
     # holder ikke overalt: aksjonærregisteroppgaven oppgir stiftelsesdato, og et kort
     # første regnskapsår starter på stiftelsesdatoen, ikke 1. januar.
-    stiftelsesdato: date | None = None
+    stiftelsesdato: Annotated[
+        date | None,
+        Dok(
+            "Eksakt stiftelsesdato (ÅÅÅÅ-MM-DD). Hentes fra Enhetsregisteret. Brukes som "
+            "stiftelsesdato i aksjonærregisteroppgaven, og som start på et kort første "
+            "regnskapsår. Uten den brukes 1. januar i stiftelsesåret"
+        ),
+    ] = None
     # Den delen av stiftelsesinnskuddet som ble gjort som tinginnskudd, typisk aksjer skutt
     # inn i et nystiftet holdingselskap. Egenkapitalavstemmingen skiller kontantinnskudd og
     # tinginnskudd på hver sin kode, og modellen kan ikke utlede hvilken som gjelder. 0 betyr
     # at hele innskuddet var kontant, som er det vanlige for et lite AS. Brukes bare i
     # selskapets første regnskapsår; senere år har ikke noe stiftelsesinnskudd å fordele.
-    tinginnskudd_ved_stiftelse: float = 0.0
+    tinginnskudd_ved_stiftelse: Annotated[
+        float,
+        Dok(
+            "Den delen av stiftelsesinnskuddet som ble gjort som tinginnskudd, i NOK. Brukes "
+            "bare i selskapets første regnskapsår, der egenkapitalavstemmingen skiller "
+            "kontantinnskudd og tinginnskudd på hver sin kode. Tom eller 0 = hele innskuddet "
+            "var kontant"
+        ),
+    ] = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -43,8 +106,8 @@ class Selskap:
 
 @dataclass
 class Driftsinntekter:
-    salgsinntekter: float = 0.0
-    andre_driftsinntekter: float = 0.0
+    salgsinntekter: Annotated[float, Dok("Inntekter fra salg av varer eller tjenester")] = 0.0
+    andre_driftsinntekter: Annotated[float, Dok("Andre løpende driftsinntekter")] = 0.0
 
     @property
     def sum(self) -> float:
@@ -53,9 +116,11 @@ class Driftsinntekter:
 
 @dataclass
 class Driftskostnader:
-    loennskostnader: float = 0.0
-    avskrivninger: float = 0.0
-    andre_driftskostnader: float = 0.0
+    loennskostnader: Annotated[float, Dok("Lønn, arbeidsgiveravgift og lignende")] = 0.0
+    avskrivninger: Annotated[float, Dok("Planmessige avskrivninger på anleggsmidler")] = 0.0
+    andre_driftskostnader: Annotated[
+        float, Dok("Bank- og regnskapsgebyrer, kontorkostnader o.l.")
+    ] = 0.0
 
     @property
     def sum(self) -> float:
@@ -64,21 +129,43 @@ class Driftskostnader:
 
 @dataclass
 class Finansposter:
-    utbytte_fra_datterselskap: float = 0.0
-    andre_finansinntekter: float = 0.0
-    rentekostnader: float = 0.0
-    andre_finanskostnader: float = 0.0
+    utbytte_fra_datterselskap: Annotated[
+        float, Dok("Utbytte mottatt fra datterselskaper (dekkes av fritaksmetoden)")
+    ] = 0.0
+    andre_finansinntekter: Annotated[float, Dok("Renteinntekter og andre finansinntekter")] = 0.0
+    rentekostnader: Annotated[float, Dok("Renter på lån")] = 0.0
+    andre_finanskostnader: Annotated[float, Dok("Andre finanskostnader")] = 0.0
     # Gevinst og tap ved realisasjon av aksjer (grupperingskode 8074 og 8174). Egne linjer
     # fordi fritaksmetoden (sktl. § 2-38) gjør gevinsten skattefri og tapet ikke
     # fradragsberettiget, mens andre finansposter skattlegges fullt. Står sist, så eldre
     # kallsteder og config uten feltene gir samme resultat som før.
-    gevinst_ved_realisasjon_av_aksjer: float = 0.0
-    tap_ved_realisasjon_av_aksjer: float = 0.0
+    gevinst_ved_realisasjon_av_aksjer: Annotated[
+        float,
+        Dok(
+            "Gevinst ved salg av aksjer innenfor fritaksmetoden (kode 8074). Skattefri når "
+            "`anvend_fritaksmetoden` er `true`, uansett eierandel"
+        ),
+    ] = 0.0
+    tap_ved_realisasjon_av_aksjer: Annotated[
+        float,
+        Dok(
+            "Tap ved salg av aksjer innenfor fritaksmetoden (kode 8174). Ikke "
+            "fradragsberettiget når `anvend_fritaksmetoden` er `true`"
+        ),
+    ] = 0.0
     # Utbytte fra selskaper som verken er datterselskap eller tilknyttet selskap, typisk en
     # eierandel under 20 %. Egen linje fordi årsregnskapet skiller det fra utbytte fra
     # datterselskap og tilknyttet selskap. Skatten er den samme: fritaksmetoden med
     # 3 %-sjablon. Står sist, så eldre kallsteder og config uten feltet gir samme resultat.
-    utbytte_fra_andre_aksjer: float = 0.0
+    utbytte_fra_andre_aksjer: Annotated[
+        float,
+        Dok(
+            "Utbytte fra selskaper som verken er datterselskap eller tilknyttet selskap, typisk "
+            "en eierandel under 20 %. Egen linje i årsregnskapet («Inntekt på andre "
+            "investeringer»). I skattemeldingen skattlegges det som utbytte fra datterselskap, "
+            "alltid med 3 %-sjablonen når `anvend_fritaksmetoden` er `true`"
+        ),
+    ] = 0.0
 
     @property
     def sum_utbytte(self) -> float:
@@ -105,7 +192,13 @@ class Resultatregnskap:
     # Egen linje fordi oppstillingsplanen krever den mellom resultat før skatt og årsresultat.
     # 0 for et selskap uten skattepliktig inntekt (typisk holding med bare fritatt utbytte),
     # men et selskap med renteinntekt har en reell skattekostnad som må stå her.
-    skattekostnad: float = 0.0
+    skattekostnad: Annotated[
+        float,
+        Dok(
+            "Skattekostnad på ordinært resultat (rskl. § 6-1). Egen linje mellom resultat før "
+            "skatt og årsresultat. 0 for et selskap uten skattepliktig inntekt"
+        ),
+    ] = 0.0
 
     @property
     def driftsresultat(self) -> float:
@@ -129,9 +222,21 @@ class Resultatregnskap:
 
 @dataclass
 class Anleggsmidler:
-    aksjer_i_datterselskap: float = 0.0
-    andre_aksjer: float = 0.0
-    langsiktige_fordringer: float = 0.0
+    aksjer_i_datterselskap: Annotated[
+        float,
+        Dok(
+            "Kostpris for aksjer i datterselskaper, det vil si selskaper du kontrollerer "
+            "(normalt over 50 % av stemmene, rskl. § 1-3)"
+        ),
+    ] = 0.0
+    andre_aksjer: Annotated[
+        float,
+        Dok(
+            "Aksjer i selskaper som ikke er datterselskaper. Grensen her er kontroll, ikke "
+            "90 %-grensen i fritaksmetoden"
+        ),
+    ] = 0.0
+    langsiktige_fordringer: Annotated[float, Dok("Lån gitt til andre med løpetid over 1 år")] = 0.0
 
     @property
     def sum(self) -> float:
@@ -140,8 +245,8 @@ class Anleggsmidler:
 
 @dataclass
 class Omloepmidler:
-    kortsiktige_fordringer: float = 0.0
-    bankinnskudd: float = 0.0
+    kortsiktige_fordringer: Annotated[float, Dok("Kundefordringer og andre kortsiktige krav")] = 0.0
+    bankinnskudd: Annotated[float, Dok("Saldo på driftskonto per 31.12")] = 0.0
 
     @property
     def sum(self) -> float:
@@ -160,9 +265,11 @@ class Eiendeler:
 
 @dataclass
 class Egenkapital:
-    aksjekapital: float = 0.0
-    overkursfond: float = 0.0
-    annen_egenkapital: float = 0.0  # Kan være negativ ved akkumulert underskudd
+    aksjekapital: Annotated[float, Dok("Innbetalt aksjekapital (fra stiftelsesdokumentene)")] = 0.0
+    overkursfond: Annotated[float, Dok("Innbetalt over pålydende ved emisjon")] = 0.0
+    annen_egenkapital: Annotated[
+        float, Dok("Akkumulert overskudd/underskudd. Negativ verdi = akkumulert underskudd")
+    ] = 0.0
 
     @property
     def sum(self) -> float:
@@ -171,8 +278,10 @@ class Egenkapital:
 
 @dataclass
 class LangsiktigGjeld:
-    laan_fra_aksjonaer: float = 0.0
-    andre_langsiktige_laan: float = 0.0
+    laan_fra_aksjonaer: Annotated[float, Dok("Lån fra eier med avtalt løpetid over 1 år")] = 0.0
+    andre_langsiktige_laan: Annotated[float, Dok("Banklån og andre lån med løpetid over 1 år")] = (
+        0.0
+    )
 
     @property
     def sum(self) -> float:
@@ -181,18 +290,31 @@ class LangsiktigGjeld:
 
 @dataclass
 class KortsiktigGjeld:
-    leverandoergjeld: float = 0.0
+    leverandoergjeld: Annotated[float, Dok("Ubetalte fakturaer per 31.12")] = 0.0
     # Betalbar skatt, ikke fastsatt (konto 2500). Motposten til skattekostnaden i
     # resultatregnskapet: uten denne linjen har et selskap med skattepliktig inntekt
     # ingen riktig plass å føre skattegjelden, og balansen går ikke opp.
-    betalbar_skatt: float = 0.0
-    skyldige_offentlige_avgifter: float = 0.0
+    betalbar_skatt: Annotated[
+        float,
+        Dok("Skyldig selskapsskatt per 31.12 (konto 2500), motposten til `skattekostnad`"),
+    ] = 0.0
+    skyldige_offentlige_avgifter: Annotated[float, Dok("Skyldig mva, arbeidsgiveravgift o.l.")] = (
+        0.0
+    )
     # Utbytte styret har foreslått for regnskapsåret (konto 2800). Forslaget er en forpliktelse
     # ved årsslutt og reduserer egenkapitalen i avsetningsåret, ikke i utbetalingsåret. Uten
     # denne linjen måtte avsetningen føres som annen kortsiktig gjeld, og egenkapitalnedgangen
     # ble stående uten en utbyttekode Skatteetaten godtar.
-    avsatt_utbytte: float = 0.0
-    annen_kortsiktig_gjeld: float = 0.0
+    avsatt_utbytte: Annotated[
+        float,
+        Dok(
+            "Utbytte styret har foreslått for regnskapsåret (konto 2800). Forslaget er en "
+            "forpliktelse ved årsslutt og reduserer egenkapitalen i avsetningsåret, ikke i "
+            "året det utbetales. Er utbyttet i stedet vedtatt og utbetalt i året uten "
+            "forutgående avsetning, skal feltet stå tomt og utbetalingen oppgis per aksjonær"
+        ),
+    ] = 0.0
+    annen_kortsiktig_gjeld: Annotated[float, Dok("Annen gjeld med forfall innen 1 år")] = 0.0
 
     @property
     def sum(self) -> float:
@@ -235,17 +357,35 @@ class Balanse:
 
 @dataclass
 class LaanTilNaerstaaende:
-    motpart: str  # Navn på nærstående part (aksjonær, styremedlem e.l.)
-    saldo: float  # Utestående saldo per 31.12 (NOK)
-    retning: str = "långiver"  # "långiver" = selskapet lånte ut; "låntaker" = selskapet lånte inn
-    rente_prosent: float = 0.0
-    sikkerhet: str = ""
+    motpart: Annotated[str, Dok("Navn på den nærstående parten (aksjonær, styremedlem e.l.)")]
+    saldo: Annotated[float, Dok("Utestående saldo per 31.12 (NOK)", typenavn="tall")]
+    retning: Annotated[
+        str,
+        Dok(
+            "`långiver` når selskapet har lånt ut, `låntaker` når det har lånt inn",
+            valg=("långiver", "låntaker"),
+        ),
+    ] = "långiver"
+    rente_prosent: Annotated[float, Dok("Rentesats i prosent", typenavn="desimaltall")] = 0.0
+    sikkerhet: Annotated[str, Dok("Eventuell sikkerhet stilt for lånet")] = ""
 
 
 @dataclass
 class Noter:
-    antall_ansatte: int = 0
-    laan_til_naerstaaende: list[LaanTilNaerstaaende] = field(default_factory=list)
+    antall_ansatte: Annotated[
+        int,
+        Dok(
+            "Antall ansatte i regnskapsåret. Settes også som årsverk i årsregnskapet, og "
+            "dry-run advarer når det er over 0, siden lønn og a-melding ligger utenfor det "
+            "Wenche sender inn. Standard: `0`"
+        ),
+    ] = 0
+    laan_til_naerstaaende: Annotated[
+        list[LaanTilNaerstaaende],
+        Dok(
+            "Lån til eller fra nærstående per 31.12, ett innslag per lån (se tabellen under). Standard: tom liste"
+        ),
+    ] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -282,27 +422,62 @@ BALANSEKATEGORIER = frozenset(
 class NaeringsspesifikasjonPost:
     """Eksakt resultat-/balansepost fra den offisielle grupperingskodelisten."""
 
-    kategori: str
-    kode: str
-    beloep: float
+    kategori: Annotated[str, Dok("Kategorien posten tilhører", valg=NAERINGSKATEGORIER)]
+    kode: Annotated[
+        str, Dok("Firesifret kode fra Skatteetatens grupperingskodeliste, for eksempel `6350`")
+    ]
+    beloep: Annotated[float, Dok("Beløpet som skal rapporteres på koden", typenavn="tall")]
 
 
 @dataclass
 class SkattemeldingKonfig:
-    underskudd_til_fremfoering: float = 0.0  # Ubenyttet underskudd fra tidligere år
-    anvend_fritaksmetoden: bool = True  # True for holdingselskaper som eier aksjer
-    eierandel_for_fritaksmetoden: float = 100.0  # Eierandel i utbyttegivende selskap (prosent,
-    # 0-100, desimaler tillatt). Brukes bare når
-    # anvend_fritaksmetoden er True.
-    boersnotert: bool = False  # True hvis selskapet er børsnotert
-    formuesverdi_aksjer: float = 0.0  # Formuesverdi av aksjer selskapet eier
-    # (fra aksjeoppgaven RF-1088S, post 209)
-    samlet_verdi_bak_aksjene: float | None = None  # Manuell overstyring av netto
-    # formuesverdi bak selskapets egne aksjer.
-    # None = beregnes fra formuesverdi + balanse.
+    underskudd_til_fremfoering: Annotated[
+        float,
+        Dok(
+            "Fremførbart underskudd fra tidligere år (NOK). Finnes i fjorårets skattemelding. Standard: `0`"
+        ),
+    ] = 0.0
+    anvend_fritaksmetoden: Annotated[
+        bool,
+        Dok(
+            "`true` for holdingselskaper som eier aksjer (sktl. § 2-38). Gjelder utbytte og "
+            "gevinst eller tap ved salg av aksjer. Standard: `true`"
+        ),
+    ] = True
+    eierandel_for_fritaksmetoden: Annotated[
+        float,
+        Dok(
+            "Eierandel i selskapet som deler ut utbytte, i prosent (0-100, desimaler tillatt, "
+            "for eksempel `90.5`). Brukes bare når `anvend_fritaksmetoden` er `true`. Over "
+            "90 %: hele utbyttet fritatt. 90 % eller lavere: 3 % skattepliktig (sjablonregelen, "
+            "sktl. § 2-38 sjette ledd). Standard: `100`",
+            typenavn="desimaltall",
+        ),
+    ] = 100.0
+    boersnotert: Annotated[bool, Dok("`true` hvis selskapet er børsnotert. Standard: `false`")] = (
+        False
+    )
+    formuesverdi_aksjer: Annotated[
+        float,
+        Dok(
+            "Formuesverdi av aksjer selskapet eier i andre selskap, fra aksjeoppgaven "
+            "(RF-1088S, post 209). Brukes til å beregne netto formuesverdi bak selskapets "
+            "egne aksjer. Standard: `0`"
+        ),
+    ] = 0.0
+    samlet_verdi_bak_aksjene: Annotated[
+        float | None,
+        Dok(
+            "Overstyrer den beregnede netto formuesverdien bak aksjene direkte. Utelat for å "
+            "la Wenche beregne den fra `formuesverdi_aksjer` og balansen"
+        ),
+    ] = None
     # Valgfri, komplett kodefordeling for næringsspesifikasjonen. Når den er oppgitt,
-    # valideres kategorisummene mot regnskapet før XML bygges.
-    naeringsspesifikasjonsposter: tuple[NaeringsspesifikasjonPost, ...] = ()
+    # valideres kategorisummene mot regnskapet før XML bygges. Leses fra toppnivået i
+    # config.yaml (naeringsspesifikasjon.poster), ikke fra skattemelding-seksjonen.
+    naeringsspesifikasjonsposter: Annotated[
+        tuple[NaeringsspesifikasjonPost, ...], IkkeIConfig()
+    ] = ()
 
 
 @dataclass
@@ -367,12 +542,27 @@ class Aarsregnskap:
 
 @dataclass
 class Aksjonaer:
-    navn: str
-    fodselsnummer: str  # 11 siffer
-    antall_aksjer: int
-    aksjeklasse: str
-    utbytte_utbetalt: float  # NOK utbetalt i løpet av regnskapsåret
-    innbetalt_kapital_per_aksje: float
+    navn: Annotated[str, Dok("Aksjonærens fulle navn")]
+    fodselsnummer: Annotated[str, Dok("Fødselsnummer (personnummer), 11 siffer")]
+    antall_aksjer: Annotated[int, Dok("Antall aksjer eid per 31.12")]
+    aksjeklasse: Annotated[str, Dok("Aksjeklasse, f.eks. `ordinære`")]
+    # De to siste leses med 0 som standard (konfig.les_aksjonaerer), så i config.yaml er de
+    # valgfrie selv om modellen krever dem.
+    utbytte_utbetalt: Annotated[
+        float,
+        Dok(
+            "Utbytte utbetalt til denne aksjonæren i løpet av året (NOK). Standard: `0`",
+            paakrevd="nei",
+        ),
+    ]
+    innbetalt_kapital_per_aksje: Annotated[
+        float,
+        Dok(
+            "Innbetalt kapital per aksje i NOK. Beregnes som aksjekapital / antall aksjer. "
+            "Standard: `0`",
+            paakrevd="nei",
+        ),
+    ]
 
 
 @dataclass
@@ -397,3 +587,73 @@ class Aksjonaerregisteroppgave:
 # ---------------------------------------------------------------------------
 # Obligatoriske noter (rskl. §§ 7-35, 7-43, 7-45, 7-46)
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Formen på config.yaml
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ForegaaendeAar:
+    resultatregnskap: Resultatregnskap = field(default_factory=Resultatregnskap)
+    balanse: Balanse = field(default_factory=Balanse)
+
+
+@dataclass
+class Naeringsspesifikasjon:
+    poster: Annotated[
+        list[NaeringsspesifikasjonPost],
+        Dok("Komplett liste over poster med grupperingskode, se avsnittet under"),
+    ] = field(default_factory=list)
+
+
+@dataclass
+class Konfig:
+    """
+    config.yaml slik Wenche leser den. Instansieres aldri: leserne i wenche.konfig bygger
+    domenemodellene direkte, men formen beskrives her, ett sted, så JSON Schema, TypeScript-
+    typen, referansen og varselet om ukjente felt ikke kan drifte fra hverandre.
+    """
+
+    selskap: Annotated[Selskap, Dok("Selskapsopplysningene")]
+    regnskapsaar: Annotated[int, Dok("Året regnskapet gjelder for, f.eks. `2024`")]
+    resultatregnskap: Annotated[Resultatregnskap, Dok("Resultatregnskapet for året")]
+    balanse: Annotated[Balanse, Dok("Balansen per 31.12")]
+    foregaaende_aar: Annotated[
+        ForegaaendeAar | None,
+        Dok(
+            "Fjorårets tall, med samme struktur som `resultatregnskap` og `balanse`. "
+            "Obligatorisk etter regnskapslovens § 6-6, men kan utelates for selskaper stiftet "
+            "i regnskapsåret"
+        ),
+    ] = None
+    regnskapsstart: Annotated[
+        date | None,
+        Dok("Første dag i regnskapsperioden (ÅÅÅÅ-MM-DD). Tom = 1. januar i regnskapsåret"),
+    ] = None
+    regnskapsslutt: Annotated[
+        date | None,
+        Dok("Siste dag i regnskapsperioden. Tom = 31. desember i regnskapsåret"),
+    ] = None
+    skattemelding: Annotated[
+        SkattemeldingKonfig, Dok("Opplysninger som bare skattemeldingen trenger")
+    ] = field(default_factory=SkattemeldingKonfig)
+    naeringsspesifikasjon: Annotated[
+        Naeringsspesifikasjon | None,
+        Dok("Integrasjonsflate for regnskapssystemer, se eget avsnitt. Utelates ved vanlig bruk"),
+    ] = None
+    aksjonaerer: Annotated[
+        list[Aksjonaer],
+        Dok("Alle aksjonærer per 31.12 i regnskapsåret", paakrevd="for RF-1086"),
+    ] = field(default_factory=list)
+    utbytte_vedtaksdato: Annotated[
+        date | None,
+        Dok(
+            "Datoen generalforsamlingen vedtok utbyttet (ÅÅÅÅ-MM-DD). Må ligge i inntektsåret",
+            paakrevd="når det er utbetalt utbytte",
+        ),
+    ] = None
+    noter: Annotated[Noter, Dok("Grunnlaget for de obligatoriske notene")] = field(
+        default_factory=Noter
+    )
