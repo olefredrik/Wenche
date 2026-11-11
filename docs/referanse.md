@@ -225,6 +225,15 @@ Når en aksjonær har `utbytte_utbetalt` over 0, rapporterer Wenche utdelingen i
 
 Wenche rapporterer én utdeling per år, for én aksjeklasse. Alle aksjonærer må derfor ha fått like mye per aksje (en krones avvik for avrunding godtas), ellers stopper Wenche innsendingen, fordi post 8 og post 21 da ikke ville gått opp hos Skatteetaten.
 
+### `noter` (valgfritt)
+
+Grunnlaget for de obligatoriske notene (se [Bruk](bruk.md)). Notene sendes ikke inn digitalt, men `antall_ansatte` går også inn som årsverk i årsregnskapet til Brønnøysund, så noten og skjemaet sier det samme.
+
+| Felt | Type | Påkrevd | Beskrivelse |
+|---|---|---|---|
+| `antall_ansatte` | heltall | nei | Antall ansatte i regnskapsåret. Settes også som årsverk i årsregnskapet, og dry-run advarer når det er over 0, siden lønn og a-melding ligger utenfor det Wenche sender inn. Standard: `0` |
+| `laan_til_naerstaaende` | liste | nei | Lån til eller fra nærstående per 31.12, ett innslag per lån med `motpart` (tekst), `saldo` (NOK), `retning` (`långiver` når selskapet har lånt ut, `låntaker` når det har lånt inn), `rente_prosent` og `sikkerhet` (tekst). Standard: tom liste |
+
 ---
 
 ## Miljøvariabler (.env)

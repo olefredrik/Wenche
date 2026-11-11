@@ -164,7 +164,7 @@ Notene sendes **ikke** inn digitalt til Brønnøysundregistrene. Skjemaet RR-000
 ### Hvordan bruke notene i Wenche?
 
 1. Gå til fanen **Tall** og finn seksjonen **Obligatoriske noter**
-2. Fyll inn antall ansatte (typisk 0 for holdingselskaper)
+2. Fyll inn antall ansatte (typisk 0 for holdingselskaper). Tallet går også inn som årsverk i årsregnskapet som sendes til Brønnøysund, og dry-run advarer hvis det er over 0, siden lønn og a-melding ligger utenfor det Wenche sender inn
 3. Fyll inn eventuelle lån til nærstående (aksjonærer, styremedlemmer), og klikk **Lagre data**
 4. Gå til fanen **Dokumenter** og klikk **Last ned** ved siden av **Noter**, du får filen `noter_ÅÅÅÅ_ORGNR.txt`
 5. Les gjennom teksten og tilpass om nødvendig

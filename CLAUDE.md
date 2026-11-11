@@ -52,8 +52,8 @@ gitignored).
 Wenche støtter **bare passive holdingselskaper** (uten ansatte/drift). Det er et bevisst,
 avgrenset scope, ikke en mangel. Driftsselskap er utenfor scope og ikke planlagt
 (issue #82 lukket som not planned). Valgene som følger av scopet i årsregnskaps-XML-en (AS, små
-foretak, ingen regnskapsfører, null årsverk) er samlet som `SCOPE_*`-konstanter øverst i
-`wenche/brg_xml.py`. Wenche er et innsendingsverktøy, **ikke en
+foretak, ingen regnskapsfører) er samlet som `SCOPE_*`-konstanter øverst i `wenche/brg_xml.py`;
+årsverk følger `noter.antall_ansatte`, og dry-run advarer når det er over 0. Wenche er et innsendingsverktøy, **ikke en
 regnskapsfører**: den forutsetter at tallene finnes. For å føre regnskapet finnes
 søsterprosjektet [Bodil](https://github.com/olefredrik/Bodil), som produserer en
 `config.yaml` Wenche leser direkte.

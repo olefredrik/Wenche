@@ -8,6 +8,11 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 
 ### Endret
 
+- **Årsverk i årsregnskapet følger noten.** `antallAarsverk` i skjemaet til Brønnøysund var
+  alltid 0, uansett hva note 2 sa om antall ansatte. Nå leses `noter` inn på årsregnskapet og
+  årsverk settes lik `noter.antall_ansatte`, og dry-run advarer når tallet er over 0 (lønn,
+  arbeidsgiveravgift, a-melding og pensjon er utenfor det Wenche sender inn). For selskaper
+  uten ansatte er XML-en uendret.
 - **Opprydding etter kodegjennomgangen** (leveranse 7 av 8). Valgene som følger av
   Wenches scope (aksjeselskap, små foretak, ingen regnskapsfører, null årsverk) står nå som
   navngitte `SCOPE_*`-konstanter øverst i `wenche/brg_xml.py` i stedet for spredt i XML-malen.

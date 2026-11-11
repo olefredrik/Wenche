@@ -34,7 +34,9 @@ from wenche.models import (
     Eiendeler,
     Finansposter,
     KortsiktigGjeld,
+    LaanTilNaerstaaende,
     LangsiktigGjeld,
+    Noter,
     Omloepmidler,
     Resultatregnskap,
     Selskap,
@@ -372,6 +374,30 @@ def les_aksjonaerer(raa: dict) -> list[Aksjonaer]:
 # ---------------------------------------------------------------------------
 
 
+def les_noter(raa: dict) -> Noter:
+    """Notene fra en parset config. Seksjonen er valgfri; samme form som skjemaet lagrer."""
+    noter_cfg = raa.get("noter") or {}
+    if not isinstance(noter_cfg, dict):
+        raise KonfigFeil("noter i configen må være en seksjon med undernøkler.", felt="noter")
+    return Noter(
+        antall_ansatte=heltall(noter_cfg.get("antall_ansatte"), "noter.antall_ansatte"),
+        laan_til_naerstaaende=[
+            LaanTilNaerstaaende(
+                motpart=str(laan.get("motpart", laan.get("mottaker", "")) or ""),
+                saldo=tall(
+                    laan.get("saldo", laan.get("beloep")), f"noter.laan_til_naerstaaende[{i}].saldo"
+                ),
+                retning=str(laan.get("retning") or "långiver"),
+                rente_prosent=tall(
+                    laan.get("rente_prosent"), f"noter.laan_til_naerstaaende[{i}].rente_prosent"
+                ),
+                sikkerhet=str(laan.get("sikkerhet") or ""),
+            )
+            for i, laan in enumerate(noter_cfg.get("laan_til_naerstaaende") or [])
+        ],
+    )
+
+
 def les_aarsregnskap(raa: dict) -> Aarsregnskap:
     """Årsregnskapet (også grunnlaget for skattemeldingen) fra en parset config."""
     selskap = les_selskap(raa)
@@ -391,6 +417,7 @@ def les_aarsregnskap(raa: dict) -> Aarsregnskap:
         eierandel_for_utbytte=eierandel_eller_none(
             (raa.get("skattemelding") or {}).get("eierandel_for_fritaksmetoden")
         ),
+        noter=les_noter(raa),
     )
 
 

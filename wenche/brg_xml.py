@@ -28,8 +28,6 @@ SCOPE_REGNSKAPSREGLER_SELSKAP = "nei"  # ikke de ordinære reglene for større s
 SCOPE_FORENKLET_IFRS = "nei"
 SCOPE_AUTORISERT_REGNSKAPSFOERER = "nei"  # Wenche er et innsendingsverktøy, ikke regnskapsfører
 SCOPE_BISTAND_REGNSKAPSFOERER = "nei"
-# Ingen ansatte. `Noter.antall_ansatte` styrer bare teksten i note 2, ikke dette feltet.
-SCOPE_ANTALL_AARSVERK = 0
 
 
 def _row_id() -> str:
@@ -192,6 +190,10 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
     b = regnskap.balanse
     fr = regnskap.foregaaende_aar_resultat
     fb = regnskap.foregaaende_aar_balanse
+    # Årsverk settes lik antall ansatte i note 2, så skjemaet og noten sier det samme. Wenche
+    # har ingen deltidsbrøk; passive selskap har normalt 0, og dry-run advarer når tallet er
+    # over 0 (lønn og a-melding er utenfor det Wenche sender inn).
+    aarsverk = regnskap.noter.antall_ansatte
 
     # Avrund float til int for BRG XML (registrene aksepterer kun heltall)
     def _i(v: float) -> int:
@@ -465,7 +467,7 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
 
     <noter>
       <noteAarsverkTjenestePensjon>
-        <antallAarsverk orid="37467">{SCOPE_ANTALL_AARSVERK}</antallAarsverk>
+        <antallAarsverk orid="37467">{aarsverk}</antallAarsverk>
       </noteAarsverkTjenestePensjon>
     </noter>
 

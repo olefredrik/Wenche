@@ -141,6 +141,18 @@ def advarsler(regnskap: Aarsregnskap) -> list[str]:
     """
     adv = []
 
+    # Wenche er laget for selskaper uten ansatte. Står det ansatte i note 2, går tallet inn
+    # som årsverk i årsregnskapet, og lønn, arbeidsgiveravgift, a-melding og pensjon ligger
+    # utenfor det Wenche sender inn. Ikke blokkerende: tallet kan være riktig.
+    ansatte = regnskap.noter.antall_ansatte
+    if ansatte > 0:
+        adv.append(
+            f"Selskapet har {ansatte} {'ansatt' if ansatte == 1 else 'ansatte'} i note 2, og "
+            f"årsregnskapet oppgir derfor {ansatte} årsverk. Wenche er laget for selskaper uten "
+            "ansatte: lønn, arbeidsgiveravgift, a-melding og pensjon er utenfor det Wenche "
+            "sender inn. Kontroller at antallet stemmer før du sender."
+        )
+
     # Utbytte kan bare deles ut av fri egenkapital (aksjeloven § 8-1). Fri
     # egenkapital = overkursfond + annen egenkapital (aksjekapital er bundet).
     # I modellen reduserer utbytte annen_egenkapital, så hvis utdelingen
