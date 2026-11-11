@@ -71,6 +71,7 @@ ruff check . && ruff format --check .   # lint og formatering (ruff format . ret
 mypy                                    # typesjekk av wenche/ og hosted/
 npm ci                                  # workspace for SPA-ene (Node 22, se .nvmrc)
 npm run typecheck && npm run lint       # tsc for alle tre workspaces + eslint
+npm test                                # vitest (packages/ui + røyktester av appene)
 npm run build --workspace hosted/web    # hostet SPA
 npm run build --workspace wenche/web/frontend   # self-hosted SPA
 ```

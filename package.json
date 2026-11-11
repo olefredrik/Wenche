@@ -13,12 +13,17 @@
   ],
   "scripts": {
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit -p packages/ui && tsc --noEmit -p hosted/web && tsc --noEmit -p wenche/web/frontend"
+    "typecheck": "tsc --noEmit -p packages/ui && tsc --noEmit -p hosted/web && tsc --noEmit -p wenche/web/frontend",
+    "test": "vitest run"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.3",
+    "@vitejs/plugin-react": "^6.3.0",
     "eslint": "^10.14.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.14.0",
-    "typescript-eslint": "^8.72.2"
+    "jsdom": "^29.1.1",
+    "typescript-eslint": "^8.72.2",
+    "vitest": "^5.1.0"
   }
 }
