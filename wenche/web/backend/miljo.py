@@ -1,10 +1,8 @@
 """
 Miljø- og konfig-tilstand for det self-hostede webgrensesnittet.
 
-Miljøet (prod/test) låses per kjøring (slik `wenche` vs `wenche dev` gjorde det i NiceGUI),
-og settes også i `WENCHE_ENV` slik at hele kjernen (auth, klienter, fristsjekk) peker mot
-riktig miljø. Credentials og oppsett bor i `~/.wenche/.env` + `~/.wenche/maskinporten_privat.pem`,
-nøyaktig som før — porten fra `wenche/ui.py`.
+Miljøet (prod/test) låses per kjøring (`wenche` mot prod, `wenche dev` mot tt02), og settes også i `WENCHE_ENV` slik at hele kjernen (auth, klienter, fristsjekk) peker mot
+riktig miljø. Credentials og oppsett bor i `~/.wenche/.env` + `~/.wenche/maskinporten_privat.pem`.
 """
 
 from __future__ import annotations
@@ -43,7 +41,7 @@ def config_fil() -> Path:
     """Aktiv config-fil: `config.yaml` (prod) eller `config.dev.yaml` (test).
 
     Skiller test-data fra ekte selskapsinformasjon slik at Tenor-orgnumre ikke
-    overskriver din virkelige config (samme regel som NiceGUI-en brukte).
+    overskriver din virkelige config.
     """
     return Path("config.dev.yaml" if _AKTIV_ENV == "test" else "config.yaml")
 

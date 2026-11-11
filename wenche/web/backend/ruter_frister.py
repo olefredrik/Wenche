@@ -1,5 +1,5 @@
 """
-Frist- og statusoversikt for self-hosted Wenche (porten fra Hjem-fanen i `wenche/ui.py`).
+Frist- og statusoversikt for self-hosted Wenche (Hjem-fanen).
 
 Statussjekk mot myndighetene gjøres mot PROD for din egen virksomhet (ORG_NUMMER), uavhengig
 av aktivt miljø — test-API-ene kjenner kun syntetiske Tenor-orgnumre. Derfor er statussjekk
