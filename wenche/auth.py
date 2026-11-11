@@ -26,7 +26,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import httpx
-from authlib.jose import jwt
+from joserfc import jwt
+from joserfc.jwk import RSAKey
 
 from wenche import miljoer
 from wenche.feil import AuthFeil, KonfigFeil, MyndighetsFeil
@@ -169,8 +170,7 @@ def _lag_jwt(
             }
         ]
     header = {"alg": "RS256", "kid": kid}
-    token = jwt.encode(header, claims, private_key_pem)
-    return token.decode() if isinstance(token, bytes) else token
+    return jwt.encode(header, claims, RSAKey.import_key(private_key_pem), algorithms=["RS256"])
 
 
 def _hent_maskinporten_token(

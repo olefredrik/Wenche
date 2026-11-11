@@ -4,6 +4,16 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.16.2] - 2026-11-11
+
+### Endret
+
+- **JWT-signering og -validering bruker `joserfc` i stedet for `authlib`.** Nyere authlib (1.9)
+  melder at `authlib.jose` er utdatert, og advarselen sto på stderr ved hvert CLI-kall.
+  Maskinporten-assertionen, ID-portens `private_key_jwt` og valideringen av `id_token` (RS256,
+  utsteder, mottaker, utløp, nonce og nøkkelrotasjon) virker som før, og valideringen har fått
+  egne tester. `authlib` er ikke lenger en avhengighet.
+
 ## [1.16.1] - 2026-11-11
 
 ### Endret
