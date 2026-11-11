@@ -90,15 +90,6 @@ class Settings:
         return vert not in ("localhost", "127.0.0.1", "::1")
 
     @property
-    def kontakt_tekst(self) -> str:
-        """Kontaktverdien uten URL-skjema, for innfelling i ren tekst. `kontakt` lagres med
-        skjema (mailto:/https://) fordi den brukes som href; skjemaet skal ikke leses av en
-        bruker. Speiler KontaktLenke i frontend."""
-        if self.kontakt.startswith("mailto:"):
-            return self.kontakt[len("mailto:") :]
-        return self.kontakt.removeprefix("https://").removeprefix("http://")
-
-    @property
     def idporten_client_id(self) -> str | None:
         return self._idporten_client_id
 

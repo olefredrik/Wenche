@@ -1,10 +1,10 @@
 """
 Oppsett-endepunkter for self-hosted Wenche: Maskinporten-credentials, privat nøkkel,
 tilkoblingstest og systembruker-onboarding (registrer system, opprett forespørsel,
-godkjenn i Altinn med BankID, sjekk status). Porten fra Oppsett-fanen i `wenche/ui.py`.
+godkjenn i Altinn med BankID, sjekk status).
 
-Miljøet er låst per kjøring (WENCHE_ENV), så vi trenger ikke flippe env per kall slik
-NiceGUI gjorde; auth-flyten peker allerede mot riktig miljø.
+Miljøet er låst per kjøring (WENCHE_ENV), så auth-flyten peker alltid mot riktig miljø uten
+at noe endepunkt trenger å bytte miljø per kall.
 """
 
 from __future__ import annotations
@@ -198,7 +198,7 @@ def test_tilkobling() -> dict:
         return resultat
     try:
         token = auth.login_admin()
-        svar = systembruker.hent_forespørsel_status(token, request_id)
+        svar = systembruker.hent_forespoersel_status(token, request_id)
         resultat["systembruker"] = _tolk_systembruker_status(svar.get("status", "ukjent"))
     except Exception as e:
         resultat["systembruker"] = {
@@ -270,7 +270,7 @@ def opprett_systembruker() -> dict:
     try:
         token = auth.login_admin()
         systembruker.registrer_system(token, vendor_orgnr, _client_id())
-        svar = systembruker.opprett_forespørsel(token, vendor_orgnr, _party_orgnr())
+        svar = systembruker.opprett_forespoersel(token, vendor_orgnr, _party_orgnr())
     except WencheFeil as e:
         raise _lesbar(e) from e
     request_id = svar.get("id", "")
@@ -295,7 +295,7 @@ def systembruker_status() -> dict:
         return {"status": "ikke_opprettet", "melding": "Ingen forespørsel opprettet ennå"}
     try:
         token = auth.login_admin()
-        svar = systembruker.hent_forespørsel_status(token, request_id)
+        svar = systembruker.hent_forespoersel_status(token, request_id)
     except WencheFeil as e:
         raise _lesbar(e) from e
     return _tolk_systembruker_status(svar.get("status", "ukjent"))
@@ -318,7 +318,7 @@ def oppdater_systembruker() -> dict:
     party = _party_orgnr()
     treff = next((b for b in brukere if b.get("reporteeOrgNo") == party), brukere[0])
     try:
-        svar = systembruker.opprett_endringsforespørsel(
+        svar = systembruker.opprett_endringsforespoersel(
             token, treff["id"], [systembruker.SKATTEMELDING_RETT]
         )
     except WencheFeil as e:

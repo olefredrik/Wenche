@@ -251,7 +251,6 @@ def callback(
     code: str | None = None,
     state: str | None = None,
     error: str | None = None,
-    error_description: str | None = None,
 ) -> RedirectResponse:
     """Løs inn autorisasjonskoden, valider id_token, og bind den verifiserte identiteten til økten."""
     _krev_aktivert()
@@ -262,7 +261,8 @@ def callback(
     verifier = request.session.pop("idp_verifier", None)
 
     if error:
-        # Brukeren avbrøt eller ID-porten avviste. error_description er teknisk, vis en rolig tekst.
+        # Brukeren avbrøt eller ID-porten avviste. error_description i URL-en er teknisk og leses
+        # ikke; vis en rolig tekst.
         return _tilbake("avbrutt")
     if not code or not state or state != forventet_state or not verifier:
         return _tilbake("mislyktes")

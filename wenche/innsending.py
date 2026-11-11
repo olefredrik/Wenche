@@ -168,7 +168,7 @@ def bygg_skattemelding(
         raise ValideringsFeil(feil)
     skjoennsfastsatt = False
     if partsnummer is None:
-        forhaandsutfylt, gjeldende_dokument_id = skd_klient.hent_forhåndsutfylt_med_id(
+        forhaandsutfylt, gjeldende_dokument_id = skd_klient.hent_forhaandsutfylt_med_id(
             regnskap.regnskapsaar, orgnr
         )
         # hent_partsnummer kaster ValueError (eller en XML-parse-/decode-feil) hvis svaret fra

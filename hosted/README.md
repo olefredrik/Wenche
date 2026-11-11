@@ -26,9 +26,10 @@ andre apparat står i utgangspunktet uten tilkobling. En alt koblet økt kan der
 kortvarig lenke (vist som QR + lenke på Hjem), som den nye enheten åpner for å arve samme
 binding, uten ny BankID. Tilkoblingen **kopieres** (den flyttes ikke): begge enheter forblir
 koblet, og hver enhet logges ut for seg. Lenken er forankret i en alt verifisert økt (bundet
-`kunde_org`) og er ferskvare (5 min). Vises kun for **invite-baserte økter** (demo + fallback);
+`kunde_org`) og er ferskvare (5 min). Grensesnittet skjuler den for **ID-porten-økter**:
 en ID-porten-bruker logger bare inn på nytt på den nye enheten (treffer AlreadyApproved), så
-handoff er overflødig for dem og skjules.
+handoff er overflødig for dem. API-et skiller ikke på hvordan økten ble bundet; lenken kopierer
+uansett bare en alt verifisert binding.
 
 ## Komponenter
 - `api/` — FastAPI JSON-API (importerer `wenche`).
@@ -156,8 +157,8 @@ flyten er en reell handling mot Altinn, men ingenting sendes inn før du fullfø
 
 ## Deploy (Fly.io)
 
-Tjenesten kjøres som **én alltid-på container** på Fly.io i EØS-region (in-memory-sesjonen
-krever én prosess). `Dockerfile` og `fly.toml` ligger i repo-roten. Engangsoppsett:
+Tjenesten kjøres som **én maskin** på Fly.io i EØS-region, som dvaler når ingen bruker den
+(scale-to-zero). Økten ligger i en signert cookie, så det finnes ingen database. `Dockerfile` og `fly.toml` ligger i repo-roten. Engangsoppsett:
 
 1. **Installer flyctl og logg inn:**
    ```sh
@@ -196,7 +197,7 @@ krever én prosess). `Dockerfile` og `fly.toml` ligger i repo-roten. Engangsopps
 4. **Første deploy:** `flyctl deploy`. Test på `https://<appnavn>.fly.dev` (helsesjekk: `/api/health`).
 
 ### Deploy fremover
-Foreløpig deployer vi **manuelt**: `flyctl deploy --remote-only` fra repo-roten. Det er
+Foreløpig deployer jeg **manuelt**: `flyctl deploy --remote-only --ha=false` fra repo-roten. Det er
 bevisst, så merge til `main` ikke auto-deployer.
 
 `.github/workflows/deploy-hosted.yml` finnes og kan kjøres **manuelt** (Actions →
@@ -255,8 +256,8 @@ Engangsoppsett:
      HOSTED_VENDOR_KEY_PEM="$(cat maskinporten_privat.pem)"
    ```
 3. **Deploy:** `flyctl deploy -c fly.demo.toml --ha=false`. `--ha=false` hindrer at Fly lager to
-   maskiner — appen MÅ kjøre på **én** maskin (in-memory-sesjon kan ikke spres mellom maskiner,
-   samme grunn som prod). Lagde du to: `flyctl scale count 1 -a wenche-demo`.
+   maskiner. Appen kjører på **én** maskin med vilje (lav kost, og rate-limiten lever i
+   prosessminnet), samme som prod. Lagde du to: `flyctl scale count 1 -a wenche-demo`.
 4. **Domene:** `flyctl certs add demo.wenche.cloud -a wenche-demo`, legg deretter til DNS-postene
    Fly oppgir hos domene.shop. Vent til `flyctl certs show demo.wenche.cloud -a wenche-demo` er grønt.
 5. **Forhåndsgodkjenn systembruker** for et syntetisk Tenor-demo-org (engang): åpne demo-appen via

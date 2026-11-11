@@ -79,7 +79,7 @@ _UTEN_PARTSNUMMER = (
 
 def test_manglende_partsnummer_gir_lesbar_runtimeerror_ikke_500():
     skd = Mock()
-    skd.hent_forhåndsutfylt_med_id.return_value = (_UTEN_PARTSNUMMER, None)
+    skd.hent_forhaandsutfylt_med_id.return_value = (_UTEN_PARTSNUMMER, None)
     with pytest.raises(RuntimeError) as ei:
         tjeneste.send_skattemelding(_CONFIG, skd, "altinn-token", orgnr="314273818")
     melding = str(ei.value)

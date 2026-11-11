@@ -87,16 +87,9 @@ def generer(regnskap: Aarsregnskap, noter: Noter) -> str:
             "Det er ikke utbetalt lønn, honorar eller annen godtgjørelse "
             "til daglig leder eller styret i regnskapsåret."
         )
-    elif antall == 1:
-        linje(f"Selskapet hadde {antall} ansatt i regnskapsåret.")
-        loennskostnader = regnskap.resultatregnskap.driftskostnader.loennskostnader
-        linje(
-            f"Lønnskostnader inkl. arbeidsgiveravgift: {loennskostnader:,} kr".replace(
-                ",", "\u202f"
-            )
-        )
     else:
-        linje(f"Selskapet hadde {antall} ansatte i regnskapsåret.")
+        ansatte = "ansatt" if antall == 1 else "ansatte"
+        linje(f"Selskapet hadde {antall} {ansatte} i regnskapsåret.")
         loennskostnader = regnskap.resultatregnskap.driftskostnader.loennskostnader
         linje(
             f"Lønnskostnader inkl. arbeidsgiveravgift: {loennskostnader:,} kr".replace(

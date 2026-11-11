@@ -131,7 +131,7 @@ def _normaliser_svar(resp: httpx.Response, sid: str, oppdatert: bool) -> dict:
     return {"id": data if isinstance(data, str) else sid, "oppdatert": oppdatert}
 
 
-def opprett_forespørsel(maskinporten_token: str, vendor_orgnr: str, org_nummer: str) -> dict:
+def opprett_forespoersel(maskinporten_token: str, vendor_orgnr: str, org_nummer: str) -> dict:
     """
     Oppretter en systembrukerforespørsel for organisasjonen.
 
@@ -155,7 +155,7 @@ def opprett_forespørsel(maskinporten_token: str, vendor_orgnr: str, org_nummer:
     ).json()
 
 
-def hent_forespørsel_status(maskinporten_token: str, request_id: str) -> dict:
+def hent_forespoersel_status(maskinporten_token: str, request_id: str) -> dict:
     """Henter status for en systembrukerforespørsel."""
     return _kall(
         "GET",
@@ -165,7 +165,7 @@ def hent_forespørsel_status(maskinporten_token: str, request_id: str) -> dict:
     ).json()
 
 
-def opprett_endringsforespørsel(
+def opprett_endringsforespoersel(
     maskinporten_token: str, systembruker_id: str, required_rights: list[dict]
 ) -> dict:
     """

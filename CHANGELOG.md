@@ -4,6 +4,34 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.15.0] - 2026-11-11
+
+### Endret
+
+- **Årsverk i årsregnskapet følger noten.** `antallAarsverk` i skjemaet til Brønnøysund var
+  alltid 0, uansett hva note 2 sa om antall ansatte. Nå leses `noter` inn på årsregnskapet og
+  årsverk settes lik `noter.antall_ansatte`, og dry-run advarer når tallet er over 0 (lønn,
+  arbeidsgiveravgift, a-melding og pensjon er utenfor det Wenche sender inn). For selskaper
+  uten ansatte er XML-en uendret.
+- **Opprydding etter kodegjennomgangen** (leveranse 7 av 8). Valgene som følger av
+  Wenches scope (aksjeselskap, små foretak, ingen regnskapsfører, null årsverk) står nå som
+  navngitte `SCOPE_*`-konstanter øverst i `wenche/brg_xml.py` i stedet for spredt i XML-malen.
+  XML-en som sendes inn er uendret.
+- Fem funksjoner med æøå i navnet er omdøpt til samme translitterering som resten av koden
+  (`opprett_forespoersel`, `hent_forespoersel_status`, `opprett_endringsforespoersel`,
+  `hent_forhaandsutfylt_med_id`). Bruker du dem fra egen Python-kode, må kallene oppdateres.
+- `wenche importer-saft` overskriver ikke lenger en `config.yaml` som alt finnes uten
+  `--overskriv`, siden det er nettopp de manuelt utfylte feltene som ville gått tapt.
+- Driftsskriptene i `hosted/`: `mint_invite.py` krever at `HOSTED_INVITE_SECRET` og
+  `HOSTED_PUBLIC_URL` er satt i stedet for å falle stille tilbake til dev-verdiene, og
+  `hent_forhandsutfylt.py` skriver bare ut hele svaret fra Skatteetaten ved feil eller med
+  `--vis-svar`. Invite-tokens signeres ett sted (`lag_invite_token`), også fra skriptene.
+- Død kode og utdaterte kommentarer fjernet: ubrukt `kontakt_tekst` i hostet-konfigurasjonen,
+  en ulest query-parameter i ID-porten-callbacken, to like grener i notegenereringen, og
+  henvisninger til det gamle NiceGUI-grensesnittet og en «in-memory-sesjon» som ikke finnes
+  (økten ligger i en signert cookie). Deploy-kommentarene i `fly.toml`, `fly.demo.toml` og
+  `hosted/README.md` sier nå det som faktisk gjøres (`--remote-only --ha=false`, manuelt).
+
 ## [1.14.0] - 2026-11-11
 
 ### Lagt til

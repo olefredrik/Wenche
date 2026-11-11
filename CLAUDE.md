@@ -26,7 +26,7 @@ Repoet inneholder tre ting som henger sammen via et npm-workspace + en Python-pa
   webgrensesnitt. `wenche`-kommandoen starter en lokal server som serverer denne.
 - **`hosted/`** — den hostede tjenesten: FastAPI-backend (`hosted/api/`) + egen SPA
   (`hosted/web`). Pakkes som Docker-image (multi-stage, se [Dockerfile](Dockerfile)) og
-  kjøres på Fly. Session-only (in-memory), **én worker** med vilje. Brukeren kobler til via
+  kjøres på Fly. Session-only (øktbinding i signert cookie, ingen database), **én worker** med vilje. Brukeren kobler til via
   invite-token; operatøren har satt opp Maskinporten på forhånd.
 - **`wenche/web/felles`** — web-laget begge backendene deler: dokumentgenerering, SAF-T-import,
   innsending med én feilfelle (`kjoer`), svar-modellene (pydantic, i OpenAPI) og `Kroppsgrense`
@@ -51,7 +51,9 @@ gitignored).
 
 Wenche støtter **bare passive holdingselskaper** (uten ansatte/drift). Det er et bevisst,
 avgrenset scope, ikke en mangel. Driftsselskap er utenfor scope og ikke planlagt
-(issue #82 lukket som not planned). Wenche er et innsendingsverktøy, **ikke en
+(issue #82 lukket som not planned). Valgene som følger av scopet i årsregnskaps-XML-en (AS, små
+foretak, ingen regnskapsfører) er samlet som `SCOPE_*`-konstanter øverst i `wenche/brg_xml.py`;
+årsverk følger `noter.antall_ansatte`, og dry-run advarer når det er over 0. Wenche er et innsendingsverktøy, **ikke en
 regnskapsfører**: den forutsetter at tallene finnes. For å føre regnskapet finnes
 søsterprosjektet [Bodil](https://github.com/olefredrik/Bodil), som produserer en
 `config.yaml` Wenche leser direkte.

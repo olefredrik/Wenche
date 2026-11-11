@@ -298,6 +298,33 @@ def test_advarselsnoekkelen_skrives_ikke_til_config_yaml(tmp_path):
     assert "_advarsler" not in ut_fil.read_text(encoding="utf-8")
 
 
+def test_importer_saft_roerer_ikke_eksisterende_config_uten_overskriv(tmp_path):
+    """Manuelt utfylte felt (styreleder, aksjonærer) bor i config.yaml; en import som
+    overskriver stille ville kastet dem. Uten --overskriv stopper kommandoen, med flagget skriver den."""
+    from click.testing import CliRunner
+
+    from wenche.cli import main
+
+    saft_fil = tmp_path / "saft.xml"
+    saft_fil.write_bytes(_saft_xml(KONTOER))
+    ut_fil = tmp_path / "config.yaml"
+    ut_fil.write_text("selskap:\n  styreleder: Kari Nordmann\n", encoding="utf-8")
+
+    resultat = CliRunner().invoke(main, ["importer-saft", str(saft_fil), "--ut", str(ut_fil)])
+
+    assert resultat.exit_code == 1
+    assert "finnes alt" in resultat.output and "--overskriv" in resultat.output
+    assert ut_fil.read_text(encoding="utf-8") == "selskap:\n  styreleder: Kari Nordmann\n"
+
+    resultat = CliRunner().invoke(
+        main, ["importer-saft", str(saft_fil), "--ut", str(ut_fil), "--overskriv"]
+    )
+
+    assert resultat.exit_code == 0, resultat.output
+    assert "styreleder: Kari Nordmann" not in ut_fil.read_text(encoding="utf-8")
+    assert "regnskapsaar" in ut_fil.read_text(encoding="utf-8")
+
+
 def test_avsatt_utbytte_konto_2800_faar_egen_linje():
     """
     Konto 2800 havnet før i annen kortsiktig gjeld og ble rapportert som kode 2990.

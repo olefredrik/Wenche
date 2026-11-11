@@ -162,7 +162,7 @@ def test_flagget_validerer_mot_xsd():
 
 def _skd(forhaandsutfylt: bytes) -> Mock:
     skd = Mock()
-    skd.hent_forhåndsutfylt_med_id.return_value = (forhaandsutfylt, "SKI:756:114129")
+    skd.hent_forhaandsutfylt_med_id.return_value = (forhaandsutfylt, "SKI:756:114129")
     skd.send.return_value = "https://af.tt02.altinn.no/inbox"
     return skd
 
@@ -248,7 +248,7 @@ def _kjoer_cli(monkeypatch, forhaandsutfylt: bytes, svar: str):
         patch("wenche.skd_skattemelding_client.SkdSkattemeldingClient") as Client,
     ):
         skd = Client.return_value.__enter__.return_value
-        skd.hent_forhåndsutfylt_med_id.return_value = (forhaandsutfylt, "SKI:756:114129")
+        skd.hent_forhaandsutfylt_med_id.return_value = (forhaandsutfylt, "SKI:756:114129")
         skd.send.return_value = "https://af.tt02.altinn.no/inbox"
         result = CliRunner().invoke(
             main, ["send-skattemelding", "--config", str(_CONFIG_FIL)], input=svar

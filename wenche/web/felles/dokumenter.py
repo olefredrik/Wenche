@@ -19,10 +19,11 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 
 from wenche import aarsregnskap as ar
 from wenche import aksjonaerregister as akr
+from wenche import konfig
 from wenche import noter as noter_modul
 from wenche import skattemelding as sm
 from wenche.feil import KonfigFeil
-from wenche.models import LaanTilNaerstaaende, Noter
+from wenche.models import Noter
 
 from .svar import Fil, FilerSvar, SkatteberegningSvar
 
@@ -86,21 +87,9 @@ def _tekstfil(navn: str, tekst: str) -> FilerSvar:
 
 
 def bygg_noter(config: dict) -> Noter:
-    """Bygg Noter-objektet fra config-dict (samme form som skjemaet lagrer)."""
-    noter_cfg = config.get("noter") or {}
-    return Noter(
-        antall_ansatte=int(noter_cfg.get("antall_ansatte", 0)),
-        laan_til_naerstaaende=[
-            LaanTilNaerstaaende(
-                motpart=laan.get("motpart", laan.get("mottaker", "")),
-                saldo=float(laan.get("saldo", laan.get("beloep", 0))),
-                retning=laan.get("retning", "långiver"),
-                rente_prosent=float(laan.get("rente_prosent", 0.0)),
-                sikkerhet=laan.get("sikkerhet", ""),
-            )
-            for laan in noter_cfg.get("laan_til_naerstaaende", [])
-        ],
-    )
+    """Noter-objektet fra config-dict (samme form som skjemaet lagrer). Samme leser som
+    årsregnskapet bruker, så noten og årsverk-feltet i XML-en kommer fra samme tall."""
+    return konfig.les_noter(config)
 
 
 # ---------------------------------------------------------------------------

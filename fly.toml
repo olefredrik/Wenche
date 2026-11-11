@@ -1,5 +1,6 @@
 # Fly.io-konfig for den HOSTEDE Wenche-tjenesten (operatørselskapets drift).
-# Deploy: `flyctl deploy` lokalt, eller automatisk via .github/workflows/deploy-hosted.yml.
+# Deploy: `flyctl deploy --remote-only --ha=false` lokalt, eller manuelt utløst via
+# .github/workflows/deploy-hosted.yml (workflow_dispatch; merge til main deployer ikke).
 # Hemmeligheter settes med `flyctl secrets set ...`, ALDRI her (denne fila er åpen kildekode).
 
 app = "wenche-hosted"          # bytt til ditt faktiske Fly-appnavn (settes av `flyctl launch`)

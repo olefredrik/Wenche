@@ -13,7 +13,7 @@ Bruk:
   wenche generer-skattemelding [--config config.yaml] [--ut skattemelding.txt]
   wenche valider-skattemelding [--config config.yaml]
   wenche send-skattemelding [--config config.yaml] [--dry-run] [--ut-mappe MAPPE]
-  wenche importer-saft SAF-T-FIL [--ut config.yaml]
+  wenche importer-saft SAF-T-FIL [--ut config.yaml] [--overskriv]
 
 Feil Wenche selv melder (WencheFeil fra wenche.feil) blir én lesbar melding på stderr og
 exit-kode 1; valideringsfeil listes opp. Fremdrift fra kjernen logges til stderr, så stdout er
@@ -229,7 +229,7 @@ def opprett_systembruker(org: str | None) -> None:
     click.echo("Henter Maskinporten admin-token...")
     token = auth.login_admin()
     click.echo(f"Oppretter systembrukerforespørsel for {org_nummer}...")
-    svar = systembruker.opprett_forespørsel(token, vendor_orgnr, org_nummer)
+    svar = systembruker.opprett_forespoersel(token, vendor_orgnr, org_nummer)
     click.echo(f"\nForespørsel opprettet (ID: {svar['id']})")
     click.echo(f"Status: {svar['status']}")
     click.echo(f"\nGodkjenn her:\n  {svar['confirmUrl']}")
@@ -537,7 +537,12 @@ def valider_skattemelding(config_fil: str) -> None:
     show_default=True,
     help="Sti til config.yaml-filen som skal skrives.",
 )
-def importer_saft(saft_fil: str, ut_fil: str) -> None:
+@click.option(
+    "--overskriv",
+    is_flag=True,
+    help="Erstatt en config-fil som alt finnes.",
+)
+def importer_saft(saft_fil: str, ut_fil: str, overskriv: bool) -> None:
     """
     Importer SAF-T Financial XML og generer config.yaml.
 
@@ -545,10 +550,16 @@ def importer_saft(saft_fil: str, ut_fil: str) -> None:
     (Fiken, Tripletex, Visma, Uni Micro, PowerOffice Go, etc.).
 
     Felter som ikke finnes i SAF-T (daglig_leder, styreleder, stiftelsesaar,
-    aksjonaerer) må fylles inn manuelt i config.yaml etterpå.
+    aksjonaerer) må fylles inn manuelt i config.yaml etterpå. En fil som alt finnes røres ikke
+    uten --overskriv, siden det er nettopp de manuelle feltene som ville gått tapt.
     """
     from wenche.saft import importer
 
+    ut = Path(ut_fil)
+    if ut.exists() and not overskriv:
+        raise KonfigFeil(
+            f"{ut_fil} finnes alt. Bruk --overskriv for å erstatte den, eller --ut for et annet filnavn."
+        )
     click.echo(f"Importerer SAF-T-fil: {saft_fil}")
     try:
         data = importer(saft_fil)
@@ -562,7 +573,7 @@ def importer_saft(saft_fil: str, ut_fil: str) -> None:
     saft_advarsler = data.pop("_advarsler", [])
 
     # 0600: configen får etter hvert fødselsnummer, samme regel som webgrensesnittet bruker.
-    skriv_privat(Path(ut_fil), yaml.dump(data, allow_unicode=True, sort_keys=False))
+    skriv_privat(ut, yaml.dump(data, allow_unicode=True, sort_keys=False))
     click.echo(f"config.yaml skrevet til {ut_fil}")
 
     for advarsel in saft_advarsler:

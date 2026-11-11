@@ -13,6 +13,10 @@ Altinn-kallene (wenche.systembruker) mockes, så testen treffer ikke nett eller 
 """
 
 import importlib
+import os
+import subprocess
+import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -180,7 +184,7 @@ def test_request_bruker_token_org_ikke_body(klient, monkeypatch):
         fanget["org"] = org
         return {"id": "req-1", "status": "New", "confirmUrl": "https://altinn/confirm"}
 
-    monkeypatch.setattr(sb.wsb, "opprett_forespørsel", fake_opprett)
+    monkeypatch.setattr(sb.wsb, "opprett_forespoersel", fake_opprett)
 
     klient.post("/api/auth/invite", json={"token": lag_invite_token("314273818")})
     # Angriper forsøker å overstyre org via body:
@@ -344,3 +348,35 @@ def test_sikkerhetsheadere_settes_paa_alle_svar(klient):
     assert r.headers.get("referrer-policy") == "strict-origin-when-cross-origin"
     # HSTS settes kun i prod; klient-fixturen kjører med WENCHE_ENV=test.
     assert "strict-transport-security" not in r.headers
+
+
+def _kjoer_mint_invite(env: dict[str, str], org: str = "314273818") -> subprocess.CompletedProcess:
+    rot = Path(__file__).resolve().parent.parent
+    return subprocess.run(  # noqa: S603 (python + fast sti i repoet, ingen brukerinput)
+        [sys.executable, str(rot / "hosted" / "mint_invite.py"), org],
+        capture_output=True,
+        text=True,
+        env={k: v for k, v in {**os.environ, **env}.items() if k != "PYTHONPATH"},
+        cwd=rot,
+        check=False,
+    )
+
+
+def test_mint_invite_krever_secret_og_url_eksplisitt():
+    """Uten variablene ville skriptet før signert med dev-secret og gitt en lenke prod avviser,
+    stille. Nå stopper det og sier hva som mangler."""
+    env = {k: "" for k in ("HOSTED_INVITE_SECRET", "HOSTED_PUBLIC_URL")}
+    resultat = _kjoer_mint_invite(env)
+    assert resultat.returncode != 0
+    assert "HOSTED_INVITE_SECRET" in resultat.stderr
+    assert "#invite=" not in resultat.stdout
+
+
+def test_mint_invite_signerer_som_appen():
+    """Skriptet og appen deler signeringen, så lenken det lager er den appen godtar."""
+    env = {"HOSTED_INVITE_SECRET": _INVITE_SECRET, "HOSTED_PUBLIC_URL": "https://wenche.example/"}
+    resultat = _kjoer_mint_invite(env)
+    assert resultat.returncode == 0, resultat.stderr
+    lenke = resultat.stdout.strip()
+    assert lenke.startswith("https://wenche.example/#invite=")
+    assert lenke.split("#invite=", 1)[1] == lag_invite_token("314273818", secret=_INVITE_SECRET)

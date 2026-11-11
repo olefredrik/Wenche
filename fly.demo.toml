@@ -2,7 +2,7 @@
 # Helt separat fra prod-appen (app.wenche.cloud / fly.toml): egne test-vendor-creds og
 # WENCHE_ENV=test, så en demo aldri kan røre ekte Altinn. Samme image/Dockerfile som prod.
 #
-# Deploy: `flyctl deploy -c fly.demo.toml`. Hemmeligheter settes med
+# Deploy: `flyctl deploy -c fly.demo.toml --remote-only --ha=false`. Hemmeligheter settes med
 # `flyctl secrets set -a wenche-demo ...`, ALDRI her (denne fila er åpen kildekode).
 
 app = "wenche-demo"
@@ -25,7 +25,7 @@ primary_region = "ams"         # Amsterdam, EØS (samme som prod). Flyttet fra "
   # Scale-to-zero for minimal kostnad: maskinen dvaler når ingen bruker den, og våkner
   # automatisk på første request. "suspend" fryser VM-en med RAM intakt (sub-sekund vekking
   # i stedet for ~2 s kaldstart); kostnad ~lik "stop". Kan sjelden falle tilbake til "stop",
-  # det er trygt. Kun én maskin (in-memory-sesjon må ikke spres mellom maskiner).
+  # det er trygt. Kun én maskin med vilje: lav kost, og rate-limiten lever i prosessminnet.
   auto_stop_machines = "suspend"
   auto_start_machines = true
   min_machines_running = 0

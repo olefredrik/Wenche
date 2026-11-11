@@ -234,97 +234,6 @@ class Balanse:
 
 
 @dataclass
-class Aarsregnskap:
-    selskap: Selskap
-    regnskapsaar: int
-    resultatregnskap: Resultatregnskap
-    balanse: Balanse
-    fastsettelsesdato: date | None = None  # Dato styret godkjente regnskapet; standard: i dag
-    signatar: str | None = None  # Navn på den som signerer; standard: daglig_leder
-    revideres: bool = False  # True hvis regnskapet er revidert
-    foregaaende_aar_resultat: Resultatregnskap = field(default_factory=Resultatregnskap)
-    foregaaende_aar_balanse: Balanse = field(default_factory=Balanse)
-    utbytte_utbetalt: float = 0.0  # Totalt utbytte utbetalt til aksjonærer i løpet av året
-    # Regnskapsperioden. Normalt hele kalenderåret (rskl. § 1-7 første ledd), og da kan begge
-    # stå tomme. Settes bare når perioden avviker, i praksis et kort første regnskapsår fra
-    # stiftelsesdatoen til 31.12. Forlenget første regnskapsår (§ 1-7 andre ledd) støttes
-    # ikke, se `aarsregnskap.valider_periode`.
-    regnskapsstart: date | None = None
-    regnskapsslutt: date | None = None
-    # Eierandelen (prosent) fra skattemelding.eierandel_for_fritaksmetoden, eller None når den
-    # ikke er oppgitt. Brukes bare av advarselen om hvilken linje utbyttet står på: ved 20 %
-    # eller mer er det et tilknyttet selskap, og da er linjen for datterselskap riktig selv om
-    # aksjene står under andre aksjer i balansen.
-    eierandel_for_utbytte: float | None = None
-
-    @property
-    def periode_start(self) -> date:
-        """Første dag i regnskapsperioden. 1. januar med mindre noe annet er oppgitt."""
-        return self.regnskapsstart or date(self.regnskapsaar, 1, 1)
-
-    @property
-    def periode_slutt(self) -> date:
-        """Siste dag i regnskapsperioden. 31. desember med mindre noe annet er oppgitt."""
-        return self.regnskapsslutt or date(self.regnskapsaar, 12, 31)
-
-    @property
-    def er_foerste_regnskapsaar(self) -> bool:
-        """
-        Om dette er selskapets første regnskapsår.
-
-        Faller stiftelsesdatoen innenfor perioden, teller det også. Det gjelder bare et
-        forlenget første regnskapsår, som `aarsregnskap.valider_periode` avviser. Uten dette
-        fikk brukeren i tillegg en misvisende advarsel om manglende fjorårstall.
-
-        To kallsteder er avhengige av samme svar: fjorårsadvarselen i `aarsregnskap.valider`
-        og stiftelsesinnskuddet i egenkapitalavstemmingen. Da de var to kopier rakk de å
-        drive fra hverandre, derfor bor definisjonen her.
-        """
-        stiftet = self.selskap.stiftelsesdato
-        stiftet_i_perioden = bool(stiftet and self.periode_start <= stiftet <= self.periode_slutt)
-        return self.selskap.stiftelsesaar >= self.regnskapsaar or stiftet_i_perioden
-
-
-# ---------------------------------------------------------------------------
-# Aksjonærregisteroppgave
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class Aksjonaer:
-    navn: str
-    fodselsnummer: str  # 11 siffer
-    antall_aksjer: int
-    aksjeklasse: str
-    utbytte_utbetalt: float  # NOK utbetalt i løpet av regnskapsåret
-    innbetalt_kapital_per_aksje: float
-
-
-@dataclass
-class Aksjonaerregisteroppgave:
-    selskap: Selskap
-    regnskapsaar: int
-    aksjonaerer: list[Aksjonaer]
-    # Generalforsamlingens vedtak om utbytte. Skatteetaten krever det som tidspunkt for
-    # utdelingen, likt i post 8 (selskapet) og post 21 (aksjonæren). Påkrevd bare når det
-    # er utbetalt utbytte. Wenche rapporterer én utdeling per år.
-    utbytte_vedtaksdato: date | None = None
-
-    @property
-    def totalt_antall_aksjer(self) -> int:
-        return sum(a.antall_aksjer for a in self.aksjonaerer)
-
-    @property
-    def totalt_utbytte_utbetalt(self) -> float:
-        return sum(a.utbytte_utbetalt for a in self.aksjonaerer)
-
-
-# ---------------------------------------------------------------------------
-# Obligatoriske noter (rskl. §§ 7-35, 7-43, 7-45, 7-46)
-# ---------------------------------------------------------------------------
-
-
-@dataclass
 class LaanTilNaerstaaende:
     motpart: str  # Navn på nærstående part (aksjonær, styremedlem e.l.)
     saldo: float  # Utestående saldo per 31.12 (NOK)
@@ -394,3 +303,97 @@ class SkattemeldingKonfig:
     # Valgfri, komplett kodefordeling for næringsspesifikasjonen. Når den er oppgitt,
     # valideres kategorisummene mot regnskapet før XML bygges.
     naeringsspesifikasjonsposter: tuple[NaeringsspesifikasjonPost, ...] = ()
+
+
+@dataclass
+class Aarsregnskap:
+    selskap: Selskap
+    regnskapsaar: int
+    resultatregnskap: Resultatregnskap
+    balanse: Balanse
+    fastsettelsesdato: date | None = None  # Dato styret godkjente regnskapet; standard: i dag
+    signatar: str | None = None  # Navn på den som signerer; standard: daglig_leder
+    revideres: bool = False  # True hvis regnskapet er revidert
+    foregaaende_aar_resultat: Resultatregnskap = field(default_factory=Resultatregnskap)
+    foregaaende_aar_balanse: Balanse = field(default_factory=Balanse)
+    utbytte_utbetalt: float = 0.0  # Totalt utbytte utbetalt til aksjonærer i løpet av året
+    # Regnskapsperioden. Normalt hele kalenderåret (rskl. § 1-7 første ledd), og da kan begge
+    # stå tomme. Settes bare når perioden avviker, i praksis et kort første regnskapsår fra
+    # stiftelsesdatoen til 31.12. Forlenget første regnskapsår (§ 1-7 andre ledd) støttes
+    # ikke, se `aarsregnskap.valider_periode`.
+    regnskapsstart: date | None = None
+    regnskapsslutt: date | None = None
+    # Eierandelen (prosent) fra skattemelding.eierandel_for_fritaksmetoden, eller None når den
+    # ikke er oppgitt. Brukes bare av advarselen om hvilken linje utbyttet står på: ved 20 %
+    # eller mer er det et tilknyttet selskap, og da er linjen for datterselskap riktig selv om
+    # aksjene står under andre aksjer i balansen.
+    eierandel_for_utbytte: float | None = None
+    # Notene (antall ansatte, lån til nærstående). Antall ansatte går også inn som årsverk i
+    # årsregnskapet til Brønnøysund, så feltet og noten ikke sier to forskjellige ting.
+    noter: Noter = field(default_factory=Noter)
+
+    @property
+    def periode_start(self) -> date:
+        """Første dag i regnskapsperioden. 1. januar med mindre noe annet er oppgitt."""
+        return self.regnskapsstart or date(self.regnskapsaar, 1, 1)
+
+    @property
+    def periode_slutt(self) -> date:
+        """Siste dag i regnskapsperioden. 31. desember med mindre noe annet er oppgitt."""
+        return self.regnskapsslutt or date(self.regnskapsaar, 12, 31)
+
+    @property
+    def er_foerste_regnskapsaar(self) -> bool:
+        """
+        Om dette er selskapets første regnskapsår.
+
+        Faller stiftelsesdatoen innenfor perioden, teller det også. Det gjelder bare et
+        forlenget første regnskapsår, som `aarsregnskap.valider_periode` avviser. Uten dette
+        fikk brukeren i tillegg en misvisende advarsel om manglende fjorårstall.
+
+        To kallsteder er avhengige av samme svar: fjorårsadvarselen i `aarsregnskap.valider`
+        og stiftelsesinnskuddet i egenkapitalavstemmingen. Da de var to kopier rakk de å
+        drive fra hverandre, derfor bor definisjonen her.
+        """
+        stiftet = self.selskap.stiftelsesdato
+        stiftet_i_perioden = bool(stiftet and self.periode_start <= stiftet <= self.periode_slutt)
+        return self.selskap.stiftelsesaar >= self.regnskapsaar or stiftet_i_perioden
+
+
+# ---------------------------------------------------------------------------
+# Aksjonærregisteroppgave
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class Aksjonaer:
+    navn: str
+    fodselsnummer: str  # 11 siffer
+    antall_aksjer: int
+    aksjeklasse: str
+    utbytte_utbetalt: float  # NOK utbetalt i løpet av regnskapsåret
+    innbetalt_kapital_per_aksje: float
+
+
+@dataclass
+class Aksjonaerregisteroppgave:
+    selskap: Selskap
+    regnskapsaar: int
+    aksjonaerer: list[Aksjonaer]
+    # Generalforsamlingens vedtak om utbytte. Skatteetaten krever det som tidspunkt for
+    # utdelingen, likt i post 8 (selskapet) og post 21 (aksjonæren). Påkrevd bare når det
+    # er utbetalt utbytte. Wenche rapporterer én utdeling per år.
+    utbytte_vedtaksdato: date | None = None
+
+    @property
+    def totalt_antall_aksjer(self) -> int:
+        return sum(a.antall_aksjer for a in self.aksjonaerer)
+
+    @property
+    def totalt_utbytte_utbetalt(self) -> float:
+        return sum(a.utbytte_utbetalt for a in self.aksjonaerer)
+
+
+# ---------------------------------------------------------------------------
+# Obligatoriske noter (rskl. §§ 7-35, 7-43, 7-45, 7-46)
+# ---------------------------------------------------------------------------
