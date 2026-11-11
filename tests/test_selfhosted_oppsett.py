@@ -12,9 +12,10 @@ import stat
 import pytest
 from fastapi.testclient import TestClient
 
+from wenche.feil import AuthFeil, KonfigFeil
 from wenche.web.backend import miljo
 from wenche.web.backend.app import lag_app
-from wenche.web.backend.ruter_oppsett import _tolk_feilmelding
+from wenche.web.backend.ruter_oppsett import _tolk_feil
 
 _PEM = "-----BEGIN PRIVATE KEY-----\nMIIEv...\n-----END PRIVATE KEY-----\n"
 
@@ -107,11 +108,8 @@ def test_lagre_nokkel_skriver_0600_og_peker_env(klient):
 def test_tilkobling_feil_gir_lesbar_melding(klient, monkeypatch):
     import wenche.auth as auth_mod
 
-    raa = (
-        "Maskinporten svarte 401:\n"
-        '{"error": "invalid_grant", "error_description": "Client authentication failed"}'
-    )
-    monkeypatch.setattr(auth_mod, "login", lambda **kw: (_ for _ in ()).throw(RuntimeError(raa)))
+    feil = AuthFeil(status=401, kode="invalid_grant", beskrivelse="Client authentication failed")
+    monkeypatch.setattr(auth_mod, "login", lambda **kw: (_ for _ in ()).throw(feil))
     data = klient.post("/api/oppsett/test-tilkobling").json()
     assert data["auth_ok"] is False
     assert "ikke registrert" in data["melding"]
@@ -243,18 +241,26 @@ def test_oppdater_systembruker_velger_riktig_rapportoer(klient, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_tolk_feilmelding_invalid_scope(monkeypatch):
+def test_tolk_feil_invalid_scope(monkeypatch):
     monkeypatch.setattr(miljo, "_AKTIV_ENV", "test")
-    raa = 'Maskinporten svarte 400:\n{"error": "invalid_scope", "error_description": "x"}'
-    melding = _tolk_feilmelding(raa)
+    melding = _tolk_feil(AuthFeil(status=400, kode="invalid_scope", beskrivelse="x"))
     assert "scopes" in melding
+    assert "sjolvbetjening.test.samarbeid.digdir.no" in melding
 
 
-def test_tolk_feilmelding_http_uten_json(monkeypatch):
+def test_tolk_feil_http_uten_json(monkeypatch):
     monkeypatch.setattr(miljo, "_AKTIV_ENV", "test")
-    melding = _tolk_feilmelding("Maskinporten svarte 503:\nService Unavailable")
+    melding = _tolk_feil(AuthFeil(status=503))
     assert "HTTP 503" in melding
 
 
-def test_tolk_feilmelding_ukjent_tekst_gir_foerste_linje():
-    assert _tolk_feilmelding("Noe annet gikk galt\ndetaljer") == "Noe annet gikk galt"
+def test_tolk_feil_konfigfeil_gir_foerste_linje():
+    assert (
+        _tolk_feil(KonfigFeil("ORG_NUMMER mangler.\nLegg til ORG_NUMMER i .env."))
+        == "ORG_NUMMER mangler."
+    )
+
+
+def test_tolk_feil_ukjent_unntak_navngir_typen():
+    melding = _tolk_feil(RuntimeError("Noe annet gikk galt"))
+    assert "Uventet feil" in melding and "Noe annet gikk galt" in melding

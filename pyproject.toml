@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "wenche"
-version = "1.10.3"
+version = "1.11.0"
 description = "Enkel innsending av årsregnskap, skattemelding og aksjonærregisteroppgave til Altinn for små selskaper uten ordinær drift"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -98,9 +98,6 @@ select = [
 ignore = [
     # Linjelengde håndteres av formatereren. Lange kommentarer og strenger får stå.
     "E501",
-    # `raise ... from e` i except-blokker: ryddes samlet når feilhierarkiet kommer (leveranse 3
-    # i kodegjennomgangen), ikke én og én.
-    "B904",
     # xml.etree brukes til å BYGGE XML og til å lese svar via defusedxml (saft.py,
     # skd_skattemelding_client.py, skattemelding_xml.py, fristsjekk.py), ikke til å parse
     # upålitelig XML med stdlib-parseren.

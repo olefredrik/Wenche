@@ -17,11 +17,22 @@ import logging
 from fastapi import APIRouter, HTTPException, Request
 
 from wenche import systembruker as wsb
+from wenche.feil import MyndighetsFeil, brukermelding
 
 from .deps import admin_token, krev_invite_org, krev_invitert, krev_vendor
 
 logger = logging.getLogger("wenche.hosted.systembruker")
 router = APIRouter(prefix="/api/systembruker", tags=["systembruker"])
+
+
+def _lesbar_502(e: MyndighetsFeil, org: str | None) -> HTTPException:
+    """Altinn/Maskinporten feilet under onboarding: logg steg og kode, svar lesbart i stedet for 500."""
+    logger.warning(
+        "Systembruker-kall feilet for org %s: %s (HTTP %s, kode %s)", org, e.steg, e.status, e.kode
+    )
+    if e.kropp:
+        logger.debug("Svarkropp: %s", e.kropp[:2000])
+    return HTTPException(status_code=502, detail=brukermelding(e))
 
 
 @router.post("/request")
@@ -44,23 +55,22 @@ def request_systembruker(request: Request) -> dict:
     krev_invitert(request)
     org = krev_invite_org(request)
     creds, vendor_orgnr = krev_vendor()
-    token = admin_token(creds)
-    eksisterende = wsb.hent_systembrukere(token, vendor_orgnr)
-    if any(b.get("reporteeOrgNo") == org for b in eksisterende):
-        request.session["kunde_org"] = org
-        request.session.pop("pending_org", None)
-        request.session.pop("request_id", None)
-        return {"status": "AlreadyApproved", "godkjent": True, "kunde_org": org}
-    # Ny kunde: sikre at systemet er registrert (idempotent), så opprett forespørselen.
-    wsb.registrer_system(token, vendor_orgnr, creds.client_id)
     try:
+        token = admin_token(creds)
+        eksisterende = wsb.hent_systembrukere(token, vendor_orgnr)
+        if any(b.get("reporteeOrgNo") == org for b in eksisterende):
+            request.session["kunde_org"] = org
+            request.session.pop("pending_org", None)
+            request.session.pop("request_id", None)
+            return {"status": "AlreadyApproved", "godkjent": True, "kunde_org": org}
+        # Ny kunde: sikre at systemet er registrert (idempotent), så opprett forespørselen.
+        wsb.registrer_system(token, vendor_orgnr, creds.client_id)
         svar = wsb.opprett_forespørsel(token, vendor_orgnr, org)
-    except RuntimeError as e:
+    except MyndighetsFeil as e:
         # AUTH-00004: Altinn har allerede en systembruker/forespørsel for dette org-et for
         # systemet vårt. Godkjente systembrukere fanges normalt av AlreadyApproved-sjekken over;
-        # havner vi likevel her finnes det typisk en påbegynt (ikke godkjent) forespørsel. Svar
-        # lesbart i stedet for en naken 500. Andre feil propagerer uendret.
-        if "AUTH-00004" in str(e):
+        # havner vi likevel her finnes det typisk en påbegynt (ikke godkjent) forespørsel.
+        if e.kode == "AUTH-00004":
             raise HTTPException(
                 status_code=409,
                 detail=(
@@ -68,7 +78,7 @@ def request_systembruker(request: Request) -> dict:
                     "selskapet. Last siden på nytt for å fortsette. Vedvarer det, ta kontakt."
                 ),
             ) from e
-        raise
+        raise _lesbar_502(e, org) from e
     request.session["request_id"] = svar.get("id")
     request.session["pending_org"] = org
     return {
@@ -86,8 +96,11 @@ def status_systembruker(request: Request) -> dict:
     request_id = request.session.get("request_id")
     if not request_id:
         raise HTTPException(status_code=400, detail="Ingen aktiv systembruker-forespørsel.")
-    token = admin_token(creds)
-    svar = wsb.hent_forespørsel_status(token, request_id)
+    try:
+        token = admin_token(creds)
+        svar = wsb.hent_forespørsel_status(token, request_id)
+    except MyndighetsFeil as e:
+        raise _lesbar_502(e, request.session.get("pending_org")) from e
     status = svar.get("status")
     godkjent = status == "Accepted"
     if godkjent and request.session.get("pending_org"):

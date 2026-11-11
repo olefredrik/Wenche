@@ -190,3 +190,40 @@ def test_runtimeerror_med_kropp_etter_linjeskift_stripper_kroppen():
     assert ei.value.status_code == 502
     assert "intern-kropp-hemmelig" not in str(ei.value.detail)
     assert "forhåndsutfylt skattemelding: 400" in str(ei.value.detail)
+
+
+# ---------------------------------------------------------------------------
+# Strukturerte feil fra klientene (wenche.feil)
+# ---------------------------------------------------------------------------
+
+
+def test_myndighetsfeil_fra_klient_blir_502_med_steg_uten_kropp():
+    from wenche.feil import MyndighetsFeil
+
+    req = httpx.Request("POST", "https://brg.apps.altinn.no/brg/x/instances")
+    svar = httpx.Response(500, text="intern-kropp-hemmelig", request=req)
+    feil = MyndighetsFeil.fra_svar("altinn", "oppretting av innsending i Altinn", svar)
+    with pytest.raises(HTTPException) as ei:
+        _utfor(_hev(feil))
+    assert ei.value.status_code == 502
+    detail = str(ei.value.detail)
+    assert "oppretting av innsending i Altinn" in detail and "500" in detail
+    assert "intern-kropp-hemmelig" not in detail
+
+
+def test_konfigfeil_blir_422_med_feilliste():
+    from wenche.feil import KonfigFeil
+
+    with pytest.raises(HTTPException) as ei:
+        _utfor(_hev(KonfigFeil("Stiftelsesår mangler")))
+    assert ei.value.status_code == 422
+    assert ei.value.detail == {"feil": ["Stiftelsesår mangler"]}
+
+
+def test_authfeil_fra_tokenhenting_blir_502():
+    from wenche.feil import AuthFeil
+
+    with pytest.raises(HTTPException) as ei:
+        _utfor(_hev(AuthFeil(status=400, kode="invalid_scope", beskrivelse="x")))
+    assert ei.value.status_code == 502
+    assert "invalid_scope" in str(ei.value.detail)

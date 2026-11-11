@@ -1,23 +1,23 @@
 """
 Oppsett-endepunkter for self-hosted Wenche: Maskinporten-credentials, privat nøkkel,
-tilkoblingstest og systembruker-onboarding (registrer system → opprett forespørsel →
-godkjenn i Altinn med BankID → sjekk status). Porten fra Oppsett-fanen i `wenche/ui.py`.
+tilkoblingstest og systembruker-onboarding (registrer system, opprett forespørsel,
+godkjenn i Altinn med BankID, sjekk status). Porten fra Oppsett-fanen i `wenche/ui.py`.
 
 Miljøet er låst per kjøring (WENCHE_ENV), så vi trenger ikke flippe env per kall slik
-NiceGUI gjorde — auth-flyten peker allerede mot riktig miljø.
+NiceGUI gjorde; auth-flyten peker allerede mot riktig miljø.
 """
 
 from __future__ import annotations
 
-import json
 import os
-import re
+from pathlib import Path
 
-import httpx
+from dotenv import set_key
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from wenche import auth, systembruker
+from wenche.feil import AuthFeil, KonfigFeil, MyndighetsFeil, WencheFeil, brukermelding
 from wenche.filer import skriv_privat
 
 from . import miljo
@@ -42,7 +42,7 @@ def _client_id() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Status (kun lokale filer/env — ingen nettverk)
+# Status (kun lokale filer/env, ingen nettverk)
 # ---------------------------------------------------------------------------
 
 
@@ -59,8 +59,6 @@ def status() -> dict:
         if not verdi
     ]
     nokkel_sti = miljo.privat_nokkel_sti()
-    from pathlib import Path
-
     nokkel_ok = Path(nokkel_sti).exists()
     return {
         "env": env,
@@ -93,8 +91,6 @@ class Credentials(BaseModel):
 @router.put("/credentials")
 def lagre_credentials(body: Credentials) -> dict:
     """Lagre Maskinporten client-id/kid + orgnr for aktivt miljø i ~/.wenche/.env."""
-    from dotenv import set_key
-
     miljo.sikre_bruker_env_fil()
     env_fil = str(miljo._BRUKER_ENV_FIL)
     suffix = miljo.aktiv_env().upper()
@@ -125,8 +121,6 @@ def lagre_nokkel(body: Nokkel) -> dict:
     """Lagre den private RSA-nøkkelen lokalt i ~/.wenche/ (chmod 600). Sendes aldri videre."""
     if "PRIVATE KEY" not in body.pem:
         raise HTTPException(status_code=422, detail="Filen ser ikke ut som en PEM privat nøkkel.")
-    from dotenv import set_key
-
     miljo.sikre_bruker_env_fil()
     skriv_privat(miljo._PRIVAT_NOKKEL_FIL, body.pem)
     abs_sti = str(miljo._PRIVAT_NOKKEL_FIL)
@@ -140,8 +134,8 @@ def lagre_nokkel(body: Nokkel) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def _tolk_feilmelding(raw: str) -> str:
-    """Oversett rå auth-feilmelding til brukervennlig norsk."""
+def _tolk_feil(e: BaseException) -> str:
+    """Oversett en feil fra innloggingen til en melding brukeren kan handle på, med miljøets portal."""
     env = miljo.aktiv_env()
     milj = "testmiljøet (tt02)" if env == "test" else "produksjonsmiljøet"
     portal = (
@@ -149,38 +143,41 @@ def _tolk_feilmelding(raw: str) -> str:
         if env == "test"
         else "sjolvbetjening.samarbeid.digdir.no"
     )
-    if "Maskinporten svarte" in raw:
-        m = re.search(r"\{.*\}", raw, re.DOTALL)
-        if m:
-            try:
-                p = json.loads(m.group(0))
-                kode = p.get("error", "")
-                beskr = p.get("error_description", "")
-                if kode == "invalid_grant" and "Client authentication" in beskr:
-                    return (
-                        f"Klient-ID-en din er ikke registrert i {milj} hos Maskinporten. "
-                        f"Sjekk at klienten er opprettet i riktig portal ({portal}) og at "
-                        f"klient-ID + nøkkel-ID matcher det som ligger der."
-                    )
-                if kode == "invalid_grant":
-                    return f"Maskinporten avviste innloggingen: {beskr or kode}."
-                if kode == "invalid_client":
-                    return f"Maskinporten kjenner ikke klient-ID-en i {milj}."
-                if kode == "invalid_scope":
-                    return (
-                        "Klienten mangler ett eller flere scopes du har prøvd å hente. "
-                        f"Legg dem til på klienten i {portal}."
-                    )
-                return f"Maskinporten-feil ({kode}): {beskr or 'ingen detaljer'}."
-            except (json.JSONDecodeError, AttributeError):
-                pass
-        m = re.search(r"svarte (\d+)", raw)
-        if m:
+    if isinstance(e, AuthFeil):
+        kode, beskr = e.kode or "", e.beskrivelse or ""
+        if kode == "invalid_grant" and "Client authentication" in beskr:
             return (
-                f"Maskinporten svarte med HTTP {m.group(1)} for {milj}. "
-                "Sjekk credentials og at klienten er registrert i riktig miljø."
+                f"Klient-ID-en din er ikke registrert i {milj} hos Maskinporten. "
+                f"Sjekk at klienten er opprettet i riktig portal ({portal}) og at "
+                f"klient-ID + nøkkel-ID matcher det som ligger der."
             )
-    return raw.split("\n")[0]
+        if kode == "invalid_grant":
+            return f"Maskinporten avviste innloggingen: {beskr or kode}."
+        if kode == "invalid_client":
+            return f"Maskinporten kjenner ikke klient-ID-en i {milj}."
+        if kode == "invalid_scope":
+            return (
+                "Klienten mangler ett eller flere scopes du har prøvd å hente. "
+                f"Legg dem til på klienten i {portal}."
+            )
+        if kode:
+            return f"Maskinporten-feil ({kode}): {beskr or 'ingen detaljer'}."
+        return (
+            f"Maskinporten svarte med HTTP {e.status} for {milj}. "
+            "Sjekk credentials og at klienten er registrert i riktig miljø."
+        )
+    if isinstance(e, MyndighetsFeil):
+        if e.status == 401:
+            return (
+                "Altinn avviste tokenet (HTTP 401). Vanligste årsak: "
+                "altinn:instances.* er ikke aktivert på klienten."
+            )
+        if e.status == 403:
+            return "Altinn avslo tilgangen (HTTP 403)."
+        return brukermelding(e)
+    if isinstance(e, KonfigFeil):
+        return str(e).split("\n", 1)[0]
+    return f"Uventet feil ({type(e).__name__}): {e}"
 
 
 @router.post("/test-tilkobling")
@@ -188,24 +185,10 @@ def test_tilkobling() -> dict:
     """Test Maskinporten + Altinn-veksling, og rapporter systembruker-status hvis auth gikk bra."""
     try:
         auth.login(lagre_token=False)
-    except RuntimeError as e:
-        return {"auth_ok": False, "melding": _tolk_feilmelding(str(e))}
-    except httpx.HTTPStatusError as e:
-        kode = e.response.status_code
-        if kode == 401:
-            melding = (
-                "Altinn avviste tokenet (HTTP 401). Vanligste årsak: "
-                "altinn:instances.* er ikke aktivert på klienten."
-            )
-        elif kode == 403:
-            melding = "Altinn avslo tilgangen (HTTP 403)."
-        else:
-            melding = f"Altinn svarte med HTTP {kode}."
-        return {"auth_ok": False, "melding": melding}
     except Exception as e:
-        return {"auth_ok": False, "melding": f"Uventet feil ({type(e).__name__}): {e}"}
+        return {"auth_ok": False, "melding": _tolk_feil(e)}
 
-    resultat = {"auth_ok": True, "melding": "Maskinporten og Altinn godtok credentials"}
+    resultat: dict = {"auth_ok": True, "melding": "Maskinporten og Altinn godtok credentials"}
     request_id = miljo.les_request_id()
     if not request_id:
         resultat["systembruker"] = {
@@ -241,7 +224,7 @@ def _tolk_systembruker_status(altinn_status: str) -> dict:
     if altinn_status == "Rejected":
         return {
             "status": "avvist",
-            "melding": "Forespørsel avvist — opprett ny",
+            "melding": "Forespørsel avvist, opprett ny",
             "altinn_status": altinn_status,
         }
     return {
@@ -256,14 +239,24 @@ def _tolk_systembruker_status(altinn_status: str) -> dict:
 # ---------------------------------------------------------------------------
 
 
+def _lesbar(e: WencheFeil) -> HTTPException:
+    """Feil fra Altinn/Maskinporten under onboarding blir en lesbar 502, ikke en naken 500."""
+    if isinstance(e, MyndighetsFeil):
+        return HTTPException(status_code=502, detail=_tolk_feil(e))
+    return HTTPException(status_code=502, detail=str(e).split("\n", 1)[0])
+
+
 @router.post("/registrer-system")
 def registrer_system() -> dict:
     """Registrer Wenche i Altinns systemregister (idempotent)."""
     vendor_orgnr = _vendor_orgnr()
     if not vendor_orgnr:
         raise HTTPException(status_code=409, detail="Organisasjonsnummer mangler i oppsettet.")
-    token = auth.login_admin()
-    svar = systembruker.registrer_system(token, vendor_orgnr, _client_id())
+    try:
+        token = auth.login_admin()
+        svar = systembruker.registrer_system(token, vendor_orgnr, _client_id())
+    except WencheFeil as e:
+        raise _lesbar(e) from e
     oppdatert = isinstance(svar, dict) and svar.get("oppdatert", False)
     return {"ok": True, "oppdatert": oppdatert}
 
@@ -274,9 +267,12 @@ def opprett_systembruker() -> dict:
     vendor_orgnr = _vendor_orgnr()
     if not vendor_orgnr:
         raise HTTPException(status_code=409, detail="Organisasjonsnummer mangler i oppsettet.")
-    token = auth.login_admin()
-    systembruker.registrer_system(token, vendor_orgnr, _client_id())
-    svar = systembruker.opprett_forespørsel(token, vendor_orgnr, _party_orgnr())
+    try:
+        token = auth.login_admin()
+        systembruker.registrer_system(token, vendor_orgnr, _client_id())
+        svar = systembruker.opprett_forespørsel(token, vendor_orgnr, _party_orgnr())
+    except WencheFeil as e:
+        raise _lesbar(e) from e
     request_id = svar.get("id", "")
     confirm_url = svar.get("confirmUrl", "")
     if request_id:
@@ -297,8 +293,11 @@ def systembruker_status() -> dict:
     request_id = miljo.les_request_id()
     if not request_id:
         return {"status": "ikke_opprettet", "melding": "Ingen forespørsel opprettet ennå"}
-    token = auth.login_admin()
-    svar = systembruker.hent_forespørsel_status(token, request_id)
+    try:
+        token = auth.login_admin()
+        svar = systembruker.hent_forespørsel_status(token, request_id)
+    except WencheFeil as e:
+        raise _lesbar(e) from e
     return _tolk_systembruker_status(svar.get("status", "ukjent"))
 
 
@@ -306,8 +305,11 @@ def systembruker_status() -> dict:
 def oppdater_systembruker() -> dict:
     """Be om oppdaterte rettigheter (skattemelding) på en eksisterende systembruker."""
     vendor_orgnr = _vendor_orgnr()
-    token = auth.login_admin()
-    brukere = systembruker.hent_systembrukere(token, vendor_orgnr)
+    try:
+        token = auth.login_admin()
+        brukere = systembruker.hent_systembrukere(token, vendor_orgnr)
+    except WencheFeil as e:
+        raise _lesbar(e) from e
     if not brukere:
         raise HTTPException(
             status_code=409,
@@ -315,8 +317,11 @@ def oppdater_systembruker() -> dict:
         )
     party = _party_orgnr()
     treff = next((b for b in brukere if b.get("reporteeOrgNo") == party), brukere[0])
-    svar = systembruker.opprett_endringsforespørsel(
-        token, treff["id"], [systembruker._SKATTEMELDING_RETT]
-    )
+    try:
+        svar = systembruker.opprett_endringsforespørsel(
+            token, treff["id"], [systembruker.SKATTEMELDING_RETT]
+        )
+    except WencheFeil as e:
+        raise _lesbar(e) from e
     confirm_url = svar.get("confirmUrl") or svar.get("ConfirmUrl", "")
     return {"ok": True, "confirm_url": confirm_url, "status": svar.get("status", "")}

@@ -2,12 +2,14 @@
 Innsending av årsregnskap til Brønnøysundregistrene via Altinn 3.
 """
 
+import logging
 from datetime import date
 
 import yaml
 
 from wenche.altinn_client import AltinnClient
 from wenche.brg_xml import generer_aksjenote_vedlegg, generer_hovedskjema, generer_underskjema
+from wenche.feil import ValideringsFeil
 from wenche.models import (
     Aarsregnskap,
     Anleggsmidler,
@@ -59,7 +61,7 @@ def _dato(verdi) -> date | None:
     try:
         return date.fromisoformat(tekst)
     except ValueError:
-        raise ValueError(f"«{verdi}» er ikke en gyldig dato. Bruk formatet ÅÅÅÅ-MM-DD.")
+        raise ValueError(f"«{verdi}» er ikke en gyldig dato. Bruk formatet ÅÅÅÅ-MM-DD.") from None
 
 
 def _les_resultat(r: dict) -> Resultatregnskap:
@@ -439,56 +441,56 @@ def advarsler(regnskap: Aarsregnskap) -> list[str]:
     return adv
 
 
-def send_inn(
-    regnskap: Aarsregnskap, klient: AltinnClient | None, dry_run: bool = False
-) -> str | None:
+log = logging.getLogger(__name__)
+
+
+def bygg_filer(regnskap: Aarsregnskap) -> dict[str, bytes]:
+    """
+    XML-dokumentene årsregnskapet består av, med filnavn: hovedskjema (RR-0002) og underskjema
+    (RR-0002U). Ren bygging, uten validering, nettverk eller disk; brukes av dry-run i CLI-en
+    og av dokument-nedlastingen i begge webgrensesnittene.
+    """
+    base = f"aarsregnskap_{regnskap.regnskapsaar}_{regnskap.selskap.org_nummer}"
+    return {
+        f"{base}_hovedskjema.xml": generer_hovedskjema(regnskap),
+        f"{base}_underskjema.xml": generer_underskjema(regnskap),
+    }
+
+
+def send_inn(regnskap: Aarsregnskap, klient: AltinnClient) -> str:
     """
     Sender inn årsregnskapet til Brønnøysundregistrene via Altinn.
 
     Flyten er:
-      1. Opprett instans → Altinn oppretter data-elementer automatisk
+      1. Opprett instans (Altinn oppretter data-elementer automatisk)
       2. PUT Hovedskjema (selskapsinfo, periode, prinsipper)
       3. PUT Underskjema (resultatregnskap og balanse)
-      4. process/next (uten action) → avanserer til Signering
+      4. process/next (uten action) avanserer til Signering
 
     Returnerer Altinn-lenken der brukeren må signere med BankID/ID-Porten.
-    Signering kan ikke gjøres maskinelt — dette er et juridisk krav.
+    Signering kan ikke gjøres maskinelt; det er et juridisk krav.
 
-    dry_run=True skriver XML-filene lokalt uten å sende til Altinn.
+    Kaster ValideringsFeil ved blokkerende feil, før noe sendes. Fremdrift og
+    ikke-blokkerende advarsler logges (CLI-en viser dem på stderr).
     """
     feil = valider(regnskap)
     if feil:
-        print("\nValidering mislyktes:")
-        for f in feil:
-            print(f"  - {f}")
-        raise SystemExit(1)
-
-    print("Validering OK.")
-
+        raise ValideringsFeil(feil)
+    log.info("Validering OK.")
     for a in advarsler(regnskap):
-        print(f"  ADVARSEL: {a}")
+        log.warning("ADVARSEL: %s", a)
 
     hovedskjema = generer_hovedskjema(regnskap)
     underskjema = generer_underskjema(regnskap)
     org = regnskap.selskap.org_nummer
     aar = regnskap.regnskapsaar
-    print(
-        f"XML generert: Hovedskjema {len(hovedskjema):,} bytes, Underskjema {len(underskjema):,} bytes."
+    log.info(
+        "XML generert: Hovedskjema %s bytes, Underskjema %s bytes.",
+        f"{len(hovedskjema):,}",
+        f"{len(underskjema):,}",
     )
 
-    if dry_run:
-        hoved_fil = f"aarsregnskap_{aar}_{org}_hovedskjema.xml"
-        under_fil = f"aarsregnskap_{aar}_{org}_underskjema.xml"
-        with open(hoved_fil, "wb") as fil:
-            fil.write(hovedskjema)
-        with open(under_fil, "wb") as fil:
-            fil.write(underskjema)
-        print(f"Dry-run: filer lagret til {hoved_fil} og {under_fil} — ingenting sendt til Altinn.")
-        return None
-
-    if klient is None:
-        raise ValueError("send_inn trenger en AltinnClient når dry_run er False.")
-    print("Sender årsregnskap til Brønnøysundregistrene via Altinn...")
+    log.info("Sender årsregnskap til Brønnøysundregistrene via Altinn...")
     instans = klient.opprett_instans("aarsregnskap", org)
 
     klient.oppdater_data_element(
@@ -498,7 +500,7 @@ def send_inn(
         data=hovedskjema,
         content_type="application/xml",
     )
-    print("Hovedskjema lastet opp.")
+    log.info("Hovedskjema lastet opp.")
 
     klient.oppdater_data_element(
         "aarsregnskap",
@@ -507,7 +509,7 @@ def send_inn(
         data=underskjema,
         content_type="application/xml",
     )
-    print("Underskjema lastet opp.")
+    log.info("Underskjema lastet opp.")
 
     if regnskap.balanse.eiendeler.anleggsmidler.andre_aksjer > 0:
         vedlegg = generer_aksjenote_vedlegg(regnskap)
@@ -518,12 +520,11 @@ def send_inn(
             content_type="application/pdf",
             filnavn=f"aksjenote_{aar}_{org}.pdf",
         )
-        print("Aksjenote (Vedlegg) lastet opp. Venter på virusskanning...")
+        log.info("Aksjenote (Vedlegg) lastet opp. Venter på virusskanning...")
         klient.vent_paa_filskanning("aarsregnskap", instans, vedlegg_element["id"])
-        print("Virusskanning fullført.")
+        log.info("Virusskanning fullført.")
 
     inbox_url = klient.fullfoor_instans("aarsregnskap", instans)
-
-    print("Årsregnskap lastet opp og klar for signering.")
-    print(f"Finn skjemaet i Altinn-innboksen og signer der: {inbox_url}")
+    log.info("Årsregnskap lastet opp og klar for signering.")
+    log.info("Finn skjemaet i Altinn-innboksen og signer der: %s", inbox_url)
     return inbox_url

@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 
 import hosted.api.systembruker as sb
 from hosted.api.auth import lag_invite_token
+from wenche.feil import MyndighetsFeil
 
 _INVITE_SECRET = "test-invite-secret"
 
@@ -122,9 +123,13 @@ def test_auth_00004_gir_lesbar_409_ikke_500(klient, monkeypatch):
     monkeypatch.setattr(sb.wsb, "registrer_system", lambda token, vendor, cid: {})
 
     def kast_auth_00004(token, vendor, party):
-        raise RuntimeError(
-            '400 Bad Request:\n{"detail":"Failed to create new SystemUser, existing '
-            'SystemUser tied to the given System-Id.","code":"AUTH-00004"}'
+        raise MyndighetsFeil(
+            "altinn",
+            "oppretting av systembruker-forespørsel i Altinn",
+            status=400,
+            kode="AUTH-00004",
+            kropp='{"detail":"Failed to create new SystemUser, existing SystemUser tied to '
+            'the given System-Id.","code":"AUTH-00004"}',
         )
 
     monkeypatch.setattr(sb.wsb, "opprett_forespørsel", kast_auth_00004)
@@ -135,8 +140,30 @@ def test_auth_00004_gir_lesbar_409_ikke_500(klient, monkeypatch):
     assert klient.get("/api/auth/me").json()["kunde_org"] is None
 
 
+def test_annen_myndighetsfeil_blir_lesbar_502(klient, monkeypatch):
+    """Andre Altinn-feil enn AUTH-00004 blir en lesbar 502 med steget, ikke en naken 500."""
+    _inviter(klient)
+    _stub_vendor(monkeypatch)
+    monkeypatch.setattr(sb.wsb, "hent_systembrukere", lambda token, vendor: [])
+    monkeypatch.setattr(sb.wsb, "registrer_system", lambda token, vendor, cid: {})
+
+    def kast_serverfeil(token, vendor, party):
+        raise MyndighetsFeil(
+            "altinn",
+            "oppretting av systembruker-forespørsel i Altinn",
+            status=500,
+            kropp="intern-altinn-stacktrace",
+        )
+
+    monkeypatch.setattr(sb.wsb, "opprett_forespørsel", kast_serverfeil)
+    r = klient.post("/api/systembruker/request")
+    assert r.status_code == 502
+    assert "500" in r.json()["detail"] and "systembruker" in r.json()["detail"]
+    assert "intern-altinn-stacktrace" not in r.json()["detail"]
+
+
 def test_annen_runtimeerror_propagerer_uendret(klient, monkeypatch):
-    """Andre feil enn AUTH-00004 skal ikke fanges av 409-grenen (uendret oppførsel)."""
+    """En ukjent feiltype (ikke MyndighetsFeil) fanges ikke; den skal synes som programfeil."""
     _inviter(klient)
     _stub_vendor(monkeypatch)
     monkeypatch.setattr(sb.wsb, "hent_systembrukere", lambda token, vendor: [])

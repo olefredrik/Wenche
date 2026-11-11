@@ -17,6 +17,12 @@ For testmiljø-bruk med CLI må test-credentials være satt i `~/.wenche/.env` m
 
 ---
 
+## Feil og avslutningskoder
+
+Kommandoene avslutter med kode 0 når alt gikk bra, og 1 ved feil. Blokkerende valideringsfeil listes under `Validering mislyktes:`. Andre feil Wenche selv oppdager (manglende config-fil eller felt, avvist innlogging, feil fra Altinn eller Skatteetaten) gis som én melding som begynner med `Feil:` og navngir steget som feilet, uten traceback. Advarsler og feilmeldinger skrives til stderr.
+
+---
+
 ## `wenche login`
 
 Autentiserer mot Maskinporten med RSA-nøkkel og lagrer Altinn-token lokalt.
@@ -59,13 +65,14 @@ wenche generer-skattemelding [--config FILSTI] [--ut FILSTI]
 Sender inn årsregnskap til Brønnøysundregistrene via Altinn.
 
 ```bash
-wenche send-aarsregnskap [--config FILSTI] [--dry-run]
+wenche send-aarsregnskap [--config FILSTI] [--dry-run] [--ut-mappe MAPPE]
 ```
 
 | Alternativ | Beskrivelse |
 |---|---|
 | `--config` | Sti til konfigurasjonsfil. Standard: `config.yaml` |
-| `--dry-run` | Genererer XML-dokumentene lokalt uten å sende til Altinn |
+| `--dry-run` | Validerer og genererer XML-dokumentene lokalt uten å sende til Altinn |
+| `--ut-mappe` | Mappe for filene `--dry-run` skriver. Standard: mappen du står i |
 
 ---
 
@@ -74,13 +81,14 @@ wenche send-aarsregnskap [--config FILSTI] [--dry-run]
 Sender inn aksjonærregisteroppgave (RF-1086) til Skatteetaten via Altinn.
 
 ```bash
-wenche send-aksjonaerregister [--config FILSTI] [--dry-run]
+wenche send-aksjonaerregister [--config FILSTI] [--dry-run] [--ut-mappe MAPPE]
 ```
 
 | Alternativ | Beskrivelse |
 |---|---|
 | `--config` | Sti til konfigurasjonsfil. Standard: `config.yaml` |
-| `--dry-run` | Genererer XML lokalt uten å sende til Altinn |
+| `--dry-run` | Validerer og genererer XML lokalt uten å sende til Altinn |
+| `--ut-mappe` | Mappe for filene `--dry-run` skriver. Standard: mappen du står i |
 
 ---
 
@@ -89,13 +97,14 @@ wenche send-aksjonaerregister [--config FILSTI] [--dry-run]
 Sender inn skattemelding for AS til Skatteetaten via Altinn3.
 
 ```bash
-wenche send-skattemelding [--config FILSTI] [--dry-run]
+wenche send-skattemelding [--config FILSTI] [--dry-run] [--ut-mappe MAPPE]
 ```
 
 | Alternativ | Beskrivelse |
 |---|---|
 | `--config` | Sti til konfigurasjonsfil. Standard: `config.yaml` |
 | `--dry-run` | Henter forhåndsutfylt og genererer XML lokalt (`skattemelding.xml` og `naeringsspesifikasjon.xml`) uten å validere eller sende |
+| `--ut-mappe` | Mappe for filene `--dry-run` skriver. Standard: mappen du står i |
 
 Validerer mot Skatteetaten som første steg og laster ikke opp noe hvis resultatet ikke er `validertOK`. Er skattemeldingen skjønnsfastsatt av Skatteetaten, blir innsendingen en klage på skjønnsfastsettingen. Wenche forklarer dette og spør om du vil sende som klage (`j/N`) før noe sendes. Etter opplasting skriver Wenche ut en lenke til Altinn-innboksen. Innsendingen fullføres først når en personlig bruker signerer med BankID i Altinn, det kan ikke gjøres maskinelt.
 

@@ -66,7 +66,7 @@ def _tall(verdi, etikett: str, konverter):
     try:
         return konverter(verdi)
     except (TypeError, ValueError):
-        raise ValueError(f"{etikett} må være et tall (fikk {verdi!r}).")
+        raise ValueError(f"{etikett} må være et tall (fikk {verdi!r}).") from None
 
 
 def _eierandel(verdi) -> float:
@@ -85,7 +85,7 @@ def _eierandel(verdi) -> float:
         else:
             tall = float(verdi)
     except (TypeError, ValueError):
-        raise ValueError(f"{etikett} må være et tall (fikk {verdi!r}).")
+        raise ValueError(f"{etikett} må være et tall (fikk {verdi!r}).") from None
     if not 0 <= tall <= 100:  # avviser også nan og inf
         raise ValueError(f"{etikett} må være mellom 0 og 100 % (fikk {verdi!r}).")
     return tall
@@ -224,7 +224,9 @@ def _les_naeringsspesifikasjonsposter(raw: dict) -> tuple[NaeringsspesifikasjonP
         try:
             beloep = float(beloep_raa)
         except (TypeError, ValueError):
-            raise ValueError(f"Næringsspesifikasjonspost {nummer} må ha et numerisk beløp.")
+            raise ValueError(
+                f"Næringsspesifikasjonspost {nummer} må ha et numerisk beløp."
+            ) from None
         if not math.isfinite(beloep):
             raise ValueError(f"Næringsspesifikasjonspost {nummer} har ugyldig beløp.")
         if kategori in BALANSEKATEGORIER and beloep < 0:

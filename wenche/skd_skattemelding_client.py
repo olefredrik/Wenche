@@ -2,8 +2,8 @@
 Skatteetaten API-klient for skattemelding (upersonlig/AS).
 
 Innsendingsflyt for AS via Maskinporten:
-  1. GET  /api/skattemelding/v2/{år}/{orgnr}          — hent forhåndsutfylt melding
-  2. POST /api/skattemelding/v2/valider/{år}/{orgnr}  — valider konvolutten (valgfritt)
+  1. GET  /api/skattemelding/v2/{år}/{orgnr}          hent forhåndsutfylt melding
+  2. POST /api/skattemelding/v2/valider/{år}/{orgnr}  valider konvolutten (valgfritt)
   3. POST Altinn3: opprett instans
   4. POST Altinn3: last opp konvolutt (text/xml, ingen anførselstegn i Content-Disposition)
   5. Returner Altinn-inbox-URL der brukeren bekrefter med BankID
@@ -22,6 +22,7 @@ from __future__ import annotations
 import base64
 import binascii
 import json
+import logging
 from xml.etree.ElementTree import ParseError
 
 import httpx
@@ -32,7 +33,12 @@ from defusedxml import DefusedXmlException
 from defusedxml.ElementTree import fromstring
 
 from wenche.altinn_client import AltinnClient
+from wenche.feil import MyndighetsFeil, WencheFeil
 from wenche.skattemelding_konvolutt import generer_konvolutt
+
+log = logging.getLogger(__name__)
+
+_TJENESTE = "skatteetaten"
 
 _BASES = {
     "test": "https://api-test.sits.no",
@@ -40,7 +46,7 @@ _BASES = {
 }
 
 
-class SkattemeldingValideringsfeil(RuntimeError):
+class SkattemeldingValideringsfeil(WencheFeil):
     """
     Skatteetatens valider-tjeneste avviste skattemeldingen (validertMedFeil).
 
@@ -70,7 +76,6 @@ class SkdSkattemeldingClient:
             raise ValueError(f"Ugyldig env: {env!r}. Bruk 'prod' eller 'test'.")
         self._base = _BASES[env]
         self._env = env
-        self._token = maskinporten_token
         self._http = httpx.Client(
             headers={
                 "Authorization": f"Bearer {maskinporten_token}",
@@ -79,41 +84,35 @@ class SkdSkattemeldingClient:
             timeout=60,
         )
 
-    def hent_forhåndsutfylt(self, inntektsaar: int, orgnr: str) -> bytes:
-        """
-        Henter forhåndsutfylt skattemelding fra Skatteetaten.
-
-        Returnerer rå XML-bytes (skattemeldingUpersonlig v5).
-        Inneholder partsnummer som trengs for innsending — bruk
-        skattemelding_xml.hent_partsnummer() for å hente det ut.
-
-        API-et returnerer en wrapper-XML med base64-kodet innhold i <content>.
-        Denne metoden dekoder automatisk hvis wrapper-format oppdages.
-        For å hente ID-en på forhåndsutfylt-dokumentet (kreves for
-        dokumentreferanseTilGjeldendeDokument i innsending), bruk
-        hent_forhåndsutfylt_med_id() i stedet.
-        """
-        xml, _ = self.hent_forhåndsutfylt_med_id(inntektsaar, orgnr)
-        return xml
+    def _kall(self, metode: str, url: str, steg: str, **kw) -> httpx.Response:
+        """Ett kall mot Skatteetaten. Nettverksfeil og feilstatus blir MyndighetsFeil med steget."""
+        try:
+            resp = self._http.request(metode, url, **kw)
+        except httpx.RequestError as e:
+            raise MyndighetsFeil.fra_nettverksfeil(_TJENESTE, steg, e) from e
+        if not resp.is_success:
+            raise MyndighetsFeil.fra_svar(_TJENESTE, steg, resp)
+        return resp
 
     def hent_forhåndsutfylt_med_id(self, inntektsaar: int, orgnr: str) -> tuple[bytes, str | None]:
         """
-        Henter forhåndsutfylt skattemelding og dens dokument-ID.
+        Henter forhåndsutfylt skattemelding (skattemeldingUpersonlig v5) og dens dokument-ID.
 
-        Returnerer (skattemelding_xml, dokument_id). Dokument-ID-en er
-        identifikatoren Skatteetaten genererer for forhåndsutfylt-dokumentet.
-        Inkluderes som dokumentreferanseTilGjeldendeDokument i konvolutten
-        ved innsending, slik at Skatteetaten kan koble innsendingen til
-        det opprinnelige dokumentet (visning-API-et bruker dette feltet).
+        Returnerer (skattemelding_xml, dokument_id). API-et returnerer en wrapper-XML med
+        base64-kodet innhold i <content>; innholdet dekodes automatisk når wrapper-formatet
+        gjenkjennes. Dokument-ID-en inkluderes som dokumentreferanseTilGjeldendeDokument i
+        konvolutten ved innsending, slik at Skatteetaten kan koble innsendingen til det
+        opprinnelige dokumentet. Partsnummeret hentes ut med skattemelding_xml.hent_partsnummer().
 
         dokument_id er None hvis responsen ikke følger forventet wrapper-format.
         """
         url = f"{self._base}/api/skattemelding/v2/{inntektsaar}/{orgnr}"
-        resp = self._http.get(url, headers={"Accept": "application/xml"})
-        if not resp.is_success:
-            raise RuntimeError(
-                f"Feil ved henting av forhåndsutfylt skattemelding: {resp.status_code}\n{resp.text}"
-            )
+        resp = self._kall(
+            "GET",
+            url,
+            "henting av forhåndsutfylt skattemelding",
+            headers={"Accept": "application/xml"},
+        )
         raw = resp.content
 
         try:
@@ -124,7 +123,7 @@ class SkdSkattemeldingClient:
             )
             dok_el = root.find(f".//{{{ns}}}skattemeldingdokument")
             if dok_el is None:
-                # Fallback: tolerér ukjent eller endret namespace
+                # Fallback: tolerer ukjent eller endret namespace
                 dok_el = root.find(".//{*}skattemeldingdokument")
             if dok_el is not None:
                 content_el = dok_el.find(f"{{{ns}}}content")
@@ -141,12 +140,7 @@ class SkdSkattemeldingClient:
 
         return raw, None
 
-    def valider(
-        self,
-        inntektsaar: int,
-        orgnr: str,
-        konvolutt: bytes,
-    ) -> dict:
+    def valider(self, inntektsaar: int, orgnr: str, konvolutt: bytes) -> dict:
         """
         Validerer skattemelding-konvolutten mot Skatteetatens API.
 
@@ -159,19 +153,18 @@ class SkdSkattemeldingClient:
                 "veiledning": [ {veiledningstype, hjelpetekst, ...}, ... ],
             }
 
-        Validering lagrer ikke data hos Skatteetaten — det er ikke en innsending.
+        Validering lagrer ikke data hos Skatteetaten; det er ikke en innsending.
 
-        NB: endepunktet svarer kun med application/xml. Accept: application/json
-        gir HTTP 406.
+        NB: endepunktet svarer kun med application/xml. Accept: application/json gir HTTP 406.
         """
         url = f"{self._base}/api/skattemelding/v2/valider/{inntektsaar}/{orgnr}"
-        resp = self._http.post(
+        resp = self._kall(
+            "POST",
             url,
+            "validering av skattemeldingen",
             content=konvolutt,
             headers={"Content-Type": "application/xml", "Accept": "application/xml"},
         )
-        if not resp.is_success:
-            raise RuntimeError(f"Valideringsfeil: {resp.status_code}\n{resp.text}")
         return _parse_valideringsrespons(resp.content)
 
     def send(
@@ -230,17 +223,17 @@ class SkdSkattemeldingClient:
         )
 
         if valider_foerst:
-            print("Validerer mot Skatteetaten før innsending...")
+            log.info("Validerer mot Skatteetaten før innsending...")
             resultat = self.valider(inntektsaar, orgnr, konvolutt)
             if resultat.get("resultat") != "validertOK":
                 raise SkattemeldingValideringsfeil(resultat)
-            print("Validering OK. Laster opp...")
+            log.info("Validering OK. Laster opp...")
 
         with AltinnClient(altinn_token, env=self._env) as altinn:
-            print("Oppretter Altinn3-instans...")
+            log.info("Oppretter Altinn3-instans...")
             instans = altinn.opprett_instans("skattemelding", orgnr)
 
-            print("Setter inntektsaar i Skattemeldingsapp_v2-modellen...")
+            log.info("Setter inntektsaar i Skattemeldingsapp_v2-modellen...")
             altinn.oppdater_data_element(
                 "skattemelding",
                 instans,
@@ -249,23 +242,23 @@ class SkdSkattemeldingClient:
                 "application/json",
             )
 
-            print("Laster opp skattemelding-konvolutt...")
+            log.info("Laster opp skattemelding-konvolutt...")
             altinn.last_opp_skattemelding_data(instans, konvolutt)
 
             # Avanser ett prosesssteg slik at instansen havner i bekreftelses-
             # tasken og dukker opp som en oppgave i brukerens Altinn-innboks.
             # Selve bekreftelsen (siste prosesssteg) gjøres av brukeren via
-            # BankID i Altinn-UI — det kan ikke kjøres av systembrukeren
+            # BankID i Altinn-UI; det kan ikke kjøres av systembrukeren
             # (SSV-5129, 2026-05-20).
             return altinn.fullfoor_instans("skattemelding", instans)
 
-    def close(self):
+    def close(self) -> None:
         self._http.close()
 
-    def __enter__(self):
+    def __enter__(self) -> SkdSkattemeldingClient:
         return self
 
-    def __exit__(self, *args):
+    def __exit__(self, *args: object) -> None:
         self.close()
 
 
@@ -364,7 +357,7 @@ _KODE_FORKLARINGER = {
 }
 
 
-def _koder_i_resultat(res: dict):
+def _koder_i_resultat(res: dict) -> list[str]:
     """Samler alle koder (aarsak, avvikstype, veiledningstype) i rekkefølge, uten duplikater."""
     koder = []
     if res.get("aarsak"):
@@ -420,23 +413,3 @@ def formater_valideringsresultat(res: dict) -> str:
             linjer.append(f"  - {kode}:\n    {tekst}")
 
     return "\n".join(linjer)
-
-
-def bygg_og_valider_konvolutt(
-    skattemelding_xml: bytes,
-    inntektsaar: int,
-    orgnr: str,
-    naeringsspesifikasjon_xml: bytes | None = None,
-) -> bytes:
-    """
-    Hjelpefunksjon: bygger konvolutten uten å sende den.
-
-    Nyttig for lokal testing og for å inspisere XML-strukturen
-    før API-tilgang er på plass.
-    """
-    return generer_konvolutt(
-        skattemelding_xml=skattemelding_xml,
-        inntektsaar=inntektsaar,
-        orgnr=orgnr,
-        naeringsspesifikasjon_xml=naeringsspesifikasjon_xml,
-    )
