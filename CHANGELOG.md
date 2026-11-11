@@ -4,7 +4,18 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
-## [1.16.0] - 2026-11-12
+## [1.16.1] - 2026-11-11
+
+### Endret
+
+- **De tre lengste XML- og rapportfunksjonene er delt opp.** Underskjemaet til Brønnøysund,
+  næringsspesifikasjonen og tekstrapporten for skattemeldingen bygges nå av én funksjon per
+  seksjon, med felles hjelpere for linjer og forekomstgrupper. Innsendingene er uendret:
+  XML-en og rapporten er identiske med 1.16.0 for alle eksempel- og testconfiger.
+- Tankestreken er tatt ut av overskriften i skattemeldingsrapporten og av titlene i
+  notevedlegget til årsregnskapet.
+
+## [1.16.0] - 2026-11-11
 
 ### Lagt til
 
