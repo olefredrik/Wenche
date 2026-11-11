@@ -6,6 +6,10 @@
 // kommer. Én navngitt type i stedet for `any` overalt, så bruken er lett å finne igjen.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Config = Record<string, any>;
+// Den nøyaktige formen på config.yaml, generert fra Python-modellen (config.generert.ts).
+// Skjemaet holder delvis utfylte verdier (tomme strenger i tallfelt), derfor er `Config`
+// fortsatt løs; `WencheConfig` er for det som skal være komplett, som eksempeldataene.
+export type { WencheConfig } from "./config.generert";
 
 // Dry-run: lokal validering uten nettverk.
 export interface ValideringSvar {

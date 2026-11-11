@@ -87,3 +87,10 @@ Docker-imaget installerer fra låsen `hosted/requirements.txt`; regenerer den me
 toppen av fila når avhengighetene i `pyproject.toml` endres.
 
 Dokumentasjon bygges med mkdocs (`mkdocs.yml`, `docs/`).
+
+**Config-skjemaet har én kilde:** dataklassene i `wenche/models.py` (`Konfig` + `Dok`-annotasjonene).
+`wenche/skjema.py` lager JSON Schema (`wenche skjema`), TypeScript-typen
+(`packages/ui/src/config.generert.ts`) og referansetabellene i `docs/referanse.md` fra den, og
+`configfelt` varsler om ukjente felt fra samme tre. Endrer du et config-felt: legg `Dok` på det i
+modellen og kjør `./.venv/bin/python scripts/generer_skjema.py`; `tests/test_skjema.py` feiler til de
+genererte filene er à jour.

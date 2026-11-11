@@ -1,7 +1,9 @@
 // Eksempeldata for testmiljøet: demo-selskapet i tt02 (Tenor-org med systembruker for demoen).
 // Vises bare når appen kjører mot test (knappen «Fyll inn eksempeldata»).
+import type { WencheConfig } from "./config.generert";
 import type { Config } from "./typer";
 
+// `satisfies`: typesjekkes mot den genererte formen, men beholder typen Config som skjemaet bruker.
 export const EKSEMPEL: Config = {
   selskap: {
     navn: "FORSIKTIG MINKENDE TIGER AS",
@@ -92,4 +94,4 @@ export const EKSEMPEL: Config = {
       innbetalt_kapital_per_aksje: 1000,
     },
   ],
-};
+} satisfies WencheConfig;
