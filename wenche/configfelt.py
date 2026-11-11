@@ -5,61 +5,37 @@ Leserne henter bare feltene de kjenner og ignorerer resten uten varsel. Et belø
 Wenche ikke kjenner, forsvinner derfor fra innsendingen mens valideringen sier OK. Typisk
 er configen laget for en nyere Wenche-versjon, eller feltnavnet er feilstavet (#191).
 
-De gyldige nøklene utledes fra dataklassene i models.py, der config-nøklene og feltnavnene
-er like, så listen ikke kan drifte fra modellen. Toppnivået kontrolleres ikke: der ligger
-seksjoner uten egen dataklasse (noter, naeringsspesifikasjon, utbytte_vedtaksdato).
+De gyldige nøklene kommer fra `Konfig` i models.py via wenche.skjema, samme kilde som JSON
+Schema og referansen, så listen kan ikke drifte fra modellen. Hele fila kontrolleres, også
+toppnivået.
 
-Modulen har bare modeller som avhengighet, så den kan importeres fra alle kallsteder.
+Modulen har bare modeller og skjemaet som avhengighet, så den kan importeres fra alle kallsteder.
 """
-
-from dataclasses import fields, is_dataclass
-from typing import get_type_hints
 
 import yaml
 
-from wenche.models import (
-    Aksjonaer,
-    Balanse,
-    Resultatregnskap,
-    Selskap,
-    SkattemeldingKonfig,
-)
+from wenche import skjema
 
-
-def _nokler(klasse) -> dict:
-    """Gyldige nøkler for en dataklasse. Et nestet felt gir et undertre, et blad gir None."""
-    typer = get_type_hints(klasse)
-    return {
-        f.name: _nokler(typer[f.name]) if is_dataclass(typer[f.name]) else None
-        for f in fields(klasse)
-    }
-
-
-_SKATTEMELDING = _nokler(SkattemeldingKonfig)
-# Postene leses fra toppnivået (naeringsspesifikasjon.poster), ikke fra skattemelding-seksjonen.
-del _SKATTEMELDING["naeringsspesifikasjonsposter"]
-
-_KJENTE = {
-    "selskap": _nokler(Selskap),
-    "resultatregnskap": _nokler(Resultatregnskap),
-    "balanse": _nokler(Balanse),
-    "foregaaende_aar": {
-        "resultatregnskap": _nokler(Resultatregnskap),
-        "balanse": _nokler(Balanse),
-    },
-    "skattemelding": _SKATTEMELDING,
-}
-_AKSJONAER = _nokler(Aksjonaer)
+# Nøkkeltreet for hele config.yaml, fra samme modell som JSON Schema og referansen. Toppnivået
+# kontrolleres også; nøkler som begynner med «_» er metadata (som _advarsler fra SAF-T-importen)
+# og ikke config-felt.
+_KJENTE = skjema.nokkeltre()
 
 
 def _ukjente(verdi: dict, kjente: dict, sti: str) -> list[str]:
     ukjente = []
     for nokkel, under in verdi.items():
-        full = f"{sti}.{nokkel}"
+        full = f"{sti}.{nokkel}" if sti else str(nokkel)
+        if not sti and str(nokkel).startswith("_"):
+            continue
         if nokkel not in kjente:
             ukjente.append(full)
         elif isinstance(kjente[nokkel], dict) and isinstance(under, dict):
             ukjente.extend(_ukjente(under, kjente[nokkel], full))
+        elif isinstance(kjente[nokkel], list) and kjente[nokkel] and isinstance(under, list):
+            for i, element in enumerate(under):
+                if isinstance(element, dict):
+                    ukjente.extend(_ukjente(element, kjente[nokkel][0], f"{full}[{i}]"))
     return ukjente
 
 
@@ -71,14 +47,7 @@ def ukjente_felt(config: str | dict) -> list[str]:
         with open(config, encoding="utf-8") as f:
             raw = yaml.safe_load(f) or {}
 
-    ukjente = []
-    for seksjon, kjente in _KJENTE.items():
-        if isinstance(raw.get(seksjon), dict):
-            ukjente.extend(_ukjente(raw[seksjon], kjente, seksjon))
-    for i, aksjonaer in enumerate(raw.get("aksjonaerer") or []):
-        if isinstance(aksjonaer, dict):
-            ukjente.extend(_ukjente(aksjonaer, _AKSJONAER, f"aksjonaerer[{i}]"))
-    return ukjente
+    return _ukjente(raw, _KJENTE, "") if isinstance(raw, dict) else []
 
 
 def advarsel_om_ukjente_felt(config: str | dict) -> list[str]:

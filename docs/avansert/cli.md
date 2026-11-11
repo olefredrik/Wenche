@@ -191,3 +191,17 @@ Følgende felt fylles inn automatisk så langt det lar seg gjøre fra SAF-T, men
 
 !!! tip "I webgrensesnittet"
     Denne kommandoen er for skripting og avansert bruk. I `wenche`-webgrensesnittet (fanen **Tall**) finner du **Importer fra SAF-T**, som gjør det samme uten kommandolinjen, og i tillegg lar deg laste opp en egen SAF-T for fjoråret for å fylle inn sammenligningstallene.
+
+## `wenche skjema`
+
+Skriver ut et [JSON Schema](https://json-schema.org/) for `config.yaml`, generert fra Wenches datamodell. Skjemaet avviser felt Wenche ikke kjenner, så det fanger feilstavinger før innsendingen, og det gir fullføring og feilmerking i editorer som forstår JSON Schema for YAML.
+
+```bash
+wenche skjema [--ut FIL]
+```
+
+| Alternativ | Beskrivelse |
+|---|---|
+| `--ut` | Skriv skjemaet til fil i stedet for til skjermen |
+
+Se [Referanse](../referanse.md#json-schema) for hvordan du kobler skjemaet til `config.yaml` i editoren.

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "wenche"
-version = "1.15.0"
+version = "1.16.0"
 description = "Enkel innsending av årsregnskap, skattemelding og aksjonærregisteroppgave til Altinn for små selskaper uten ordinær drift"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -47,6 +47,8 @@ dev = [
     "types-PyYAML>=6.0",
     "pip-audit>=2.7",
     "mkdocs-material>=9.5",
+    # Validerer config.example.yaml og testconfiger mot JSON Schema-et `wenche skjema` lager.
+    "jsonschema>=4.23",
 ]
 # Den hostede tjenesten (hosted/): signerte sesjonscookies. Resten (FastAPI, uvicorn) er alt
 # kjerneavhengigheter fordi `wenche` starter det lokale webgrensesnittet.

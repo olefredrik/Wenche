@@ -14,12 +14,14 @@ Bruk:
   wenche valider-skattemelding [--config config.yaml]
   wenche send-skattemelding [--config config.yaml] [--dry-run] [--ut-mappe MAPPE]
   wenche importer-saft SAF-T-FIL [--ut config.yaml] [--overskriv]
+  wenche skjema [--ut FIL]
 
 Feil Wenche selv melder (WencheFeil fra wenche.feil) blir én lesbar melding på stderr og
 exit-kode 1; valideringsfeil listes opp. Fremdrift fra kjernen logges til stderr, så stdout er
 ren (generer-skattemelding skriver sammendraget dit).
 """
 
+import json
 import logging
 import os
 import re
@@ -38,6 +40,7 @@ from wenche import (
     configfelt,
     miljoer,
     skattemelding,
+    skjema,
     systembruker,
 )
 from wenche import innsending as tjeneste
@@ -586,3 +589,30 @@ def importer_saft(saft_fil: str, ut_fil: str, overskriv: bool) -> None:
         "  - aksjonaerer (navn, fødselsnummer, antall aksjer, utbytte)\n"
         "  - foregaaende_aar.resultatregnskap (er ikke tilgjengelig i SAF-T)"
     )
+
+
+# ---------------------------------------------------------------------------
+# Skjema
+# ---------------------------------------------------------------------------
+
+
+@main.command("skjema")
+@click.option(
+    "--ut",
+    "ut_fil",
+    default=None,
+    help="Skriv skjemaet til fil i stedet for til skjermen.",
+)
+def skjema_kommando(ut_fil: str | None) -> None:
+    """
+    Skriv ut JSON Schema for config.yaml.
+
+    Skjemaet er generert fra Wenches datamodell og avviser felt Wenche ikke kjenner. Bruk det
+    til å validere en config maskinelt, eller gi editoren fullføring og feilmerking.
+    """
+    tekst = json.dumps(skjema.json_schema(), indent=2, ensure_ascii=False) + "\n"
+    if ut_fil:
+        Path(ut_fil).write_text(tekst, encoding="utf-8")
+        click.echo(f"Skjema skrevet til {ut_fil}")
+    else:
+        click.echo(tekst, nl=False)

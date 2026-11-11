@@ -4,6 +4,17 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.16.0] - 2026-11-12
+
+### Lagt til
+
+- **Ett skjema for `config.yaml`.** Datamodellen i Wenche er nå den ene kilden til feltnavn,
+  typer, standardverdier og beskrivelser: `wenche skjema` skriver ut et JSON Schema generert
+  fra den, referansetabellene i dokumentasjonen og TypeScript-typen i webgrensesnittene er
+  generert fra samme modell, og varselet om ukjente felt dekker nå hele fila, også toppnivået.
+  Skjemaet avviser felt Wenche ikke kjenner, og kan kobles til editoren for fullføring og
+  feilmerking (se referansen). Verktøy som lager `config.yaml`, som Bodil, kan validere mot det.
+
 ## [1.15.0] - 2026-11-11
 
 ### Endret
@@ -13,7 +24,7 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
   årsverk settes lik `noter.antall_ansatte`, og dry-run advarer når tallet er over 0 (lønn,
   arbeidsgiveravgift, a-melding og pensjon er utenfor det Wenche sender inn). For selskaper
   uten ansatte er XML-en uendret.
-- **Opprydding etter kodegjennomgangen** (leveranse 7 av 8). Valgene som følger av
+- **Opprydding.** Valgene som følger av
   Wenches scope (aksjeselskap, små foretak, ingen regnskapsfører, null årsverk) står nå som
   navngitte `SCOPE_*`-konstanter øverst i `wenche/brg_xml.py` i stedet for spredt i XML-malen.
   XML-en som sendes inn er uendret.
