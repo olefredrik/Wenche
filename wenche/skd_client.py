@@ -13,44 +13,30 @@ Prod-URL (api.skatteetaten.no) er verifisert med vellykket innsending 2026-05-04
 """
 
 import uuid
+from typing import Any
 
 import httpx
 
 from wenche.feil import MyndighetsFeil
-
-_TJENESTE = "skatteetaten"
-
-_BASES = {
-    "test": "https://api-test.sits.no/api/aksjonaerregister/v1",
-    "prod": "https://api.skatteetaten.no/api/aksjonaerregister/v1",
-}
+from wenche.klient import HttpKlient
 
 
-class SkdAksjonaerClient:
-    def __init__(self, maskinporten_token: str, env: str = "prod"):
-        if env not in _BASES:
-            raise ValueError(f"Ugyldig env: {env!r}. Bruk 'prod' eller 'test'.")
-        self._base = _BASES[env]
-        self._http = httpx.Client(
-            headers={"Authorization": f"Bearer {maskinporten_token}", "Accept": "application/json"},
-            timeout=30,
-        )
+class SkdAksjonaerClient(HttpKlient):
+    tjeneste = "skatteetaten"
 
-    def _kall(self, url: str, steg: str, **kw) -> httpx.Response:
+    def __init__(self, maskinporten_token: str, env: str | None = None):
+        super().__init__(maskinporten_token, env=env, timeout=30)
+        self._base = self.miljo.skd_aksjonaer_api
+
+    def _post(self, url: str, steg: str, **kw: Any) -> httpx.Response:
         """Ett POST-kall. Hvert kall får sin egen idempotencyKey, som SKDs API krever."""
         headers = {"idempotencyKey": str(uuid.uuid4()), **kw.pop("headers", {})}
-        try:
-            resp = self._http.post(url, headers=headers, **kw)
-        except httpx.RequestError as e:
-            raise MyndighetsFeil.fra_nettverksfeil(_TJENESTE, steg, e) from e
-        if not resp.is_success:
-            raise MyndighetsFeil.fra_svar(_TJENESTE, steg, resp)
-        return resp
+        return self._kall("POST", url, steg, headers=headers, **kw)
 
     def send_hovedskjema(self, regnskapsaar: int, xml: bytes) -> str:
         """Sender Hovedskjema (RF-1086) til SKD. Returnerer hovedskjemaId (UUID) for neste kall."""
         steg = "innsending av hovedskjemaet (RF-1086)"
-        resp = self._kall(
+        resp = self._post(
             f"{self._base}/{regnskapsaar}/1086H",
             steg,
             content=xml,
@@ -59,13 +45,13 @@ class SkdAksjonaerClient:
         data = resp.json()
         if "hovedskjemaId" not in data:
             raise MyndighetsFeil.fra_svar(
-                _TJENESTE, steg, resp, beskrivelse="Uventet svar: mangler 'hovedskjemaId'."
+                self.tjeneste, steg, resp, beskrivelse="Uventet svar: mangler 'hovedskjemaId'."
             )
         return data["hovedskjemaId"]
 
     def send_underskjema(self, regnskapsaar: int, hovedskjemaId: str, xml: bytes) -> None:
         """Sender Underskjema (RF-1086-U) for én aksjonær."""
-        self._kall(
+        self._post(
             f"{self._base}/{regnskapsaar}/{hovedskjemaId}/1086U",
             "innsending av underskjemaet (RF-1086-U)",
             content=xml,
@@ -74,17 +60,8 @@ class SkdAksjonaerClient:
 
     def bekreft(self, regnskapsaar: int, hovedskjemaId: str, antall_underskjema: int) -> dict:
         """Bekrefter at alle underskjema er innsendt. Returnerer forsendelse-ID og dialog-ID."""
-        return self._kall(
+        return self._post(
             f"{self._base}/{regnskapsaar}/{hovedskjemaId}/bekreft",
             "bekreftelse av aksjonærregisteroppgaven",
             params={"antall_underskjema": antall_underskjema},
         ).json()
-
-    def close(self) -> None:
-        self._http.close()
-
-    def __enter__(self) -> "SkdAksjonaerClient":
-        return self
-
-    def __exit__(self, *args: object) -> None:
-        self.close()
