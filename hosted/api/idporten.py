@@ -25,6 +25,7 @@ worker), så vi slipper å hardkode stier som kan endres.
 
 import base64
 import hashlib
+import json
 import logging
 import secrets
 import time
@@ -32,10 +33,12 @@ import uuid
 from urllib.parse import urlencode
 
 import httpx
-from authlib.jose import JsonWebKey, JsonWebToken, jwt
-from authlib.jose.errors import JoseError
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
+from joserfc import jwt
+from joserfc.errors import JoseError
+from joserfc.jwk import KeySet, RSAKey
+from joserfc.jwt import JWTClaimsRegistry
 from pydantic import BaseModel
 
 from .auth import _grant
@@ -72,11 +75,11 @@ def _scope() -> str:
 # hos ID-porten), så innloggingen ikke stopper til prosessen tilfeldigvis restarter.
 _JWKS_TTL = 24 * 3600
 _metadata_cache: dict[str, dict] = {}
-_jwks_cache: dict[str, tuple[object, float]] = {}
+_jwks_cache: dict[str, tuple[KeySet, float]] = {}
 
 # Bare RS256: ID-porten signerer id_token med RS256, og en låst liste gjør at en annen algoritme
 # i tokenets header aldri vurderes (f.eks. HMAC med den offentlige nøkkelen som hemmelighet).
-_JWT = JsonWebToken(["RS256"])
+_ALGORITMER = ["RS256"]
 
 
 def _issuer(env: str) -> str:
@@ -94,13 +97,13 @@ def _metadata(env: str) -> dict:
     return md
 
 
-def _jwks(env: str, *, tving_ny: bool = False):
+def _jwks(env: str, *, tving_ny: bool = False) -> KeySet:
     cachet = _jwks_cache.get(env)
     if cachet is not None and not tving_ny and time.time() - cachet[1] < _JWKS_TTL:
         return cachet[0]
     resp = httpx.get(_metadata(env)["jwks_uri"], timeout=10)
     resp.raise_for_status()
-    jwks = JsonWebKey.import_key_set(resp.json())
+    jwks = KeySet.import_key_set(resp.json())
     _jwks_cache[env] = (jwks, time.time())
     return jwks
 
@@ -122,8 +125,10 @@ def _client_assertion(audience: str) -> str:
         "jti": str(uuid.uuid4()),
     }
     header = {"alg": "RS256", "kid": s.idporten_kid}
-    token = jwt.encode(header, claims, s.idporten_key())
-    return token.decode() if isinstance(token, bytes) else token
+    nokkel = s.idporten_key()
+    if nokkel is None:
+        raise RuntimeError("ID-porten er ikke konfigurert: privatnøkkelen mangler")
+    return jwt.encode(header, claims, RSAKey.import_key(nokkel), algorithms=_ALGORITMER)
 
 
 def _navn_fra_claims(claims: dict) -> str:
@@ -411,21 +416,35 @@ def velg_org_altinn(body: VelgOrgBody, request: Request) -> dict:
     return {"ok": True, "invite_org": orgnr}
 
 
+def _kid(id_token: str) -> str | None:
+    """kid fra JWT-headeren, uverifisert. Brukes bare til å avgjøre om JWKS skal hentes på nytt."""
+    try:
+        segment = id_token.split(".")[0]
+        header = json.loads(base64.urlsafe_b64decode(segment + "=" * (-len(segment) % 4)))
+        return header.get("kid") if isinstance(header, dict) else None
+    except (ValueError, AttributeError, UnicodeDecodeError):
+        return None
+
+
 def _valider_id_token(id_token: str, md: dict, nonce: str | None) -> dict:
     """Valider signatur (JWKS), utsteder, mottaker, utløp og nonce. Kaster ved avvik."""
-    env = settings().env
-    claims_options = {
-        "iss": {"essential": True, "value": md["issuer"]},
-        "aud": {"essential": True, "value": settings().idporten_client_id},
-        "exp": {"essential": True},
-    }
-    try:
-        claims = _JWT.decode(id_token, _jwks(env), claims_options=claims_options)
-    except ValueError:
-        # Ukjent kid («Key not found»): ID-porten har trolig rotert nøkler siden JWKS ble cachet.
-        # Hent på nytt én gang; feiler det igjen, er tokenet faktisk ugyldig.
-        claims = _JWT.decode(id_token, _jwks(env, tving_ny=True), claims_options=claims_options)
-    claims.validate(now=int(time.time()), leeway=_LEEWAY)
+    s = settings()
+    if not s.idporten_client_id:
+        raise RuntimeError("ID-porten er ikke konfigurert: klient-ID mangler")
+    jwks = _jwks(s.env)
+    if _kid(id_token) not in {k.kid for k in jwks.keys}:
+        # Ukjent kid: ID-porten har trolig rotert nøkler siden JWKS ble cachet. Hent på nytt
+        # én gang; er nøkkelen fortsatt ukjent, feiler dekodingen under som for et ugyldig token.
+        jwks = _jwks(s.env, tving_ny=True)
+    token = jwt.decode(id_token, jwks, algorithms=_ALGORITMER)
+    JWTClaimsRegistry(
+        now=int(time.time()),
+        leeway=_LEEWAY,
+        iss={"essential": True, "value": md["issuer"]},
+        aud={"essential": True, "value": s.idporten_client_id},
+        exp={"essential": True},
+    ).validate(token.claims)
+    claims = token.claims
     if not nonce or claims.get("nonce") != nonce:
         raise ValueError("nonce-avvik i id_token")
     return claims
