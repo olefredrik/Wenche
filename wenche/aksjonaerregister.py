@@ -15,17 +15,11 @@ import logging
 import os
 from xml.sax.saxutils import escape
 
-import httpx
-import yaml
-
-from wenche.aarsregnskap import _dato, _tall
+from wenche import brreg, konfig
 from wenche.feil import ValideringsFeil
 from wenche.models import Aksjonaer, Aksjonaerregisteroppgave, Selskap
 from wenche.skd_client import SkdAksjonaerClient
-
-# Brønnøysundregistrenes åpne Enhetsregister-API.
-# Brukes for å verifisere stiftelsesår mot SKDs forventning (MAKS_025-klassen).
-_BRG_ENHET_URL = "https://data.brreg.no/enhetsregisteret/api/enheter"
+from wenche.xml_hjelp import desimaltall
 
 
 def _stiftelsestidspunkt(selskap: Selskap) -> str:
@@ -62,10 +56,7 @@ def _format_beloep(verdi: float) -> str:
     Skatteetaten godtar et positivt tall med inntil to desimaler og punktum som skilletegn,
     uten mellomrom eller tusenskille (SSV-6233): hele kroner som "10000", ellers "10000.50".
     """
-    rundet = round(float(verdi), 2)
-    if rundet.is_integer():
-        return str(int(rundet))
-    return f"{rundet:.2f}"
+    return desimaltall(verdi, 2)
 
 
 def _format_paalydende(verdi: float) -> str:
@@ -80,52 +71,12 @@ def _format_paalydende(verdi: float) -> str:
     → "0.1", 0,123456 → "0.123456"), slik at selskaper med fri pålydende
     (lovlig siden 2013) representeres kompakt i skjemaet.
     """
-    rundet = round(verdi, 6)
-    if rundet.is_integer():
-        return str(int(rundet))
-    return f"{rundet:.6f}".rstrip("0").rstrip(".")
+    return desimaltall(verdi, 6, kompakt=True)
 
 
 def les_config(config_fil: str | dict) -> Aksjonaerregisteroppgave:
-    """Leser config (filsti eller allerede parset dict) og returnerer en Aksjonaerregisteroppgave."""
-    if isinstance(config_fil, dict):
-        cfg = config_fil
-    else:
-        with open(config_fil, encoding="utf-8") as f:
-            cfg = yaml.safe_load(f)
-
-    s = cfg["selskap"]
-    selskap = Selskap(
-        navn=s["navn"],
-        org_nummer=s["org_nummer"],
-        daglig_leder=s["daglig_leder"],
-        styreleder=s["styreleder"],
-        forretningsadresse=s["forretningsadresse"],
-        stiftelsesaar=s["stiftelsesaar"],
-        aksjekapital=s["aksjekapital"],
-        kontakt_epost=s.get("kontakt_epost", ""),
-        stiftelsesdato=_dato(s.get("stiftelsesdato")),
-        tinginnskudd_ved_stiftelse=_tall(s.get("tinginnskudd_ved_stiftelse")),
-    )
-
-    aksjonaerer = [
-        Aksjonaer(
-            navn=a["navn"],
-            fodselsnummer=str(a["fodselsnummer"]),
-            antall_aksjer=a["antall_aksjer"],
-            aksjeklasse=a["aksjeklasse"],
-            utbytte_utbetalt=_tall(a.get("utbytte_utbetalt")),
-            innbetalt_kapital_per_aksje=a["innbetalt_kapital_per_aksje"],
-        )
-        for a in cfg["aksjonaerer"]
-    ]
-
-    return Aksjonaerregisteroppgave(
-        selskap=selskap,
-        regnskapsaar=cfg["regnskapsaar"],
-        aksjonaerer=aksjonaerer,
-        utbytte_vedtaksdato=_dato(cfg.get("utbytte_vedtaksdato")),
-    )
+    """Leser config (filsti eller alt parset dict) til en Aksjonaerregisteroppgave. Se wenche.konfig."""
+    return konfig.les_aksjonaerregisteroppgave(konfig.les_raa(config_fil))
 
 
 def generer_hovedskjema_xml(oppgave: Aksjonaerregisteroppgave, innsending_org: str = "") -> bytes:
@@ -469,34 +420,16 @@ def valider_mot_brg(oppgave: Aksjonaerregisteroppgave, *, timeout: float = 5.0) 
     Brukes kun mot reelle org.nr. — syntetiske Tenor-orger finnes ikke i BRG.
     """
     orgnr = oppgave.selskap.org_nummer
-    try:
-        resp = httpx.get(
-            f"{_BRG_ENHET_URL}/{orgnr}",
-            headers={"Accept": "application/json"},
-            timeout=timeout,
-        )
-    except httpx.HTTPError:
-        return []
-
-    if resp.status_code == 404:
+    status, data = brreg.hent_enhet_svar(orgnr, timeout=timeout)
+    if status == 404:
         return [
             f"Org.nr. {orgnr} ble ikke funnet i Brønnøysundregistrene. Sjekk at org.nr. er korrekt."
         ]
-    if not resp.is_success:
-        return []
+    if status is None or not 200 <= status < 300 or not data:
+        return []  # transient feil eller uventet svar skal ikke blokkere innsending
 
-    try:
-        data = resp.json()
-    except ValueError:
-        return []
-
-    stiftelsesdato = data.get("stiftelsesdato")
-    if not stiftelsesdato or len(stiftelsesdato) < 4:
-        return []
-
-    try:
-        brg_stiftelsesaar = int(stiftelsesdato[:4])
-    except ValueError:
+    brg_stiftelsesaar = brreg.parse_stiftelsesaar(data)
+    if not brg_stiftelsesaar:
         return []
 
     if brg_stiftelsesaar != oppgave.selskap.stiftelsesaar:

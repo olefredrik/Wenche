@@ -88,10 +88,18 @@ def test_les_config_tom_verdi_gir_lesbar_valueerror_ikke_rå_int():
         sm.les_config(_config(stiftelsesaar=""))
 
 
-def test_aarsregnskap_tåler_samme_tomme_verdi():
-    # Bekrefter divergensen som forklarer hvorfor bare skattemelding feilet for brukeren:
-    # årsregnskapet leser de samme feltene uten konvertering og krasjer ikke.
-    ar.les_config(_config(stiftelsesaar=""))  # skal ikke kaste
+def test_aarsregnskap_gir_samme_lesbare_feil():
+    # Leserne er samlet i wenche.konfig: årsregnskapet gir nå samme forklarende melding som
+    # skattemeldingen. Før leste det feltet uten konvertering og krasjet først senere
+    # (TypeError i er_foerste_regnskapsaar) som en naken 500.
+    with pytest.raises(ValueError, match="Stiftelsesår"):
+        ar.les_config(_config(stiftelsesaar=""))
+    # Dry-run-svaret bærer feilen som et rettbart punkt, slik bekreft-modalen viser den.
+    from wenche.innsending import valider_aarsregnskap
+
+    svar = valider_aarsregnskap(_config(stiftelsesaar=""))
+    assert svar["ok"] is False
+    assert any("Stiftelsesår" in f for f in svar["feil"])
 
 
 def test_valider_skattemelding_returnerer_feil_liste():

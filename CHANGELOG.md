@@ -4,6 +4,28 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.13.0] - 2026-11-11
+
+### Endret
+
+- **Én config-leser for alle tre innsendingene** (`wenche/konfig.py`). Årsregnskapet,
+  skattemeldingen og aksjonærregisteroppgaven leste config-en hver for seg, med ulik tvang av
+  tall og datoer. Nå leses alt likt: organisasjonsnummer som tekst, stiftelsesår og
+  regnskapsår som heltall, tomme felt fra skjemaet som 0. En seksjon som mangler eller en
+  verdi som ikke lar seg lese gir én lesbar melding med feltnavnet: «Feil: ...» og exit 1 i
+  CLI-en, et rettbart punkt (`ok: false`) i dry-run-svaret, og 422 i webgrensesnittene. Før
+  kunne det bli en traceback eller HTTP 500.
+- **`.env` leses ved oppstart, ikke ved import.** CLI-en og den lokale webserveren laster
+  `~/.wenche/.env` og `.env` i arbeidsmappen når de starter. Å importere `wenche` som
+  bibliotek endrer ikke lenger prosessens miljøvariabler.
+- Miljøtabellen `wenche/miljoer.py` samler alle base-URL-er, Maskinporten-utstedere og
+  Altinn-app-ID-er for prod og test. En ukjent `WENCHE_ENV` gir en feil i stedet for å bli
+  behandlet som prod i deler av koden.
+- Klientene mot Altinn og Skatteetaten deler én base (`wenche/klient.py`), og XML-byggerne
+  deler avrundings- og formateringshjelperne i `wenche/xml_hjelp.py`. XML-en som sendes inn
+  er uendret (verifisert byte for byte mot forrige versjon).
+- Stiftelsesårkontrollen mot Enhetsregisteret bruker samme oppslag som forhåndsfyllingen.
+
 ## [1.12.0] - 2026-11-11
 
 ### Sikkerhet

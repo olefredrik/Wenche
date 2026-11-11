@@ -4,87 +4,33 @@ Altinn 3 API-klient.
 Håndterer oppretting, datainnsending og fullføring av instanser for alle tre
 innsendingstypene: årsregnskap, skattemelding og aksjonærregisteroppgave.
 
-Alle kall går gjennom `_kall`, som gjør nettverksfeil og feilstatus om til `MyndighetsFeil`
-med steget navngitt, så web-lagene og CLI-en kan vise hvor det stoppet uten å tolke tekst.
+Alle kall går gjennom `_kall` (wenche.klient), som gjør nettverksfeil og feilstatus om til
+`MyndighetsFeil` med steget navngitt, så web-lagene og CLI-en kan vise hvor det stoppet uten å
+tolke tekst. Base-URL-er og app-ID-er kommer fra wenche.miljoer.
 """
 
 import logging
-import os
 import time
 
-import httpx
-
 from wenche.feil import MyndighetsFeil
+from wenche.klient import HttpKlient
+from wenche.miljoer import ALTINN_APPER
 
 log = logging.getLogger(__name__)
 
-_TJENESTE = "altinn"
-
-_BASES = {
-    "test": {
-        "platform": "https://platform.tt02.altinn.no",
-        "apps": "https://{org}.apps.tt02.altinn.no",
-        "web": "https://tt02.altinn.no",
-        "inbox": "https://af.tt02.altinn.no/inbox",
-    },
-    "prod": {
-        "platform": "https://platform.altinn.no",
-        "apps": "https://{org}.apps.altinn.no",
-        "web": "https://altinn.no",
-        "inbox": "https://af.altinn.no/inbox",
-    },
-}
-
-# Altinn 3-apper for hver innsendingstype
-# Org er etaten som eier appen, app er appnavnet i Altinn Studio.
-# Disse må verifiseres mot Altinn sin app-katalog.
-APPS = {
-    "aarsregnskap": {
-        "org": "brg",
-        "app": "aarsregnskap-vanlig-202406",  # RR-0002, sist oppdatert 2025-09
-    },
-    "aksjonaerregister": {
-        "org": "skd",
-        "app": "a2-1051-241111",  # RF-1086, opprettet 2025-11
-    },
-    "skattemelding": {
-        "org": "skd",
-        "app": "formueinntekt-skattemelding-v2",
-    },
-}
+# Eldre form av app-tabellen ({"org": ..., "app": ...}), beholdt for kallsteder som leser den.
+APPS = {navn: {"org": org, "app": app} for navn, (org, app) in ALTINN_APPER.items()}
 
 
-class AltinnClient:
+class AltinnClient(HttpKlient):
+    tjeneste = "altinn"
+
     def __init__(self, altinn_token: str, env: str | None = None):
-        if env is None:
-            env = os.getenv("WENCHE_ENV", "prod")
-        if env not in _BASES:
-            raise ValueError(f"Ugyldig env: {env!r}. Bruk 'prod' eller 'test'.")
-        self._env = env
-        self._apps_base = _BASES[env]["apps"]
-        self._altinn_web = _BASES[env]["web"]
-        self._altinn_inbox = _BASES[env]["inbox"]
-        self._http = httpx.Client(
-            headers={
-                "Authorization": f"Bearer {altinn_token}",
-                "Accept": "application/json",
-            },
-            timeout=30,
-        )
+        super().__init__(altinn_token, env=env, timeout=30)
 
     def _app_base(self, app_key: str) -> str:
-        cfg = APPS[app_key]
-        return self._apps_base.format(org=cfg["org"]) + f"/{cfg['org']}/{cfg['app']}"
-
-    def _kall(self, metode: str, url: str, steg: str, **kw) -> httpx.Response:
-        """Ett kall mot Altinn. Nettverksfeil og feilstatus blir MyndighetsFeil med steget navngitt."""
-        try:
-            resp = self._http.request(metode, url, **kw)
-        except httpx.RequestError as e:
-            raise MyndighetsFeil.fra_nettverksfeil(_TJENESTE, steg, e) from e
-        if not resp.is_success:
-            raise MyndighetsFeil.fra_svar(_TJENESTE, steg, resp)
-        return resp
+        org, app = ALTINN_APPER[app_key]
+        return self.miljo.altinn_app_url(org, app)
 
     def opprett_instans(self, app_key: str, org_nummer: str) -> dict:
         """Oppretter en ny instans for gitt innsendingstype."""
@@ -125,7 +71,7 @@ class AltinnClient:
                 return element["id"]
         tilgjengelige = [e.get("dataType") for e in instans.get("data", [])]
         raise MyndighetsFeil(
-            _TJENESTE,
+            self.tjeneste,
             "opplasting av data til Altinn",
             kode="mangler-dataelement",
             beskrivelse=(
@@ -161,7 +107,7 @@ class AltinnClient:
                 return
             if resultat == "Infected":
                 raise MyndighetsFeil(
-                    _TJENESTE,
+                    self.tjeneste,
                     steg,
                     kode="infisert",
                     beskrivelse="Vedlegget ble avvist av Altinns virusskanning.",
@@ -169,7 +115,7 @@ class AltinnClient:
             # Pending eller None: vent og prøv igjen
             time.sleep(ventetid)
         raise MyndighetsFeil(
-            _TJENESTE,
+            self.tjeneste,
             steg,
             kode="tidsavbrudd",
             beskrivelse=(
@@ -241,13 +187,4 @@ class AltinnClient:
         url = f"{self._app_base(app_key)}/instances/{instance_id}/process/next"
         self._kall("PUT", url, "fullføring av innsendingen i Altinn")
         log.info("Instans klar for signering.")
-        return self._altinn_inbox
-
-    def close(self) -> None:
-        self._http.close()
-
-    def __enter__(self) -> "AltinnClient":
-        return self
-
-    def __exit__(self, *args: object) -> None:
-        self.close()
+        return self.miljo.altinn_innboks

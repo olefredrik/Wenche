@@ -14,6 +14,7 @@ from datetime import date
 from xml.sax.saxutils import escape
 
 from wenche.models import Aarsregnskap
+from wenche.xml_hjelp import heltall
 
 
 def _row_id() -> str:
@@ -82,7 +83,7 @@ def generer_aksjenote_vedlegg(regnskap: Aarsregnskap) -> bytes:
     """
     s = regnskap.selskap
     aar = regnskap.regnskapsaar
-    beloep = round(regnskap.balanse.eiendeler.anleggsmidler.andre_aksjer)
+    beloep = heltall(regnskap.balanse.eiendeler.anleggsmidler.andre_aksjer)
 
     linjer = [
         f"Note til årsregnskap — {s.navn}",
@@ -179,7 +180,7 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
 
     # Avrund float til int for BRG XML (registrene aksepterer kun heltall)
     def _i(v: float) -> int:
-        return round(v)
+        return heltall(v)
 
     # Hjelpefunksjon: lager linjeelement med altinnRowId og beskrivelse (unbounded-elementer)
     def linje(

@@ -459,13 +459,13 @@ def _brg_mock(status_code: int = 200, json_data: dict | None = None):
     return resp
 
 
-@patch("wenche.aksjonaerregister.httpx.get")
+@patch("wenche.brreg.httpx.get")
 def test_valider_mot_brg_samsvar_gir_ingen_advarsel(mock_get, eksempel_oppgave):
     mock_get.return_value = _brg_mock(json_data={"stiftelsesdato": "2020-06-15"})
     assert valider_mot_brg(eksempel_oppgave) == []
 
 
-@patch("wenche.aksjonaerregister.httpx.get")
+@patch("wenche.brreg.httpx.get")
 def test_valider_mot_brg_mismatch_gir_advarsel(mock_get, eksempel_oppgave):
     # BRG har 2018, config har 2020 → mismatch.
     mock_get.return_value = _brg_mock(json_data={"stiftelsesdato": "2018-12-11"})
@@ -476,7 +476,7 @@ def test_valider_mot_brg_mismatch_gir_advarsel(mock_get, eksempel_oppgave):
     assert "2020" in advarsler[0]
 
 
-@patch("wenche.aksjonaerregister.httpx.get")
+@patch("wenche.brreg.httpx.get")
 def test_valider_mot_brg_404_gir_advarsel_om_ukjent_orgnr(mock_get, eksempel_oppgave):
     mock_get.return_value = _brg_mock(status_code=404)
     advarsler = valider_mot_brg(eksempel_oppgave)
@@ -484,20 +484,20 @@ def test_valider_mot_brg_404_gir_advarsel_om_ukjent_orgnr(mock_get, eksempel_opp
     assert "ikke funnet" in advarsler[0].lower()
 
 
-@patch("wenche.aksjonaerregister.httpx.get")
+@patch("wenche.brreg.httpx.get")
 def test_valider_mot_brg_nettverksfeil_returnerer_tom_liste(mock_get, eksempel_oppgave):
     # Transient feil skal ikke blokkere innsending.
     mock_get.side_effect = httpx.ConnectError("Connection refused")
     assert valider_mot_brg(eksempel_oppgave) == []
 
 
-@patch("wenche.aksjonaerregister.httpx.get")
+@patch("wenche.brreg.httpx.get")
 def test_valider_mot_brg_5xx_returnerer_tom_liste(mock_get, eksempel_oppgave):
     mock_get.return_value = _brg_mock(status_code=503)
     assert valider_mot_brg(eksempel_oppgave) == []
 
 
-@patch("wenche.aksjonaerregister.httpx.get")
+@patch("wenche.brreg.httpx.get")
 def test_valider_mot_brg_uten_stiftelsesdato_i_svar(mock_get, eksempel_oppgave):
     # BRG-svar uten stiftelsesdato (uvanlig, men håndteres trygt).
     mock_get.return_value = _brg_mock(json_data={"navn": "TEST AS"})

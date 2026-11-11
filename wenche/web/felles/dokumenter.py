@@ -21,6 +21,7 @@ from wenche import aarsregnskap as ar
 from wenche import aksjonaerregister as akr
 from wenche import noter as noter_modul
 from wenche import skattemelding as sm
+from wenche.feil import KonfigFeil
 from wenche.models import LaanTilNaerstaaende, Noter
 
 from .svar import Fil, FilerSvar, SkatteberegningSvar
@@ -53,15 +54,21 @@ def les_eller_422(les: Callable[[dict], Any], config: dict) -> Any:
     """
     try:
         return les(config)
+    except KonfigFeil as e:
+        # wenche.konfig: feltstien sier hvilken seksjon som mangler; andre feil er alt lesbare.
+        if e.felt in _SEKSJON_TEKST:
+            raise _422([_tall_steg_melding(_SEKSJON_TEKST[e.felt])]) from e
+        raise _422([str(e)]) from e
     except KeyError as e:
         felt = str(e.args[0]) if e.args else ""
         navn = _SEKSJON_TEKST.get(felt, f"Feltet «{felt}»" if felt else "Et påkrevd felt")
-        raise _422(
-            [
-                f"{navn} mangler. Fyll inn opplysningene i Tall-steget før du genererer "
-                "dette dokumentet."
-            ]
-        ) from e
+        raise _422([_tall_steg_melding(navn)]) from e
+
+
+def _tall_steg_melding(navn: str) -> str:
+    return (
+        f"{navn} mangler. Fyll inn opplysningene i Tall-steget før du genererer dette dokumentet."
+    )
 
 
 def fil(filnavn: str, innhold: bytes, mime: str) -> Fil:

@@ -3,199 +3,27 @@ Innsending av årsregnskap til Brønnøysundregistrene via Altinn 3.
 """
 
 import logging
-from datetime import date
 
-import yaml
-
+from wenche import konfig
 from wenche.altinn_client import AltinnClient
 from wenche.brg_xml import generer_aksjenote_vedlegg, generer_hovedskjema, generer_underskjema
 from wenche.feil import ValideringsFeil
 from wenche.models import (
     Aarsregnskap,
-    Anleggsmidler,
-    Balanse,
-    Driftsinntekter,
-    Driftskostnader,
-    Egenkapital,
-    EgenkapitalOgGjeld,
-    Eiendeler,
-    Finansposter,
-    KortsiktigGjeld,
-    LangsiktigGjeld,
-    Omloepmidler,
-    Resultatregnskap,
-    Selskap,
 )
 from wenche.naeringsspesifikasjon_xml import egenkapitalavstemming
 
-
-def _tall(verdi) -> float:
-    """Tolererer tomme og manglende tallfelt (None, "", whitespace) som 0.0, ellers float().
-
-    Skjemaet utelater urørte (valgfrie) felt og sender tom streng for blanke. Et passivt
-    holdingselskap har legitimt mange slike, særlig i fjorårstallene. Uten dette havnet en ""
-    eller None i modellen og fikk summeringen til å kaste TypeError -> naken HTTP 500.
-    """
-    if verdi is None or (isinstance(verdi, str) and not verdi.strip()):
-        return 0.0
-    return float(verdi)
-
-
-def _dato(verdi) -> date | None:
-    """Tolererer tomme og manglende datofelt som None, ellers en date.
-
-    YAML tolker en naken YYYY-MM-DD som date, mens skjemaet sender streng. Begge godtas.
-    En ugyldig dato blir en lesbar feil, ikke en naken ValueError fra fromisoformat.
-    """
-    if verdi is None or (isinstance(verdi, str) and not verdi.strip()):
-        return None
-    if isinstance(verdi, date):
-        return verdi
-    tekst = str(verdi).strip()
-    # En ISO-datetime ("2025-10-24T00:00:00.000Z") er ikke noe skjemaet sender, men den
-    # oppstår når et JS Date serialiseres til JSON. Kilden er rettet (SPA-en parser YAML
-    # med CORE_SCHEMA), men gamle lagrede configer kan bære formen, og en dato med
-    # tidsdel er utvetydig nok til å ta imot i stedet for å avvise med formatfeil.
-    if "T" in tekst:
-        tekst = tekst.split("T", 1)[0]
-    try:
-        return date.fromisoformat(tekst)
-    except ValueError:
-        raise ValueError(f"«{verdi}» er ikke en gyldig dato. Bruk formatet ÅÅÅÅ-MM-DD.") from None
-
-
-def _les_resultat(r: dict) -> Resultatregnskap:
-    # .get(..., {}) på hver underseksjon: et delvis utfylt år (typisk fjoråret) utelater hele
-    # seksjoner brukeren ikke rørte, så et direkte oppslag ville kastet KeyError -> 500.
-    di = r.get("driftsinntekter", {})
-    dk = r.get("driftskostnader", {})
-    fp = r.get("finansposter", {})
-    return Resultatregnskap(
-        driftsinntekter=Driftsinntekter(
-            salgsinntekter=_tall(di.get("salgsinntekter")),
-            andre_driftsinntekter=_tall(di.get("andre_driftsinntekter")),
-        ),
-        driftskostnader=Driftskostnader(
-            loennskostnader=_tall(dk.get("loennskostnader")),
-            avskrivninger=_tall(dk.get("avskrivninger")),
-            andre_driftskostnader=_tall(dk.get("andre_driftskostnader")),
-        ),
-        finansposter=Finansposter(
-            utbytte_fra_datterselskap=_tall(fp.get("utbytte_fra_datterselskap")),
-            andre_finansinntekter=_tall(fp.get("andre_finansinntekter")),
-            rentekostnader=_tall(fp.get("rentekostnader")),
-            andre_finanskostnader=_tall(fp.get("andre_finanskostnader")),
-            gevinst_ved_realisasjon_av_aksjer=_tall(fp.get("gevinst_ved_realisasjon_av_aksjer")),
-            tap_ved_realisasjon_av_aksjer=_tall(fp.get("tap_ved_realisasjon_av_aksjer")),
-            utbytte_fra_andre_aksjer=_tall(fp.get("utbytte_fra_andre_aksjer")),
-        ),
-        skattekostnad=_tall(r.get("skattekostnad")),
-    )
-
-
-def _les_balanse(b: dict) -> Balanse:
-    eiendeler = b.get("eiendeler", {})
-    am = eiendeler.get("anleggsmidler", {})
-    om = eiendeler.get("omloepmidler", {})
-    ekg = b.get("egenkapital_og_gjeld", {})
-    ek = ekg.get("egenkapital", {})
-    lg = ekg.get("langsiktig_gjeld", {})
-    kg = ekg.get("kortsiktig_gjeld", {})
-    return Balanse(
-        eiendeler=Eiendeler(
-            anleggsmidler=Anleggsmidler(
-                aksjer_i_datterselskap=_tall(am.get("aksjer_i_datterselskap")),
-                andre_aksjer=_tall(am.get("andre_aksjer")),
-                langsiktige_fordringer=_tall(am.get("langsiktige_fordringer")),
-            ),
-            omloepmidler=Omloepmidler(
-                kortsiktige_fordringer=_tall(om.get("kortsiktige_fordringer")),
-                bankinnskudd=_tall(om.get("bankinnskudd")),
-            ),
-        ),
-        egenkapital_og_gjeld=EgenkapitalOgGjeld(
-            egenkapital=Egenkapital(
-                aksjekapital=_tall(ek.get("aksjekapital")),
-                overkursfond=_tall(ek.get("overkursfond")),
-                annen_egenkapital=_tall(ek.get("annen_egenkapital")),
-            ),
-            langsiktig_gjeld=LangsiktigGjeld(
-                laan_fra_aksjonaer=_tall(lg.get("laan_fra_aksjonaer")),
-                andre_langsiktige_laan=_tall(lg.get("andre_langsiktige_laan")),
-            ),
-            kortsiktig_gjeld=KortsiktigGjeld(
-                leverandoergjeld=_tall(kg.get("leverandoergjeld")),
-                betalbar_skatt=_tall(kg.get("betalbar_skatt")),
-                skyldige_offentlige_avgifter=_tall(kg.get("skyldige_offentlige_avgifter")),
-                avsatt_utbytte=_tall(kg.get("avsatt_utbytte")),
-                annen_kortsiktig_gjeld=_tall(kg.get("annen_kortsiktig_gjeld")),
-            ),
-        ),
-    )
+# Lesingen bor i wenche.konfig (delt av alle tre innsendingene). Navnene under er beholdt for
+# eldre kallsteder og tester.
+_tall = konfig.tall
+_dato = konfig.dato
+_les_resultat = konfig.les_resultat
+_les_balanse = konfig.les_balanse
 
 
 def les_config(config_fil: str | dict) -> Aarsregnskap:
-    """Leser config (filsti eller allerede parset dict) og returnerer et Aarsregnskap-objekt."""
-    if isinstance(config_fil, dict):
-        cfg = config_fil
-    else:
-        with open(config_fil, encoding="utf-8") as f:
-            cfg = yaml.safe_load(f)
-
-    s = cfg["selskap"]
-    selskap = Selskap(
-        navn=s["navn"],
-        org_nummer=s["org_nummer"],
-        daglig_leder=s["daglig_leder"],
-        styreleder=s["styreleder"],
-        forretningsadresse=s["forretningsadresse"],
-        stiftelsesaar=s["stiftelsesaar"],
-        aksjekapital=s["aksjekapital"],
-        stiftelsesdato=_dato(s.get("stiftelsesdato")),
-        tinginnskudd_ved_stiftelse=_tall(s.get("tinginnskudd_ved_stiftelse")),
-    )
-
-    resultat = _les_resultat(cfg["resultatregnskap"])
-    balanse = _les_balanse(cfg["balanse"])
-
-    fa = cfg.get("foregaaende_aar", {})
-    foregaaende_resultat = (
-        _les_resultat(fa["resultatregnskap"]) if "resultatregnskap" in fa else Resultatregnskap()
-    )
-    foregaaende_balanse = _les_balanse(fa["balanse"]) if "balanse" in fa else Balanse()
-
-    utbytte_utbetalt = sum(float(a.get("utbytte_utbetalt", 0)) for a in cfg.get("aksjonaerer", []))
-
-    return Aarsregnskap(
-        selskap=selskap,
-        regnskapsaar=cfg["regnskapsaar"],
-        resultatregnskap=resultat,
-        balanse=balanse,
-        foregaaende_aar_resultat=foregaaende_resultat,
-        foregaaende_aar_balanse=foregaaende_balanse,
-        utbytte_utbetalt=utbytte_utbetalt,
-        regnskapsstart=_dato(cfg.get("regnskapsstart")),
-        regnskapsslutt=_dato(cfg.get("regnskapsslutt")),
-        eierandel_for_utbytte=_eierandel_eller_none(
-            (cfg.get("skattemelding") or {}).get("eierandel_for_fritaksmetoden")
-        ),
-    )
-
-
-def _eierandel_eller_none(verdi) -> float | None:
-    """Eierandelen som prosent, eller None når den mangler eller ikke er et tall.
-
-    Bare til advarsler. Ugyldige verdier avvises av skattemeldingens validering, så her er det
-    nok å ikke kaste.
-    """
-    if verdi is None or (isinstance(verdi, str) and not verdi.strip()):
-        return None
-    try:
-        if isinstance(verdi, str):
-            return float(verdi.replace("\u00a0", "").replace(" ", "").replace(",", "."))
-        return float(verdi)
-    except (TypeError, ValueError):
-        return None
+    """Leser config (filsti eller alt parset dict) til et Aarsregnskap. Se wenche.konfig."""
+    return konfig.les_aarsregnskap(konfig.les_raa(config_fil))
 
 
 def valider(regnskap: Aarsregnskap) -> list[str]:

@@ -10,7 +10,8 @@ Flyt:
   3. Veksle Maskinporten-token mot Altinn-token
 
 To innganger: `hent_tokens_for` tar credentials eksplisitt (hostet: vendor-creds fra
-server-config), `hent_tokens` leser dem fra .env for gitt miljø (self-hosted og CLI). De eldre
+server-config), `hent_tokens` leser dem fra miljøvariabler for gitt miljø (self-hosted og CLI; .env-filene er
+lastet av inngangen, se wenche.miljoer). De eldre
 `login`/`get_*_token`-funksjonene er tynne innpakninger rundt `hent_tokens`, beholdt fordi
 web-backenden og testene kaller dem.
 """
@@ -26,52 +27,33 @@ from pathlib import Path
 
 import httpx
 from authlib.jose import jwt
-from dotenv import load_dotenv
 
+from wenche import miljoer
 from wenche.feil import AuthFeil, KonfigFeil, MyndighetsFeil
 from wenche.filer import skriv_privat
 
 log = logging.getLogger(__name__)
 
-# Last credentials fra ~/.wenche/.env (fast lokasjon, brukerbundet, utenfor
-# cwd og git-trees). Faller tilbake til cwd/.env for bakoverkompatibilitet
-# med oppsett gjort i tidligere versjoner av Wenche.
-_BRUKER_ENV_FIL = Path.home() / ".wenche" / ".env"
-if _BRUKER_ENV_FIL.is_file():
-    load_dotenv(_BRUKER_ENV_FIL)
-load_dotenv()
-
-# Miljø-spesifikke URL-er evalueres ved hvert kall (ikke ved modulinnlastning),
-# slik at brukeren kan bytte miljø i UI-et og få umiddelbar effekt uten å
-# starte Wenche på nytt.
+# Credentials leses fra miljøvariabler. .env-filene (~/.wenche/.env og .env i arbeidsmappen)
+# lastes av inngangene (CLI-en, den lokale webserveren) via `miljoer.last_env_filer`, ikke ved
+# import av biblioteket. Miljø-spesifikke URL-er slås opp ved hvert kall, så et miljøbytte i
+# prosessen virker straks.
 
 
 def _gjeldende_env() -> str:
-    return os.getenv("WENCHE_ENV", "prod")
+    return miljoer.gjeldende_navn()
 
 
 def _maskinporten_token_url(env: str | None = None) -> str:
-    return (
-        "https://test.maskinporten.no/token"
-        if (env or _gjeldende_env()) == "test"
-        else "https://maskinporten.no/token"
-    )
+    return miljoer.miljo(env).maskinporten_tokenendepunkt
 
 
 def _maskinporten_aud(env: str | None = None) -> str:
-    return (
-        "https://test.maskinporten.no/"
-        if (env or _gjeldende_env()) == "test"
-        else "https://maskinporten.no/"
-    )
+    return miljoer.miljo(env).maskinporten_aud
 
 
 def _altinn_exchange_url(env: str | None = None) -> str:
-    return (
-        "https://platform.tt02.altinn.no/authentication/api/v1/exchange/maskinporten"
-        if (env or _gjeldende_env()) == "test"
-        else "https://platform.altinn.no/authentication/api/v1/exchange/maskinporten"
-    )
+    return miljoer.miljo(env).altinn_veksling_url
 
 
 # Scopes for innsending av instanser via Altinn

@@ -44,6 +44,7 @@ from wenche.models import (
     SkattemeldingKonfig,
 )
 from wenche.skatteberegning import beregn_skatt
+from wenche.xml_hjelp import beloep_tekst
 
 _NS = "urn:no:skatteetaten:fastsetting:formueinntekt:naeringsspesifikasjon:ekstern:v6"
 
@@ -186,7 +187,7 @@ def _beloep_element(parent: Element, tag: str, beloep: float) -> Element:
     el = SubElement(parent, tag)
     outer = SubElement(el, "beloep")  # BeloepMedSkattemessigeEgenskaper
     inner = SubElement(outer, "beloep")  # BeloepMedInnkapsling → BeloepMed2Desimaler
-    inner.text = f"{round(beloep):.2f}"
+    inner.text = beloep_tekst(beloep)
     return el
 
 

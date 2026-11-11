@@ -21,7 +21,7 @@ from wenche import aksjonaerregister as _akr
 from wenche import configfelt as _configfelt
 from wenche import skattemelding as _sm
 from wenche.altinn_client import AltinnClient
-from wenche.feil import MyndighetsFeil, ValideringsFeil
+from wenche.feil import KonfigFeil, MyndighetsFeil, ValideringsFeil
 from wenche.models import Aarsregnskap
 from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
 from wenche.skattemelding_xml import (
@@ -53,15 +53,30 @@ SKJOENN_KLAGE_FORKLARING = (
 # ---------------------------------------------------------------------------
 
 
+def _konfigfeil_svar(e: KonfigFeil, config: Config) -> dict:
+    """Dry-run-svaret når configen ikke lar seg lese: et rettbart punkt, ikke en kastet feil."""
+    return {
+        "ok": False,
+        "feil": [str(e)],
+        "advarsler": _configfelt.advarsel_om_ukjente_felt(config),
+    }
+
+
 def valider_aarsregnskap(config: Config) -> dict:
-    regnskap = _ar.les_config(config)
+    try:
+        regnskap = _ar.les_config(config)
+    except KonfigFeil as e:
+        return _konfigfeil_svar(e, config)
     feil = _ar.valider(regnskap)
     advarsler = _ar.advarsler(regnskap) + _configfelt.advarsel_om_ukjente_felt(config)
     return {"ok": not feil, "feil": feil, "advarsler": advarsler}
 
 
 def valider_aksjonaer(config: Config) -> dict:
-    oppgave = _akr.les_config(config)
+    try:
+        oppgave = _akr.les_config(config)
+    except KonfigFeil as e:
+        return _konfigfeil_svar(e, config)
     feil = _akr.valider(oppgave)
     return {
         "ok": not feil,
@@ -80,7 +95,10 @@ def valider_skattemelding(config: Config) -> dict:
     feil = _sm.valider_selskap(config)
     if feil:
         return {"ok": False, "feil": feil, "advarsler": advarsler}
-    regnskap, _konfig = _sm.les_config(config)
+    try:
+        regnskap, _konfig = _sm.les_config(config)
+    except KonfigFeil as e:
+        return _konfigfeil_svar(e, config)
     # Skattemeldingen leveres per kalenderår og bygges fra årsregnskapets periode, så en
     # periode over to kalenderår ville gitt en skattemelding for feil periode.
     feil = _ar.valider_periode(regnskap)

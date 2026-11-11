@@ -119,3 +119,16 @@ def regnskap_med_utbytte(eksempel_selskap):
             ),
         ),
     )
+
+
+@pytest.fixture(autouse=True)
+def _ingen_env_filer(monkeypatch):
+    """
+    Inngangene (CLI-en og den lokale webserveren) laster ~/.wenche/.env og cwd/.env ved oppstart
+    (wenche.miljoer.last_env_filer). I testene ville det dratt utviklerens egne credentials og
+    test-overstyringer (SKD_TEST_PARTSNUMMER m.m.) inn i prosessen midt i en test, så lastingen
+    er en no-op her. Testene som tester selve lastingen henter funksjonen direkte fra modulen.
+    """
+    from wenche import miljoer
+
+    monkeypatch.setattr(miljoer, "last_env_filer", lambda: None)

@@ -25,6 +25,7 @@ from defusedxml.ElementTree import fromstring
 
 from wenche.models import Aarsregnskap, SkattemeldingKonfig
 from wenche.skatteberegning import beregn_skatt
+from wenche.xml_hjelp import heltall, heltall_tekst
 
 _NS = "urn:no:skatteetaten:fastsetting:formueinntekt:skattemelding:upersonlig:ekstern:v5"
 
@@ -33,7 +34,7 @@ def _overstyrt_heltall(parent: Element, tag: str, verdi: int) -> None:
     """Bygger et StortBeloepSomHeltallMedOverstyring-element med erOverstyrt=true."""
     el = SubElement(parent, tag)
     beloep = SubElement(el, "beloep")
-    SubElement(beloep, "beloepSomHeltall").text = str(int(round(verdi)))
+    SubElement(beloep, "beloepSomHeltall").text = heltall_tekst(verdi)
     erov = SubElement(el, "erOverstyrt")
     SubElement(erov, "boolsk").text = "true"
 
@@ -41,7 +42,7 @@ def _overstyrt_heltall(parent: Element, tag: str, verdi: int) -> None:
 def _heltall_med_innkapsling(parent: Element, tag: str, verdi: int) -> None:
     """Bygger et BeloepSomHeltallMedInnkapsling-element (uten erOverstyrt)."""
     el = SubElement(parent, tag)
-    SubElement(el, "beloepSomHeltall").text = str(int(round(verdi)))
+    SubElement(el, "beloepSomHeltall").text = heltall_tekst(verdi)
 
 
 def _heltall_med_beloep(parent: Element, tag: str, verdi: int) -> None:
@@ -54,7 +55,7 @@ def _heltall_med_beloep(parent: Element, tag: str, verdi: int) -> None:
     """
     el = SubElement(parent, tag)
     beloep = SubElement(el, "beloep")
-    SubElement(beloep, "beloepSomHeltall").text = str(int(round(verdi)))
+    SubElement(beloep, "beloepSomHeltall").text = heltall_tekst(verdi)
 
 
 def generer_skattemelding_upersonlig(
@@ -114,7 +115,7 @@ def generer_skattemelding_upersonlig(
         utf = SubElement(iou, "underskuddTilFremfoering")
         if fremfoert_underskudd > 0:
             fremfoert = SubElement(utf, "fremfoertUnderskuddFraTidligereAar")
-            SubElement(fremfoert, "beloepSomHeltall").text = str(int(round(fremfoert_underskudd)))
+            SubElement(fremfoert, "beloepSomHeltall").text = heltall_tekst(fremfoert_underskudd)
         if aarets_underskudd > 0:
             # fremfoerbartUnderskuddIInntekt = årets + fremført fra tidligere år.
             # Står sist i UnderskuddTilFremfoering-sekvensen.
@@ -209,24 +210,19 @@ def beregn_formue_inputs(
     overstyring (samlet_verdi_bak_aksjene) er satt.
     """
     b = regnskap.balanse
-    samlet_gjeld = int(
-        round(
-            b.egenkapital_og_gjeld.langsiktig_gjeld.sum
-            + b.egenkapital_og_gjeld.kortsiktig_gjeld.sum
-        )
+    samlet_gjeld = heltall(
+        b.egenkapital_og_gjeld.langsiktig_gjeld.sum + b.egenkapital_og_gjeld.kortsiktig_gjeld.sum
     )
     if konfig.samlet_verdi_bak_aksjene is not None:
-        netto = max(0, int(round(konfig.samlet_verdi_bak_aksjene)))
+        netto = max(0, heltall(konfig.samlet_verdi_bak_aksjene))
         return netto + samlet_gjeld, samlet_gjeld
     if not konfig.formuesverdi_aksjer:
         return None, None
-    verdi_foer_rabatt = int(
-        round(
-            konfig.formuesverdi_aksjer
-            + b.eiendeler.omloepmidler.bankinnskudd
-            + b.eiendeler.omloepmidler.kortsiktige_fordringer
-            + b.eiendeler.anleggsmidler.langsiktige_fordringer
-        )
+    verdi_foer_rabatt = heltall(
+        konfig.formuesverdi_aksjer
+        + b.eiendeler.omloepmidler.bankinnskudd
+        + b.eiendeler.omloepmidler.kortsiktige_fordringer
+        + b.eiendeler.anleggsmidler.langsiktige_fordringer
     )
     return verdi_foer_rabatt, samlet_gjeld
 
@@ -264,7 +260,7 @@ def generer_skattemelding_fra_konfig(
     # regnskapsmessig overskudd og skattemessig underskudd samtidig. Brukte vi resultat
     # før skatt, ville et slikt selskap mistet underskuddet til fremføring.
     beregning = beregn_skatt(regnskap.resultatregnskap, konfig)
-    aarets_underskudd = max(0, int(round(-beregning.skattepliktig_inntekt_brutto)))
+    aarets_underskudd = max(0, heltall(-beregning.skattepliktig_inntekt_brutto))
     return generer_skattemelding_upersonlig(
         partsnummer=partsnummer,
         inntektsaar=regnskap.regnskapsaar,

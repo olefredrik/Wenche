@@ -35,6 +35,7 @@ from wenche.naeringsspesifikasjon_xml import generer_naeringsspesifikasjon
 from wenche.skattemelding_konvolutt import generer_konvolutt
 from wenche.skattemelding_xml import generer_skattemelding_fra_konfig, hent_partsnummer
 from wenche.skd_skattemelding_client import SkdSkattemeldingClient
+from wenche.xml_hjelp import lokalnavn
 
 
 def _minimal_config(orgnr: str, aar: int) -> dict:
@@ -114,8 +115,7 @@ def _creds_fra_env() -> VendorCredentials:
     return VendorCredentials(client_id=client_id, kid=kid, private_key_pem=pem_bytes)
 
 
-def _lokal(tag: str) -> str:
-    return tag.rsplit("}", 1)[-1]
+_lokal = lokalnavn
 
 
 def main() -> None:

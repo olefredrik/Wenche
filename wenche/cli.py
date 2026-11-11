@@ -36,6 +36,7 @@ from wenche import (
     aksjonaerregister,
     auth,
     configfelt,
+    miljoer,
     skattemelding,
     systembruker,
 )
@@ -96,6 +97,7 @@ def main(ctx: click.Context) -> None:
     Uten argumenter starter webgrensesnittet mot produksjonsmiljøet.
     Bruk `wenche dev` for å åpne UI mot Skatteetatens testmiljø (tt02).
     """
+    miljoer.last_env_filer()
     _sett_opp_logging()
     if ctx.invoked_subcommand is not None:
         return
@@ -199,7 +201,7 @@ def logout() -> None:
 @main.command("registrer-system")
 def registrer_system() -> None:
     """Registrer Wenche i Altinns systemregister (kjøres én gang per miljø)."""
-    env = auth._gjeldende_env()
+    env = miljoer.gjeldende_navn()
     creds = auth.les_cli_credentials(env)
     org_nummer = auth.les_vendor_orgnr()
     click.echo("Henter Maskinporten admin-token...")
@@ -223,7 +225,7 @@ def registrer_system() -> None:
 def opprett_systembruker(org: str | None) -> None:
     """Opprett systembrukerforespørsel og få godkjenningslenke."""
     vendor_orgnr = auth.les_vendor_orgnr()
-    org_nummer = org or auth._les_systembruker_org(auth._gjeldende_env())
+    org_nummer = org or auth._les_systembruker_org(miljoer.gjeldende_navn())
     click.echo("Henter Maskinporten admin-token...")
     token = auth.login_admin()
     click.echo(f"Oppretter systembrukerforespørsel for {org_nummer}...")
@@ -340,7 +342,7 @@ def send_aksjonaerregister(config_fil: str, dry_run: bool, ut_mappe: str) -> Non
 
     click.echo("Henter Maskinporten-token med SKD-scope...")
     token = auth.get_skd_aksjonaer_token()
-    with SkdAksjonaerClient(token, env=auth._gjeldende_env()) as klient:
+    with SkdAksjonaerClient(token, env=miljoer.gjeldende_navn()) as klient:
         svar = aksjonaerregister.send_inn(oppgave, klient)
     click.echo(f"\nForsendelse-ID: {svar.get('forsendelseId')}")
     click.echo(f"Dialog-ID:      {svar.get('dialogId')}")
@@ -384,7 +386,7 @@ def _skattemelding_forberedelser(config_fil: str) -> tuple[str, str, int | None]
     # Skattemeldingen leveres per kalenderår, og Wenche bygger den fra samme periode som
     # årsregnskapet. En periode over to kalenderår ville gitt en skattemelding for feil periode.
     _krev_gyldig(aarsregnskap.valider_periode(regnskap))
-    env = auth._gjeldende_env()
+    env = miljoer.gjeldende_navn()
     orgnr = regnskap.selskap.org_nummer
     partsnummer: int | None = None
     if env == "test":
