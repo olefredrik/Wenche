@@ -64,12 +64,22 @@ class TestUkjenteFelt:
         cfg["aksjonaerer"][0]["fnr"] = "x"
         assert ukjente_felt(cfg) == ["aksjonaerer[0].fnr"]
 
-    def test_toppnivaaet_kontrolleres_ikke(self):
-        # Seksjoner uten egen dataklasse, som noter fra Dokumenter-fanen, skal ikke gi treff.
+    def test_toppnivaaet_kontrolleres_ogsaa(self):
+        # Alle seksjoner er kjente via Konfig, også noter og naeringsspesifikasjon, mens en
+        # feilstavet toppnøkkel fanges. Metadata med «_» foran (som _advarsler) er ikke felt.
         cfg = copy.deepcopy(_EKSEMPEL)
-        cfg["noter"] = {"antall_ansatte": 0}
-        cfg["naeringsspesifikasjon"] = {"poster": []}
+        cfg["noter"] = {
+            "antall_ansatte": 0,
+            "laan_til_naerstaaende": [{"motpart": "X", "saldo": 1}],
+        }
+        cfg["naeringsspesifikasjon"] = {
+            "poster": [{"kategori": "salgsinntekt", "kode": "3000", "beloep": 1}]
+        }
+        cfg["_advarsler"] = ["x"]
         assert ukjente_felt(cfg) == []
+        cfg["regnskapsår"] = 2025
+        cfg["noter"]["laan_til_naerstaaende"][0]["rente"] = 2
+        assert sorted(ukjente_felt(cfg)) == ["noter.laan_til_naerstaaende[0].rente", "regnskapsår"]
 
     def test_leser_fil(self, tmp_path):
         fil = tmp_path / "config.yaml"
