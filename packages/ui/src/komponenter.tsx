@@ -18,6 +18,7 @@ export function Kort({
   );
 }
 
+// Statuspanel. Feil annonseres for skjermlesere (role="alert"); ok og advarsel er innhold.
 export function Panel({
   tone,
   tittel,
@@ -33,7 +34,7 @@ export function Panel({
     feil: "border-red-300 bg-red-50 text-red-800",
   };
   return (
-    <div className={`mt-6 rounded-sm border p-5 ${toner[tone]}`}>
+    <div role={tone === "feil" ? "alert" : undefined} className={`mt-6 rounded-sm border p-5 ${toner[tone]}`}>
       <p className="font-display text-lg">{tittel}</p>
       <div className="mt-2 text-sm text-foreground/80">{children}</div>
     </div>
@@ -79,29 +80,28 @@ export function Inn({
 }
 
 // Grupperer heltallsdelen med hardt mellomrom (nb-NO-stil), bevarer fortegn og desimaler.
-// 1000 -> "1\u00A0000", 1000000 -> "1\u00A0000\u00A0000", -2500.5 -> "-2\u00A0500,5". Ren visning;
-// tallet i config r\u00f8res ikke. Hardt mellomrom (\u00A0) matcher kr()/toLocaleString("nb-NO").
+// 1000 -> "1 000", 1000000 -> "1 000 000", -2500.5 -> "-2 500,5". Ren visning;
+// tallet i config røres ikke. Hardt mellomrom ( ) matcher kr()/toLocaleString("nb-NO").
 export function grupperTusen(n: number): string {
   if (!Number.isFinite(n)) return "";
   const neg = n < 0;
   const [heltall, desimal] = String(Math.abs(n)).split(".");
-  const gruppert = heltall.replace(/\B(?=(\d{3})+(?!\d))/g, "\u00A0");
+  const gruppert = heltall.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
   return (neg ? "-" : "") + gruppert + (desimal ? "," + desimal : "");
 }
 
 // Tolker en skrevet streng (mellomrom og komma tillatt) til number | "". Tomt/ufullstendig
-// ("", "-", ".") og ugyldig blir "", s\u00e5 feltet kan st\u00e5 tomt under redigering.
+// ("", "-", ".") og ugyldig blir "", så feltet kan stå tomt under redigering.
 export function tolkTall(s: string): number | "" {
-  const r = s.replace(/[\s\u00A0]/g, "").replace(",", ".");
+  const r = s.replace(/[\s ]/g, "").replace(",", ".");
   if (r === "" || r === "-" || r === "." || r === "-.") return "";
   const n = Number(r);
   return Number.isNaN(n) ? "" : n;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function formaterVerdi(v: any): string {
+export function formaterVerdi(v: unknown): string {
   if (v === "" || v == null) return "";
-  const n = typeof v === "number" ? v : Number(String(v).replace(/[\s\u00A0]/g, "").replace(",", "."));
+  const n = typeof v === "number" ? v : Number(String(v).replace(/[\s ]/g, "").replace(",", "."));
   return Number.isFinite(n) ? grupperTusen(n) : "";
 }
 
@@ -177,6 +177,7 @@ export function SeksjonsNav({
 }) {
   return (
     <nav
+      aria-label="Innhold"
       className={`sticky ${top} z-40 -mx-6 border-b border-border bg-background/85 px-6 py-3 backdrop-blur-sm`}
     >
       <div className="flex flex-wrap gap-x-5 gap-y-1">

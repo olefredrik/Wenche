@@ -63,6 +63,7 @@ pytest --cov                             # med dekningsrapport
 ruff check . && ruff format --check .    # lint og formatering (`ruff format .` retter)
 mypy                                     # typesjekk av wenche/ og hosted/
 npm run typecheck && npm run lint        # TypeScript og ESLint for alle tre workspaces
+npm test                                 # vitest: designsystemet og røyktester av appene
 ```
 
 Testene dekker domenelaget (validering, XML-generering, klientene) og begge web-backendene. De krever ikke nettverk. XSD-valideringen av generert XML bruker `lxml`, som følger med `dev`-extraen.

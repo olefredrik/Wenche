@@ -1,26 +1,7 @@
 import { useEffect, useState } from "react";
-import { Kort, monoLabel } from "@wenche/ui";
+import { Kort, StegTittel, feilmelding, monoLabel } from "@wenche/ui";
 import { api } from "./api";
-
-interface Frist {
-  key: string;
-  tittel: string;
-  undertittel: string;
-  maaned: number;
-  dag: number;
-  beskrivelse: string;
-  auto_sjekk: boolean;
-  neste_frist: string;
-}
-interface FristStatus {
-  innfridd: boolean;
-  tidspunkt?: string | null;
-  beskrivelse?: string;
-  brukertekst?: string;
-  lenke?: string | null;
-  referanse?: string | null;
-  referanse_etikett?: string;
-}
+import type { Frist, FristStatus } from "./typer";
 
 function dagerTil(iso: string): number {
   const naa = new Date();
@@ -90,7 +71,7 @@ export default function Hjem() {
       const r = await api.sjekkFrister();
       setStatuser(r.statuser ?? {});
     } catch (e) {
-      setFeil((e as Error).message);
+      setFeil(feilmelding(e));
     } finally {
       setSjekker(false);
     }
@@ -104,18 +85,15 @@ export default function Hjem() {
         setAktiv(!!r.statussjekk_aktiv);
         if (r.statussjekk_aktiv) sjekk();
       })
-      .catch((e) => setFeil((e as Error).message));
+      .catch((e) => setFeil(feilmelding(e)));
   }, []);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="font-display text-2xl font-normal">Frister og status</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Wenche ordner årsregnskap, skattemelding og aksjonærregisteroppgave for
-          holdingselskapet ditt. Fyll ut tallene under «Tall», og send inn under «Send».
-        </p>
-      </div>
+      <StegTittel tittel="Frister og status">
+        Wenche ordner årsregnskap, skattemelding og aksjonærregisteroppgave for holdingselskapet
+        ditt. Fyll ut tallene under «Tall», og send inn under «Send».
+      </StegTittel>
 
       <div className="flex items-center gap-3">
         <h3 className="font-display text-lg">Frister</h3>
@@ -136,7 +114,11 @@ export default function Hjem() {
         ))}
       </div>
 
-      {feil && <p className="text-sm text-red-700">{feil}</p>}
+      {feil && (
+        <p role="alert" className="text-sm text-red-700">
+          {feil}
+        </p>
+      )}
 
       <Kort>
         <p className={monoLabel}>Ansvarsfraskrivelse</p>

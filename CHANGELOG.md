@@ -4,6 +4,31 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.14.0] - 2026-11-11
+
+### Lagt til
+
+- **Vakt mot å miste utfyllingen ved fanebytte.** Bytter du fane med ulagrede endringer i
+  Tall, spør Wenche først («Forlate uten å lagre?»). Før forsvant endringene stille; bare
+  lukking av siden ble varslet.
+- Lagring som feiler vises i skjemaet («Kunne ikke lagre» med årsaken). I hostet gir også
+  utlogging som feiler og en tjeneste som ikke svarer en melding, i stedet for en stille
+  innloggingsskjerm.
+- `npm test`: vitest med 37 tester av det delte designsystemet og appene, også i CI.
+
+### Endret
+
+- **Tilgjengelighet.** Dialogene (bekreft innsending, Bodil-import, SAF-T-import, ulagrede
+  endringer) er ekte dialoger med tittel, Escape, fokusfelle og fokus tilbake dit du var.
+  Feilmeldinger annonseres for skjermlesere, appene har én hovedoverskrift, og aksjonær- og
+  lånerader har stabile nøkler så feltene ikke blandes når en rad midt i lista fjernes.
+- Ventingen på BankID-godkjenning i hostet stopper etter 15 minutter og ber deg sjekke
+  manuelt, i stedet for å spørre Altinn i det uendelige fra en glemt fane.
+- React 19 (fra 18) i begge webgrensesnittene.
+- Internt: typet API-lag (`req<T>` med svar-typer som speiler backendens), delt header,
+  banner og steg-overskrifter, skjemaet delt opp i felter, import-dialoger og aksjonærliste,
+  hostet `App.tsx` delt i én fil per skjerm, og felles `tsconfig.base.json`.
+
 ## [1.13.0] - 2026-11-11
 
 ### Endret
