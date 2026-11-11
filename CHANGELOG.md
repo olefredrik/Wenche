@@ -36,6 +36,8 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
   innsendingsformål avgjøres ett sted.
 - Én token-funksjon, `wenche.auth.hent_tokens`, bak `login`, `get_altinn_token` og
   SKD-variantene. De eldre navnene virker som før.
+- Altinns feilkode AUTH-00004 (selskapet har allerede en systembruker) forklares i meldingen,
+  i CLI-en og i webgrensesnittene.
 - Fjernet ubrukt kode: `AltinnClient.hent_status` og `neste_prosesssteg`,
   `SkdSkattemeldingClient.hent_forhåndsutfylt` og `bygg_og_valider_konvolutt`.
 

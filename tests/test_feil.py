@@ -82,6 +82,14 @@ def test_beskrivelse_foelger_med_i_meldingen():
     assert "Ingenting er sendt inn" in brukermelding(e)
 
 
+def test_kjent_kode_faar_forklaring_i_begge_meldinger():
+    e = MyndighetsFeil(
+        "altinn", "oppretting av systembruker-forespørsel i Altinn", status=400, kode="AUTH-00004"
+    )
+    assert "AUTH-00004" in str(e) and "allerede en systembruker" in str(e)
+    assert "allerede en systembruker" in brukermelding(e)
+
+
 def test_authfeil_fra_maskinporten_svar():
     kropp = '{"error": "invalid_grant", "error_description": "Client authentication failed"}'
     e = AuthFeil.fra_maskinporten_svar(_svar(401, kropp, url="https://maskinporten.no/token"))

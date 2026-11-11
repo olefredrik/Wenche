@@ -36,6 +36,17 @@ _KODEMONSTER = re.compile(r"\b[A-Z]{2,6}-\d{3,6}\b")
 # Koden for «fikk ikke svar»: tidsavbrudd, brutt forbindelse, DNS-feil.
 NETTVERK = "nettverk"
 
+# Feilkoder brukeren kan gjøre noe med, eller som ellers ser ut som en feil i Wenche. Teksten
+# legges til i meldingen (CLI og web) ved siden av steg og status.
+KJENTE_KODER: dict[str, str] = {
+    # Altinn avviser en ny systembruker-forespørsel når selskapet allerede har en systembruker
+    # for systemet (verifisert i tt02).
+    "AUTH-00004": (
+        "Selskapet har allerede en systembruker for Wenche i Altinn, så det trengs ingen ny "
+        "forespørsel."
+    ),
+}
+
 
 class WencheFeil(RuntimeError):
     """Basisklasse for feil Wenche selv melder (ikke programmeringsfeil)."""
@@ -104,6 +115,8 @@ class MyndighetsFeil(WencheFeil):
             tekst = f"{self.navn}: {hva}{kode}"
         if self.beskrivelse:
             tekst += f". {self.beskrivelse}"
+        if self.kode in KJENTE_KODER:
+            tekst += f". {KJENTE_KODER[self.kode]}"
         return tekst
 
     @classmethod
@@ -266,4 +279,6 @@ def brukermelding(e: MyndighetsFeil) -> str:
         tekst = f"{e.navn}: {e.steg or 'kallet'} feilet. Ingenting er sendt inn."
     if e.beskrivelse:
         tekst += f" {e.beskrivelse}"
+    if e.kode in KJENTE_KODER:
+        tekst += f" {KJENTE_KODER[e.kode]}"
     return tekst
