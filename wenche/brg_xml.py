@@ -3,7 +3,7 @@ Generering av BRG XML-dokumenter for årsregnskap.
 
 Brønnøysundregistrene krever to separate XML-dokumenter ved innsending via Altinn:
   - Hovedskjema (RR-0002): selskapsinfo, regnskapsperiode, prinsipper, fastsettelse
-  - Underskjema (RR-0002U): selve tallene — resultatregnskap og balanse
+  - Underskjema (RR-0002U): selve tallene, resultatregnskap og balanse
 
 Namespace og orid-verdier er hentet fra BRGs offisielle Postman-eksempler:
 https://brreg.github.io/docs/apidokumentasjon/regnskapsregisteret/maskinell-innrapportering/
@@ -13,7 +13,7 @@ import uuid
 from datetime import date
 from xml.sax.saxutils import escape
 
-from wenche.models import Aarsregnskap
+from wenche.models import Aarsregnskap, Balanse, Resultatregnskap
 from wenche.xml_hjelp import heltall
 
 # ---------------------------------------------------------------------------
@@ -99,11 +99,11 @@ def generer_aksjenote_vedlegg(regnskap: Aarsregnskap) -> bytes:
     beloep = heltall(regnskap.balanse.eiendeler.anleggsmidler.andre_aksjer)
 
     linjer = [
-        f"Note til årsregnskap — {s.navn}",
+        f"Note til årsregnskap, {s.navn}",
         f"Organisasjonsnummer: {s.org_nummer}",
         f"Regnskapsår: {aar}",
         "",
-        "Note — Andre aksjer og andeler (rskl. § 7-36)",
+        "Note: Andre aksjer og andeler (rskl. § 7-36)",
         "",
         "Selskapet eier aksjer og andeler i andre foretak.",
         f"Bokført verdi per 31.12.{aar}: {beloep:,} kr".replace(",", " "),
@@ -180,95 +180,208 @@ def generer_hovedskjema(regnskap: Aarsregnskap) -> bytes:
     return xml.encode("utf-8")
 
 
-def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
+def _linje(
+    tag: str,
+    verdi: float,
+    besk: str,
+    orid_besk: str,
+    orid_aarets: str,
+    orid_fjor: str,
+    fjor_verdi: float = 0.0,
+) -> str:
     """
-    Genererer Underskjema XML (dataType=Underskjema, dataFormatId=758).
-    Inneholder resultatregnskap og balanse med BRGs orid-verdier.
-    BRG krever heltall — alle beløp rundes til nærmeste krone.
+    Linjeelement med altinnRowId og beskrivelse, for elementene XSD-en lar gjenta
+    (unbounded). Utelates når både årets og fjorårets verdi er 0.
     """
-    r = regnskap.resultatregnskap
-    b = regnskap.balanse
-    fr = regnskap.foregaaende_aar_resultat
-    fb = regnskap.foregaaende_aar_balanse
-    # Årsverk settes lik antall ansatte i note 2, så skjemaet og noten sier det samme. Wenche
-    # har ingen deltidsbrøk; passive selskap har normalt 0, og dry-run advarer når tallet er
-    # over 0 (lønn og a-melding er utenfor det Wenche sender inn).
-    aarsverk = regnskap.noter.antall_ansatte
+    iv, ifv = heltall(verdi), heltall(fjor_verdi)
+    if iv == 0 and ifv == 0:
+        return ""
+    return (
+        f'<{tag} altinnRowId="{_row_id()}">'
+        f'<beskrivelse orid="{orid_besk}">{besk}</beskrivelse>'
+        f'<aarets orid="{orid_aarets}">{iv}</aarets>'
+        f'<fjoraarets orid="{orid_fjor}">{ifv}</fjoraarets>'
+        f"</{tag}>"
+    )
 
-    # Avrund float til int for BRG XML (registrene aksepterer kun heltall)
-    def _i(v: float) -> int:
-        return heltall(v)
 
-    # Hjelpefunksjon: lager linjeelement med altinnRowId og beskrivelse (unbounded-elementer)
-    def linje(
-        tag: str,
-        verdi: float,
-        besk: str,
-        orid_besk: str,
-        orid_aarets: str,
-        orid_fjor: str,
-        fjor_verdi: float = 0.0,
-    ) -> str:
-        iv, ifv = _i(verdi), _i(fjor_verdi)
-        if iv == 0 and ifv == 0:
-            return ""
-        return (
-            f'<{tag} altinnRowId="{_row_id()}">'
-            f'<beskrivelse orid="{orid_besk}">{besk}</beskrivelse>'
-            f'<aarets orid="{orid_aarets}">{iv}</aarets>'
-            f'<fjoraarets orid="{orid_fjor}">{ifv}</fjoraarets>'
-            f"</{tag}>"
-        )
+def _linje_enkel(
+    tag: str, verdi: float, orid_aarets: str, orid_fjor: str, fjor_verdi: float = 0.0
+) -> str:
+    """
+    Linjeelement for elementer som bare kan forekomme én gang. Utelater altinnRowId og
+    <beskrivelse> med vilje: XSD-en definerer disse (f.eks. rentekostnad, overkursfond,
+    utbytte) uten dem, i motsetning til de gjentakbare elementene i _linje(). Utelates når
+    både årets og fjorårets verdi er 0.
+    """
+    iv, ifv = heltall(verdi), heltall(fjor_verdi)
+    if iv == 0 and ifv == 0:
+        return ""
+    return (
+        f"<{tag}>"
+        f'<aarets orid="{orid_aarets}">{iv}</aarets>'
+        f'<fjoraarets orid="{orid_fjor}">{ifv}</fjoraarets>'
+        f"</{tag}>"
+    )
 
-    # Hjelpefunksjon for single-occurrence elementer.
-    # Utelater altinnRowId og <beskrivelse> med vilje: XSD-en for disse
-    # elementene (f.eks. rentekostnad, langsiktigKonserngjeld, overkursfond)
-    # definerer dem uten disse attributtene/barna, i motsetning til
-    # repeatable-elementer som bruker linje().
-    def linje_enkel(
-        tag: str, verdi: float, orid_aarets: str, orid_fjor: str, fjor_verdi: float = 0.0
-    ) -> str:
-        iv, ifv = _i(verdi), _i(fjor_verdi)
-        if iv == 0 and ifv == 0:
-            return ""
-        return (
-            f"<{tag}>"
-            f'<aarets orid="{orid_aarets}">{iv}</aarets>'
-            f'<fjoraarets orid="{orid_fjor}">{ifv}</fjoraarets>'
-            f"</{tag}>"
-        )
 
-    # Inneværende år
-    di = r.driftsinntekter
-    dk = r.driftskostnader
-    fp = r.finansposter
-    ei = b.eiendeler
-    am = ei.anleggsmidler
-    om = ei.omloepmidler
-    ek = b.egenkapital_og_gjeld.egenkapital
-    lg = b.egenkapital_og_gjeld.langsiktig_gjeld
-    kg = b.egenkapital_og_gjeld.kortsiktig_gjeld
+def _sumlinje(tag: str, verdi: float, orid_aarets: str, orid_fjor: str, fjor_verdi: float) -> str:
+    """Sum- og resultatelement. Sendes alltid, også når begge verdiene er 0."""
+    return (
+        f"<{tag}>"
+        f'<aarets orid="{orid_aarets}">{heltall(verdi)}</aarets>'
+        f'<fjoraarets orid="{orid_fjor}">{heltall(fjor_verdi)}</fjoraarets>'
+        f"</{tag}>"
+    )
 
-    # Foregående år
-    fdi = fr.driftsinntekter
-    fdk = fr.driftskostnader
-    ffp = fr.finansposter
-    fei = fb.eiendeler
-    fam = fei.anleggsmidler
-    fom = fei.omloepmidler
-    fek = fb.egenkapital_og_gjeld.egenkapital
-    flg = fb.egenkapital_og_gjeld.langsiktig_gjeld
-    fkg = fb.egenkapital_og_gjeld.kortsiktig_gjeld
 
-    netto_finans = fp.sum_inntekter - fp.sum_kostnader
-
+def _resultatregnskap_xml(r: Resultatregnskap, fr: Resultatregnskap) -> str:
+    """Resultatregnskapet i underskjemaet: drift, finans og resultat, med fjorårets tall."""
+    di, dk, fp = r.driftsinntekter, r.driftskostnader, r.finansposter
+    fdi, fdk, ffp = fr.driftsinntekter, fr.driftskostnader, fr.finansposter
     # Gevinst ved realisasjon av aksjer er en annen finansinntekt (annenFinansinntekt), ikke
     # en renteinntekt, og rapporteres på egen linje. Tap rapporteres sammen med andre
     # finanskostnader, der det hører hjemme.
     andre_finanskostnader = fp.andre_finanskostnader + fp.tap_ved_realisasjon_av_aksjer
     f_andre_finanskostnader = ffp.andre_finanskostnader + ffp.tap_ved_realisasjon_av_aksjer
-    sum_gjeld = lg.sum + kg.sum
-    sum_innskutt_ek = ek.aksjekapital + ek.overkursfond
+    return f"""
+    <resultatregnskapDriftsresultat>
+      {_sumlinje("driftsresultat", r.driftsresultat, "146", "7026", fr.driftsresultat)}
+      <inntekt>
+        {_linje("salgsinntekt", di.salgsinntekter, "Salgsinntekter", "28998", "1340", "7965", fdi.salgsinntekter)}
+        {_linje("driftsinntekt", di.andre_driftsinntekter, "Andre driftsinntekter", "28999", "7709", "7966", fdi.andre_driftsinntekter)}
+        {_sumlinje("driftsinntektSum", di.sum, "72", "6972", fdi.sum)}
+      </inntekt>
+      <kostnad>
+        {_linje("loennskostnad", dk.loennskostnader, "Lønnskostnader", "29001", "81", "6979", fdk.loennskostnader)}
+        {_linje("avskrivning", dk.avskrivninger, "Avskrivninger", "29002", "2139", "10181", fdk.avskrivninger)}
+        {_linje("annenDriftskostnad", dk.andre_driftskostnader, "Andre driftskostnader", "29003", "82", "7023", fdk.andre_driftskostnader)}
+        {_sumlinje("sumDriftskostnad", dk.sum, "17126", "17127", fdk.sum)}
+      </kostnad>
+    </resultatregnskapDriftsresultat>
+
+    <resultatregnskapFinansinntekt>
+      {_sumlinje("nettoFinans", fp.sum_inntekter - fp.sum_kostnader, "158", "7999", ffp.sum_inntekter - ffp.sum_kostnader)}
+      <finansinntekt>
+        {_linje("investeringDatterforetakTilknyttetSelskap", fp.utbytte_fra_datterselskap, "Utbytte fra datterselskap", "29004", "27934", "27935", ffp.utbytte_fra_datterselskap)}
+        {_linje("andreInvesteringer", fp.utbytte_fra_andre_aksjer, "Utbytte fra andre aksjer", "29005", "27936", "27937", ffp.utbytte_fra_andre_aksjer)}
+        {_linje_enkel("annenRenteinntekt", fp.andre_finansinntekter, "150", "7030", ffp.andre_finansinntekter)}
+        {_linje("annenFinansinntekt", fp.gevinst_ved_realisasjon_av_aksjer, "Gevinst ved realisasjon av aksjer", "29006", "152", "7032", ffp.gevinst_ved_realisasjon_av_aksjer)}
+        {_sumlinje("sumFinansinntekter", fp.sum_inntekter, "153", "7993", ffp.sum_inntekter)}
+      </finansinntekt>
+      <finanskostnad>
+        {_linje_enkel("rentekostnad", fp.rentekostnader, "7037", "7038", ffp.rentekostnader)}
+        {_linje("annenFinanskostnad", andre_finanskostnader, "Andre finanskostnader", "29011", "156", "7041", f_andre_finanskostnader)}
+        {_sumlinje("sumFinanskostnader", fp.sum_kostnader, "17130", "17131", ffp.sum_kostnader)}
+      </finanskostnad>
+    </resultatregnskapFinansinntekt>
+
+    <resultatregnskapResultat>
+      <resultat>
+        {_sumlinje("resultatFoerSkattekostnad", r.resultat_foer_skatt, "167", "7042", fr.resultat_foer_skatt)}
+        {_linje("skattekostnad", r.skattekostnad, "Skattekostnad på ordinært resultat", "29013", "11835", "11836", fr.skattekostnad)}
+        {_sumlinje("aarsresultat", r.aarsresultat, "172", "7054", fr.aarsresultat)}
+      </resultat>
+      <overfoeringer>
+        {_sumlinje("sumOverfoeringerOgDisponeringer", r.aarsresultat, "7071", "7072", fr.aarsresultat)}
+      </overfoeringer>
+    </resultatregnskapResultat>
+"""
+
+
+def _eiendeler_xml(b: Balanse, fb: Balanse) -> str:
+    """Balansens eiendelsside: anleggsmidler og omløpsmidler, med fjorårets tall."""
+    ei, fei = b.eiendeler, fb.eiendeler
+    am, fam = ei.anleggsmidler, fei.anleggsmidler
+    om, fom = ei.omloepmidler, fei.omloepmidler
+    return f"""
+    <balanseAnleggsmidlerOmloepsmidler>
+      {_sumlinje("sumEiendeler", ei.sum, "219", "7127", fei.sum)}
+      <balanseAnleggsmidler>
+        {_sumlinje("sumAnleggsmidler", am.sum, "217", "7108", fam.sum)}
+        <balanseFinansielleAnleggsmidler>
+          {_sumlinje("investeringDatterselskap", am.aksjer_i_datterselskap, "9686", "10289", fam.aksjer_i_datterselskap)}
+          {_linje("investeringAksjerAndeler", am.andre_aksjer, "Andre aksjer", "29024", "7100", "7101", fam.andre_aksjer)}
+          {_linje("annenFordring", am.langsiktige_fordringer, "Langsiktige fordringer", "29025", "203", "27585", fam.langsiktige_fordringer)}
+          {_sumlinje("sumFinansielleAnleggsmidler", am.sum, "5267", "8014", fam.sum)}
+        </balanseFinansielleAnleggsmidler>
+      </balanseAnleggsmidler>
+      <balanseOmloepsmidler>
+        {_sumlinje("sumOmloepsmidler", om.sum, "194", "7126", fom.sum)}
+        <balanseOmloepsmidlerVarerFordringer>
+          <fordringer>
+            {_linje("andreFordringer", om.kortsiktige_fordringer, "Kortsiktige fordringer", "29028", "282", "7112", fom.kortsiktige_fordringer)}
+            {_sumlinje("sumFordringer", om.kortsiktige_fordringer, "80", "8015", fom.kortsiktige_fordringer)}
+          </fordringer>
+        </balanseOmloepsmidlerVarerFordringer>
+        <balanseOmloepsmidlerInvesteringerBankinnskuddKontanter>
+          <bankinnskuddKontanter>
+            {_linje("bankinnskuddKontanter", om.bankinnskudd, "Bankinnskudd", "29031", "786", "8019", fom.bankinnskudd)}
+            {_sumlinje("sumBankinnskuddKontanter", om.bankinnskudd, "29042", "29043", fom.bankinnskudd)}
+          </bankinnskuddKontanter>
+        </balanseOmloepsmidlerInvesteringerBankinnskuddKontanter>
+      </balanseOmloepsmidler>
+    </balanseAnleggsmidlerOmloepsmidler>
+"""
+
+
+def _egenkapital_og_gjeld_xml(b: Balanse, fb: Balanse) -> str:
+    """Balansens finansieringsside: innskutt og opptjent egenkapital, langsiktig og kortsiktig gjeld."""
+    eg, feg = b.egenkapital_og_gjeld, fb.egenkapital_og_gjeld
+    ek, fek = eg.egenkapital, feg.egenkapital
+    lg, flg = eg.langsiktig_gjeld, feg.langsiktig_gjeld
+    kg, fkg = eg.kortsiktig_gjeld, feg.kortsiktig_gjeld
+    # «opptjentEgenkaiptal» er elementnavnet i BRGs skjema, med skrivefeilen.
+    return f"""
+    <balanseEgenkapitalGjeld>
+      {_sumlinje("sumEgenkapitalGjeld", eg.sum, "251", "7185", feg.sum)}
+      <balanseEgenkapitalInnskuttOpptjentEgenkapital>
+        <innskuttEgenkapital>
+          {_linje("selskapskapital", ek.aksjekapital, "Aksjekapital", "29032", "20488", "20489", fek.aksjekapital)}
+          {_linje_enkel("overkursfond", ek.overkursfond, "2585", "7135", fek.overkursfond)}
+          {_sumlinje("sumInnskuttEgenkapital", ek.aksjekapital + ek.overkursfond, "3730", "9984", fek.aksjekapital + fek.overkursfond)}
+        </innskuttEgenkapital>
+        <opptjentEgenkaiptal>
+          {_linje("annenEgenkapital", ek.annen_egenkapital, "Annen egenkapital", "29034", "3274", "7140", fek.annen_egenkapital)}
+          {_sumlinje("sumOpptjentEgenkapital", ek.annen_egenkapital, "9702", "9985", fek.annen_egenkapital)}
+          {_sumlinje("sumEgenkapital", ek.sum, "250", "7142", fek.sum)}
+        </opptjentEgenkaiptal>
+      </balanseEgenkapitalInnskuttOpptjentEgenkapital>
+      <balanseGjeldOversikt>
+        {_sumlinje("sumGjeld", lg.sum + kg.sum, "1119", "7184", flg.sum + fkg.sum)}
+        <balanseGjeldAvsetningerForpliktelserAnnenLangsiktigGjeld>
+          {_sumlinje("sumLangsiktigGjeld", lg.sum, "86", "7156", flg.sum)}
+          <annenLangsiktigGjeld>
+            {_linje("oevrigLangsiktigGjeld", lg.laan_fra_aksjonaer, "Lån fra aksjonær", "29036", "242", "7155", flg.laan_fra_aksjonaer)}
+            {_linje("oevrigLangsiktigGjeld", lg.andre_langsiktige_laan, "Andre langsiktige lån", "29036", "242", "7155", flg.andre_langsiktige_laan)}
+            {_sumlinje("sumAnnenLangsiktigGjeld", lg.sum, "25019", "25020", flg.sum)}
+          </annenLangsiktigGjeld>
+        </balanseGjeldAvsetningerForpliktelserAnnenLangsiktigGjeld>
+        <balanseKortsiktigGjeld>
+          {_linje_enkel("leverandoergjeld", kg.leverandoergjeld, "220", "7162", fkg.leverandoergjeld)}
+          {_linje("betalbarSkatt", kg.betalbar_skatt, "Betalbar skatt", "29038", "2483", "10293", fkg.betalbar_skatt)}
+          {_linje("skyldigeOffentligeAvgifter", kg.skyldige_offentlige_avgifter, "Skyldige offentlige avgifter", "29039", "225", "7170", fkg.skyldige_offentlige_avgifter)}
+          {_linje_enkel("utbytte", kg.avsatt_utbytte, "235", "7171", fkg.avsatt_utbytte)}
+          {_linje("annenKortsiktigGjeld", kg.annen_kortsiktig_gjeld, "Annen kortsiktig gjeld", "29040", "236", "7182", fkg.annen_kortsiktig_gjeld)}
+          {_sumlinje("sumKortsiktigGjeld", kg.sum, "85", "7183", fkg.sum)}
+        </balanseKortsiktigGjeld>
+      </balanseGjeldOversikt>
+    </balanseEgenkapitalGjeld>
+"""
+
+
+def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
+    """
+    Genererer Underskjema XML (dataType=Underskjema, dataFormatId=758).
+    Inneholder resultatregnskap og balanse med BRGs orid-verdier, seksjon for seksjon.
+    BRG krever heltall, så alle beløp rundes til nærmeste krone.
+    """
+    # Årsverk settes lik antall ansatte i note 2, så skjemaet og noten sier det samme. Wenche
+    # har ingen deltidsbrøk; passive selskap har normalt 0, og dry-run advarer når tallet er
+    # over 0 (lønn og a-melding er utenfor det Wenche sender inn).
+    aarsverk = regnskap.noter.antall_ansatte
+    fr = regnskap.foregaaende_aar_resultat
+    fb = regnskap.foregaaende_aar_balanse
 
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <melding xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -286,191 +399,14 @@ def generer_underskjema(regnskap: Aarsregnskap) -> bytes:
     </aarsregnskap>
   </Rapport-RR0002U>
   <Skjemainnhold-RR0002U>
-
-    <resultatregnskapDriftsresultat>
-      <driftsresultat>
-        <aarets orid="146">{_i(r.driftsresultat)}</aarets>
-        <fjoraarets orid="7026">{_i(fr.driftsresultat)}</fjoraarets>
-      </driftsresultat>
-      <inntekt>
-        {linje("salgsinntekt", di.salgsinntekter, "Salgsinntekter", "28998", "1340", "7965", fdi.salgsinntekter)}
-        {linje("driftsinntekt", di.andre_driftsinntekter, "Andre driftsinntekter", "28999", "7709", "7966", fdi.andre_driftsinntekter)}
-        <driftsinntektSum>
-          <aarets orid="72">{_i(di.sum)}</aarets>
-          <fjoraarets orid="6972">{_i(fdi.sum)}</fjoraarets>
-        </driftsinntektSum>
-      </inntekt>
-      <kostnad>
-        {linje("loennskostnad", dk.loennskostnader, "Lønnskostnader", "29001", "81", "6979", fdk.loennskostnader)}
-        {linje("avskrivning", dk.avskrivninger, "Avskrivninger", "29002", "2139", "10181", fdk.avskrivninger)}
-        {linje("annenDriftskostnad", dk.andre_driftskostnader, "Andre driftskostnader", "29003", "82", "7023", fdk.andre_driftskostnader)}
-        <sumDriftskostnad>
-          <aarets orid="17126">{_i(dk.sum)}</aarets>
-          <fjoraarets orid="17127">{_i(fdk.sum)}</fjoraarets>
-        </sumDriftskostnad>
-      </kostnad>
-    </resultatregnskapDriftsresultat>
-
-    <resultatregnskapFinansinntekt>
-      <nettoFinans>
-        <aarets orid="158">{_i(netto_finans)}</aarets>
-        <fjoraarets orid="7999">{_i(ffp.sum_inntekter - ffp.sum_kostnader)}</fjoraarets>
-      </nettoFinans>
-      <finansinntekt>
-        {linje("investeringDatterforetakTilknyttetSelskap", fp.utbytte_fra_datterselskap, "Utbytte fra datterselskap", "29004", "27934", "27935", ffp.utbytte_fra_datterselskap)}
-        {linje("andreInvesteringer", fp.utbytte_fra_andre_aksjer, "Utbytte fra andre aksjer", "29005", "27936", "27937", ffp.utbytte_fra_andre_aksjer)}
-        {linje_enkel("annenRenteinntekt", fp.andre_finansinntekter, "150", "7030", ffp.andre_finansinntekter)}
-        {linje("annenFinansinntekt", fp.gevinst_ved_realisasjon_av_aksjer, "Gevinst ved realisasjon av aksjer", "29006", "152", "7032", ffp.gevinst_ved_realisasjon_av_aksjer)}
-        <sumFinansinntekter>
-          <aarets orid="153">{_i(fp.sum_inntekter)}</aarets>
-          <fjoraarets orid="7993">{_i(ffp.sum_inntekter)}</fjoraarets>
-        </sumFinansinntekter>
-      </finansinntekt>
-      <finanskostnad>
-        {linje_enkel("rentekostnad", fp.rentekostnader, "7037", "7038", ffp.rentekostnader)}
-        {linje("annenFinanskostnad", andre_finanskostnader, "Andre finanskostnader", "29011", "156", "7041", f_andre_finanskostnader)}
-        <sumFinanskostnader>
-          <aarets orid="17130">{_i(fp.sum_kostnader)}</aarets>
-          <fjoraarets orid="17131">{_i(ffp.sum_kostnader)}</fjoraarets>
-        </sumFinanskostnader>
-      </finanskostnad>
-    </resultatregnskapFinansinntekt>
-
-    <resultatregnskapResultat>
-      <resultat>
-        <resultatFoerSkattekostnad>
-          <aarets orid="167">{_i(r.resultat_foer_skatt)}</aarets>
-          <fjoraarets orid="7042">{_i(fr.resultat_foer_skatt)}</fjoraarets>
-        </resultatFoerSkattekostnad>
-        {linje("skattekostnad", r.skattekostnad, "Skattekostnad på ordinært resultat", "29013", "11835", "11836", fr.skattekostnad)}
-        <aarsresultat>
-          <aarets orid="172">{_i(r.aarsresultat)}</aarets>
-          <fjoraarets orid="7054">{_i(fr.aarsresultat)}</fjoraarets>
-        </aarsresultat>
-      </resultat>
-      <overfoeringer>
-        <sumOverfoeringerOgDisponeringer>
-          <aarets orid="7071">{_i(r.aarsresultat)}</aarets>
-          <fjoraarets orid="7072">{_i(fr.aarsresultat)}</fjoraarets>
-        </sumOverfoeringerOgDisponeringer>
-      </overfoeringer>
-    </resultatregnskapResultat>
-
-    <balanseAnleggsmidlerOmloepsmidler>
-      <sumEiendeler>
-        <aarets orid="219">{_i(ei.sum)}</aarets>
-        <fjoraarets orid="7127">{_i(fei.sum)}</fjoraarets>
-      </sumEiendeler>
-      <balanseAnleggsmidler>
-        <sumAnleggsmidler>
-          <aarets orid="217">{_i(am.sum)}</aarets>
-          <fjoraarets orid="7108">{_i(fam.sum)}</fjoraarets>
-        </sumAnleggsmidler>
-        <balanseFinansielleAnleggsmidler>
-          <investeringDatterselskap>
-            <aarets orid="9686">{_i(am.aksjer_i_datterselskap)}</aarets>
-            <fjoraarets orid="10289">{_i(fam.aksjer_i_datterselskap)}</fjoraarets>
-          </investeringDatterselskap>
-          {linje("investeringAksjerAndeler", am.andre_aksjer, "Andre aksjer", "29024", "7100", "7101", fam.andre_aksjer)}
-          {linje("annenFordring", am.langsiktige_fordringer, "Langsiktige fordringer", "29025", "203", "27585", fam.langsiktige_fordringer)}
-          <sumFinansielleAnleggsmidler>
-            <aarets orid="5267">{_i(am.sum)}</aarets>
-            <fjoraarets orid="8014">{_i(fam.sum)}</fjoraarets>
-          </sumFinansielleAnleggsmidler>
-        </balanseFinansielleAnleggsmidler>
-      </balanseAnleggsmidler>
-      <balanseOmloepsmidler>
-        <sumOmloepsmidler>
-          <aarets orid="194">{_i(om.sum)}</aarets>
-          <fjoraarets orid="7126">{_i(fom.sum)}</fjoraarets>
-        </sumOmloepsmidler>
-        <balanseOmloepsmidlerVarerFordringer>
-          <fordringer>
-            {linje("andreFordringer", om.kortsiktige_fordringer, "Kortsiktige fordringer", "29028", "282", "7112", fom.kortsiktige_fordringer)}
-            <sumFordringer>
-              <aarets orid="80">{_i(om.kortsiktige_fordringer)}</aarets>
-              <fjoraarets orid="8015">{_i(fom.kortsiktige_fordringer)}</fjoraarets>
-            </sumFordringer>
-          </fordringer>
-        </balanseOmloepsmidlerVarerFordringer>
-        <balanseOmloepsmidlerInvesteringerBankinnskuddKontanter>
-          <bankinnskuddKontanter>
-            {linje("bankinnskuddKontanter", om.bankinnskudd, "Bankinnskudd", "29031", "786", "8019", fom.bankinnskudd)}
-            <sumBankinnskuddKontanter>
-              <aarets orid="29042">{_i(om.bankinnskudd)}</aarets>
-              <fjoraarets orid="29043">{_i(fom.bankinnskudd)}</fjoraarets>
-            </sumBankinnskuddKontanter>
-          </bankinnskuddKontanter>
-        </balanseOmloepsmidlerInvesteringerBankinnskuddKontanter>
-      </balanseOmloepsmidler>
-    </balanseAnleggsmidlerOmloepsmidler>
-
-    <balanseEgenkapitalGjeld>
-      <sumEgenkapitalGjeld>
-        <aarets orid="251">{_i(b.egenkapital_og_gjeld.sum)}</aarets>
-        <fjoraarets orid="7185">{_i(fb.egenkapital_og_gjeld.sum)}</fjoraarets>
-      </sumEgenkapitalGjeld>
-      <balanseEgenkapitalInnskuttOpptjentEgenkapital>
-        <innskuttEgenkapital>
-          {linje("selskapskapital", ek.aksjekapital, "Aksjekapital", "29032", "20488", "20489", fek.aksjekapital)}
-          {linje_enkel("overkursfond", ek.overkursfond, "2585", "7135", fek.overkursfond)}
-          <sumInnskuttEgenkapital>
-            <aarets orid="3730">{_i(sum_innskutt_ek)}</aarets>
-            <fjoraarets orid="9984">{_i(fek.aksjekapital + fek.overkursfond)}</fjoraarets>
-          </sumInnskuttEgenkapital>
-        </innskuttEgenkapital>
-        <opptjentEgenkaiptal>
-          {linje("annenEgenkapital", ek.annen_egenkapital, "Annen egenkapital", "29034", "3274", "7140", fek.annen_egenkapital)}
-          <sumOpptjentEgenkapital>
-            <aarets orid="9702">{_i(ek.annen_egenkapital)}</aarets>
-            <fjoraarets orid="9985">{_i(fek.annen_egenkapital)}</fjoraarets>
-          </sumOpptjentEgenkapital>
-          <sumEgenkapital>
-            <aarets orid="250">{_i(ek.sum)}</aarets>
-            <fjoraarets orid="7142">{_i(fek.sum)}</fjoraarets>
-          </sumEgenkapital>
-        </opptjentEgenkaiptal>
-      </balanseEgenkapitalInnskuttOpptjentEgenkapital>
-      <balanseGjeldOversikt>
-        <sumGjeld>
-          <aarets orid="1119">{_i(sum_gjeld)}</aarets>
-          <fjoraarets orid="7184">{_i(flg.sum + fkg.sum)}</fjoraarets>
-        </sumGjeld>
-        <balanseGjeldAvsetningerForpliktelserAnnenLangsiktigGjeld>
-          <sumLangsiktigGjeld>
-            <aarets orid="86">{_i(lg.sum)}</aarets>
-            <fjoraarets orid="7156">{_i(flg.sum)}</fjoraarets>
-          </sumLangsiktigGjeld>
-          <annenLangsiktigGjeld>
-            {linje("oevrigLangsiktigGjeld", lg.laan_fra_aksjonaer, "Lån fra aksjonær", "29036", "242", "7155", flg.laan_fra_aksjonaer)}
-            {linje("oevrigLangsiktigGjeld", lg.andre_langsiktige_laan, "Andre langsiktige lån", "29036", "242", "7155", flg.andre_langsiktige_laan)}
-            <sumAnnenLangsiktigGjeld>
-              <aarets orid="25019">{_i(lg.sum)}</aarets>
-              <fjoraarets orid="25020">{_i(flg.sum)}</fjoraarets>
-            </sumAnnenLangsiktigGjeld>
-          </annenLangsiktigGjeld>
-        </balanseGjeldAvsetningerForpliktelserAnnenLangsiktigGjeld>
-        <balanseKortsiktigGjeld>
-          {linje_enkel("leverandoergjeld", kg.leverandoergjeld, "220", "7162", fkg.leverandoergjeld)}
-          {linje("betalbarSkatt", kg.betalbar_skatt, "Betalbar skatt", "29038", "2483", "10293", fkg.betalbar_skatt)}
-          {linje("skyldigeOffentligeAvgifter", kg.skyldige_offentlige_avgifter, "Skyldige offentlige avgifter", "29039", "225", "7170", fkg.skyldige_offentlige_avgifter)}
-          {linje_enkel("utbytte", kg.avsatt_utbytte, "235", "7171", fkg.avsatt_utbytte)}
-          {linje("annenKortsiktigGjeld", kg.annen_kortsiktig_gjeld, "Annen kortsiktig gjeld", "29040", "236", "7182", fkg.annen_kortsiktig_gjeld)}
-          <sumKortsiktigGjeld>
-            <aarets orid="85">{_i(kg.sum)}</aarets>
-            <fjoraarets orid="7183">{_i(fkg.sum)}</fjoraarets>
-          </sumKortsiktigGjeld>
-        </balanseKortsiktigGjeld>
-      </balanseGjeldOversikt>
-    </balanseEgenkapitalGjeld>
-
-
+{_resultatregnskap_xml(regnskap.resultatregnskap, fr)}
+{_eiendeler_xml(regnskap.balanse, fb)}
+{_egenkapital_og_gjeld_xml(regnskap.balanse, fb)}
     <noter>
       <noteAarsverkTjenestePensjon>
         <antallAarsverk orid="37467">{aarsverk}</antallAarsverk>
       </noteAarsverkTjenestePensjon>
     </noter>
-
   </Skjemainnhold-RR0002U>
 </melding>"""
     return xml.encode("utf-8")

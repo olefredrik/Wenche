@@ -40,10 +40,12 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 from wenche.models import (
     NAERINGSKATEGORIER,
     Aarsregnskap,
+    Balanse,
     NaeringsspesifikasjonPost,
+    Resultatregnskap,
     SkattemeldingKonfig,
 )
-from wenche.skatteberegning import beregn_skatt
+from wenche.skatteberegning import Skatteberegning, beregn_skatt
 from wenche.xml_hjelp import beloep_tekst
 
 _NS = "urn:no:skatteetaten:fastsetting:formueinntekt:naeringsspesifikasjon:ekstern:v6"
@@ -338,211 +340,128 @@ def egenkapitalavstemming(
     return inngaaende_ek, utgaaende_ek, tillegg, fradrag
 
 
-def generer_naeringsspesifikasjon(
-    regnskap: Aarsregnskap,
-    partsnummer: int,
-    konfig: SkattemeldingKonfig | None = None,
-) -> bytes:
+def _resultatgruppe(
+    parent: Element, tag: str, barn_tag: str, poster: list[tuple[float, str]]
+) -> None:
+    """<tag> med én Resultatregnskapsforekomst per (beløp, kode). Utelates uten poster."""
+    if poster:
+        gruppe = SubElement(parent, tag)
+        for beloep, kode in poster:
+            _resultatforekomst(gruppe, barn_tag, beloep, kode)
+
+
+def _balansegruppe(
+    parent: Element, tag: str, barn_tag: str, poster: list[tuple[float, str]]
+) -> None:
+    """<tag> med én Balanseregnskapsforekomst per (beløp, kode). Utelates uten poster."""
+    if poster:
+        gruppe = SubElement(parent, tag)
+        for beloep, kode in poster:
+            _balanseforekomst(gruppe, barn_tag, beloep, kode)
+
+
+def _resultatregnskap(
+    root: Element, res: Resultatregnskap, poster: dict[str, list[tuple[float, str]]]
+) -> None:
     """
-    Genererer naeringsspesifikasjon XML for innsending til Skatteetaten.
-
-    Næringsoppgaven er obligatorisk for AS — uten den avviser Skatteetaten
-    konvolutten. Avledede summer (sumDriftsinntekt, aarsresultat,
-    sumBalanseverdiFor*, sumGjeldOgEgenkapital, skattemessigResultat osv.)
-    emitteres eksplisitt for å unngå avvik i SKDs etterBeregning.
-
-    Args:
-        regnskap:     Årsregnskap med resultatregnskap og balanse.
-        partsnummer:  Skatteetatens interne partsnummer (fra forhåndsutfylt API).
-        konfig:       Skattemelding-konfigurasjonen. Nødvendig fordi det skattemessige
-                      resultatet avhenger av fritaksmetoden og eierandelen: uten den
-                      ville næringsspesifikasjonen oppgitt brutto utbytte som
-                      skattepliktig inntekt. Utelates den, brukes standardvalgene
-                      (fritaksmetoden på, 100 % eierandel).
-
-    Returns:
-        XML-bytes klar for innpakking i konvolutt via generer_konvolutt().
+    Resultatregnskapet. Rekkefølgen følger XSD-sekvensen: summen står først i hver gruppe,
+    sum-finanspostene og sumSkattekostnad ligger på resultatregnskap-nivå før forekomstene,
+    skattekostnad-forekomsten kommer etter finanskostnad, og aarsresultat står sist.
     """
-    konfig = konfig or SkattemeldingKonfig()
-    beregning = beregn_skatt(regnskap.resultatregnskap, konfig)
-    poster = _poster_per_kategori(regnskap, konfig)
-    root = Element("naeringsspesifikasjon", xmlns=_NS)
-
-    SubElement(root, "partsreferanse").text = str(partsnummer)
-    SubElement(root, "inntektsaar").text = str(regnskap.regnskapsaar)
-
-    # -----------------------------------------------------------------------
-    # Resultatregnskap
-    # -----------------------------------------------------------------------
-    res = regnskap.resultatregnskap
-    di = res.driftsinntekter
-    dk = res.driftskostnader
-    fp = res.finansposter
-
+    di, dk, fp = res.driftsinntekter, res.driftskostnader, res.finansposter
     resultatregnskap = SubElement(root, "resultatregnskap")
 
-    # Driftsinntekter. sumDriftsinntekt må stå først i Driftsinntekt per XSD.
     driftsinntekt_el = SubElement(resultatregnskap, "driftsinntekt")
     if di.sum:
         _beloep_element(driftsinntekt_el, "sumDriftsinntekt", di.sum)
+    _resultatgruppe(driftsinntekt_el, "salgsinntekt", "inntekt", poster["salgsinntekt"])
+    _resultatgruppe(driftsinntekt_el, "annenDriftsinntekt", "inntekt", poster["annenDriftsinntekt"])
 
-    if poster["salgsinntekt"]:
-        salgsinntekt_el = SubElement(driftsinntekt_el, "salgsinntekt")
-        for beloep, kode in poster["salgsinntekt"]:
-            _resultatforekomst(salgsinntekt_el, "inntekt", beloep, kode)
-
-    if poster["annenDriftsinntekt"]:
-        annen_di_el = SubElement(driftsinntekt_el, "annenDriftsinntekt")
-        for beloep, kode in poster["annenDriftsinntekt"]:
-            _resultatforekomst(annen_di_el, "inntekt", beloep, kode)
-
-    # Driftskostnader. sumDriftskostnad må stå først i Driftskostnad per XSD.
     driftskostnad_el = SubElement(resultatregnskap, "driftskostnad")
     if dk.sum:
         _beloep_element(driftskostnad_el, "sumDriftskostnad", dk.sum)
+    _resultatgruppe(driftskostnad_el, "loennskostnad", "kostnad", poster["loennskostnad"])
+    _resultatgruppe(driftskostnad_el, "annenDriftskostnad", "kostnad", poster["annenDriftskostnad"])
 
-    if poster["loennskostnad"]:
-        loenn_el = SubElement(driftskostnad_el, "loennskostnad")
-        for beloep, kode in poster["loennskostnad"]:
-            _resultatforekomst(loenn_el, "kostnad", beloep, kode)
-
-    annen_dk_poster = poster["annenDriftskostnad"]
-    if annen_dk_poster:
-        annen_dk_el = SubElement(driftskostnad_el, "annenDriftskostnad")
-        for beloep, kode in annen_dk_poster:
-            _resultatforekomst(annen_dk_el, "kostnad", beloep, kode)
-
-    # Sum-finansposter må stå på resultatregnskap-nivå før finansinntekt/-kostnad
-    # per XSD-sekvensen.
     if fp.sum_inntekter:
         _beloep_element(resultatregnskap, "sumFinansinntekt", fp.sum_inntekter)
     if fp.sum_kostnader:
         _beloep_element(resultatregnskap, "sumFinanskostnad", fp.sum_kostnader)
-    # sumSkattekostnad står etter sumFinanskostnad og før finansinntekt per XSD-sekvensen.
     if res.skattekostnad:
         _beloep_element(resultatregnskap, "sumSkattekostnad", res.skattekostnad)
-
-    # Finansinntekter
-    fi_poster = poster["finansinntekt"]
-    if fi_poster:
-        finansinntekt_el = SubElement(resultatregnskap, "finansinntekt")
-        for beloep, kode in fi_poster:
-            _resultatforekomst(finansinntekt_el, "inntekt", beloep, kode)
-
-    # Finanskostnader
-    fk_poster = poster["finanskostnad"]
-    if fk_poster:
-        finanskostnad_el = SubElement(resultatregnskap, "finanskostnad")
-        for beloep, kode in fk_poster:
-            _resultatforekomst(finanskostnad_el, "kostnad", beloep, kode)
-
-    # Skattekostnad-forekomsten står etter finanskostnad per XSD-sekvensen.
-    if poster["skattekostnad"]:
-        skattekostnad_el = SubElement(resultatregnskap, "skattekostnad")
-        for beloep, kode in poster["skattekostnad"]:
-            _resultatforekomst(skattekostnad_el, "kostnad", beloep, kode)
-
-    # aarsresultat står sist i Resultatregnskap-sekvensen.
+    _resultatgruppe(resultatregnskap, "finansinntekt", "inntekt", poster["finansinntekt"])
+    _resultatgruppe(resultatregnskap, "finanskostnad", "kostnad", poster["finanskostnad"])
+    _resultatgruppe(resultatregnskap, "skattekostnad", "kostnad", poster["skattekostnad"])
     if res.aarsresultat:
         _beloep_element(resultatregnskap, "aarsresultat", res.aarsresultat)
 
-    # -----------------------------------------------------------------------
-    # Balanseregnskap
-    # -----------------------------------------------------------------------
-    bal = regnskap.balanse
-    am = bal.eiendeler.anleggsmidler
-    om = bal.eiendeler.omloepmidler
-    eg = bal.egenkapital_og_gjeld
 
+def _balanseregnskap(
+    root: Element, bal: Balanse, poster: dict[str, list[tuple[float, str]]]
+) -> None:
+    """
+    Balanseregnskapet. Summen står først i anleggsmiddel og omløpsmiddel. XSD-sekvensen i
+    GjeldOgEgenkapital er sumLangsiktigGjeld -> sumKortsiktigGjeld -> sumEgenkapital ->
+    langsiktigGjeld -> kortsiktigGjeld -> egenkapital; feil rekkefølge gjør XML-en ugyldig
+    mot naeringsspesifikasjon_v6 og var årsaken til SMEVB-005 fra Skatteetatens visning-API
+    (SSV-5187). Balansetotalene står sist i Balanseregnskap-sekvensen.
+    """
+    am, om = bal.eiendeler.anleggsmidler, bal.eiendeler.omloepmidler
+    eg = bal.egenkapital_og_gjeld
+    lg, kg, ek = eg.langsiktig_gjeld, eg.kortsiktig_gjeld, eg.egenkapital
     balanseregnskap = SubElement(root, "balanseregnskap")
 
-    # Anleggsmidler. sumBalanseverdiForAnleggsmiddel må stå først per XSD.
     am_poster = poster["balanseverdiForAnleggsmiddel"]
     if am_poster or am.sum:
         anleggsmiddel_el = SubElement(balanseregnskap, "anleggsmiddel")
         if am.sum:
             _beloep_element(anleggsmiddel_el, "sumBalanseverdiForAnleggsmiddel", am.sum)
-        if am_poster:
-            bv_am_el = SubElement(anleggsmiddel_el, "balanseverdiForAnleggsmiddel")
-            for beloep, kode in am_poster:
-                _balanseforekomst(bv_am_el, "balanseverdi", beloep, kode)
+        _balansegruppe(anleggsmiddel_el, "balanseverdiForAnleggsmiddel", "balanseverdi", am_poster)
 
-    # Omløpsmidler. sumBalanseverdiForOmloepsmiddel må stå først per XSD.
     om_poster = poster["balanseverdiForOmloepsmiddel"]
     if om_poster or om.sum:
         omloepsmiddel_el = SubElement(balanseregnskap, "omloepsmiddel")
         if om.sum:
             _beloep_element(omloepsmiddel_el, "sumBalanseverdiForOmloepsmiddel", om.sum)
-        if om_poster:
-            bv_om_el = SubElement(omloepsmiddel_el, "balanseverdiForOmloepsmiddel")
-            for beloep, kode in om_poster:
-                _balanseforekomst(bv_om_el, "balanseverdi", beloep, kode)
+        _balansegruppe(omloepsmiddel_el, "balanseverdiForOmloepsmiddel", "balanseverdi", om_poster)
 
-    # Gjeld og egenkapital
-    # XSD-sekvensen i GjeldOgEgenkapital:
-    #   sumLangsiktigGjeld -> sumKortsiktigGjeld -> sumEgenkapital
-    #   -> langsiktigGjeld -> kortsiktigGjeld -> egenkapital.
-    # Feil rekkefølge gjør XML-en ugyldig mot naeringsspesifikasjon_v6 og er
-    # årsaken til SMEVB-005 fra Skatteetatens visning-API (SSV-5187).
     gek_el = SubElement(balanseregnskap, "gjeldOgEgenkapital")
-
-    lg = eg.langsiktig_gjeld
-    kg = eg.kortsiktig_gjeld
-    ek = eg.egenkapital
-
     if lg.sum:
         _beloep_element(gek_el, "sumLangsiktigGjeld", lg.sum)
     if kg.sum:
         _beloep_element(gek_el, "sumKortsiktigGjeld", kg.sum)
     if ek.sum:
         _beloep_element(gek_el, "sumEgenkapital", ek.sum)
+    _balansegruppe(gek_el, "langsiktigGjeld", "gjeld", poster["langsiktigGjeld"])
+    _balansegruppe(gek_el, "kortsiktigGjeld", "gjeld", poster["kortsiktigGjeld"])
+    _balansegruppe(gek_el, "egenkapital", "kapital", poster["egenkapital"])
 
-    # Langsiktig gjeld
-    lg_poster = poster["langsiktigGjeld"]
-    if lg_poster:
-        langsiktig_gjeld_el = SubElement(gek_el, "langsiktigGjeld")
-        for beloep, kode in lg_poster:
-            _balanseforekomst(langsiktig_gjeld_el, "gjeld", beloep, kode)
-
-    # Kortsiktig gjeld
-    kg_poster = poster["kortsiktigGjeld"]
-    if kg_poster:
-        kortsiktig_gjeld_el = SubElement(gek_el, "kortsiktigGjeld")
-        for beloep, kode in kg_poster:
-            _balanseforekomst(kortsiktig_gjeld_el, "gjeld", beloep, kode)
-
-    # Egenkapital
-    ek_poster = poster["egenkapital"]
-    if ek_poster:
-        egenkapital_el = SubElement(gek_el, "egenkapital")
-        for beloep, kode in ek_poster:
-            _balanseforekomst(egenkapital_el, "kapital", beloep, kode)
-
-    # Balanse-totaler står sist i Balanseregnskap-sekvensen.
     if bal.eiendeler.sum:
         _beloep_element(balanseregnskap, "sumBalanseverdiForEiendel", bal.eiendeler.sum)
     gek_total = lg.sum + kg.sum + ek.sum
     if gek_total:
         _beloep_element(balanseregnskap, "sumGjeldOgEgenkapital", gek_total)
 
-    # -----------------------------------------------------------------------
-    # BeregnetNaeringsinntekt (XSD-pos: etter balanseregnskap, før virksomhet)
-    # For et upersonlig skattesubjekt (AS) fordeles skattemessig resultat på
-    # «forekomst 1» (én virksomhet). SKD krysstillegger feltet mot
-    # skattemeldingens inntektOgUnderskudd-poster.
-    #
-    # Grunnlaget er den skattepliktige inntekten slik skatteberegningen definerer den,
-    # ikke årsresultatet og ikke resultat før skatt. Forskjellen er reell for et
-    # holdingselskap: utbytte som er fritatt etter fritaksmetoden (sktl. § 2-38) er ikke
-    # skattepliktig inntekt, mens skattekostnaden ikke er fradragsberettiget (§ 6-1).
-    # Én kilde til tallet (skatteberegning.beregn_skatt) gjør at næringsspesifikasjonen
-    # og skatteberegningen ikke kan sprike.
-    #
-    # SKD utleder sitt eget skattemessige resultat som ÅRSRESULTAT + permanente
-    # forskjeller. Hver forskjell må derfor emitteres eksplisitt nedenfor, ellers
-    # svarer SKD validertMedFeil (avvikNaeringsopplysninger). Verifisert mot tt02
-    # 2026-08-05.
-    # -----------------------------------------------------------------------
+
+def _beregnet_naeringsinntekt(
+    root: Element, res: Resultatregnskap, beregning: Skatteberegning
+) -> None:
+    """
+    BeregnetNaeringsinntekt (XSD-pos: etter balanseregnskap, før virksomhet). For et
+    upersonlig skattesubjekt (AS) fordeles skattemessig resultat på «forekomst 1» (én
+    virksomhet). SKD krysstillegger feltet mot skattemeldingens inntektOgUnderskudd-poster.
+
+    Grunnlaget er den skattepliktige inntekten slik skatteberegningen definerer den, ikke
+    årsresultatet og ikke resultat før skatt. Forskjellen er reell for et holdingselskap:
+    utbytte som er fritatt etter fritaksmetoden (sktl. § 2-38) er ikke skattepliktig inntekt,
+    mens skattekostnaden ikke er fradragsberettiget (§ 6-1). Én kilde til tallet
+    (skatteberegning.beregn_skatt) gjør at næringsspesifikasjonen og skatteberegningen ikke
+    kan sprike.
+
+    SKD utleder sitt eget skattemessige resultat som ÅRSRESULTAT + permanente forskjeller.
+    Hver forskjell må derfor emitteres eksplisitt i _permanente_forskjeller, ellers svarer SKD
+    validertMedFeil (avvikNaeringsopplysninger). Verifisert mot tt02 2026-08-05.
+    """
     skattemessig_resultat = beregning.skattepliktig_inntekt_brutto
     # Emitteres også når resultatet er 0, så lenge det er aktivitet i resultatregnskapet.
     # Et holdingselskap med bare fritatt utbytte har legitimt 0 i skattepliktig inntekt, og
@@ -557,46 +476,45 @@ def generer_naeringsspesifikasjon(
         or res.finansposter.sum_kostnader
         or res.skattekostnad
     )
-    if skattemessig_resultat or har_resultatposter:
-        bni_el = SubElement(root, "beregnetNaeringsinntekt")
-        fordelt_el = SubElement(bni_el, "fordeltBeregnetNaeringsinntektForUpersonligSkattepliktig")
-        SubElement(fordelt_el, "id").text = "1"
-        _beloep_element(fordelt_el, "fordeltSkattemessigResultat", skattemessig_resultat)
-        _beloep_element(
-            fordelt_el,
-            "fordeltSkattemessigResultatEtterKorreksjon",
-            skattemessig_resultat,
-        )
-        _beloep_element(bni_el, "skattemessigResultat", skattemessig_resultat)
+    if not (skattemessig_resultat or har_resultatposter):
+        return
+    bni_el = SubElement(root, "beregnetNaeringsinntekt")
+    fordelt_el = SubElement(bni_el, "fordeltBeregnetNaeringsinntektForUpersonligSkattepliktig")
+    SubElement(fordelt_el, "id").text = "1"
+    _beloep_element(fordelt_el, "fordeltSkattemessigResultat", skattemessig_resultat)
+    _beloep_element(fordelt_el, "fordeltSkattemessigResultatEtterKorreksjon", skattemessig_resultat)
+    _beloep_element(bni_el, "skattemessigResultat", skattemessig_resultat)
 
-    # -----------------------------------------------------------------------
-    # ForskjellMellomRegnskapsmessigOgSkattemessigVerdi
-    # (XSD-pos: etter beregnetNaeringsinntekt, før virksomhet)
-    #
-    # Broen mellom regnskapet og skattegrunnlaget. SKD regner årsresultat + tillegg -
-    # fradrag og krysstjekker mot skattemessigResultat over, så denne seksjonen må
-    # forklare hele differansen. Kodene er hentet fra kodelisten
-    # 2025_permanentForskjellstype, og id settes lik koden (samme krav som for
-    # resultat- og balanseforekomstene, ellers avvik idAvvikerFraKrav).
-    #
-    # Tre forskjeller er aktuelle for et passivt holdingselskap:
-    #
-    #   Skattekostnaden er ikke fradragsberettiget (sktl. § 6-1) og legges tilbake.
-    #
-    #   Utbytte som er fritatt etter fritaksmetoden (sktl. § 2-38) er inntektsført i
-    #   regnskapet, men er ikke skattepliktig. Hele utbyttet tilbakeføres derfor, og
-    #   den skattepliktige delen legges til igjen: 0 ved eierandel over 90 %, ellers
-    #   3 %-sjablonen (§ 2-38 sjette ledd). Uten dette paret oppgav
-    #   næringsspesifikasjonen brutto utbytte som skattepliktig inntekt.
-    #
-    #   Gevinst ved realisasjon av aksjer innenfor fritaksmetoden er skattefri, og tap gir
-    #   ikke fradrag (§ 2-38). Gevinsten tilbakeføres i sin helhet, siden 3 %-sjablonen
-    #   bare gjelder utbytte, og tapet legges til igjen.
-    #
-    # Regnestykket, med utbytte U, skattepliktig del S, skattekostnad K, gevinst G og tap T:
-    #   årsresultat + (K + S + T) - (U + G)
-    #     == resultat før skatt - U + S - G + T == skattepliktig inntekt.
-    # -----------------------------------------------------------------------
+
+def _permanente_forskjeller(
+    root: Element, res: Resultatregnskap, konfig: SkattemeldingKonfig, beregning: Skatteberegning
+) -> None:
+    """
+    ForskjellMellomRegnskapsmessigOgSkattemessigVerdi (XSD-pos: etter beregnetNaeringsinntekt,
+    før virksomhet).
+
+    Broen mellom regnskapet og skattegrunnlaget. SKD regner årsresultat + tillegg - fradrag og
+    krysstjekker mot skattemessigResultat, så denne seksjonen må forklare hele differansen.
+    Kodene er hentet fra kodelisten 2025_permanentForskjellstype, og id settes lik koden (samme
+    krav som for resultat- og balanseforekomstene, ellers avvik idAvvikerFraKrav).
+
+    Tre forskjeller er aktuelle for et passivt holdingselskap:
+
+      Skattekostnaden er ikke fradragsberettiget (sktl. § 6-1) og legges tilbake.
+
+      Utbytte som er fritatt etter fritaksmetoden (sktl. § 2-38) er inntektsført i regnskapet,
+      men er ikke skattepliktig. Hele utbyttet tilbakeføres derfor, og den skattepliktige delen
+      legges til igjen: 0 ved eierandel over 90 %, ellers 3 %-sjablonen (§ 2-38 sjette ledd).
+      Uten dette paret oppgav næringsspesifikasjonen brutto utbytte som skattepliktig inntekt.
+
+      Gevinst ved realisasjon av aksjer innenfor fritaksmetoden er skattefri, og tap gir ikke
+      fradrag (§ 2-38). Gevinsten tilbakeføres i sin helhet, siden 3 %-sjablonen bare gjelder
+      utbytte, og tapet legges til igjen.
+
+    Regnestykket, med utbytte U, skattepliktig del S, skattekostnad K, gevinst G og tap T:
+      årsresultat + (K + S + T) - (U + G)
+        == resultat før skatt - U + S - G + T == skattepliktig inntekt.
+    """
     tillegg: list[tuple[str, float]] = []
     fradrag: list[tuple[str, float]] = []
 
@@ -632,24 +550,25 @@ def generer_naeringsspesifikasjon(
             )
         )
 
-    if tillegg or fradrag:
-        forskjell_el = SubElement(root, "forskjellMellomRegnskapsmessigOgSkattemessigVerdi")
-        # Alle permanentForskjell-elementene først, så de avledede summene, per XSD-sekvensen.
-        for kode, beloep in tillegg + fradrag:
-            perm_el = SubElement(forskjell_el, "permanentForskjell")
-            SubElement(perm_el, "id").text = kode
-            type_el = SubElement(perm_el, "permanentForskjellstype")
-            SubElement(type_el, "permanentForskjellstype").text = kode
-            _beloep_element(perm_el, "beloep", beloep)
-        # Avledede summer, emitteres eksplisitt som de øvrige (jf. modulens docstring).
-        if tillegg:
-            _beloep_element(forskjell_el, "sumTilleggINaeringsinntekt", sum(b for _, b in tillegg))
-        if fradrag:
-            _beloep_element(forskjell_el, "sumFradragINaeringsinntekt", sum(b for _, b in fradrag))
+    if not (tillegg or fradrag):
+        return
+    forskjell_el = SubElement(root, "forskjellMellomRegnskapsmessigOgSkattemessigVerdi")
+    # Alle permanentForskjell-elementene først, så de avledede summene, per XSD-sekvensen.
+    for kode, beloep in tillegg + fradrag:
+        perm_el = SubElement(forskjell_el, "permanentForskjell")
+        SubElement(perm_el, "id").text = kode
+        type_el = SubElement(perm_el, "permanentForskjellstype")
+        SubElement(type_el, "permanentForskjellstype").text = kode
+        _beloep_element(perm_el, "beloep", beloep)
+    # Avledede summer, emitteres eksplisitt som de øvrige (jf. modulens docstring).
+    if tillegg:
+        _beloep_element(forskjell_el, "sumTilleggINaeringsinntekt", sum(b for _, b in tillegg))
+    if fradrag:
+        _beloep_element(forskjell_el, "sumFradragINaeringsinntekt", sum(b for _, b in fradrag))
 
-    # -----------------------------------------------------------------------
-    # Virksomhet (obligatorisk)
-    # -----------------------------------------------------------------------
+
+def _virksomhet(root: Element, regnskap: Aarsregnskap) -> None:
+    """Virksomhet (obligatorisk): regnskapsplikt, periode, virksomhetstype og regelsett."""
     virksomhet = SubElement(root, "virksomhet")
 
     rpt = SubElement(virksomhet, "regnskapspliktstype")
@@ -667,38 +586,41 @@ def generer_naeringsspesifikasjon(
     rt = SubElement(virksomhet, "regeltypeForAarsregnskap")
     SubElement(rt, "regeltypeForAarsregnskap").text = "regnskapslovensReglerForSmaaForetak"
 
-    # -----------------------------------------------------------------------
-    # Egenkapitalavstemming (XSD-pos: etter virksomhet, før andreForhold)
-    # inngående EK + separate tillegg - separate fradrag = utgående (avledet).
-    # -----------------------------------------------------------------------
-    # Egne navn: `tillegg`/`fradrag` over er de permanente forskjellene (float), disse er
-    # egenkapitalendringene (hele kroner).
-    inngaaende_ek, utgaaende_ek, ek_tillegg, ek_fradrag = egenkapitalavstemming(regnskap)
 
-    if inngaaende_ek or utgaaende_ek or ek_tillegg or ek_fradrag:
-        ekavst = SubElement(root, "egenkapitalavstemming")
-        _beloep_element(ekavst, "inngaaendeEgenkapital", inngaaende_ek)
-        # sumTilleggIEgenkapital / sumFradragIEgenkapital må stå før
-        # egenkapitalendring-listen per XSD-sekvensen.
-        if ek_tillegg:
-            _beloep_element(ekavst, "sumTilleggIEgenkapital", sum(b for _, b in ek_tillegg))
-        if ek_fradrag:
-            _beloep_element(ekavst, "sumFradragIEgenkapital", sum(b for _, b in ek_fradrag))
-        for kode, beloep in ek_tillegg + ek_fradrag:
-            endring_el = SubElement(ekavst, "egenkapitalendring")
-            # id må være lik kodeverdien (jf. idAvvikerFraKrav-regelen).
-            SubElement(endring_el, "id").text = kode
-            ekt = SubElement(endring_el, "egenkapitalendringstype")
-            SubElement(ekt, "egenkapitalendringstype").text = kode
-            _beloep_element(endring_el, "beloep", beloep)
-        # utgaaendeEgenkapital står sist i Egenkapitalavstemming.
-        _beloep_element(ekavst, "utgaaendeEgenkapital", utgaaende_ek)
+def _egenkapitalavstemming_element(root: Element, regnskap: Aarsregnskap) -> None:
+    """
+    Egenkapitalavstemming (XSD-pos: etter virksomhet, før andreForhold): inngående EK +
+    separate tillegg - separate fradrag = utgående (avledet). Tallene kommer fra
+    egenkapitalavstemming(), som aarsregnskap.advarsler deler.
+    """
+    inngaaende_ek, utgaaende_ek, tillegg, fradrag = egenkapitalavstemming(regnskap)
+    if not (inngaaende_ek or utgaaende_ek or tillegg or fradrag):
+        return
+    ekavst = SubElement(root, "egenkapitalavstemming")
+    _beloep_element(ekavst, "inngaaendeEgenkapital", inngaaende_ek)
+    # sumTilleggIEgenkapital / sumFradragIEgenkapital må stå før
+    # egenkapitalendring-listen per XSD-sekvensen.
+    if tillegg:
+        _beloep_element(ekavst, "sumTilleggIEgenkapital", sum(b for _, b in tillegg))
+    if fradrag:
+        _beloep_element(ekavst, "sumFradragIEgenkapital", sum(b for _, b in fradrag))
+    for kode, beloep in tillegg + fradrag:
+        endring_el = SubElement(ekavst, "egenkapitalendring")
+        # id må være lik kodeverdien (jf. idAvvikerFraKrav-regelen).
+        SubElement(endring_el, "id").text = kode
+        ekt = SubElement(endring_el, "egenkapitalendringstype")
+        SubElement(ekt, "egenkapitalendringstype").text = kode
+        _beloep_element(endring_el, "beloep", beloep)
+    # utgaaendeEgenkapital står sist i Egenkapitalavstemming.
+    _beloep_element(ekavst, "utgaaendeEgenkapital", utgaaende_ek)
 
-    # -----------------------------------------------------------------------
-    # andreForhold: spesifiser ytelse mellom aksjonær og selskap (lån fra
-    # aksjonær). Kreves når opplysningOmSkattesubjekt.harYtelse=true.
-    # -----------------------------------------------------------------------
-    laan_fra_aksjonaer = eg.langsiktig_gjeld.laan_fra_aksjonaer
+
+def _andre_forhold(root: Element, bal: Balanse) -> None:
+    """
+    andreForhold: spesifiser ytelse mellom aksjonær og selskap (lån fra aksjonær). Kreves når
+    opplysningOmSkattesubjekt.harYtelse=true.
+    """
+    laan_fra_aksjonaer = bal.egenkapital_og_gjeld.langsiktig_gjeld.laan_fra_aksjonaer
     if laan_fra_aksjonaer and laan_fra_aksjonaer > 0:
         andre = SubElement(root, "andreForhold")
         ytelse = SubElement(andre, "ytelseFraAksjonaerDeltakerEllerNaerstaaende")
@@ -707,9 +629,47 @@ def generer_naeringsspesifikasjon(
             int(round(laan_fra_aksjonaer))
         )
 
-    # -----------------------------------------------------------------------
-    # skalBekreftesAvRevisor (obligatorisk)
-    # -----------------------------------------------------------------------
-    SubElement(root, "skalBekreftesAvRevisor").text = "true" if regnskap.revideres else "false"
 
+def generer_naeringsspesifikasjon(
+    regnskap: Aarsregnskap,
+    partsnummer: int,
+    konfig: SkattemeldingKonfig | None = None,
+) -> bytes:
+    """
+    Genererer naeringsspesifikasjon XML for innsending til Skatteetaten.
+
+    Næringsoppgaven er obligatorisk for AS. Uten den avviser Skatteetaten konvolutten.
+    Avledede summer (sumDriftsinntekt, aarsresultat, sumBalanseverdiFor*,
+    sumGjeldOgEgenkapital, skattemessigResultat osv.) emitteres eksplisitt for å unngå avvik
+    i SKDs etterBeregning. Seksjonene bygges i XSD-sekvensens rekkefølge, én funksjon per
+    seksjon.
+
+    Args:
+        regnskap:     Årsregnskap med resultatregnskap og balanse.
+        partsnummer:  Skatteetatens interne partsnummer (fra forhåndsutfylt API).
+        konfig:       Skattemelding-konfigurasjonen. Nødvendig fordi det skattemessige
+                      resultatet avhenger av fritaksmetoden og eierandelen: uten den
+                      ville næringsspesifikasjonen oppgitt brutto utbytte som
+                      skattepliktig inntekt. Utelates den, brukes standardvalgene
+                      (fritaksmetoden på, 100 % eierandel).
+
+    Returns:
+        XML-bytes klar for innpakking i konvolutt via generer_konvolutt().
+    """
+    konfig = konfig or SkattemeldingKonfig()
+    res = regnskap.resultatregnskap
+    beregning = beregn_skatt(res, konfig)
+    poster = _poster_per_kategori(regnskap, konfig)
+
+    root = Element("naeringsspesifikasjon", xmlns=_NS)
+    SubElement(root, "partsreferanse").text = str(partsnummer)
+    SubElement(root, "inntektsaar").text = str(regnskap.regnskapsaar)
+    _resultatregnskap(root, res, poster)
+    _balanseregnskap(root, regnskap.balanse, poster)
+    _beregnet_naeringsinntekt(root, res, beregning)
+    _permanente_forskjeller(root, res, konfig, beregning)
+    _virksomhet(root, regnskap)
+    _egenkapitalavstemming_element(root, regnskap)
+    _andre_forhold(root, regnskap.balanse)
+    SubElement(root, "skalBekreftesAvRevisor").text = "true" if regnskap.revideres else "false"
     return tostring(root, encoding="unicode").encode("utf-8")
