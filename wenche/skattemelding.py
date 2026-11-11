@@ -10,10 +10,8 @@ Se modulens docstring i skattemelding.py for detaljer.
 
 import math
 
-import yaml
-
-from wenche.aarsregnskap import _dato, _les_balanse, _les_resultat
-from wenche.aarsregnskap import _tall as _belop
+from wenche import konfig
+from wenche.feil import KonfigFeil
 from wenche.models import (
     BALANSEKATEGORIER,
     NAERINGSKATEGORIER,
@@ -21,7 +19,6 @@ from wenche.models import (
     Balanse,
     NaeringsspesifikasjonPost,
     Resultatregnskap,
-    Selskap,
     SkattemeldingKonfig,
 )
 
@@ -47,26 +44,11 @@ PAAKREVDE_SELSKAPSFELT: list[tuple[str, str]] = [
 _NUMERISKE_SELSKAPSFELT = {"stiftelsesaar", "aksjekapital"}
 
 
-def _raw(config_fil: str | dict) -> dict:
-    """Leser config som dict (allerede parset) eller fra YAML-fil."""
-    if isinstance(config_fil, dict):
-        return config_fil
-    with open(config_fil, encoding="utf-8") as f:
-        return yaml.safe_load(f)
+_raw = konfig.les_raa
+_er_tom = konfig.er_tom
 
 
-def _er_tom(verdi) -> bool:
-    return verdi is None or (isinstance(verdi, str) and not verdi.strip())
-
-
-def _tall(verdi, etikett: str, konverter):
-    """Konverterer et påkrevd tallfelt med lesbar feil, aldri en rå int('')/float('')-ValueError."""
-    if _er_tom(verdi):
-        raise ValueError(f"{etikett} mangler i selskapsopplysningene.")
-    try:
-        return konverter(verdi)
-    except (TypeError, ValueError):
-        raise ValueError(f"{etikett} må være et tall (fikk {verdi!r}).") from None
+_EIERANDEL_FELT = "skattemelding.eierandel_for_fritaksmetoden"
 
 
 def _eierandel(verdi) -> float:
@@ -85,9 +67,13 @@ def _eierandel(verdi) -> float:
         else:
             tall = float(verdi)
     except (TypeError, ValueError):
-        raise ValueError(f"{etikett} må være et tall (fikk {verdi!r}).") from None
+        raise KonfigFeil(
+            f"{etikett} må være et tall (fikk {verdi!r}).", felt=_EIERANDEL_FELT
+        ) from None
     if not 0 <= tall <= 100:  # avviser også nan og inf
-        raise ValueError(f"{etikett} må være mellom 0 og 100 % (fikk {verdi!r}).")
+        raise KonfigFeil(
+            f"{etikett} må være mellom 0 og 100 % (fikk {verdi!r}).", felt=_EIERANDEL_FELT
+        )
     return tall
 
 
@@ -136,46 +122,9 @@ def valider_selskap(config_fil: str | dict) -> list[str]:
 
 
 def les_config(config_fil: str | dict) -> tuple[Aarsregnskap, SkattemeldingKonfig]:
-    """Leser config (filsti eller allerede parset dict) og returnerer (Aarsregnskap, SkattemeldingKonfig)."""
+    """Leser config (filsti eller alt parset dict) til (Aarsregnskap, SkattemeldingKonfig)."""
     raw = _raw(config_fil)
-
-    s = raw["selskap"]
-    selskap = Selskap(
-        navn=s["navn"],
-        org_nummer=str(s["org_nummer"]),
-        daglig_leder=str(s.get("daglig_leder") or ""),
-        styreleder=str(s.get("styreleder") or ""),
-        forretningsadresse=s["forretningsadresse"],
-        stiftelsesaar=_tall(s.get("stiftelsesaar"), "Stiftelsesår", int),
-        aksjekapital=_tall(s.get("aksjekapital"), "Aksjekapital", float),
-        stiftelsesdato=_dato(s.get("stiftelsesdato")),
-        tinginnskudd_ved_stiftelse=_belop(s.get("tinginnskudd_ved_stiftelse")),
-    )
-
-    resultatregnskap = _les_resultat(raw["resultatregnskap"])
-    balanse = _les_balanse(raw["balanse"])
-
-    fa = raw.get("foregaaende_aar", {})
-    foregaaende_resultat = (
-        _les_resultat(fa["resultatregnskap"]) if "resultatregnskap" in fa else Resultatregnskap()
-    )
-    foregaaende_balanse = _les_balanse(fa["balanse"]) if "balanse" in fa else Balanse()
-
-    utbytte_utbetalt = sum(float(a.get("utbytte_utbetalt", 0)) for a in raw.get("aksjonaerer", []))
-
-    regnskap = Aarsregnskap(
-        selskap=selskap,
-        regnskapsaar=int(raw["regnskapsaar"]),
-        resultatregnskap=resultatregnskap,
-        balanse=balanse,
-        foregaaende_aar_resultat=foregaaende_resultat,
-        foregaaende_aar_balanse=foregaaende_balanse,
-        utbytte_utbetalt=utbytte_utbetalt,
-        regnskapsstart=_dato(raw.get("regnskapsstart")),
-        regnskapsslutt=_dato(raw.get("regnskapsslutt")),
-    )
-
-    return regnskap, _les_skattekonfig(raw)
+    return konfig.les_aarsregnskap(raw), _les_skattekonfig(raw)
 
 
 def _les_skattekonfig(raw: dict) -> SkattemeldingKonfig:
@@ -188,13 +137,19 @@ def _les_skattekonfig(raw: dict) -> SkattemeldingKonfig:
     sm_raw = raw.get("skattemelding") or {}
     _verdi_override = sm_raw.get("samlet_verdi_bak_aksjene")
     return SkattemeldingKonfig(
-        underskudd_til_fremfoering=_belop(sm_raw.get("underskudd_til_fremfoering")),
+        underskudd_til_fremfoering=konfig.tall(
+            sm_raw.get("underskudd_til_fremfoering"), "skattemelding.underskudd_til_fremfoering"
+        ),
         anvend_fritaksmetoden=bool(sm_raw.get("anvend_fritaksmetoden", True)),
         eierandel_for_fritaksmetoden=_eierandel(sm_raw.get("eierandel_for_fritaksmetoden")),
         boersnotert=bool(sm_raw.get("boersnotert", False)),
-        formuesverdi_aksjer=_belop(sm_raw.get("formuesverdi_aksjer")),
+        formuesverdi_aksjer=konfig.tall(
+            sm_raw.get("formuesverdi_aksjer"), "skattemelding.formuesverdi_aksjer"
+        ),
         samlet_verdi_bak_aksjene=(
-            None if _verdi_override is None or _er_tom(_verdi_override) else float(_verdi_override)
+            None
+            if _er_tom(_verdi_override)
+            else konfig.tall(_verdi_override, "skattemelding.samlet_verdi_bak_aksjene")
         ),
         naeringsspesifikasjonsposter=_les_naeringsspesifikasjonsposter(raw),
     )
@@ -204,36 +159,36 @@ def _les_naeringsspesifikasjonsposter(raw: dict) -> tuple[NaeringsspesifikasjonP
     seksjon = raw.get("naeringsspesifikasjon") or {}
     poster = seksjon.get("poster") or []
     if not isinstance(poster, list):
-        raise ValueError("naeringsspesifikasjon.poster må være en liste.")
+        raise KonfigFeil("naeringsspesifikasjon.poster må være en liste.")
     resultat: list[NaeringsspesifikasjonPost] = []
     sett: set[tuple[str, str]] = set()
     for nummer, post in enumerate(poster, start=1):
         if not isinstance(post, dict):
-            raise ValueError(f"Næringsspesifikasjonspost {nummer} må være et objekt.")
+            raise KonfigFeil(f"Næringsspesifikasjonspost {nummer} må være et objekt.")
         kategori = str(post.get("kategori") or "").strip()
         kode = str(post.get("kode") or "").strip()
         if kategori not in NAERINGSKATEGORIER:
-            raise ValueError(
+            raise KonfigFeil(
                 f"Næringsspesifikasjonspost {nummer} har ukjent kategori {kategori!r}."
             )
         if len(kode) != 4 or not kode.isdigit():
-            raise ValueError(f"Næringsspesifikasjonspost {nummer} må ha en firesifret kode.")
+            raise KonfigFeil(f"Næringsspesifikasjonspost {nummer} må ha en firesifret kode.")
         beloep_raa = post.get("beloep")
         if beloep_raa is None:
-            raise ValueError(f"Næringsspesifikasjonspost {nummer} må ha et numerisk beløp.")
+            raise KonfigFeil(f"Næringsspesifikasjonspost {nummer} må ha et numerisk beløp.")
         try:
             beloep = float(beloep_raa)
         except (TypeError, ValueError):
-            raise ValueError(
+            raise KonfigFeil(
                 f"Næringsspesifikasjonspost {nummer} må ha et numerisk beløp."
             ) from None
         if not math.isfinite(beloep):
-            raise ValueError(f"Næringsspesifikasjonspost {nummer} har ugyldig beløp.")
+            raise KonfigFeil(f"Næringsspesifikasjonspost {nummer} har ugyldig beløp.")
         if kategori in BALANSEKATEGORIER and beloep < 0:
-            raise ValueError(f"Næringsspesifikasjonspost {nummer} må ha positivt balansebeløp.")
+            raise KonfigFeil(f"Næringsspesifikasjonspost {nummer} må ha positivt balansebeløp.")
         identitet = (kategori, kode)
         if identitet in sett:
-            raise ValueError(f"Næringsspesifikasjonen har duplikat for {kategori} kode {kode}.")
+            raise KonfigFeil(f"Næringsspesifikasjonen har duplikat for {kategori} kode {kode}.")
         sett.add(identitet)
         resultat.append(NaeringsspesifikasjonPost(kategori, kode, beloep))
     return tuple(sorted(resultat, key=lambda post: (post.kategori, post.kode)))
@@ -258,7 +213,7 @@ def beregn_skatt_fra_config(config_fil: str | dict) -> tuple[Skatteberegning, fl
     ennå. les_config ville kastet på dem.
     """
     raw = _raw(config_fil)
-    resultat = _les_resultat(raw.get("resultatregnskap") or {})
+    resultat = konfig.les_resultat(raw.get("resultatregnskap") or {})
     return beregn_skatt(resultat, _les_skattekonfig(raw)), resultat.skattekostnad
 
 
