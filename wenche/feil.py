@@ -52,8 +52,12 @@ class WencheFeil(RuntimeError):
     """Basisklasse for feil Wenche selv melder (ikke programmeringsfeil)."""
 
 
-class KonfigFeil(WencheFeil):
-    """Feil i config eller oppsett som brukeren kan rette selv."""
+class KonfigFeil(WencheFeil, ValueError):
+    """Feil i config eller oppsett som brukeren kan rette selv.
+
+    Arver også ValueError: config-leserne kastet før ValueError for ugyldige verdier, og eldre
+    kallsteder og tester fanger den. `felt` er feltstien i configen (f.eks. «selskap.aksjekapital»).
+    """
 
     def __init__(self, melding: str, *, felt: str | None = None) -> None:
         super().__init__(melding)

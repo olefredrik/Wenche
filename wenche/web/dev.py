@@ -15,7 +15,10 @@ import os
 
 os.environ.setdefault("WENCHE_ENV", "test")
 
-from wenche.web.backend.app import lag_app
+from wenche import miljoer  # noqa: E402
+from wenche.web.backend.app import lag_app  # noqa: E402
+
+miljoer.last_env_filer()
 
 
 def lag_dev_app():

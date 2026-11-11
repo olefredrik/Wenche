@@ -17,7 +17,10 @@ Repoet inneholder tre ting som henger sammen via et npm-workspace + en Python-pa
 - **`wenche/`** — Python-kjernen og CLI-en (`wenche` → `wenche.cli:main`). Bygger XML
   for hvert skjema (`*_xml.py`, `brg_xml.py`), autentiserer (`auth.py`,
   `systembruker.py`) og sender inn (`altinn_client.py`, `skd_client.py`, `innsending.py`).
-  Forretningslogikken bor her; alt annet er presentasjon.
+  Forretningslogikken bor her; alt annet er presentasjon. Config leses av `konfig.py` (én
+  leser for alle tre skjemaene, `KonfigFeil` med feltsti), miljøene (URL-er, app-ID-er og
+  `.env`-lasting ved oppstart) bor i `miljoer.py`, HTTP-klientene arver `klient.py`, og
+  XML-byggerne deler `xml_hjelp.py`.
 - **`wenche/web/frontend`** — self-hosted SPA (React + Tailwind). Bygges til
   `wenche/web/static` og force-includes i wheelen, så `pip install wenche` får et ferdig
   webgrensesnitt. `wenche`-kommandoen starter en lokal server som serverer denne.

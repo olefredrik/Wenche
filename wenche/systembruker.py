@@ -12,19 +12,14 @@ Oppsett (kjøres én gang):
 Ved innsending bruker wenche login et systembruker-token fra Maskinporten.
 """
 
-import os
 import uuid
 
 import httpx
 
+from wenche import miljoer
 from wenche.feil import MyndighetsFeil
 
 _TJENESTE = "altinn"
-
-_BASES = {
-    "test": "https://platform.tt02.altinn.no",
-    "prod": "https://platform.altinn.no",
-}
 
 # Navnet som inngår i system-ID-en (<orgnr>_wenche2). «2» fordi den første registreringen
 # måtte gjøres om, og Altinn lar ikke en system-ID gjenbrukes.
@@ -33,13 +28,19 @@ _SYSTEM_NAVN = "wenche2"
 # Ressurser Wenche-systemet trenger tilgang til.
 # BRG årsregnskap: Altinn 3-app, ressurs-ID på format app_{org}_{appnavn}.
 # SKD aksjonærregisteroppgave: SKDs eget REST-API, ressurs-ID fra SKDs API-dokumentasjon.
-SKATTEMELDING_RETT = {
-    "resource": [{"id": "urn:altinn:resource", "value": "app_skd_formueinntekt-skattemelding-v2"}]
-}
+
+
+def _app_ressurs(app_key: str) -> dict:
+    """Altinn-ressursen for en Altinn 3-app, utledet av app-tabellen så ID-ene ikke kan sprike."""
+    org, app = miljoer.ALTINN_APPER[app_key]
+    return {"resource": [{"id": "urn:altinn:resource", "value": f"app_{org}_{app}"}]}
+
+
+SKATTEMELDING_RETT = _app_ressurs("skattemelding")
 _SKATTEMELDING_RETT = SKATTEMELDING_RETT  # eldre navn
 
 _RIGHTS = [
-    {"resource": [{"id": "urn:altinn:resource", "value": "app_brg_aarsregnskap-vanlig-202406"}]},
+    _app_ressurs("aarsregnskap"),
     {
         "resource": [
             {"id": "urn:altinn:resource", "value": "ske-innrapportering-aksjonaerregisteroppgave"}
@@ -50,10 +51,7 @@ _RIGHTS = [
 
 
 def _base() -> str:
-    env = os.getenv("WENCHE_ENV", "prod")
-    if env not in _BASES:
-        raise ValueError(f"Ugyldig WENCHE_ENV: {env!r}. Bruk 'prod' eller 'test'.")
-    return _BASES[env]
+    return miljoer.miljo().altinn_platform
 
 
 def system_id(vendor_orgnr: str) -> str:

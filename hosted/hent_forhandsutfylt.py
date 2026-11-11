@@ -21,10 +21,10 @@ Read-only: gjør kun en GET (henting/visning), sender ingenting inn og endrer in
 Skatteetaten.
 """
 
-import os
 import sys
 
 from wenche import auth as wauth
+from wenche import miljoer
 from wenche.auth import SKD_SKATTEMELDING_SCOPE
 from wenche.skd_skattemelding_client import SkdSkattemeldingClient
 
@@ -35,17 +35,17 @@ def main() -> None:
     org = sys.argv[1].strip()
     inntektsaar = int(sys.argv[2]) if len(sys.argv) > 2 else 2025
 
-    env = os.getenv("WENCHE_ENV", "prod")
-    creds = wauth._les_cli_credentials(env)  # leser MASKINPORTEN_*_{ENV} fra .env
+    miljoer.last_env_filer()
+    env = miljoer.gjeldende_navn()
+    creds = wauth.les_cli_credentials(env)  # leser MASKINPORTEN_*_{ENV} fra miljøet
     print(f"Miljø: {env}   org: {org}   inntektsår: {inntektsaar}\n")
 
     # Maskinporten-token på vegne av kunde-orgen, akkurat slik innsendingsruten gjør.
     token = wauth.hent_tokens_for(creds, org, SKD_SKATTEMELDING_SCOPE)["maskinporten_token"]
 
     with SkdSkattemeldingClient(token, env=env) as skd:
-        url = f"{skd._base}/api/skattemelding/v2/{inntektsaar}/{org}"
-        print(f"GET {url}\n")
-        resp = skd._http.get(url, headers={"Accept": "application/xml"})
+        resp = skd.hent_forhaandsutfylt_svar(inntektsaar, org)
+        print(f"GET {resp.request.url}\n")
         print(f"HTTP {resp.status_code}   Content-Type: {resp.headers.get('content-type', '?')}")
         print("--- svar fra Skatteetaten ---")
         print(resp.text or "(tom kropp)")

@@ -33,17 +33,12 @@ from defusedxml import DefusedXmlException
 from defusedxml.ElementTree import fromstring
 
 from wenche.altinn_client import AltinnClient
-from wenche.feil import MyndighetsFeil, WencheFeil
+from wenche.feil import WencheFeil
+from wenche.klient import HttpKlient
 from wenche.skattemelding_konvolutt import generer_konvolutt
+from wenche.xml_hjelp import finn_tekst
 
 log = logging.getLogger(__name__)
-
-_TJENESTE = "skatteetaten"
-
-_BASES = {
-    "test": "https://api-test.sits.no",
-    "prod": "https://api.skatteetaten.no",
-}
 
 
 class SkattemeldingValideringsfeil(WencheFeil):
@@ -63,7 +58,7 @@ class SkattemeldingValideringsfeil(WencheFeil):
         )
 
 
-class SkdSkattemeldingClient:
+class SkdSkattemeldingClient(HttpKlient):
     """
     Klient for Skatteetatens skattemelding-API (upersonlig/AS).
 
@@ -71,28 +66,20 @@ class SkdSkattemeldingClient:
     trengs i tillegg et Altinn-token (oppnås via auth.veksle_til_altinn_token).
     """
 
-    def __init__(self, maskinporten_token: str, env: str = "prod"):
-        if env not in _BASES:
-            raise ValueError(f"Ugyldig env: {env!r}. Bruk 'prod' eller 'test'.")
-        self._base = _BASES[env]
-        self._env = env
-        self._http = httpx.Client(
-            headers={
-                "Authorization": f"Bearer {maskinporten_token}",
-                "Accept": "application/json",
-            },
-            timeout=60,
-        )
+    tjeneste = "skatteetaten"
 
-    def _kall(self, metode: str, url: str, steg: str, **kw) -> httpx.Response:
-        """Ett kall mot Skatteetaten. Nettverksfeil og feilstatus blir MyndighetsFeil med steget."""
-        try:
-            resp = self._http.request(metode, url, **kw)
-        except httpx.RequestError as e:
-            raise MyndighetsFeil.fra_nettverksfeil(_TJENESTE, steg, e) from e
-        if not resp.is_success:
-            raise MyndighetsFeil.fra_svar(_TJENESTE, steg, resp)
-        return resp
+    def __init__(self, maskinporten_token: str, env: str | None = None):
+        super().__init__(maskinporten_token, env=env, timeout=60)
+        self._base = self.miljo.skd_api
+
+    def _forhaandsutfylt_url(self, inntektsaar: int, orgnr: str) -> str:
+        return f"{self._base}/api/skattemelding/v2/{inntektsaar}/{orgnr}"
+
+    def hent_forhaandsutfylt_svar(self, inntektsaar: int, orgnr: str) -> httpx.Response:
+        """Det rå svaret fra forhåndsutfylt-API-et, uten statussjekk. For operatør-diagnostikk."""
+        return self._http.get(
+            self._forhaandsutfylt_url(inntektsaar, orgnr), headers={"Accept": "application/xml"}
+        )
 
     def hent_forhåndsutfylt_med_id(self, inntektsaar: int, orgnr: str) -> tuple[bytes, str | None]:
         """
@@ -106,10 +93,9 @@ class SkdSkattemeldingClient:
 
         dokument_id er None hvis responsen ikke følger forventet wrapper-format.
         """
-        url = f"{self._base}/api/skattemelding/v2/{inntektsaar}/{orgnr}"
         resp = self._kall(
             "GET",
-            url,
+            self._forhaandsutfylt_url(inntektsaar, orgnr),
             "henting av forhåndsutfylt skattemelding",
             headers={"Accept": "application/xml"},
         )
@@ -229,7 +215,7 @@ class SkdSkattemeldingClient:
                 raise SkattemeldingValideringsfeil(resultat)
             log.info("Validering OK. Laster opp...")
 
-        with AltinnClient(altinn_token, env=self._env) as altinn:
+        with AltinnClient(altinn_token, env=self.miljo.navn) as altinn:
             log.info("Oppretter Altinn3-instans...")
             instans = altinn.opprett_instans("skattemelding", orgnr)
 
@@ -252,20 +238,8 @@ class SkdSkattemeldingClient:
             # (SSV-5129, 2026-05-20).
             return altinn.fullfoor_instans("skattemelding", instans)
 
-    def close(self) -> None:
-        self._http.close()
 
-    def __enter__(self) -> SkdSkattemeldingClient:
-        return self
-
-    def __exit__(self, *args: object) -> None:
-        self.close()
-
-
-def _tekst(el, tag: str) -> str | None:
-    """Henter teksten i barneelementet `tag` (namespace-agnostisk)."""
-    funnet = el.findtext(f"{{*}}{tag}")
-    return funnet.strip() if funnet else None
+_tekst = finn_tekst
 
 
 def _avvik_liste(root, container_tag: str) -> list[dict]:

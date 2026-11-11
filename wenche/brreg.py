@@ -112,17 +112,32 @@ def parse_enhet(data: dict) -> dict:
     }
 
 
-def _hent_json(url: str, timeout: float) -> dict | None:
+def _hent(url: str, timeout: float) -> tuple[int | None, dict | None]:
+    """(HTTP-status, JSON-objekt). (None, None) ved nettverksfeil, (status, None) uten JSON-objekt."""
     try:
         resp = httpx.get(url, headers={"Accept": "application/json"}, timeout=timeout)
     except httpx.HTTPError:
-        return None
-    if not resp.is_success:
-        return None
+        return None, None
     try:
-        return resp.json()
+        data = resp.json()
     except ValueError:
+        return resp.status_code, None
+    return resp.status_code, data if isinstance(data, dict) else None
+
+
+def _hent_json(url: str, timeout: float) -> dict | None:
+    status, data = _hent(url, timeout)
+    if status is None or not 200 <= status < 300:
         return None
+    return data
+
+
+def hent_enhet_svar(orgnr: str, *, timeout: float = 5.0) -> tuple[int | None, dict | None]:
+    """
+    Rått enhets-oppslag: (HTTP-status, JSON). Lar kalleren skille «fant ikke orgnr» (404) fra
+    «fikk ikke kontakt» (None), der `hent_enhet` svarer tomt for begge.
+    """
+    return _hent(f"{_BASE}/{orgnr}", timeout)
 
 
 def hent_roller(orgnr: str, *, timeout: float = 5.0) -> dict:

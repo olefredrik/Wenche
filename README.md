@@ -102,11 +102,3 @@ Har du funnet en sikkerhetssårbarhet, ikke bruk et offentlig issue. Se [SECURIT
 ## Lisens
 
 MIT, se [LICENSE](https://github.com/olefredrik/Wenche/blob/main/LICENSE).
-
----
-
-### Bonus: en helt unødvendig folkevise
-
-En stillferdig, bittersøt og oppriktig kjærlighetsvise om skattemelding, aksjonærregister og maskinell innsending til Altinn.
-
-🎧 Hør "Wenche": https://suno.com/s/QSz9P1EylWOF7vnz

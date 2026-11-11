@@ -19,6 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from wenche import __version__ as WENCHE_VERSJON
+from wenche import miljoer
 from wenche.web.felles import saft as felles_saft
 from wenche.web.felles.kropp import Kroppsgrense
 
@@ -91,6 +92,7 @@ def kjor(env: str = "prod", port: int = 8080) -> None:
     """Start det lokale webgrensesnittet og åpne nettleseren (inngang fra CLI-en)."""
     import uvicorn
 
+    miljoer.last_env_filer()
     app = lag_app(env)
     url = f"http://127.0.0.1:{port}"
     if _INDEX_HTML.is_file():
