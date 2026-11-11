@@ -4,6 +4,36 @@ Alle vesentlige endringer i Wenche dokumenteres her. Formatet bygger på
 [Keep a Changelog](https://keepachangelog.com/no/), og prosjektet følger
 [semantisk versjonering](https://semver.org/lang/no/).
 
+## [1.12.0] - 2026-11-11
+
+### Sikkerhet
+
+- **Størrelsesgrense på forespørsler i begge webgrensesnittene.** Kroppen leses og parses før
+  vaktene kjører, så uten grense kunne hvem som helst (i hostet: uten invitasjon) få serveren
+  til å parse vilkårlig store dokumenter. Nå avvises kropper over 2 MB (SAF-T-filer over 1 MB)
+  med 413 før noe leses, også når de sendes uten `Content-Length`.
+
+### Endret
+
+- **Ett web-lag for hostet og self-hosted** (`wenche/web/felles`). Dokumentgenerering,
+  SAF-T-import, innsending og feilhåndtering fantes i to kopier som hadde driftet fra
+  hverandre. Nå bygges begge appenes ruter av de samme fabrikkene, som bare tar auth
+  (invite-vakt og vendor-creds mot brukerens egen innlogging) og test-org-byttet som parametre.
+- Svarene fra dokument- og innsendings-endepunktene har pydantic-modeller (`FilerSvar`,
+  `SkatteberegningSvar`, `ValideringSvar`, `InnsendingSvar`) og ligger i OpenAPI-skjemaet.
+  JSON-en er uendret.
+- Hostet: invite-vakten er en FastAPI-avhengighet på ruterne i stedet for et kall i hver
+  handler, så et nytt endepunkt ikke kan glemme den. Vendor- og ID-porten-nøkkelen leses én
+  gang, ikke for hvert kall.
+
+### Rettet
+
+- **Self-hosted: et ufullstendig Tall-steg ga HTTP 500 ved dokumentgenerering** (manglende
+  resultatregnskap eller balanse). Nå gir det 422 med en melding som peker til Tall-steget,
+  som i hostet.
+- Self-hosted: en uventet feiltype under innsending gir en kontrollert 500 med melding og
+  traceback i loggen, i stedet for en rå serverfeil.
+
 ## [1.11.0] - 2026-11-10
 
 ### Lagt til

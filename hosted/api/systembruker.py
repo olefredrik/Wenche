@@ -7,14 +7,15 @@ Operatøren (vendor) registrerer sluttbrukersystemet i Altinn én gang. Per kund
   3. POST /api/systembruker/status         -> sjekk status; ved 'Accepted' bindes
                                               sesjonens kunde-org.
 
-Gjenbruker `wenche.systembruker` (samme kode som self-hosted). Forespørsels-id og binding
+Gjenbruker `wenche.systembruker` (samme kode som self-hosted). Invite-vakten ligger som
+avhengighet på ruteren. Forespørsels-id og binding
 holdes i den signerte session-cookien, ikke i serverminnet eller filer, så en sovende/
 restartende maskin ikke mister en alt etablert tilkobling.
 """
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from wenche import systembruker as wsb
 from wenche.feil import MyndighetsFeil, brukermelding
@@ -22,7 +23,10 @@ from wenche.feil import MyndighetsFeil, brukermelding
 from .deps import admin_token, krev_invite_org, krev_invitert, krev_vendor
 
 logger = logging.getLogger("wenche.hosted.systembruker")
-router = APIRouter(prefix="/api/systembruker", tags=["systembruker"])
+# Invite-vakten som avhengighet på hele ruteren, så et nytt endepunkt ikke kan glemme den.
+router = APIRouter(
+    prefix="/api/systembruker", tags=["systembruker"], dependencies=[Depends(krev_invitert)]
+)
 
 
 def _lesbar_502(e: MyndighetsFeil, org: str | None) -> HTTPException:
@@ -52,7 +56,6 @@ def request_systembruker(request: Request) -> dict:
     BankID + bekreftet rolle for orgnr i Enhetsregisteret (se auth.velg_org). En som bare kjenner
     et offentlig styremedlemsnavn kommer ikke forbi porten i utgangspunktet.
     """
-    krev_invitert(request)
     org = krev_invite_org(request)
     creds, vendor_orgnr = krev_vendor()
     try:
@@ -91,7 +94,6 @@ def request_systembruker(request: Request) -> dict:
 @router.post("/status")
 def status_systembruker(request: Request) -> dict:
     """Sjekk status; ved 'Accepted' bindes kunde-org til sesjonen."""
-    krev_invitert(request)
     creds, _ = krev_vendor()
     request_id = request.session.get("request_id")
     if not request_id:

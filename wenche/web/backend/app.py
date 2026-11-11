@@ -19,6 +19,8 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from wenche import __version__ as WENCHE_VERSJON
+from wenche.web.felles import saft as felles_saft
+from wenche.web.felles.kropp import Kroppsgrense
 
 from . import miljo
 from .oppdatering import er_nyere_versjon, hent_nyeste_pypi_versjon, kjorer_fra_git_klone
@@ -43,6 +45,8 @@ def lag_app(env: str = "prod", serve_spa: bool = True) -> FastAPI:
     # Vertssjekken (ytterst) stopper DNS-rebinding, vakten stopper cross-site-kall.
     app.add_middleware(LokalVakt)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(TILLATTE_VERTER))
+    # Ytterst: størrelsesgrense på request-kropper før noe parses (wenche/web/felles/kropp.py).
+    app.add_middleware(Kroppsgrense, per_sti={felles_saft.STI: felles_saft.MAKS_BYTES})
 
     app.include_router(config_router)
     app.include_router(oppsett_router)

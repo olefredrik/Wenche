@@ -20,6 +20,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from wenche import __version__ as WENCHE_VERSJON
+from wenche.web.felles import saft as felles_saft
+from wenche.web.felles.kropp import Kroppsgrense
 
 from .auth import router as auth_router
 from .config import settings
@@ -90,6 +92,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Ytterst: størrelsesgrense på request-kropper før noe parses (kroppen leses før vaktene kjører,
+# så den må stoppes uavhengig av invite). Se wenche/web/felles/kropp.py.
+app.add_middleware(Kroppsgrense, per_sti={felles_saft.STI: felles_saft.MAKS_BYTES})
 
 app.include_router(auth_router)
 app.include_router(idporten_router)

@@ -62,6 +62,30 @@ def test_aarsregnskap_ubalansert_gir_422(klient):
     assert "feil" in r.json()["detail"]
 
 
+@pytest.mark.parametrize("type_", ["skattemelding", "aarsregnskap", "noter"])
+@pytest.mark.parametrize(
+    "seksjon,navn", [("resultatregnskap", "Resultatregnskapet"), ("balanse", "Balansen")]
+)
+def test_manglende_tall_gir_422_ikke_500(klient, type_, seksjon, navn):
+    # Samme regel som hostet (delt lag): et ufullstendig Tall-steg er et rettbart avvik som
+    # peker brukeren til Tall-steget, ikke en KeyError-500. Self-hosted manglet dette før.
+    cfg = _gyldig_config()
+    del cfg[seksjon]
+    r = klient.post(f"/api/dokumenter/{type_}", json=cfg)
+    assert r.status_code == 422, r.text
+    feil = r.json()["detail"]["feil"]
+    assert any(navn in f and "Tall-steget" in f for f in feil), feil
+
+
+def test_aksjonaer_genereres_uten_tall(klient):
+    cfg = _gyldig_config()
+    del cfg["resultatregnskap"]
+    del cfg["balanse"]
+    r = klient.post("/api/dokumenter/aksjonaer", json=cfg)
+    assert r.status_code == 200, r.text
+    assert r.json()["filer"]
+
+
 def test_aksjonaer_ugyldig_foedselsnummer_gir_422(klient):
     cfg = _gyldig_config()
     cfg["aksjonaerer"][0]["fodselsnummer"] = "12345"
