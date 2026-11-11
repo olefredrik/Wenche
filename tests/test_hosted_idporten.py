@@ -14,11 +14,15 @@ nett, ID-porten eller ekte krypto.
 """
 
 import importlib
+import time
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlparse
 
 import pytest
 from fastapi.testclient import TestClient
+from joserfc import jwt as joserfc_jwt
+from joserfc.errors import JoseError
+from joserfc.jwk import KeySet, OctKey, RSAKey
 
 import hosted.api.idporten as idp
 import hosted.api.systembruker as sb
@@ -445,3 +449,98 @@ def test_idporten_okt_faar_already_approved(klient, monkeypatch):
     assert res["status"] == "AlreadyApproved"
     assert res["kunde_org"] == "922020523"
     assert klient.get("/api/auth/me").json()["kunde_org"] == "922020523"
+
+
+# ---------------------------------------------------------------------------
+# Validering av id_token: ekte RS256-signatur mot en lokal JWKS, ingen nett.
+# ---------------------------------------------------------------------------
+
+_NOKKEL = RSAKey.generate_key(2048, parameters={"kid": "k1"})
+_ANNEN_NOKKEL = RSAKey.generate_key(2048, parameters={"kid": "k2"})
+
+
+def _id_token(nokkel: RSAKey = _NOKKEL, **overstyr) -> str:
+    naa = int(time.time())
+    claims = {
+        "iss": _META["issuer"],
+        "aud": "test-client",
+        "iat": naa,
+        "exp": naa + 300,
+        "nonce": "n1",
+        "name": "Kari Nordmann",
+        "pid": "12345678901",
+    }
+    claims.update(overstyr)
+    return joserfc_jwt.encode({"alg": "RS256", "kid": nokkel.kid}, claims, nokkel)
+
+
+@pytest.fixture
+def jwks(monkeypatch):
+    """Test-innstillinger og en lokal JWKS med nøkkelen k1. Returnerer loggen over JWKS-kall."""
+    from hosted.api import config
+
+    _bygg_klient(monkeypatch, reportees=False)
+    kall: list[bool] = []
+
+    def _lokal(env, *, tving_ny=False):
+        kall.append(tving_ny)
+        return KeySet([_NOKKEL])
+
+    monkeypatch.setattr(idp, "_jwks", _lokal)
+    yield kall
+    config.settings.cache_clear()
+
+
+class TestValiderIdToken:
+    def test_gyldig_token_gir_claims(self, jwks):
+        claims = idp._valider_id_token(_id_token(), _META, "n1")
+        assert claims["name"] == "Kari Nordmann"
+        assert jwks == [False]  # kjent kid: JWKS hentes ikke på nytt
+
+    def test_ukjent_kid_henter_jwks_paa_nytt(self, monkeypatch, jwks):
+        # Cachen kjenner bare k2 (nøkkelrotasjon); oppfriskningen gir k1, og tokenet godtas.
+        def _roterende(env, *, tving_ny=False):
+            jwks.append(tving_ny)
+            return KeySet([_NOKKEL]) if tving_ny else KeySet([_ANNEN_NOKKEL])
+
+        monkeypatch.setattr(idp, "_jwks", _roterende)
+        assert idp._valider_id_token(_id_token(), _META, "n1")["pid"] == "12345678901"
+        assert jwks == [False, True]
+
+    @pytest.mark.parametrize(
+        "overstyr",
+        [
+            {"exp": int(time.time()) - 120},  # utløpt, utenfor leeway
+            {"aud": "annen-klient"},
+            {"iss": "https://falsk.example"},
+        ],
+        ids=["utloept", "feil-mottaker", "feil-utsteder"],
+    )
+    def test_avvik_i_claims_avvises(self, jwks, overstyr):
+        with pytest.raises(JoseError):
+            idp._valider_id_token(_id_token(**overstyr), _META, "n1")
+
+    def test_feil_signatur_avvises(self, jwks):
+        # Signert med en nøkkel JWKS ikke har, heller ikke etter oppfriskning.
+        with pytest.raises(JoseError):
+            idp._valider_id_token(_id_token(nokkel=_ANNEN_NOKKEL), _META, "n1")
+        assert jwks == [False, True]
+
+    def test_annen_algoritme_avvises(self, jwks):
+        # Algoritmelisten er låst til RS256: et HS256-token med kjent kid vurderes aldri.
+        hs = joserfc_jwt.encode(
+            {"alg": "HS256", "kid": "k1"}, {"iss": _META["issuer"]}, OctKey.import_key("hemmelig")
+        )
+        with pytest.raises(JoseError):
+            idp._valider_id_token(hs, _META, "n1")
+
+    def test_nonce_avvik_avvises(self, jwks):
+        with pytest.raises(ValueError):
+            idp._valider_id_token(_id_token(), _META, "n2")
+        with pytest.raises(ValueError):
+            idp._valider_id_token(_id_token(), _META, None)
+
+    def test_misdannet_token_avvises(self, jwks):
+        # Callbacken fanger JoseError og ValueError; alt annet ville blitt en naken 500.
+        with pytest.raises((JoseError, ValueError)):
+            idp._valider_id_token("ikke-et-jwt", _META, "n1")
