@@ -520,18 +520,22 @@ class TestValiderIdToken:
         with pytest.raises(JoseError):
             idp._valider_id_token(_id_token(**overstyr), _META, "n1")
 
+    # joserfc 1.0 kaster ValueError for ukjent kid og avvist algoritme, nyere JoseError.
+    # Callbacken fanger begge, så begge er riktig svar.
+
     def test_feil_signatur_avvises(self, jwks):
         # Signert med en nøkkel JWKS ikke har, heller ikke etter oppfriskning.
-        with pytest.raises(JoseError):
+        with pytest.raises((JoseError, ValueError)):
             idp._valider_id_token(_id_token(nokkel=_ANNEN_NOKKEL), _META, "n1")
         assert jwks == [False, True]
 
     def test_annen_algoritme_avvises(self, jwks):
         # Algoritmelisten er låst til RS256: et HS256-token med kjent kid vurderes aldri.
+        hemmelighet = OctKey.import_key("en-lang-nok-hemmelighet-for-hmac-paa-minst-32-byte")
         hs = joserfc_jwt.encode(
-            {"alg": "HS256", "kid": "k1"}, {"iss": _META["issuer"]}, OctKey.import_key("hemmelig")
+            {"alg": "HS256", "kid": "k1"}, {"iss": _META["issuer"]}, hemmelighet
         )
-        with pytest.raises(JoseError):
+        with pytest.raises((JoseError, ValueError)):
             idp._valider_id_token(hs, _META, "n1")
 
     def test_nonce_avvik_avvises(self, jwks):
