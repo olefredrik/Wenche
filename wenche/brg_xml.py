@@ -99,11 +99,11 @@ def generer_aksjenote_vedlegg(regnskap: Aarsregnskap) -> bytes:
     beloep = heltall(regnskap.balanse.eiendeler.anleggsmidler.andre_aksjer)
 
     linjer = [
-        f"Note til årsregnskap — {s.navn}",
+        f"Note til årsregnskap, {s.navn}",
         f"Organisasjonsnummer: {s.org_nummer}",
         f"Regnskapsår: {aar}",
         "",
-        "Note — Andre aksjer og andeler (rskl. § 7-36)",
+        "Note: Andre aksjer og andeler (rskl. § 7-36)",
         "",
         "Selskapet eier aksjer og andeler i andre foretak.",
         f"Bokført verdi per 31.12.{aar}: {beloep:,} kr".replace(",", " "),

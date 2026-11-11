@@ -541,7 +541,7 @@ def generer(regnskap: Aarsregnskap, konfig: SkattemeldingKonfig) -> str:
 
     linjer = [
         _BRED,
-        f"  SKATTEMELDING FOR AS — {aar}",
+        f"  SKATTEMELDING FOR AS {aar}",
         f"  {s.navn}  |  Org.nr. {s.org_nummer}",
         _BRED,
         "",
